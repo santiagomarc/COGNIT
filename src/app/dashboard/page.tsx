@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { CreateDeckForm } from '@/components/ui/shared/CreateDeckForm';
+import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export default async function Dashboard() {
@@ -41,12 +42,17 @@ export default async function Dashboard() {
             </p>
           ) : (
             decks?.map((deck) => (
-              <Card key={deck.id} className="hover:bg-accent transition-colors cursor-pointer">
+              <Card key={deck.id} className="hover:bg-accent transition-colors group relative">
                 <CardHeader>
-                  <CardTitle>{deck.title}</CardTitle>
-                  <CardDescription>
-                    {new Date(deck.created_at).toLocaleDateString()}
-                  </CardDescription>
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <CardTitle>{deck.title}</CardTitle>
+                      <CardDescription>
+                        {new Date(deck.created_at).toLocaleDateString()}
+                      </CardDescription>
+                    </div>
+                    <DeckActions deckId={deck.id} currentTitle={deck.title} />
+                  </div>
                 </CardHeader>
               </Card>
             ))
