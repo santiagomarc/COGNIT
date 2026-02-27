@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       if (mode === 'login') {
@@ -53,7 +55,7 @@ export default function LoginPage() {
         if (error) throw error;
         
         // Show success message (user needs to confirm email)
-        setError('Check your email for a confirmation link!');
+        setSuccessMessage('Check your email for a confirmation link!');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -113,9 +115,10 @@ export default function LoginPage() {
               </div>
               
               {error && (
-                <p className={`text-sm ${error.includes('Check your email') ? 'text-green-500' : 'text-destructive'}`}>
-                  {error}
-                </p>
+                <p className="text-sm text-destructive">{error}</p>
+              )}
+              {successMessage && (
+                <p className="text-sm text-green-500">{successMessage}</p>
               )}
             </CardContent>
             

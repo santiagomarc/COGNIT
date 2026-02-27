@@ -1,6 +1,6 @@
 'use client'; // allows to use hooks like useState and useEffect
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {createDeck} from '@/app/actions'; // import server action
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 export function CreateDeckForm() {
     // simple state to handle loading
     const[isLoading, setIsLoading] = useState(false);
+    const formRef = useRef<HTMLFormElement>(null);
 
     // handle form submission
     async function handleSubmit(formData: FormData) {
@@ -24,12 +25,13 @@ export function CreateDeckForm() {
         toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
         } else {
         toast.success('Deck created successfully');
+        formRef.current?.reset();
         }
         setIsLoading(false);
     }
 
     return (
-    <form action={handleSubmit} className="glass-card glow-border flex flex-col gap-4 p-5 rounded-2xl text-card-foreground max-w-md">
+    <form ref={formRef} action={handleSubmit} className="glass-card glow-border flex flex-col gap-4 p-5 rounded-2xl text-card-foreground max-w-md">
       <div className="space-y-1">
         <h3 className="text-lg font-semibold tracking-tight">Create New Deck</h3>
         <p className="text-sm text-muted-foreground">Start a new collection of flashcards.</p>

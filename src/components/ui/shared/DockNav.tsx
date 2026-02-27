@@ -1,24 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Layers, Brain, UserRound } from 'lucide-react';
+import { Layers, Brain, UserRound, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Layers },
   { href: '/dashboard/stats', label: 'Stats', icon: Brain, disabled: true },
   { href: '/dashboard/profile', label: 'Profile', icon: UserRound, disabled: true },
-  { href: '/', label: 'Home', icon: Home },
 ];
 
 export function DockNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [visible, setVisible] = useState(true);
   const [lastY, setLastY] = useState(0);
-
-  const showDock = pathname.startsWith('/dashboard') || pathname === '/';
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -37,9 +37,17 @@ export function DockNav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, [lastY]);
 
+  async function handleLogout() {
+    setLoggingOut(true);
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
     <AnimatePresence>
-      {showDock && visible && (
+      {visible && (
         <motion.nav
           initial={{ opacity: 0, y: 30, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -88,6 +96,21 @@ export function DockNav() {
                 </Link>
               );
             })}
+
+            {/* Divider */}
+            <div className="mx-0.5 h-6 w-px bg-primary/15" />
+
+            {/* Logout */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={loggingOut}
+              className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:text-destructive hover:bg-destructive/10 disabled:opacity-50"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="relative z-10 h-5 w-5" />
+            </button>
           </div>
         </motion.nav>
       )}

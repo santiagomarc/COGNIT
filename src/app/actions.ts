@@ -1,7 +1,7 @@
 'use server'; // <--- This marks all functions in this file as "Backend Only"
 
 import { createClient } from '@/lib/supabase/server';
-import { createDeckSchema, CreateDeckInput, createCardSchema, CreateCardInput } from '@/lib/schemas';
+import { createDeckSchema, CreateDeckInput, createCardSchema, CreateCardInput, updateCardSchema, UpdateCardInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -37,9 +37,9 @@ export async function createDeck(data: CreateDeckInput) {
     return { error: error.message };
   }
 
-  // 4. Refresh the UI and Redirect
-  revalidatePath('/dashboard'); // Tell Next.js to refresh the dashboard list
-  redirect('/dashboard');
+  // 4. Refresh the UI
+  revalidatePath('/dashboard');
+  return { success: true };
 }
 
 export async function deleteDeck(deckId: string) {
@@ -128,5 +128,83 @@ export async function createCard(data: CreateCardInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
+}
+
+export async function updateCard(data: UpdateCardInput) {
+  const result = updateCardSchema.safeParse(data);
+
+  if (!result.success) {
+    return { error: result.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'You must be logged in to update a card.' };
+  }
+
+  // Verify deck ownership
+  const { data: ownedDeck, error: deckError } = await supabase
+    .from('decks')
+    .select('id')
+    .eq('id', result.data.deck_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (deckError || !ownedDeck) {
+    return { error: 'Deck not found or access denied.' };
+  }
+
+  const { error } = await supabase
+    .from('cards')
+    .update({
+      front: result.data.front,
+      back: result.data.back,
+    })
+    .eq('id', result.data.id)
+    .eq('deck_id', result.data.deck_id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/dashboard/${result.data.deck_id}`);
+  return { success: true };
+}
+
+export async function deleteCard(cardId: string, deckId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Unauthorized' };
+  }
+
+  // Verify deck ownership
+  const { data: ownedDeck, error: deckError } = await supabase
+    .from('decks')
+    .select('id')
+    .eq('id', deckId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (deckError || !ownedDeck) {
+    return { error: 'Deck not found or access denied.' };
+  }
+
+  const { error } = await supabase
+    .from('cards')
+    .delete()
+    .eq('id', cardId)
+    .eq('deck_id', deckId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/dashboard/${deckId}`);
+  revalidatePath('/dashboard');
+  return { success: true };
 }
 

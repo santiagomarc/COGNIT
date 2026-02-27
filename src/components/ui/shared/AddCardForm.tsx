@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { createCard } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ type AddCardFormProps = {
 
 export function AddCardForm({ deckId }: AddCardFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
@@ -30,13 +31,14 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
       toast.error(typeof result.error === 'string' ? result.error : 'Failed to create card');
     } else {
       toast.success('Card added to deck');
+      formRef.current?.reset();
     }
 
     setIsLoading(false);
   }
 
   return (
-    <form action={handleSubmit} className="glass-card glow-border rounded-2xl p-5 text-card-foreground">
+    <form ref={formRef} action={handleSubmit} className="glass-card glow-border rounded-2xl p-5 text-card-foreground">
       <div className="mb-4 space-y-1">
         <h2 className="text-lg font-semibold tracking-tight">Add Card</h2>
         <p className="text-sm text-muted-foreground">Create a new flashcard for this deck.</p>

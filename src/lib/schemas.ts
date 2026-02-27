@@ -19,3 +19,13 @@ export const createCardSchema = z.object({
 
 export type CreateCardInput = z.infer<typeof createCardSchema>;
 
+// properties of card update from the user
+export const updateCardSchema = z.object({
+    id: z.uuid({ message: "Invalid card id" }),
+    deck_id: z.uuid({ message: "Invalid deck id" }),
+    front: z.string().min(1, { message: "Question is required" }).max(1000),
+    back: z.string().min(1, { message: "Answer is required" }).max(2000),
+});
+
+export type UpdateCardInput = z.infer<typeof updateCardSchema>;
+

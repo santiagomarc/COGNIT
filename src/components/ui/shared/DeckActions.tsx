@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { deleteDeck, updateDeck } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { Pencil, Trash2, X, Check } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DeckActionsProps {
     deckId: string;
@@ -15,6 +17,19 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(currentTitle);
     const [isLoading, setIsLoading] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+    async function handleDelete() {
+        setIsLoading(true);
+        const result = await deleteDeck(deckId);
+        if (result?.error) {
+            toast.error(typeof result.error === 'string' ? result.error : 'Failed to delete deck');
+        } else {
+            toast.success('Deck deleted');
+        }
+        setIsLoading(false);
+        setShowDeleteConfirm(false);
+    }
 
     // Toggle Edit Mode
     if (isEditing) {
@@ -31,7 +46,12 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
                     variant="ghost"
                     onClick={async () => {
                         setIsLoading(true);
-                        await updateDeck(deckId, title);
+                        const result = await updateDeck(deckId, title);
+                        if (result?.error) {
+                            toast.error(typeof result.error === 'string' ? result.error : 'Failed to rename deck');
+                        } else {
+                            toast.success('Deck renamed');
+                        }
                         setIsEditing(false);
                         setIsLoading(false);
                     }}
@@ -54,30 +74,39 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
     }
 
     return (
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
-            <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                title="Rename Deck"
-                className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
-            >
-                <Pencil className="h-4 w-4" />
-            </Button>
+        <>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setIsEditing(true)}
+                    title="Rename Deck"
+                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                >
+                    <Pencil className="h-4 w-4" />
+                </Button>
 
-            <Button
-                size="icon"
-                variant="ghost"
-                onClick={async () => {
-                    if (confirm('Are you sure you want to delete this deck?')) {
-                        await deleteDeck(deckId);
-                    }
-                }}
-                title="Delete Deck"
-                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
-            >
-                <Trash2 className="h-4 w-4" />
-            </Button>
-        </div>
+                <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    title="Delete Deck"
+                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                >
+                    <Trash2 className="h-4 w-4" />
+                </Button>
+            </div>
+
+            <ConfirmDialog
+                open={showDeleteConfirm}
+                onOpenChange={setShowDeleteConfirm}
+                title="Delete this deck?"
+                description="All cards in this deck will be permanently deleted. This cannot be undone."
+                confirmLabel="Delete"
+                variant="destructive"
+                loading={isLoading}
+                onConfirm={handleDelete}
+            />
+        </>
     );
 }

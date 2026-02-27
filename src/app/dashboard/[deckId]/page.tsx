@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
-import { Flashcard } from '@/components/ui/shared/Flashcard';
+import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 import { Button } from '@/components/ui/button';
@@ -93,7 +93,12 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
         <StaggerContainer className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
             <StaggerItem key={card.id}>
-              <Flashcard question={card.front} answer={card.back} />
+              <FlashcardWithActions
+                cardId={card.id}
+                deckId={deckId}
+                question={card.front}
+                answer={card.back}
+              />
             </StaggerItem>
           ))}
         </StaggerContainer>
