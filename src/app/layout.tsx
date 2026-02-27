@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { DockNav } from "@/components/ui/shared/DockNav";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,6 +42,14 @@ export default function RootLayout({
           </div>
 
           {children}
+          <DockNav />
+          <Toaster
+            position="top-center"
+            richColors
+            toastOptions={{
+              className: "sonner-toast",
+            }}
+          />
         </ThemeProvider>
       </body>
     </html>

@@ -5,16 +5,15 @@ import {createDeck} from '@/app/actions'; // import server action
 import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {Label} from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export function CreateDeckForm() {
     // simple state to handle loading
     const[isLoading, setIsLoading] = useState(false);
-    const[error, setError] = useState<string | null>(null);
 
     // handle form submission
     async function handleSubmit(formData: FormData) {
         setIsLoading(true);
-        setError(null);
 
         // extract data from form
         const title = formData.get('title') as string;
@@ -22,11 +21,9 @@ export function CreateDeckForm() {
         const result = await createDeck({ title, is_public: false });
         // handle the response
         if (result?.error) {
-            //simplistic eeror handling FOR NOW
-            setError(typeof result.error === 'string' ? result.error : 'Failed to create deck');
+        toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
         } else {
-        // Success! The page will automatically refresh because of revalidatePath in actions.ts
-        // We can clear the form or close the modal here if we had one.        }
+        toast.success('Deck created successfully');
         }
         setIsLoading(false);
     }
@@ -41,7 +38,6 @@ export function CreateDeckForm() {
       <div className="space-y-2">
         <Label htmlFor="title">Deck Title</Label>
         <Input id="title" name="title" placeholder="e.g. Automata Theory" required />
-        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
       <Button type="submit" disabled={isLoading}>

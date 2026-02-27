@@ -5,6 +5,7 @@ import { createCard } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 type AddCardFormProps = {
   deckId: string;
@@ -12,11 +13,9 @@ type AddCardFormProps = {
 
 export function AddCardForm({ deckId }: AddCardFormProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
-    setError(null);
 
     const front = String(formData.get('front') ?? '');
     const back = String(formData.get('back') ?? '');
@@ -28,7 +27,9 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
     });
 
     if (result?.error) {
-      setError(typeof result.error === 'string' ? result.error : 'Failed to create card');
+      toast.error(typeof result.error === 'string' ? result.error : 'Failed to create card');
+    } else {
+      toast.success('Card added to deck');
     }
 
     setIsLoading(false);
@@ -52,8 +53,6 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
           <Input id="back" name="back" placeholder="A function bundled with its lexical scope..." required />
         </div>
       </div>
-
-      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
       <div className="mt-4 flex items-center justify-end">
         <Button type="submit" disabled={isLoading}>

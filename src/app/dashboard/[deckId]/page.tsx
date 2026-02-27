@@ -6,6 +6,7 @@ import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
+import { Button } from '@/components/ui/button';
 
 type DeckDetailPageProps = {
   params: Promise<{
@@ -72,8 +73,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
               )}
             </div>
 
-            <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary font-medium">
-              {cards?.length ?? 0} cards
+            <div className="flex items-center gap-3">
+              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary font-medium">
+                {cards?.length ?? 0} cards
+              </div>
+              <Link href={`/dashboard/${deckId}/study`}>
+                <Button>Start Study</Button>
+              </Link>
             </div>
           </div>
         </div>
