@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { CreateDeckForm } from '@/components/ui/shared/CreateDeckForm';
 import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -42,15 +43,15 @@ export default async function Dashboard() {
             </p>
           ) : (
             decks?.map((deck) => (
-              <Card key={deck.id} className="hover:bg-accent transition-colors group relative">
+              <Card key={deck.id} className="group relative transition-shadow hover:shadow-md">
                 <CardHeader>
                   <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <CardTitle>{deck.title}</CardTitle>
+                    <Link href={`/dashboard/${deck.id}`} className="space-y-1 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <CardTitle className="group-hover:text-primary transition-colors">{deck.title}</CardTitle>
                       <CardDescription>
                         {new Date(deck.created_at).toLocaleDateString()}
                       </CardDescription>
-                    </div>
+                    </Link>
                     <DeckActions deckId={deck.id} currentTitle={deck.title} />
                   </div>
                 </CardHeader>

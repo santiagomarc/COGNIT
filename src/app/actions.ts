@@ -1,7 +1,7 @@
 'use server'; // <--- This marks all functions in this file as "Backend Only"
 
 import { createClient } from '@/lib/supabase/server';
-import { createDeckSchema, CreateDeckInput } from '@/lib/schemas';
+import { createDeckSchema, CreateDeckInput, createCardSchema, CreateCardInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -86,6 +86,47 @@ export async function updateDeck(deckId: string, title: string) {
     return { error: error.message };
   }
 
+  revalidatePath('/dashboard');
+}
+
+export async function createCard(data: CreateCardInput) {
+  const result = createCardSchema.safeParse(data);
+
+  if (!result.success) {
+    return { error: result.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'You must be logged in to add a card.' };
+  }
+
+  const { data: ownedDeck, error: deckError } = await supabase
+    .from('decks')
+    .select('id')
+    .eq('id', result.data.deck_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (deckError || !ownedDeck) {
+    return { error: 'Deck not found or access denied.' };
+  }
+
+  const { error } = await supabase
+    .from('cards')
+    .insert({
+      deck_id: result.data.deck_id,
+      front: result.data.front,
+      back: result.data.back,
+    });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
 }
 

@@ -11,4 +11,11 @@ export const createDeckSchema = z.object({
 export type CreateDeckInput = z.infer<typeof createDeckSchema>;
 
 //properties of card creation from the user
+export const createCardSchema = z.object({
+    deck_id: z.uuid({ message: "Invalid deck id" }),
+    front: z.string().min(1, { message: "Question is required" }).max(1000),
+    back: z.string().min(1, { message: "Answer is required" }).max(2000),
+});
+
+export type CreateCardInput = z.infer<typeof createCardSchema>;
 
