@@ -23,7 +23,7 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
                 <Input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="h-8 w-full"
+                    className="h-8 w-full neon-focus"
                     autoFocus
                 />
                 <Button
@@ -54,15 +54,15 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
     }
 
     return (
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
             <Button
                 size="icon"
                 variant="ghost"
                 onClick={() => setIsEditing(true)}
                 title="Rename Deck"
-                className="h-8 w-8"
+                className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
             >
-                <Pencil className="h-4 w-4 text-muted-foreground" />
+                <Pencil className="h-4 w-4" />
             </Button>
 
             <Button
@@ -74,9 +74,9 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
                     }
                 }}
                 title="Delete Deck"
-                className="h-8 w-8 hover:bg-red-100 dark:hover:bg-red-900/20"
+                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
             >
-                <Trash2 className="h-4 w-4 text-red-500" />
+                <Trash2 className="h-4 w-4" />
             </Button>
         </div>
     );

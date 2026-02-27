@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -23,11 +24,23 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased relative min-h-screen bg-background`}
       >
-        {children}
+        <ThemeProvider>
+          {/* Grain texture overlay for premium feel */}
+          <div className="grain-overlay" aria-hidden="true" />
+
+          {/* Subtle animated gradient background orbs */}
+          <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+            <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl animate-pulse" />
+            <div className="absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-neon/5 blur-3xl animate-pulse [animation-delay:2s]" />
+            <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/3 blur-3xl animate-pulse [animation-delay:4s]" />
+          </div>
+
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

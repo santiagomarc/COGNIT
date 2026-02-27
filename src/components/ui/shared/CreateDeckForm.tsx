@@ -32,16 +32,16 @@ export function CreateDeckForm() {
     }
 
     return (
-    <form action={handleSubmit} className="flex flex-col gap-4 p-4 border rounded-lg bg-card text-card-foreground shadow-sm max-w-md">
-      <div>
-        <h3 className="text-lg font-semibold">Create New Deck</h3>
+    <form action={handleSubmit} className="glass-card glow-border flex flex-col gap-4 p-5 rounded-2xl text-card-foreground max-w-md">
+      <div className="space-y-1">
+        <h3 className="text-lg font-semibold tracking-tight">Create New Deck</h3>
         <p className="text-sm text-muted-foreground">Start a new collection of flashcards.</p>
       </div>
       
       <div className="space-y-2">
         <Label htmlFor="title">Deck Title</Label>
         <Input id="title" name="title" placeholder="e.g. Automata Theory" required />
-        {error && <p className="text-sm text-red-500">{error}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
 
       <Button type="submit" disabled={isLoading}>

@@ -1,19 +1,19 @@
 export default function DeckDetailLoading() {
   return (
-    <div className="container mx-auto space-y-8 p-8">
-      <div className="h-6 w-40 animate-pulse rounded bg-muted" />
-      <div className="space-y-3 rounded-2xl border bg-card p-6">
-        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-96 max-w-full animate-pulse rounded bg-muted" />
+    <div className="container mx-auto space-y-8 p-6 md:p-8">
+      <div className="h-6 w-40 animate-pulse rounded-lg bg-muted/40" />
+      <div className="space-y-3 rounded-2xl border border-primary/10 bg-card/40 backdrop-blur-md p-6">
+        <div className="h-8 w-64 animate-pulse rounded-lg bg-muted/40" />
+        <div className="h-4 w-96 max-w-full animate-pulse rounded-lg bg-muted/40" />
       </div>
 
-      <div className="rounded-xl border bg-card p-5">
-        <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+      <div className="rounded-2xl border border-primary/10 bg-card/40 backdrop-blur-md p-5">
+        <div className="h-6 w-32 animate-pulse rounded-lg bg-muted/40" />
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, idx) => (
-          <div key={idx} className="h-56 animate-pulse rounded-2xl border bg-muted/40" />
+          <div key={idx} className="h-56 animate-pulse rounded-2xl border border-primary/10 bg-card/30 backdrop-blur-md" />
         ))}
       </div>
     </div>

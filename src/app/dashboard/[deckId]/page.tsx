@@ -4,6 +4,8 @@ import { ArrowLeft, BookOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 
 type DeckDetailPageProps = {
   params: Promise<{
@@ -46,48 +48,59 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   return (
-    <div className="container mx-auto space-y-8 p-8">
-      <div className="space-y-4">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Dashboard
-        </Link>
-
-        <div className="flex flex-col gap-4 rounded-2xl border bg-card p-6 shadow-sm md:flex-row md:items-end md:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold tracking-tight">{deck.title}</h1>
-            {deck.description ? (
-              <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No description yet.</p>
-            )}
+    <div className="container mx-auto space-y-8 p-6 md:p-8">
+      <FadeInUp>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
+            <ThemeToggle />
           </div>
 
-          <div className="inline-flex items-center rounded-full border px-3 py-1 text-sm text-muted-foreground">
-            {cards?.length ?? 0} cards
+          <div className="glass-card glow-border flex flex-col gap-4 rounded-2xl p-6 md:flex-row md:items-end md:justify-between">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight">{deck.title}</h1>
+              {deck.description ? (
+                <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground/60">No description yet.</p>
+              )}
+            </div>
+
+            <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary font-medium">
+              {cards?.length ?? 0} cards
+            </div>
           </div>
         </div>
-      </div>
+      </FadeInUp>
 
-      <AddCardForm deckId={deckId} />
+      <FadeInUp delay={0.1}>
+        <AddCardForm deckId={deckId} />
+      </FadeInUp>
 
       {cards && cards.length > 0 ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <StaggerContainer className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((card) => (
-            <Flashcard key={card.id} question={card.front} answer={card.back} />
+            <StaggerItem key={card.id}>
+              <Flashcard question={card.front} answer={card.back} />
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerContainer>
       ) : (
-        <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/30 p-8 text-center">
-          <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
-          <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            Add your first flashcard above to start studying, or generate cards from your notes in the next step.
-          </p>
-        </div>
+        <FadeInUp delay={0.2}>
+          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
+            <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
+            <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              Add your first flashcard above to start studying, or generate cards from your notes in the next step.
+            </p>
+          </div>
+        </FadeInUp>
       )}
     </div>
   );

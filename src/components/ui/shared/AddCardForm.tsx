@@ -35,7 +35,7 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
   }
 
   return (
-    <form action={handleSubmit} className="rounded-xl border bg-card p-5 text-card-foreground shadow-sm">
+    <form action={handleSubmit} className="glass-card glow-border rounded-2xl p-5 text-card-foreground">
       <div className="mb-4 space-y-1">
         <h2 className="text-lg font-semibold tracking-tight">Add Card</h2>
         <p className="text-sm text-muted-foreground">Create a new flashcard for this deck.</p>
@@ -53,7 +53,7 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
         </div>
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+      {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
       <div className="mt-4 flex items-center justify-end">
         <Button type="submit" disabled={isLoading}>
