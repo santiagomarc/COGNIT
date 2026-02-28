@@ -33,12 +33,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return;
     const root = document.documentElement;
+
+    // Enable smooth transition for theme switch
+    root.classList.add('theme-transitioning');
+
     if (theme === 'dark') {
       root.classList.add('dark');
     } else {
       root.classList.remove('dark');
     }
     localStorage.setItem('cognit-theme', theme);
+
+    // Remove the transitioning class after the animation completes
+    const timeout = setTimeout(() => {
+      root.classList.remove('theme-transitioning');
+    }, 500);
+    return () => clearTimeout(timeout);
   }, [theme, mounted]);
 
   const toggleTheme = useCallback(() => {

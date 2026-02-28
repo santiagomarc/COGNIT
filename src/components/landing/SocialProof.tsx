@@ -73,7 +73,7 @@ export function SocialProof() {
                 <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
-                <div className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+                <div className="glow-title text-3xl font-extrabold tracking-tight sm:text-4xl">
                   {stat.display ? (
                     stat.display
                   ) : (

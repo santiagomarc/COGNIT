@@ -6,8 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-poppins);
+  --font-display: var(--font-orbitron);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -94,6 +94,26 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ─── Theme transition (only applied during toggle, not page load) ─── */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition: background-color 0.4s ease, color 0.3s ease, border-color 0.35s ease,
+    box-shadow 0.35s ease, fill 0.3s ease, stroke 0.3s ease !important;
+}
+
+/* ─── Glow title: gamified display font with neon text-shadow ─── */
+.glow-title {
+  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  text-shadow: 0 0 12px var(--glow), 0 0 40px rgba(99, 102, 241, 0.12);
+}
+
+.dark .glow-title {
+  text-shadow: 0 0 14px var(--glow), 0 0 60px rgba(129, 140, 248, 0.18),
+    0 0 100px rgba(129, 140, 248, 0.06);
 }
 
 /* ─── Grain Texture Overlay ─── */

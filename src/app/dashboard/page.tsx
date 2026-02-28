@@ -36,7 +36,7 @@ export default async function Dashboard() {
               <Layers className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+              <h1 className="glow-title text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
               <p className="text-sm text-muted-foreground">Welcome back, {user.email}</p>
             </div>
           </div>

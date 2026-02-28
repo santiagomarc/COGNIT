@@ -65,7 +65,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
           <div className="glass-card glow-border flex flex-col gap-4 rounded-2xl p-6 md:flex-row md:items-end md:justify-between">
             <div className="space-y-2">
-              <h1 className="text-3xl font-bold tracking-tight">{deck.title}</h1>
+              <h1 className="glow-title text-3xl font-bold tracking-tight">{deck.title}</h1>
               {deck.description ? (
                 <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
               ) : (

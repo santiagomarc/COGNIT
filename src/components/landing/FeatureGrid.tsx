@@ -66,7 +66,7 @@ export function FeatureGrid() {
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
             Features
           </p>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="glow-title text-3xl font-bold tracking-tight sm:text-4xl">
             Everything you need to ace every exam
           </h2>
           <p className="mt-3 text-muted-foreground">

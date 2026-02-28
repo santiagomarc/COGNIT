@@ -10,7 +10,7 @@ export default function NotFound() {
           <FileQuestion className="h-7 w-7 text-primary" />
         </div>
 
-        <h1 className="text-5xl font-extrabold tracking-tighter bg-gradient-to-br from-primary via-neon to-primary/60 bg-clip-text text-transparent">
+        <h1 className="glow-title text-5xl font-extrabold tracking-tighter bg-gradient-to-br from-primary via-neon to-primary/60 bg-clip-text text-transparent">
           404
         </h1>
         <h2 className="mt-2 text-xl font-semibold tracking-tight">Page not found</h2>

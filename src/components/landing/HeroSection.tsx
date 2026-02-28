@@ -63,7 +63,7 @@ export function HeroSection() {
             initial={reduced ? undefined : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl font-extrabold leading-[1.1] tracking-tighter sm:text-6xl lg:text-7xl"
+            className="glow-title text-5xl font-extrabold leading-[1.1] tracking-tighter sm:text-6xl lg:text-7xl"
           >
             <span className="bg-gradient-to-br from-foreground via-foreground/90 to-foreground/60 bg-clip-text text-transparent">
               Study smarter,

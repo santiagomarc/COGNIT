@@ -44,7 +44,7 @@ export function HowItWorks() {
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
             How It Works
           </p>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="glow-title text-3xl font-bold tracking-tight sm:text-4xl">
             Three steps to mastery
           </h2>
           <p className="mt-3 text-muted-foreground">
