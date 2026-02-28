@@ -7,7 +7,9 @@ export default function DashboardLayout({
 }) {
   return (
     <>
-      {children}
+      <main id="main-content">
+        {children}
+      </main>
       <DockNav />
     </>
   );

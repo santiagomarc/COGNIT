@@ -1,45 +1,65 @@
-'use client'; // allows to use hooks like useState and useEffect
+'use client';
 
 import { useState, useRef } from 'react';
-import {createDeck} from '@/app/actions'; // import server action
-import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-import {Label} from '@/components/ui/label';
+import { createDeck } from '@/app/actions';
+import { createDeckSchema } from '@/lib/schemas';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 export function CreateDeckForm() {
-    // simple state to handle loading
-    const[isLoading, setIsLoading] = useState(false);
-    const formRef = useRef<HTMLFormElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
 
-    // handle form submission
-    async function handleSubmit(formData: FormData) {
-        setIsLoading(true);
+  async function handleSubmit(formData: FormData) {
+    setFieldError(null);
+    const title = (formData.get('title') as string).trim();
 
-        // extract data from form
-        const title = formData.get('title') as string;
-        // call the server action (the backend function)
-        const result = await createDeck({ title, is_public: false });
-        // handle the response
-        if (result?.error) {
-        toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
-        } else {
-        toast.success('Deck created successfully');
-        formRef.current?.reset();
-        }
-        setIsLoading(false);
+    // Client-side validation
+    const parsed = createDeckSchema.safeParse({ title, is_public: false });
+    if (!parsed.success) {
+      const msg = parsed.error.issues.find((e) => e.path.includes('title'))?.message;
+      setFieldError(msg ?? 'Invalid input');
+      return;
     }
 
-    return (
+    setIsLoading(true);
+    const result = await createDeck(parsed.data);
+    if (result?.error) {
+      toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
+    } else {
+      toast.success('Deck created successfully');
+      formRef.current?.reset();
+      setFieldError(null);
+    }
+    setIsLoading(false);
+  }
+
+  return (
     <form ref={formRef} action={handleSubmit} className="glass-card glow-border flex flex-col gap-4 p-5 rounded-2xl text-card-foreground max-w-md">
       <div className="space-y-1">
         <h3 className="text-lg font-semibold tracking-tight">Create New Deck</h3>
         <p className="text-sm text-muted-foreground">Start a new collection of flashcards.</p>
       </div>
-      
+
       <div className="space-y-2">
         <Label htmlFor="title">Deck Title</Label>
-        <Input id="title" name="title" placeholder="e.g. Automata Theory" required />
+        <Input
+          id="title"
+          name="title"
+          placeholder="e.g. Automata Theory"
+          required
+          aria-invalid={!!fieldError}
+          aria-describedby={fieldError ? 'title-error' : undefined}
+          onChange={() => fieldError && setFieldError(null)}
+        />
+        {fieldError && (
+          <p id="title-error" className="text-xs text-destructive" role="alert">
+            {fieldError}
+          </p>
+        )}
       </div>
 
       <Button type="submit" disabled={isLoading}>

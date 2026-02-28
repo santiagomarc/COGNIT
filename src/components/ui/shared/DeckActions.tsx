@@ -75,7 +75,7 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
 
     return (
         <>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
                 <Button
                     size="icon"
                     variant="ghost"

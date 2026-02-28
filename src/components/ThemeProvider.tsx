@@ -45,13 +45,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   }, []);
 
-  // Prevent flash of wrong theme
+  // Prevent flash: inline script in layout.tsx handles initial class, just render children
   if (!mounted) {
-    return (
-      <div className="dark">
-        {children}
-      </div>
-    );
+    return <>{children}</>;
   }
 
   return (

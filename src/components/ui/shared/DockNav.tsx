@@ -84,6 +84,7 @@ export function DockNav() {
                   href={item.href}
                   className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:text-foreground"
                   aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
                 >
                   {isActive && (
                     <motion.span

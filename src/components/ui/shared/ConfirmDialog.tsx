@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -28,15 +28,63 @@ export function ConfirmDialog({
   loading = false,
   onConfirm,
 }: ConfirmDialogProps) {
-  // Close on escape
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  // Capture the trigger element on open, auto-focus cancel, restore focus on close
   useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onOpenChange(false);
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open, onOpenChange]);
+    if (open) {
+      triggerRef.current = document.activeElement as HTMLElement;
+      // Small delay for the animation to render the dialog
+      requestAnimationFrame(() => {
+        cancelRef.current?.focus();
+      });
+    } else if (triggerRef.current) {
+      triggerRef.current.focus();
+      triggerRef.current = null;
+    }
+  }, [open]);
+
+  // Close on Escape + trap Tab inside the dialog
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!open) return;
+
+      if (e.key === 'Escape') {
+        if (!loading) onOpenChange(false);
+        return;
+      }
+
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    },
+    [open, loading, onOpenChange]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   return (
     <AnimatePresence>
@@ -58,6 +106,7 @@ export function ConfirmDialog({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 10 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            ref={dialogRef}
             className="glass-card relative z-10 mx-4 w-full max-w-sm rounded-2xl border border-primary/15 p-6 shadow-2xl"
             role="alertdialog"
             aria-modal="true"
@@ -92,6 +141,7 @@ export function ConfirmDialog({
 
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button
+                ref={cancelRef}
                 variant="ghost"
                 size="sm"
                 onClick={() => onOpenChange(false)}

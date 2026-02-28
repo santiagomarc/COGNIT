@@ -1,7 +1,13 @@
 'use client';
 
-import { motion, type Variants } from 'framer-motion';
+import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import type { ReactNode } from 'react';
+
+/* ─── Reduced-motion safe defaults ─── */
+const noMotion: Variants = {
+  hidden: { opacity: 1 },
+  show: { opacity: 1 },
+};
 
 /* ─── Staggered container: animates children one-by-one ─── */
 const staggerContainer: Variants = {
@@ -50,9 +56,10 @@ export function StaggerContainer({
   children: ReactNode;
   className?: string;
 }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      variants={staggerContainer}
+      variants={reduced ? noMotion : staggerContainer}
       initial="hidden"
       animate="show"
       className={className}
@@ -69,8 +76,9 @@ export function StaggerItem({
   children: ReactNode;
   className?: string;
 }) {
+  const reduced = useReducedMotion();
   return (
-    <motion.div variants={staggerItem} className={className}>
+    <motion.div variants={reduced ? noMotion : staggerItem} className={className}>
       {children}
     </motion.div>
   );
@@ -85,12 +93,13 @@ export function FadeInUp({
   className?: string;
   delay?: number;
 }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      variants={fadeInUp}
+      variants={reduced ? noMotion : fadeInUp}
       initial="hidden"
       animate="show"
-      transition={{ delay }}
+      transition={reduced ? undefined : { delay }}
       className={className}
     >
       {children}
@@ -105,11 +114,12 @@ export function PageTransition({
   children: ReactNode;
   className?: string;
 }) {
+  const reduced = useReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={reduced ? undefined : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+      transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 26 }}
       className={className}
     >
       {children}
