@@ -1,0 +1,99 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import Link from 'next/link';
+import { BookOpen } from 'lucide-react';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { DeckActions } from '@/components/ui/shared/DeckActions';
+import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
+import { StaggerContainer, StaggerItem, FadeInUp } from '@/components/motion';
+
+type DeckWithCount = {
+  id: string;
+  title: string;
+  created_at: string;
+  cards: { count: number }[];
+};
+
+type DeckGridProps = {
+  decks: DeckWithCount[];
+};
+
+export function DeckGrid({ decks }: DeckGridProps) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search.trim()) return decks;
+    const q = search.toLowerCase();
+    return decks.filter((d) => d.title.toLowerCase().includes(q));
+  }, [decks, search]);
+
+  return (
+    <div className="space-y-4">
+      {/* Search input */}
+      {decks.length > 0 && (
+        <DashboardSearch
+          value={search}
+          onChange={setSearch}
+          resultCount={filtered.length}
+          totalCount={decks.length}
+        />
+      )}
+
+      {/* Deck list */}
+      {decks.length === 0 ? (
+        <FadeInUp delay={0.2}>
+          <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/40 backdrop-blur-md p-8 text-center">
+            <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
+            <p className="text-muted-foreground">No decks yet. Create one to get started!</p>
+          </div>
+        </FadeInUp>
+      ) : filtered.length === 0 ? (
+        <FadeInUp>
+          <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/15 bg-card/30 backdrop-blur-md p-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              No decks match &ldquo;{search}&rdquo;
+            </p>
+          </div>
+        </FadeInUp>
+      ) : (
+        <StaggerContainer className="grid gap-4 sm:grid-cols-2">
+          {filtered.map((deck) => {
+            const cardCount = deck.cards?.[0]?.count ?? 0;
+            return (
+              <StaggerItem key={deck.id}>
+                <Card className="glass-card glow-border group relative rounded-2xl transition-all duration-300">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <Link
+                        href={`/dashboard/${deck.id}`}
+                        className="space-y-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1 min-w-0"
+                      >
+                        <CardTitle className="group-hover:text-primary transition-colors duration-200 truncate">
+                          {deck.title}
+                        </CardTitle>
+                        <CardDescription className="flex items-center gap-2 text-xs">
+                          <span>
+                            {new Date(deck.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
+                          <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            {cardCount} card{cardCount !== 1 ? 's' : ''}
+                          </span>
+                        </CardDescription>
+                      </Link>
+                      <DeckActions deckId={deck.id} currentTitle={deck.title} />
+                    </div>
+                  </CardHeader>
+                </Card>
+              </StaggerItem>
+            );
+          })}
+        </StaggerContainer>
+      )}
+    </div>
+  );
+}
