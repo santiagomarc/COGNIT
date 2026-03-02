@@ -1,8 +1,15 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// ── Protected path prefixes ──
+const PROTECTED_PATHS = ['/dashboard'];
+// ── Auth-only paths: redirect to dashboard if already logged in ──
+const AUTH_ONLY_PATHS = ['/login'];
+// ── Paths that require a session but aren't "dashboard" ──
+const SESSION_REQUIRED_PATHS = ['/login/update-password'];
+
 // Proxy runs BEFORE every request (renamed from middleware in Next.js 16)
-// Purpose: Refresh auth tokens and protect routes
+// Purpose: Refresh auth tokens, protect routes, enforce redirects
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -37,15 +44,27 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Protected routes: If user is NOT logged in and trying to access /dashboard
-  if (!user && request.nextUrl.pathname.startsWith('/dashboard')) {
+  const pathname = request.nextUrl.pathname;
+
+  // ── Protect dashboard routes ──
+  if (!user && PROTECTED_PATHS.some((p) => pathname.startsWith(p))) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
+    // Preserve the intended destination so we can redirect back after login
+    url.searchParams.set('redirectTo', pathname);
     return NextResponse.redirect(url);
   }
 
-  // If user IS logged in and trying to access /login, redirect to dashboard
-  if (user && request.nextUrl.pathname === '/login') {
+  // ── Protect update-password (requires active session from reset link) ──
+  if (!user && SESSION_REQUIRED_PATHS.some((p) => pathname.startsWith(p))) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('error', 'Your reset link has expired. Please request a new one.');
+    return NextResponse.redirect(url);
+  }
+
+  // ── Redirect logged-in users away from auth-only pages ──
+  if (user && AUTH_ONLY_PATHS.some((p) => pathname === p)) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';
     return NextResponse.redirect(url);

@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Layers, Brain, UserRound, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { logout } from '@/app/auth/actions';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Layers },
@@ -15,7 +15,6 @@ const navItems = [
 
 export function DockNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const [visible, setVisible] = useState(true);
   const [lastY, setLastY] = useState(0);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -39,10 +38,7 @@ export function DockNav() {
 
   async function handleLogout() {
     setLoggingOut(true);
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
+    await logout();
   }
 
   return (
