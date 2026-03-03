@@ -79,3 +79,17 @@ export const updateCardSchema = z.object({
 
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 
+/* ═══════════ Study / Grading Schema ═══════════ */
+
+export const gradeCardSchema = z.object({
+    card_id: z.uuid({ message: "Invalid card id" }),
+    deck_id: z.uuid({ message: "Invalid deck id" }),
+    grade: z.enum(['again', 'hard', 'good', 'easy'], {
+        message: "Grade must be again, hard, good, or easy",
+    }),
+    /** How long the user spent on this card (ms). 0 if not tracked. */
+    duration_ms: z.number().int().min(0).default(0),
+});
+
+export type GradeCardInput = z.infer<typeof gradeCardSchema>;
+
