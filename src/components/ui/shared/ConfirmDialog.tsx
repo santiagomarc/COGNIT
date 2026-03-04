@@ -107,7 +107,7 @@ export function ConfirmDialog({
             exit={{ opacity: 0, scale: 0.92, y: 10 }}
             transition={{ type: 'spring', stiffness: 400, damping: 28 }}
             ref={dialogRef}
-            className="glass-card relative z-10 mx-4 w-full max-w-sm rounded-2xl border border-primary/15 p-6 shadow-2xl"
+            className="glass-card relative z-10 mx-4 w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-primary/15 p-6 shadow-2xl"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="confirm-title"

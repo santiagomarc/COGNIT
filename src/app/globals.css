@@ -60,6 +60,7 @@
   --neon: #6366f1;
   --neon-foreground: #ffffff;
   --glow: rgba(99, 102, 241, 0.25);
+  --shadow-base: rgba(15, 23, 42, 0.08); /* Lighter shadow for light mode */
 }
 
 /* ─── Dark Mode: "Deep Navy" (#020617) ─── */
@@ -85,6 +86,7 @@
   --neon: #818cf8;
   --neon-foreground: #020617;
   --glow: rgba(129, 140, 248, 0.35);
+  --shadow-base: rgba(0, 0, 0, 0.35); /* Darker shadow for dark mode */
 }
 
 @layer base {
@@ -136,13 +138,14 @@
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border);
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.05),
-              0 2px 12px -2px rgba(0, 0, 0, 0.15);
+              0 4px 16px -4px var(--shadow-base);
 }
 
 .glass-card:hover {
   border-color: var(--primary);
   box-shadow: 0 0 0 1px var(--glow),
-              0 4px 20px -4px rgba(99, 102, 241, 0.2);
+              0 8px 24px -6px var(--shadow-base),
+              0 0 16px -4px var(--glow);
 }
 
 /* ─── Neon glow focus for inputs ─── */
@@ -160,8 +163,9 @@
 }
 
 .glow-border:hover {
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 0 16px -4px var(--glow);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 16px -4px var(--glow),
+              0 4px 12px -4px var(--shadow-base);
 }
 
 .sonner-toast {
@@ -171,8 +175,8 @@
   backdrop-filter: blur(14px) !important;
   -webkit-backdrop-filter: blur(14px) !important;
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.1),
-              0 8px 24px -8px rgba(0, 0, 0, 0.35),
-              0 0 20px -10px var(--glow) !important;
+              0 8px 32px -8px var(--shadow-base),
+              0 0 24px -10px var(--glow) !important;
 }
 
 .sonner-toast [data-title] {

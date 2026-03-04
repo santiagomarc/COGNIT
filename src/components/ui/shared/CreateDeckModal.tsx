@@ -115,7 +115,7 @@ export function CreateDeckModal() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.92, y: 10 }}
               transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-              className="glass-card relative z-10 mx-4 w-full max-w-md rounded-2xl border border-primary/15 p-6 shadow-2xl"
+              className="glass-card relative z-10 mx-4 w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-primary/15 p-6 shadow-2xl"
               role="dialog"
               aria-modal="true"
               aria-labelledby="create-deck-title"

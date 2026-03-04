@@ -20,6 +20,35 @@ const orbitron = Orbitron({
 export const metadata: Metadata = {
   title: "Cognit - The Universal Active Recall Engine",
   description: "AI-powered study platform that transforms any source material into interactive flashcards with smart grading.",
+  keywords: ["flashcards", "spaced repetition", "AI flashcards", "study", "active recall", "PDF to flashcards"],
+  authors: [{ name: "Cognit" }],
+  creator: "Cognit",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://cognit.app",
+    title: "Cognit - The Universal Active Recall Engine",
+    description: "AI-powered study platform that transforms any source material into interactive flashcards with smart grading.",
+    siteName: "Cognit",
+    images: [{
+      url: "https://cognit.app/og-image.png",
+      width: 1200,
+      height: 630,
+      alt: "Cognit Dashboard Preview",
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cognit - The Universal Active Recall Engine",
+    description: "AI-powered study platform that transforms any source material into interactive flashcards with smart grading.",
+    images: ["https://cognit.app/og-image.png"],
+    creator: "@cognit",
+  },
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
