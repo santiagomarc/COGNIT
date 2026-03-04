@@ -366,7 +366,13 @@ export async function generateCards(formData: FormData) {
   if (file.size > MAX_PDF_BYTES) {
     return { error: 'PDF must be under 10 MB.' };
   }
-  if (file.type !== 'application/pdf') {
+  // Accept 'application/pdf' and also 'application/octet-stream' (some OSes/browsers
+  // don't set the correct MIME type for PDFs). Fall back to checking the file name.
+  const isPdf =
+    file.type === 'application/pdf' ||
+    file.type === 'application/octet-stream' ||
+    file.name.toLowerCase().endsWith('.pdf');
+  if (!isPdf) {
     return { error: 'Only PDF files are supported.' };
   }
 
@@ -379,8 +385,10 @@ export async function generateCards(formData: FormData) {
     const textResult = await pdf.getText();
     extractedText = textResult.text;
     await pdf.destroy();
-  } catch {
-    return { error: 'Failed to read the PDF. It may be scanned or corrupted.' };
+  } catch (err) {
+    // Log the real error server-side so it's visible in Next.js terminal
+    console.error('[generateCards] pdf-parse error:', err);
+    return { error: 'Failed to read the PDF. It may be scanned-only, corrupted, or password-protected.' };
   }
 
   if (!extractedText || extractedText.trim().length < 50) {
@@ -398,10 +406,11 @@ export async function generateCards(formData: FormData) {
 
   const genai = new GoogleGenerativeAI(apiKey);
   const model = genai.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
     generationConfig: {
       temperature: 0.7,
       responseMimeType: 'application/json',
+      maxOutputTokens: Number(process.env.GEMINI_MODEL_MAX_TOKENS) || 4096,
     },
   });
 
@@ -452,8 +461,14 @@ export async function generateCards(formData: FormData) {
     if (cards.length === 0) {
       return { error: 'AI could not generate valid cards from this PDF.' };
     }
-  } catch {
-    return { error: 'AI generation failed. Please check your GEMINI_API_KEY and try again.' };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[generateCards] Gemini error:', msg);
+    // Surface quota / rate-limit errors clearly instead of a generic message
+    if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests')) {
+      return { error: 'Gemini free-tier quota exceeded for today. Enable billing at ai.google.dev or try again tomorrow.' };
+    }
+    return { error: `AI generation failed: ${msg}` };
   }
 
   // ── 7. Batch insert into the cards table ──
