@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
+import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
@@ -87,6 +88,10 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       <FadeInUp delay={0.1}>
         <AddCardForm deckId={deckId} />
+      </FadeInUp>
+
+      <FadeInUp delay={0.15}>
+        <PDFUploadZone deckId={deckId} />
       </FadeInUp>
 
       {cards && cards.length > 0 ? (

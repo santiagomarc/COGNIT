@@ -79,6 +79,16 @@ export const updateCardSchema = z.object({
 
 export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 
+/* ═══════════ AI Generation Schema ═══════════ */
+
+export const generateCardsSchema = z.object({
+    deck_id: z.uuid({ message: "Invalid deck id" }),
+    /** Number of flashcards to generate. 5-30 range keeps cost sane. */
+    count: z.number().int().min(5).max(30).default(10),
+});
+
+export type GenerateCardsInput = z.infer<typeof generateCardsSchema>;
+
 /* ═══════════ Study / Grading Schema ═══════════ */
 
 export const gradeCardSchema = z.object({
