@@ -44,7 +44,7 @@ export default async function DeckStudyPage({ params }: StudyPageProps) {
 
   const { data: dueCards } = await supabase
     .from('cards')
-    .select('id, front, back, state, interval, ease_factor, repetition_count, next_review_at')
+    .select('id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question')
     .eq('deck_id', deckId)
     .or(`next_review_at.is.null,next_review_at.lte.${now}`)
     .order('next_review_at', { ascending: true, nullsFirst: true })
@@ -58,6 +58,8 @@ export default async function DeckStudyPage({ params }: StudyPageProps) {
     interval: c.interval ?? 0,
     ease_factor: c.ease_factor ?? 2.5,
     repetition_count: c.repetition_count ?? 0,
+    mcq_distractors: Array.isArray(c.mcq_distractors) ? c.mcq_distractors.filter((value): value is string => typeof value === 'string') : null,
+    id_question: typeof c.id_question === 'string' ? c.id_question : null,
   }));
 
   return (

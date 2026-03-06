@@ -1,5 +1,7 @@
 import {z} from "zod";
 
+export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned']);
+
 /* ═══════════ Auth Schemas ═══════════ */
 
 export const emailSchema = z
@@ -65,6 +67,8 @@ export const createCardSchema = z.object({
     deck_id: z.uuid({ message: "Invalid deck id" }),
     front: z.string().min(1, { message: "Question is required" }).max(1000),
     back: z.string().min(1, { message: "Answer is required" }).max(2000),
+  source: cardSourceSchema.default('manual').optional(),
+  imported_by: z.string().trim().max(200).optional(),
 });
 
 export type CreateCardInput = z.infer<typeof createCardSchema>;
@@ -88,6 +92,39 @@ export const generateCardsSchema = z.object({
 });
 
 export type GenerateCardsInput = z.infer<typeof generateCardsSchema>;
+
+export const bulkImportSchema = z.object({
+  deck_id: z.uuid({ message: "Invalid deck id" }),
+  cards: z.array(
+    z.object({
+      front: z.string().min(1, { message: "Term is required" }).max(1000),
+      back: z.string().min(1, { message: "Description is required" }).max(2000),
+    })
+  ).min(1, { message: "At least one card is required" }).max(200, { message: "You can import at most 200 cards at once" }),
+  imported_by: z.string().trim().max(200).optional(),
+});
+
+export type BulkImportInput = z.infer<typeof bulkImportSchema>;
+
+export const enrichCardsSchema = z.object({
+  deck_id: z.uuid({ message: "Invalid deck id" }),
+  card_ids: z.array(z.uuid({ message: "Invalid card id" })).min(1).max(200),
+});
+
+export type EnrichCardsInput = z.infer<typeof enrichCardsSchema>;
+
+export const sanitizeNotesSchema = z.object({
+  raw_text: z.string().trim().min(1, { message: "Notes are required" }).max(50_000, { message: "Notes are too long" }),
+});
+
+export type SanitizeNotesInput = z.infer<typeof sanitizeNotesSchema>;
+
+export const getHintSchema = z.object({
+  card_id: z.uuid({ message: "Invalid card id" }),
+  deck_id: z.uuid({ message: "Invalid deck id" }),
+});
+
+export type GetHintInput = z.infer<typeof getHintSchema>;
 
 /* ═══════════ Study / Grading Schema ═══════════ */
 

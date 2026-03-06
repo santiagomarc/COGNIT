@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
+import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
 import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -41,7 +42,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   const { data: cards, error: cardsError } = await supabase
     .from('cards')
-    .select('id, deck_id, front, back, created_at')
+    .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question')
     .eq('deck_id', deckId)
     .order('created_at', { ascending: false });
 
@@ -87,6 +88,18 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       </FadeInUp>
 
       <FadeInUp delay={0.1}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Add Content</h2>
+            <p className="text-sm text-muted-foreground">
+              Add individual cards, bulk-import structured notes, or generate cards from a PDF.
+            </p>
+          </div>
+          <BulkImportModal deckId={deckId} />
+        </div>
+      </FadeInUp>
+
+      <FadeInUp delay={0.12}>
         <AddCardForm deckId={deckId} />
       </FadeInUp>
 
@@ -103,6 +116,9 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                 deckId={deckId}
                 question={card.front}
                 answer={card.back}
+                source={card.source ?? 'manual'}
+                importedBy={card.imported_by ?? null}
+                quizReady={Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2}
               />
             </StaggerItem>
           ))}

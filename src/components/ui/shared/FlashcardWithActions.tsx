@@ -1,28 +1,48 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Pencil, Trash2, X, Check } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
-import { updateCard, deleteCard } from '@/app/actions';
+import { updateCard, deleteCard, enrichCards } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import type { CardSource } from '@/index';
 
 type FlashcardWithActionsProps = {
   cardId: string;
   deckId: string;
   question: string;
   answer: string;
+  source: CardSource;
+  importedBy: string | null;
+  quizReady: boolean;
 };
 
-export function FlashcardWithActions({ cardId, deckId, question, answer }: FlashcardWithActionsProps) {
+const SOURCE_LABELS: Record<CardSource, string> = {
+  manual: 'Manual',
+  ai_pdf: 'AI PDF',
+  bulk_import: 'Bulk Import',
+  ai_cleaned: 'AI Cleaned',
+};
+
+export function FlashcardWithActions({
+  cardId,
+  deckId,
+  question,
+  answer,
+  source,
+  importedBy,
+  quizReady,
+}: FlashcardWithActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [front, setFront] = useState(question);
   const [back, setBack] = useState(answer);
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [, startEnrichmentTransition] = useTransition();
 
   async function handleSave() {
     setIsLoading(true);
@@ -32,6 +52,9 @@ export function FlashcardWithActions({ cardId, deckId, question, answer }: Flash
     } else {
       toast.success('Card updated');
       setIsEditing(false);
+      startEnrichmentTransition(async () => {
+        await enrichCards({ deck_id: deckId, card_ids: [cardId] });
+      });
     }
     setIsLoading(false);
   }
@@ -134,6 +157,22 @@ export function FlashcardWithActions({ cardId, deckId, question, answer }: Flash
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
+        </div>
+      )}
+
+      {!isEditing && (
+        <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[70%] flex-wrap gap-1">
+          <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
+            {SOURCE_LABELS[source]}
+          </span>
+          <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+            {quizReady ? 'Quiz Ready' : 'Quiz Pending'}
+          </span>
+          {importedBy ? (
+            <span className="rounded-full border border-primary/15 bg-card/80 px-2 py-1 text-[10px] text-muted-foreground backdrop-blur-sm">
+              {importedBy}
+            </span>
+          ) : null}
         </div>
       )}
 

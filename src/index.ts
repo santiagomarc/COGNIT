@@ -1,4 +1,5 @@
 export type CardState = 'new' | 'learning' | 'review' | 'relearning';
+export type CardSource = 'manual' | 'ai_pdf' | 'bulk_import' | 'ai_cleaned';
 
 export interface Deck {
   id: string;
@@ -16,6 +17,10 @@ export interface Card {
   front: string;
   back: string;
   explanation: string | null;
+  source: CardSource;
+  imported_by: string | null;
+  mcq_distractors: string[] | null;
+  id_question: string | null;
   
   // Spaced Repetition Data
   state: CardState;

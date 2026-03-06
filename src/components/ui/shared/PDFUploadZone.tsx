@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from 'react';
-import { generateCards } from '@/app/actions';
+import { generateCards, enrichCards } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -19,6 +19,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [cardCount, setCardCount] = useState(10);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
+  const [isEnriching, setIsEnriching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Drag handlers ──
@@ -95,6 +96,22 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
         setGeneratedCards(result.cards);
         setSelectedFile(null);
         if (inputRef.current) inputRef.current.value = '';
+
+        if (result.cardIds?.length) {
+          setIsEnriching(true);
+          void enrichCards({ deck_id: deckId, card_ids: result.cardIds })
+            .then((enrichmentResult) => {
+              if (enrichmentResult?.error) {
+                toast.error(typeof enrichmentResult.error === 'string' ? enrichmentResult.error : 'Quiz enrichment failed');
+                return;
+              }
+
+              if (enrichmentResult?.enrichedCount) {
+                toast.success(`Quiz data prepared for ${enrichmentResult.enrichedCount} generated cards.`);
+              }
+            })
+            .finally(() => setIsEnriching(false));
+        }
       }
     } catch {
       toast.error('Something went wrong. Please try again.');
@@ -274,6 +291,11 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               <CheckCircle2 className="h-4 w-4" />
               {generatedCards.length} cards generated and saved
             </div>
+            {isEnriching && (
+              <p className="text-xs text-muted-foreground">
+                Preparing MCQ distractors and identification prompts in the background...
+              </p>
+            )}
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {generatedCards.map((card, i) => (
                 <motion.div

@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { createCard } from '@/app/actions';
+import { useState, useRef, useTransition } from 'react';
+import { createCard, enrichCards } from '@/app/actions';
 import { createCardSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ type AddCardFormProps = {
 
 export function AddCardForm({ deckId }: AddCardFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [, startEnrichmentTransition] = useTransition();
   const [errors, setErrors] = useState<{ front?: string; back?: string }>({});
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -53,6 +54,11 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
       toast.success('Card added to deck');
       formRef.current?.reset();
       setErrors({});
+      if (result.cardId) {
+        startEnrichmentTransition(async () => {
+          await enrichCards({ deck_id: deckId, card_ids: [result.cardId] });
+        });
+      }
     }
 
     setIsLoading(false);
