@@ -25,27 +25,27 @@ export function parseDelimitedNotes(input: string, delimiter = ' - '): ParseResu
   const flagged: FlaggedLine[] = [];
 
   rawLines.forEach((rawLine, index) => {
-    const trimmedLine = rawLine.trim();
-    if (!trimmedLine) {
+    const displayLine = rawLine.trim();
+    if (!displayLine) {
       return;
     }
 
-    const delimiterIndex = trimmedLine.indexOf(safeDelimiter);
+    const delimiterIndex = rawLine.indexOf(safeDelimiter);
     if (delimiterIndex < 0) {
       flagged.push({
-        text: trimmedLine,
+        text: displayLine,
         lineNumber: index + 1,
         reason: 'no_delimiter',
       });
       return;
     }
 
-    const front = trimmedLine.slice(0, delimiterIndex).trim();
-    const back = trimmedLine.slice(delimiterIndex + safeDelimiter.length).trim();
+    const front = rawLine.slice(0, delimiterIndex).trim();
+    const back = rawLine.slice(delimiterIndex + safeDelimiter.length).trim();
 
     if (!front) {
       flagged.push({
-        text: trimmedLine,
+        text: displayLine,
         lineNumber: index + 1,
         reason: 'empty_front',
       });
@@ -54,7 +54,7 @@ export function parseDelimitedNotes(input: string, delimiter = ' - '): ParseResu
 
     if (!back) {
       flagged.push({
-        text: trimmedLine,
+        text: displayLine,
         lineNumber: index + 1,
         reason: 'empty_back',
       });

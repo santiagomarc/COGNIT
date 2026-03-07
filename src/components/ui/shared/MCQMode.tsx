@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CircleAlert, CircleCheckBig } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { StudyGrade } from '@/lib/sm2';
@@ -44,6 +44,34 @@ export function MCQMode({
     const distractors = Array.isArray(card.mcq_distractors) ? card.mcq_distractors.filter(Boolean) : [];
     return shuffle([card.front, ...distractors]).slice(0, Math.max(2, distractors.length + 1));
   }, [card.front, card.mcq_distractors]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (disabled || resolved) {
+        return;
+      }
+
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      const optionIndex = Number(event.key) - 1;
+      if (optionIndex < 0 || optionIndex >= options.length) {
+        return;
+      }
+
+      event.preventDefault();
+      const option = options[optionIndex];
+      setSelectedOption(option);
+      setResolved(true);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [disabled, options, resolved]);
 
   if (!Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2) {
     return (
@@ -141,6 +169,10 @@ export function MCQMode({
             </div>
           </div>
         ) : null}
+      </div>
+
+      <div className="mt-4 text-center text-xs text-muted-foreground/70">
+        Press <span className="font-mono">1-{options.length}</span> to choose an option.
       </div>
     </div>
   );

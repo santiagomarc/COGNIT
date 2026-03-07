@@ -3,7 +3,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Clock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 
 type DueTodayCardProps = {
   totalDue: number;

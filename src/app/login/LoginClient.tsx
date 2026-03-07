@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
@@ -60,20 +60,17 @@ export default function LoginClient() {
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<AuthMode>('login');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
-  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [generalError, setGeneralError] = useState<string | null>(() => {
+    const errorParam = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('error')
+      : null;
+    return errorParam ? decodeURIComponent(errorParam) : null;
+  });
   const [emailSent, setEmailSent] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const searchParams = useSearchParams();
   const reduced = useReducedMotion();
-
-  // Pick up error / redirectTo from query params (set by proxy or auth/callback)
-  useEffect(() => {
-    const errorParam = searchParams.get('error');
-    if (errorParam) {
-      setGeneralError(decodeURIComponent(errorParam));
-    }
-  }, [searchParams]);
 
   // Clear errors when switching modes
   function switchMode(newMode: AuthMode) {

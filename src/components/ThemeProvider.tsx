@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useSyncExternalStore } from 'react';
 
 type Theme = 'dark' | 'light';
 
@@ -19,16 +19,19 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    const stored = localStorage.getItem('cognit-theme') as Theme | null;
-    if (stored === 'light' || stored === 'dark') {
-      setTheme(stored);
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') {
+      return 'dark';
     }
-    setMounted(true);
-  }, []);
+
+    const stored = localStorage.getItem('cognit-theme');
+    return stored === 'light' || stored === 'dark' ? stored : 'dark';
+  });
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   useEffect(() => {
     if (!mounted) return;

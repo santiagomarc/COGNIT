@@ -13,7 +13,7 @@ function AnimatedCounter({ target, suffix = '' }: { target: number; suffix?: str
   useEffect(() => {
     if (!inView) return;
     if (reduced) {
-      setValue(target);
+      requestAnimationFrame(() => setValue(target));
       return;
     }
 

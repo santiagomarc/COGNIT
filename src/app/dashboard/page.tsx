@@ -61,8 +61,11 @@ export default async function Dashboard() {
   }
 
   const sortedDays = Array.from(uniqueDays).sort((a, b) => b.localeCompare(a)); // newest first
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const todayDate = new Date();
+  const today = todayDate.toISOString().slice(0, 10);
+  const yesterdayDate = new Date(todayDate);
+  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+  const yesterday = yesterdayDate.toISOString().slice(0, 10);
 
   let streak = 0;
   let check = today;

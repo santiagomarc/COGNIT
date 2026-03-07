@@ -4,7 +4,15 @@ import { Rocket, ArrowLeft, Home, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { StaggerContainer, StaggerItem, FadeInUp } from '@/components/motion';
+import { StaggerContainer, StaggerItem } from '@/components/motion';
+
+const FLOATING_SPARKS = [
+  { top: '12%', left: '18%', driftY: -110, duration: 3.2, delay: 0.2 },
+  { top: '24%', left: '76%', driftY: -92, duration: 4.4, delay: 1.1 },
+  { top: '48%', left: '34%', driftY: -136, duration: 3.8, delay: 0.6 },
+  { top: '62%', left: '68%', driftY: -104, duration: 4.9, delay: 1.8 },
+  { top: '78%', left: '22%', driftY: -88, duration: 3.6, delay: 1.3 },
+];
 
 export default function NotFound() {
   return (
@@ -37,24 +45,24 @@ export default function NotFound() {
         />
         
         {/* Floating Sparks */}
-        {[...Array(5)].map((_, i) => (
+        {FLOATING_SPARKS.map((spark, i) => (
           <motion.div
             key={i}
             className="absolute h-2 w-2 rounded-full bg-primary/40 shadow-[0_0_10px_var(--neon)]"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
+              top: spark.top,
+              left: spark.left,
             }}
             animate={{
-              y: [0, Math.random() * -100 - 50],
+              y: [0, spark.driftY],
               opacity: [0, 1, 0],
               scale: [0, 1, 0],
             }}
             transition={{
-              duration: Math.random() * 2 + 3,
+              duration: spark.duration,
               repeat: Infinity,
               ease: "linear",
-              delay: Math.random() * 2,
+              delay: spark.delay,
             }}
           />
         ))}
@@ -107,7 +115,7 @@ export default function NotFound() {
           
           <StaggerItem>
             <p className="mt-3 text-base text-muted-foreground leading-relaxed max-w-[280px] mx-auto">
-              The neural pathway you're trying to access doesn't exist in our memory banks.
+              The neural pathway you&apos;re trying to access doesn&apos;t exist in our memory banks.
             </p>
           </StaggerItem>
 
