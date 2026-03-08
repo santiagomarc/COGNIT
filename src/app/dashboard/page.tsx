@@ -52,7 +52,23 @@ export default async function Dashboard() {
     .select('created_at')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
-    .limit(500);
+    .limit(5000);
+
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
+
+  const { data: recentActivityLogs } = await supabase
+    .from('study_logs')
+    .select('created_at')
+    .eq('user_id', user.id)
+    .gte('created_at', sixMonthsAgo.toISOString())
+    .order('created_at', { ascending: true })
+    .limit(10000);
+
+  const { count: totalStudiedCards } = await supabase
+    .from('study_logs')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', user.id);
 
   // Deduplicate by date (UTC)
   const uniqueDays = new Set<string>();
@@ -70,6 +86,18 @@ export default async function Dashboard() {
   let streak = 0;
   let check = today;
   const studiedToday = sortedDays.includes(today);
+
+  const activityByDate = new Map<string, number>();
+  for (const log of recentActivityLogs ?? []) {
+    const day = log.created_at.slice(0, 10);
+    activityByDate.set(day, (activityByDate.get(day) ?? 0) + 1);
+  }
+
+  const activity = Array.from(activityByDate.entries())
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const todayStudiedCount = activityByDate.get(today) ?? 0;
 
   // If the user hasn't studied today, start counting from yesterday
   if (!studiedToday && sortedDays.length > 0 && sortedDays[0] === yesterday) {
@@ -128,10 +156,19 @@ export default async function Dashboard() {
         </div>
       </FadeInUp>
 
-      {/* ── Stats Row: Due Today + Streak ── */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* ── Stats Row: Due Today + Activity Board ── */}
+      <div className="grid gap-4 md:grid-cols-3">
         <DueTodayCard totalDue={totalDue} deckBreakdown={deckBreakdown} />
-        <StudyStreakCard streak={streak} longestStreak={longestStreak} studiedToday={studiedToday} />
+        <div className="md:col-span-2">
+          <StudyStreakCard
+            streak={streak}
+            longestStreak={longestStreak}
+            studiedToday={studiedToday}
+            totalStudiedCards={totalStudiedCards ?? 0}
+            todayStudiedCount={todayStudiedCount}
+            activity={activity}
+          />
+        </div>
       </div>
 
       {/* ── Deck Grid with Search ── */}
