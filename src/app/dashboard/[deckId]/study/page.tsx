@@ -2,14 +2,34 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { StudyDeckClient } from '@/components/ui/shared/StudyDeckClient';
 
+const DEFAULT_SESSION_CARD_COUNT = 10;
+const MIN_SESSION_CARD_COUNT = 5;
+const MAX_SESSION_CARD_COUNT = 50;
+
+function normalizeSessionCardCount(rawCount: string | string[] | undefined): number {
+  const countValue = Array.isArray(rawCount) ? rawCount[0] : rawCount;
+  const parsedCount = Number.parseInt(countValue ?? '', 10);
+
+  if (!Number.isFinite(parsedCount)) {
+    return DEFAULT_SESSION_CARD_COUNT;
+  }
+
+  return Math.min(MAX_SESSION_CARD_COUNT, Math.max(MIN_SESSION_CARD_COUNT, parsedCount));
+}
+
 type StudyPageProps = {
   params: Promise<{
     deckId: string;
   }>;
+  searchParams?: Promise<{
+    count?: string | string[];
+  }>;
 };
 
-export default async function DeckStudyPage({ params }: StudyPageProps) {
+export default async function DeckStudyPage({ params, searchParams }: StudyPageProps) {
   const { deckId } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count);
 
   const supabase = await createClient();
   const {
@@ -48,7 +68,7 @@ export default async function DeckStudyPage({ params }: StudyPageProps) {
     .eq('deck_id', deckId)
     .or(`next_review_at.is.null,next_review_at.lte.${now}`)
     .order('next_review_at', { ascending: true, nullsFirst: true })
-    .limit(50); // cap a single session at 50 cards
+    .limit(sessionCardCount);
 
   const cards = (dueCards ?? []).map((c) => ({
     id: c.id,

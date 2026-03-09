@@ -9,6 +9,7 @@ import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithAction
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 type DeckDetailPageProps = {
   params: Promise<{
@@ -79,9 +80,28 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
               <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary font-medium">
                 {cards?.length ?? 0} cards
               </div>
-              <Link href={`/dashboard/${deckId}/study`}>
-                <Button>Start Study</Button>
-              </Link>
+              <form
+                action={`/dashboard/${deckId}/study`}
+                method="get"
+                className="flex flex-wrap items-end gap-2"
+              >
+                <label className="space-y-1 text-left">
+                  <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    Session cards
+                  </span>
+                  <Input
+                    name="count"
+                    type="number"
+                    min={5}
+                    max={50}
+                    step={1}
+                    defaultValue={10}
+                    className="w-28"
+                    aria-label="Number of cards to study"
+                  />
+                </label>
+                <Button type="submit">Start Study</Button>
+              </form>
             </div>
           </div>
         </div>
