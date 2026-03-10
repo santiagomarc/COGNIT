@@ -39,6 +39,7 @@
 /* ─── Light Mode: "Clean Paper" ─── */
 :root {
   --radius: 0.625rem;
+  color-scheme: light;
   --background: #f8fafc;
   --foreground: #0f172a;
   --card: rgba(255, 255, 255, 0.7);
@@ -65,6 +66,7 @@
 
 /* ─── Dark Mode: "Deep Navy" (#020617) ─── */
 .dark {
+  color-scheme: dark;
   --background: #020617;
   --foreground: #e2e8f0;
   --card: rgba(15, 23, 42, 0.6);
@@ -103,8 +105,35 @@
 .theme-transitioning *,
 .theme-transitioning *::before,
 .theme-transitioning *::after {
-  transition: background-color 0.4s ease, color 0.3s ease, border-color 0.35s ease,
-    box-shadow 0.35s ease, fill 0.3s ease, stroke 0.3s ease !important;
+  transition-property: background-color, color, border-color, box-shadow, fill, stroke, text-shadow, opacity, backdrop-filter;
+  transition-duration: 280ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: 0ms;
+  will-change: background-color, color, border-color, box-shadow, fill, stroke, text-shadow;
+}
+
+.theme-fade-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity, backdrop-filter, background;
+  background:
+    radial-gradient(circle at top center, color-mix(in srgb, var(--glow) 45%, transparent) 0%, transparent 48%),
+    linear-gradient(to bottom, color-mix(in srgb, var(--background) 52%, transparent), color-mix(in srgb, var(--background) 76%, transparent));
+  backdrop-filter: blur(0px) saturate(1);
+  -webkit-backdrop-filter: blur(0px) saturate(1);
+  transition:
+    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    backdrop-filter 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.theme-fade-overlay.is-visible {
+  opacity: 0.58;
+  backdrop-filter: blur(10px) saturate(1.03);
+  -webkit-backdrop-filter: blur(10px) saturate(1.03);
 }
 
 /* ─── Glow title: gamified display font with neon text-shadow ─── */

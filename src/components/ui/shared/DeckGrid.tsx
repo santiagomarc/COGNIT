@@ -8,6 +8,13 @@ import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
 import { StaggerContainer, StaggerItem, FadeInUp } from '@/components/motion';
 
+const deckDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
 type DeckWithCount = {
   id: string;
   title: string;
@@ -73,13 +80,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                           {deck.title}
                         </CardTitle>
                         <CardDescription className="flex items-center gap-2 text-xs">
-                          <span>
-                            {new Date(deck.created_at).toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })}
-                          </span>
+                          <span>{deckDateFormatter.format(new Date(deck.created_at))}</span>
                           <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
                             {cardCount} card{cardCount !== 1 ? 's' : ''}
                           </span>

@@ -1,7 +1,15 @@
 'use client';
 
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import type { ReactNode } from 'react';
+import { useSyncExternalStore, type ReactNode } from 'react';
+
+function useHasMounted() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
 
 /* ─── Reduced-motion safe defaults ─── */
 const noMotion: Variants = {
@@ -56,10 +64,13 @@ export function StaggerContainer({
   children: ReactNode;
   className?: string;
 }) {
+  const hasMounted = useHasMounted();
   const reduced = useReducedMotion();
+  const resolvedVariants = !hasMounted || reduced ? noMotion : staggerContainer;
+
   return (
     <motion.div
-      variants={reduced ? noMotion : staggerContainer}
+      variants={resolvedVariants}
       initial="hidden"
       animate="show"
       className={className}
@@ -76,9 +87,11 @@ export function StaggerItem({
   children: ReactNode;
   className?: string;
 }) {
+  const hasMounted = useHasMounted();
   const reduced = useReducedMotion();
+
   return (
-    <motion.div variants={reduced ? noMotion : staggerItem} className={className}>
+    <motion.div variants={!hasMounted || reduced ? noMotion : staggerItem} className={className}>
       {children}
     </motion.div>
   );
@@ -93,13 +106,16 @@ export function FadeInUp({
   className?: string;
   delay?: number;
 }) {
+  const hasMounted = useHasMounted();
   const reduced = useReducedMotion();
+  const shouldReduceMotion = !hasMounted || reduced;
+
   return (
     <motion.div
-      variants={reduced ? noMotion : fadeInUp}
+      variants={shouldReduceMotion ? noMotion : fadeInUp}
       initial="hidden"
       animate="show"
-      transition={reduced ? undefined : { delay }}
+      transition={shouldReduceMotion ? undefined : { delay }}
       className={className}
     >
       {children}
@@ -114,12 +130,15 @@ export function PageTransition({
   children: ReactNode;
   className?: string;
 }) {
+  const hasMounted = useHasMounted();
   const reduced = useReducedMotion();
+  const shouldReduceMotion = !hasMounted || reduced;
+
   return (
     <motion.div
-      initial={reduced ? undefined : { opacity: 0, y: 12 }}
+      initial={shouldReduceMotion ? undefined : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={reduced ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 26 }}
+      transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 26 }}
       className={className}
     >
       {children}
