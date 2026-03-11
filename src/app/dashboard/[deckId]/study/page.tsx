@@ -1,21 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { StudyDeckClient } from '@/components/ui/shared/StudyDeckClient';
-
-const DEFAULT_SESSION_CARD_COUNT = 10;
-const MIN_SESSION_CARD_COUNT = 5;
-const MAX_SESSION_CARD_COUNT = 50;
-
-function normalizeSessionCardCount(rawCount: string | string[] | undefined): number {
-  const countValue = Array.isArray(rawCount) ? rawCount[0] : rawCount;
-  const parsedCount = Number.parseInt(countValue ?? '', 10);
-
-  if (!Number.isFinite(parsedCount)) {
-    return DEFAULT_SESSION_CARD_COUNT;
-  }
-
-  return Math.min(MAX_SESSION_CARD_COUNT, Math.max(MIN_SESSION_CARD_COUNT, parsedCount));
-}
+import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
+import { normalizeSessionCardCount, type StudySessionCard } from '@/lib/study';
 
 type StudyPageProps = {
   params: Promise<{
@@ -70,7 +56,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     .order('next_review_at', { ascending: true, nullsFirst: true })
     .limit(sessionCardCount);
 
-  const cards = (dueCards ?? []).map((c) => ({
+  const cards: StudySessionCard[] = (dueCards ?? []).map((c) => ({
     id: c.id,
     front: c.front,
     back: c.back,
@@ -83,7 +69,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
   }));
 
   return (
-    <StudyDeckClient
+    <FlashcardReviewClient
       deckId={deckId}
       deckTitle={deck.title}
       cards={cards}

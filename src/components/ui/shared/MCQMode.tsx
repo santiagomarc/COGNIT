@@ -17,7 +17,7 @@ type MCQModeProps = {
   card: MCQModeCard;
   disabled: boolean;
   enrichmentPending: boolean;
-  onResolve: (grade: StudyGrade, wasCorrect: boolean) => void;
+  onResolve: (grade: StudyGrade, wasCorrect: boolean, answer: string) => void;
   onFallbackToIdentification: () => void;
 };
 
@@ -163,7 +163,11 @@ export function MCQMode({
               </div>
             </div>
             <div className="flex justify-end">
-              <Button type="button" onClick={() => onResolve(wasCorrect ? 'easy' : 'again', wasCorrect)} disabled={disabled}>
+              <Button
+                type="button"
+                onClick={() => onResolve(wasCorrect ? 'easy' : 'again', wasCorrect, selectedOption ?? '')}
+                disabled={disabled}
+              >
                 Continue
               </Button>
             </div>

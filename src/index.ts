@@ -41,3 +41,22 @@ export interface StudyLog {
   review_duration_ms: number;
   created_at: string;
 }
+
+export interface QuizResult {
+  id: string;
+  user_id: string;
+  deck_id: string;
+  mode: 'mcq' | 'identification';
+  total_cards: number;
+  correct_cards: number;
+  duration_ms: number;
+  created_at: string;
+}
+
+export interface QuizCardResult {
+  id: string;
+  quiz_result_id: string;
+  card_id: string;
+  correct: boolean;
+  created_at: string;
+}

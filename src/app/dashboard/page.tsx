@@ -7,6 +7,7 @@ import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
 import { Layers } from 'lucide-react';
+import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
 
 export default async function Dashboard() {
   const supabase = await createClient();
@@ -21,6 +22,9 @@ export default async function Dashboard() {
     .from('decks')
     .select('id, title, created_at, cards(count)')
     .order('created_at', { ascending: false });
+
+  const deckRows = (decks as { id: string; title: string; created_at: string; cards: { count: number }[] }[] | null) ?? [];
+  const totalCardsByDeck = new Map(deckRows.map((deck) => [deck.id, deck.cards?.[0]?.count ?? 0]));
 
   // ── Fetch cards due today (next_review_at <= now) ──
   const now = new Date().toISOString();
@@ -69,6 +73,35 @@ export default async function Dashboard() {
     .from('study_logs')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id);
+
+  let masteryByDeck = computeDeckMasterySnapshots({
+    totalCardsByDeck,
+    quizResults: [],
+    quizCardResults: [],
+  });
+
+  const { data: quizResults, error: quizResultsError } = await supabase
+    .from('quiz_results')
+    .select('id, deck_id, created_at')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(5000);
+
+  if (!quizResultsError && quizResults && quizResults.length > 0) {
+    const { data: quizCardResults, error: quizCardResultsError } = await supabase
+      .from('quiz_card_results')
+      .select('quiz_result_id, card_id, correct')
+      .in('quiz_result_id', quizResults.map((row) => row.id))
+      .limit(20000);
+
+    if (!quizCardResultsError && quizCardResults) {
+      masteryByDeck = computeDeckMasterySnapshots({
+        totalCardsByDeck,
+        quizResults,
+        quizCardResults,
+      });
+    }
+  }
 
   // Deduplicate by date (UTC)
   const uniqueDays = new Set<string>();
@@ -173,7 +206,17 @@ export default async function Dashboard() {
 
       {/* ── Deck Grid with Search ── */}
       <FadeInUp delay={0.15}>
-        <DeckGrid decks={(decks as { id: string; title: string; created_at: string; cards: { count: number }[] }[]) ?? []} />
+        <DeckGrid
+          decks={deckRows.map((deck) => {
+            const mastery = masteryByDeck.get(deck.id);
+            return {
+              ...deck,
+              masteryPercentage: mastery?.masteryPercentage ?? 0,
+              assessedCards: mastery?.assessedCards ?? 0,
+              lastQuizAt: mastery?.lastQuizAt ?? null,
+            };
+          })}
+        />
       </FadeInUp>
     </div>
   );

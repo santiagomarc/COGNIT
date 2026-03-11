@@ -8,6 +8,13 @@ import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
 import { StaggerContainer, StaggerItem, FadeInUp } from '@/components/motion';
 
+function getMasteryBadgeClass(masteryPercentage: number) {
+  if (masteryPercentage >= 85) return 'border-sky-500/20 bg-sky-500/10 text-sky-300';
+  if (masteryPercentage >= 60) return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
+  if (masteryPercentage >= 30) return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+  return 'border-primary/20 bg-primary/5 text-primary';
+}
+
 const deckDateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
   day: 'numeric',
@@ -20,6 +27,9 @@ type DeckWithCount = {
   title: string;
   created_at: string;
   cards: { count: number }[];
+  masteryPercentage: number;
+  assessedCards: number;
+  lastQuizAt: string | null;
 };
 
 type DeckGridProps = {
@@ -79,10 +89,13 @@ export function DeckGrid({ decks }: DeckGridProps) {
                         <CardTitle className="group-hover:text-primary transition-colors duration-200 truncate">
                           {deck.title}
                         </CardTitle>
-                        <CardDescription className="flex items-center gap-2 text-xs">
+                        <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
                           <span>{deckDateFormatter.format(new Date(deck.created_at))}</span>
                           <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
                             {cardCount} card{cardCount !== 1 ? 's' : ''}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getMasteryBadgeClass(deck.masteryPercentage)}`}>
+                            {deck.assessedCards > 0 ? `${deck.masteryPercentage}% mastery` : 'No quiz data'}
                           </span>
                         </CardDescription>
                       </Link>

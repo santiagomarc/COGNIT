@@ -128,6 +128,8 @@ export type GetHintInput = z.infer<typeof getHintSchema>;
 
 /* ═══════════ Study / Grading Schema ═══════════ */
 
+export const quizModeSchema = z.enum(['mcq', 'identification']);
+
 export const gradeCardSchema = z.object({
     card_id: z.uuid({ message: "Invalid card id" }),
     deck_id: z.uuid({ message: "Invalid deck id" }),
@@ -139,4 +141,18 @@ export const gradeCardSchema = z.object({
 });
 
 export type GradeCardInput = z.infer<typeof gradeCardSchema>;
+
+export const logQuizResultSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  mode: quizModeSchema,
+  duration_ms: z.number().int().min(0).default(0),
+  results: z.array(
+    z.object({
+      card_id: z.uuid({ message: 'Invalid card id' }),
+      correct: z.boolean(),
+    })
+  ).min(1, { message: 'At least one quiz result is required' }).max(200, { message: 'Too many quiz results provided' }),
+});
+
+export type LogQuizResultInput = z.infer<typeof logQuizResultSchema>;
 

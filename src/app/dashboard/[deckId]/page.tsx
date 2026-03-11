@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { ArrowLeft, BookOpen } from 'lucide-react';
+import { ArrowLeft, BookOpen, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
@@ -10,6 +10,34 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
+
+function getMasteryBarClass(masteryPercentage: number) {
+  if (masteryPercentage >= 85) return 'bg-sky-400';
+  if (masteryPercentage >= 60) return 'bg-emerald-400';
+  if (masteryPercentage >= 30) return 'bg-amber-400';
+  return 'bg-red-400';
+}
+
+function formatLastQuizLabel(lastQuizAt: string | null) {
+  if (!lastQuizAt) {
+    return 'Take your first quiz to start measuring mastery.';
+  }
+
+  const now = Date.now();
+  const diffMs = now - new Date(lastQuizAt).getTime();
+  const dayDiff = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+
+  if (dayDiff === 0) {
+    return 'Last quizzed today';
+  }
+
+  if (dayDiff === 1) {
+    return 'Last quizzed 1 day ago';
+  }
+
+  return `Last quizzed ${dayDiff} days ago`;
+}
 
 type DeckDetailPageProps = {
   params: Promise<{
@@ -51,6 +79,44 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     throw new Error(cardsError.message);
   }
 
+  const totalCards = cards?.length ?? 0;
+  const quizReadyCards = (cards ?? []).filter(
+    (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
+  ).length;
+
+  let mastery = {
+    masteryPercentage: 0,
+    assessedCards: 0,
+    masteredCards: 0,
+    totalCards,
+    lastQuizAt: null as string | null,
+  };
+
+  const { data: quizResults, error: quizResultsError } = await supabase
+    .from('quiz_results')
+    .select('id, deck_id, created_at')
+    .eq('user_id', user.id)
+    .eq('deck_id', deckId)
+    .order('created_at', { ascending: false })
+    .limit(5000);
+
+  if (!quizResultsError && quizResults && quizResults.length > 0) {
+    const { data: quizCardResults, error: quizCardResultsError } = await supabase
+      .from('quiz_card_results')
+      .select('quiz_result_id, card_id, correct')
+      .in('quiz_result_id', quizResults.map((row) => row.id))
+      .limit(20000);
+
+    if (!quizCardResultsError && quizCardResults) {
+      const snapshots = computeDeckMasterySnapshots({
+        totalCardsByDeck: new Map([[deckId, totalCards]]),
+        quizResults,
+        quizCardResults,
+      });
+      mastery = snapshots.get(deckId) ?? mastery;
+    }
+  }
+
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
       <FadeInUp>
@@ -66,41 +132,141 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
             <ThemeToggle />
           </div>
 
-          <div className="glass-card glow-border flex flex-col gap-4 rounded-2xl p-6 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-2">
-              <h1 className="glow-title text-3xl font-bold tracking-tight">{deck.title}</h1>
-              {deck.description ? (
-                <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground/60">No description yet.</p>
-              )}
+          <div className="glass-card glow-border space-y-6 rounded-2xl p-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div className="space-y-2">
+                <h1 className="glow-title text-3xl font-bold tracking-tight">{deck.title}</h1>
+                {deck.description ? (
+                  <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground/60">No description yet.</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
+                  {totalCards} cards
+                </div>
+                <div className="inline-flex items-center rounded-full border border-primary/20 bg-card/50 px-3 py-1 text-sm text-muted-foreground">
+                  {quizReadyCards}/{totalCards} quiz-ready
+                </div>
+              </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm text-primary font-medium">
-                {cards?.length ?? 0} cards
+            <div className="rounded-2xl border border-primary/15 bg-card/30 p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <Trophy className="h-4 w-4 text-primary" />
+                    Deck Mastery
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {formatLastQuizLabel(mastery.lastQuizAt)}
+                  </p>
+                </div>
+                <div className="text-left md:text-right">
+                  <p className="text-3xl font-bold tracking-tight text-foreground">{mastery.masteryPercentage}%</p>
+                  <p className="text-xs text-muted-foreground">
+                    {mastery.masteredCards}/{mastery.totalCards} cards currently proven in quizzes
+                  </p>
+                </div>
               </div>
-              <form
-                action={`/dashboard/${deckId}/study`}
-                method="get"
-                className="flex flex-wrap items-end gap-2"
-              >
-                <label className="space-y-1 text-left">
-                  <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    Session cards
-                  </span>
-                  <Input
-                    name="count"
-                    type="number"
-                    min={5}
-                    max={50}
-                    step={1}
-                    defaultValue={10}
-                    className="w-28"
-                    aria-label="Number of cards to study"
-                  />
-                </label>
-                <Button type="submit">Start Study</Button>
+
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted/50">
+                <div
+                  className={`h-full rounded-full transition-all ${getMasteryBarClass(mastery.masteryPercentage)}`}
+                  style={{ width: `${Math.min(mastery.masteryPercentage, 100)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <BrainCircuit className="h-4 w-4 text-primary" />
+                      Review Flashcards
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Build recall with spaced repetition. This is the flow that advances your daily review count, streak, and heatmap.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-end gap-3">
+                  <label className="space-y-1 text-left">
+                    <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Session cards
+                    </span>
+                    <Input
+                      name="count"
+                      type="number"
+                      min={5}
+                      max={50}
+                      step={1}
+                      defaultValue={10}
+                      className="w-28"
+                      aria-label="Number of flashcards to review"
+                    />
+                  </label>
+                  <Button type="submit" disabled={totalCards === 0}>Review Flashcards</Button>
+                </div>
+              </form>
+
+              <form action={`/dashboard/${deckId}/quiz`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      Take Quiz
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Test what you know in a dedicated assessment flow. Quiz results update this deck&apos;s mastery score.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+                  <label className="space-y-1 text-left">
+                    <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Quiz cards
+                    </span>
+                    <Input
+                      name="count"
+                      type="number"
+                      min={5}
+                      max={50}
+                      step={1}
+                      defaultValue={10}
+                      className="w-28"
+                      aria-label="Number of quiz cards"
+                    />
+                  </label>
+
+                  <fieldset className="space-y-2">
+                    <legend className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Mode</legend>
+                    <div className="flex flex-wrap gap-2">
+                      <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <input type="radio" name="mode" value="mcq" defaultChecked className="accent-primary" />
+                        MCQ
+                      </label>
+                      <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <input type="radio" name="mode" value="identification" className="accent-primary" />
+                        Identification
+                      </label>
+                    </div>
+                  </fieldset>
+                </div>
+
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    {quizReadyCards < totalCards
+                      ? 'Some cards still need AI enrichment. The quiz route will prepare missing prompts automatically.'
+                      : 'All cards are ready for both quiz modes.'}
+                  </p>
+                  <Button type="submit" variant="outline" disabled={totalCards === 0}>Start Quiz</Button>
+                </div>
               </form>
             </div>
           </div>

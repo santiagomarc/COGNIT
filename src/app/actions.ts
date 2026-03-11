@@ -6,6 +6,7 @@ import {
   createCardSchema, CreateCardInput,
   updateCardSchema, UpdateCardInput,
   gradeCardSchema, GradeCardInput,
+  logQuizResultSchema, LogQuizResultInput,
   generateCardsSchema,
   bulkImportSchema, BulkImportInput,
   enrichCardsSchema, EnrichCardsInput,
@@ -551,6 +552,78 @@ export async function gradeCard(data: GradeCardInput) {
     nextReviewAt: sm2Result.nextReviewAt.toISOString(),
     interval: sm2Result.interval,
     state: sm2Result.state,
+  };
+}
+
+export async function logQuizResult(data: LogQuizResultInput) {
+  const result = logQuizResultSchema.safeParse(data);
+  if (!result.success) {
+    return { error: result.error.flatten().fieldErrors };
+  }
+
+  const deckAccess = await requireOwnedDeck(result.data.deck_id);
+  if ('error' in deckAccess) {
+    return { error: deckAccess.error };
+  }
+
+  const { supabase, user } = deckAccess;
+  const uniqueCardIds = [...new Set(result.data.results.map((entry) => entry.card_id))];
+  const { data: ownedCards, error: ownedCardsError } = await supabase
+    .from('cards')
+    .select('id')
+    .eq('deck_id', result.data.deck_id)
+    .in('id', uniqueCardIds);
+
+  if (ownedCardsError) {
+    return { error: ownedCardsError.message };
+  }
+
+  const ownedCardIds = new Set((ownedCards ?? []).map((card) => card.id));
+  if (ownedCardIds.size !== uniqueCardIds.length) {
+    return { error: 'One or more quiz results referenced cards outside this deck.' };
+  }
+
+  const correctCards = result.data.results.filter((entry) => entry.correct).length;
+  const { data: insertedQuizResult, error: quizResultError } = await supabase
+    .from('quiz_results')
+    .insert({
+      user_id: user.id,
+      deck_id: result.data.deck_id,
+      mode: result.data.mode,
+      total_cards: result.data.results.length,
+      correct_cards: correctCards,
+      duration_ms: result.data.duration_ms,
+    })
+    .select('id')
+    .single();
+
+  if (quizResultError || !insertedQuizResult) {
+    return { error: quizResultError?.message ?? 'Failed to save quiz result.' };
+  }
+
+  const { error: quizCardResultsError } = await supabase
+    .from('quiz_card_results')
+    .insert(
+      result.data.results.map((entry) => ({
+        quiz_result_id: insertedQuizResult.id,
+        card_id: entry.card_id,
+        correct: entry.correct,
+      }))
+    );
+
+  if (quizCardResultsError) {
+    return { error: quizCardResultsError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath(`/dashboard/${result.data.deck_id}`);
+  revalidatePath(`/dashboard/${result.data.deck_id}/quiz`);
+
+  return {
+    success: true,
+    quizResultId: insertedQuizResult.id,
+    correctCards,
+    totalCards: result.data.results.length,
   };
 }
 
