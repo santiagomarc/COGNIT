@@ -3,8 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 // ── Protected path prefixes ──
 const PROTECTED_PATHS = ['/dashboard'];
-// ── Auth-only paths: redirect to dashboard if already logged in ──
-const AUTH_ONLY_PATHS = ['/login'];
 // ── Paths that require a session but aren't "dashboard" ──
 const SESSION_REQUIRED_PATHS = ['/login/update-password'];
 
@@ -60,13 +58,6 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('error', 'Your reset link has expired. Please request a new one.');
-    return NextResponse.redirect(url);
-  }
-
-  // ── Redirect logged-in users away from auth-only pages ──
-  if (user && AUTH_ONLY_PATHS.some((p) => pathname === p)) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
     return NextResponse.redirect(url);
   }
 

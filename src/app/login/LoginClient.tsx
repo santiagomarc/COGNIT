@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
@@ -54,23 +54,37 @@ const floatingCards = [
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
+function resolveMode(value: string | null): AuthMode {
+  if (value === 'signup' || value === 'forgot') {
+    return value;
+  }
+
+  return 'login';
+}
+
 export default function LoginClient() {
+  const searchParams = useSearchParams();
+  const reduced = useReducedMotion();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [mode, setMode] = useState<AuthMode>('login');
+  const [mode, setMode] = useState<AuthMode>(() => resolveMode(searchParams.get('mode')));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
-  const [generalError, setGeneralError] = useState<string | null>(() => {
-    const errorParam = typeof window !== 'undefined'
-      ? new URLSearchParams(window.location.search).get('error')
-      : null;
-    return errorParam ? decodeURIComponent(errorParam) : null;
-  });
+  const [generalError, setGeneralError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const searchParams = useSearchParams();
-  const reduced = useReducedMotion();
+  useEffect(() => {
+    setGeneralError(searchParams.get('error'));
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (emailSent) {
+      return;
+    }
+
+    setMode(resolveMode(searchParams.get('mode')));
+  }, [emailSent, searchParams]);
 
   // Clear errors when switching modes
   function switchMode(newMode: AuthMode) {
@@ -130,7 +144,7 @@ export default function LoginClient() {
 
       startTransition(async () => {
         const redirectTo = searchParams.get('redirectTo') || '/dashboard';
-        const result = await login({ email, password });
+        const result = await login({ email, password, redirectTo });
         // If login succeeds, the server action redirects — we only reach here on error
         if (result?.error) {
           if (typeof result.error === 'string') {
@@ -139,7 +153,6 @@ export default function LoginClient() {
             setFieldErrors(result.error as Record<string, string[]>);
           }
         }
-        void redirectTo;
       });
     } else {
       // ── Signup ──

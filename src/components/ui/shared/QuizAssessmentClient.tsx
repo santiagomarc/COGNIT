@@ -65,6 +65,30 @@ export function QuizAssessmentClient({
   totalInDeck,
   mode,
 }: QuizAssessmentClientProps) {
+  const sessionKey = useMemo(
+    () => [deckId, mode, cards.map((card) => card.id).join(',')].join(':'),
+    [cards, deckId, mode]
+  );
+
+  return (
+    <QuizAssessmentSession
+      key={sessionKey}
+      deckId={deckId}
+      deckTitle={deckTitle}
+      cards={cards}
+      totalInDeck={totalInDeck}
+      mode={mode}
+    />
+  );
+}
+
+function QuizAssessmentSession({
+  deckId,
+  deckTitle,
+  cards,
+  totalInDeck,
+  mode,
+}: QuizAssessmentClientProps) {
   const [sessionStartMs, setSessionStartMs] = useState(() => Date.now());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [sessionCards, setSessionCards] = useState(cards);
@@ -85,19 +109,6 @@ export function QuizAssessmentClient({
 
     return () => window.clearInterval(intervalId);
   }, []);
-
-  useEffect(() => {
-    setSessionCards(cards);
-    setQuizMode(mode);
-    setIndex(0);
-    setResults([]);
-    setHasSavedResult(false);
-    requestedEnrichmentIds.current.clear();
-    didPersistResult.current = false;
-    const nextNow = Date.now();
-    setSessionStartMs(nextNow);
-    setNowMs(nextNow);
-  }, [cards, mode]);
 
   const active = sessionCards[index];
   const completed = index >= sessionCards.length;

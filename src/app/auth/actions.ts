@@ -51,8 +51,20 @@ function sanitizeAuthError(error: { message: string; code?: string }): string {
   return 'Something went wrong. Please try again.';
 }
 
+function resolveRedirectPath(redirectTo?: string | null) {
+  if (!redirectTo || !redirectTo.startsWith('/') || redirectTo.startsWith('//')) {
+    return '/dashboard';
+  }
+
+  if (redirectTo === '/login' || redirectTo.startsWith('/auth/callback')) {
+    return '/dashboard';
+  }
+
+  return redirectTo;
+}
+
 // ─── LOGIN ───
-export async function login(data: LoginInput) {
+export async function login(data: LoginInput & { redirectTo?: string | null }) {
   const parsed = loginSchema.safeParse(data);
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors };
@@ -69,7 +81,7 @@ export async function login(data: LoginInput) {
   }
 
   revalidatePath('/', 'layout');
-  redirect('/dashboard');
+  redirect(resolveRedirectPath(data.redirectTo));
 }
 
 // ─── SIGNUP ───
@@ -158,5 +170,5 @@ export async function logout() {
   const supabase = await createClient();
   await supabase.auth.signOut();
   revalidatePath('/', 'layout');
-  redirect('/login');
+  redirect('/');
 }
