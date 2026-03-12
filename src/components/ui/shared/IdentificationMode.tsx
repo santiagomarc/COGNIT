@@ -50,6 +50,10 @@ export function IdentificationMode({
   const [result, setResult] = useState<IdentificationResult | null>(null);
 
   const prompt = useMemo(() => card.id_question ?? card.back, [card.back, card.id_question]);
+  const promptStatusLabel = card.id_question ? 'AI-Rewritten Prompt' : 'Source Description';
+  const promptStatusText = card.id_question
+    ? 'This clue was rewritten from the card description to make the identification prompt cleaner.'
+    : 'This clue is using the saved card description directly until a rewritten prompt is available.';
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -70,9 +74,13 @@ export function IdentificationMode({
       <div className="mb-4 flex items-center justify-between gap-3 text-xs uppercase tracking-wider text-muted-foreground">
         <span>Identification Prompt</span>
         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${card.id_question ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
-          {card.id_question ? 'AI Prompt Ready' : 'Using Raw Description'}
+          {promptStatusLabel}
         </span>
       </div>
+
+      <p className="mb-4 text-sm text-muted-foreground">
+        {promptStatusText}
+      </p>
 
       <div className="space-y-4">
         <div className="rounded-2xl border border-primary/15 bg-background/25 px-6 py-6 text-center text-lg leading-relaxed">
@@ -81,7 +89,7 @@ export function IdentificationMode({
 
         {enrichmentPending && !card.id_question ? (
           <div className="rounded-xl border border-primary/10 bg-card/20 px-4 py-3 text-sm text-muted-foreground">
-            AI is preparing a question-style prompt for this card. You can still answer using the raw description.
+            AI is preparing a cleaner question-style clue for this card. You can still answer using the saved description right now.
           </div>
         ) : null}
 

@@ -10,7 +10,6 @@ import {
   CircleCheckBig,
   RotateCcw,
   Sparkles,
-  Target,
   Timer,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -59,30 +58,6 @@ function getLetterGrade(percentage: number) {
 }
 
 export function QuizAssessmentClient({
-  deckId,
-  deckTitle,
-  cards,
-  totalInDeck,
-  mode,
-}: QuizAssessmentClientProps) {
-  const sessionKey = useMemo(
-    () => [deckId, mode, cards.map((card) => card.id).join(',')].join(':'),
-    [cards, deckId, mode]
-  );
-
-  return (
-    <QuizAssessmentSession
-      key={sessionKey}
-      deckId={deckId}
-      deckTitle={deckTitle}
-      cards={cards}
-      totalInDeck={totalInDeck}
-      mode={mode}
-    />
-  );
-}
-
-function QuizAssessmentSession({
   deckId,
   deckTitle,
   cards,
@@ -284,33 +259,33 @@ function QuizAssessmentSession({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-[1.4fr_0.9fr]">
-        <div className="glass-card rounded-2xl p-4">
-          <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
+      <div className="glass-card rounded-2xl p-4 md:p-5">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Progress</p>
+            <p className="mt-2 text-lg font-semibold tracking-tight text-foreground">
               {completed ? 'Quiz complete' : `Question ${index + 1} of ${sessionCards.length}`}
-            </span>
-            <span className="font-medium">{Math.min(progress, 100)}%</span>
+            </p>
           </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
-            <motion.div
-              className="h-full rounded-full bg-primary"
-              animate={{ width: `${Math.min(progress, 100)}%` }}
-              transition={{ type: 'spring', stiffness: 180, damping: 24 }}
-            />
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 font-medium text-foreground">
+              {getModeLabel(quizMode)}
+            </span>
+            <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 font-medium text-foreground">
+              {Math.min(progress, 100)}% complete
+            </span>
+            <span className="flex items-center gap-1 rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 font-medium text-foreground">
+              <Timer className="h-3 w-3" />
+              {formatDuration(sessionDuration)}
+            </span>
           </div>
         </div>
-
-        <div className="glass-card rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Knowledge Check</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Quizzes test what you know. Flashcard review still drives streaks and review counts.
-              </p>
-            </div>
-            <Target className="mt-1 h-5 w-5 text-primary" />
-          </div>
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
+          <motion.div
+            className="h-full rounded-full bg-primary"
+            animate={{ width: `${Math.min(progress, 100)}%` }}
+            transition={{ type: 'spring', stiffness: 180, damping: 24 }}
+          />
         </div>
       </div>
 

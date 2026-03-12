@@ -40,8 +40,11 @@ export function HintButton({ cardId, deckId, disabled = false }: HintButtonProps
     <div className="space-y-2">
       <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={disabled || isLoading} className="gap-2">
         <Lightbulb className="h-4 w-4" />
-        {isLoading ? 'Thinking...' : hint ? 'Hide Hint' : 'Get Hint'}
+        {isLoading ? 'Thinking...' : hint ? 'Hide Hint' : 'Get AI Hint'}
       </Button>
+      <p className="max-w-sm text-xs text-muted-foreground">
+        The hint is AI-generated from the card&apos;s answer and description, and it tries not to reveal the term directly.
+      </p>
       {hint ? (
         <div className="rounded-xl border border-primary/15 bg-card/30 px-3 py-2 text-sm text-muted-foreground">
           {hint}

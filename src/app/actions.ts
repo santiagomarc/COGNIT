@@ -617,7 +617,6 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   revalidatePath('/dashboard');
   revalidatePath(`/dashboard/${result.data.deck_id}`);
-  revalidatePath(`/dashboard/${result.data.deck_id}/quiz`);
 
   return {
     success: true,
