@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CircleAlert, CircleCheckBig } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { StudyGrade } from '@/lib/sm2';
@@ -96,6 +96,39 @@ export function MCQMode({
   const prompt = card.id_question ?? card.back;
   const wasCorrect = selectedOption === card.front;
 
+  const handleContinue = useCallback(() => {
+    if (disabled || !resolved || !selectedOption) {
+      return;
+    }
+
+    onResolve(wasCorrect ? 'easy' : 'again', wasCorrect, selectedOption);
+  }, [disabled, onResolve, resolved, selectedOption, wasCorrect]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!resolved || disabled || !selectedOption) {
+        return;
+      }
+
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (event.key !== ' ' || event.repeat) {
+        return;
+      }
+
+      event.preventDefault();
+      handleContinue();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [disabled, handleContinue, resolved, selectedOption]);
+
   return (
     <div className="glass-card glow-border rounded-3xl p-7">
       <div className="mb-4 flex items-center justify-between gap-3 text-xs uppercase tracking-wider text-muted-foreground">
@@ -165,7 +198,7 @@ export function MCQMode({
             <div className="flex justify-end">
               <Button
                 type="button"
-                onClick={() => onResolve(wasCorrect ? 'easy' : 'again', wasCorrect, selectedOption ?? '')}
+                onClick={handleContinue}
                 disabled={disabled}
               >
                 Continue
