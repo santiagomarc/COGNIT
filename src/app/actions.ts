@@ -14,7 +14,7 @@ import {
   getHintSchema, GetHintInput,
 } from '@/lib/schemas';
 import { sm2, GRADE_MAP, type StudyGrade } from '@/lib/sm2';
-import type { CardState } from '@/index';
+import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath } from 'next/cache';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
@@ -608,6 +608,9 @@ export async function logQuizResult(data: LogQuizResultInput) {
         quiz_result_id: insertedQuizResult.id,
         card_id: entry.card_id,
         correct: entry.correct,
+        prompt_text: entry.prompt,
+        correct_answer_text: entry.correct_answer,
+        user_answer_text: entry.user_answer,
       }))
     );
 
@@ -873,4 +876,111 @@ export async function getHint(data: GetHintInput) {
     console.error('[getHint] Gemini error:', message);
     return { error: `Hint generation failed: ${message}` };
   }
+}
+
+export async function getQuizHistory(deckId: string) {
+  const deckAccess = await requireOwnedDeck(deckId);
+  if ('error' in deckAccess) {
+    return { error: deckAccess.error };
+  }
+
+  const { supabase, user } = deckAccess;
+
+  const { data: deckCards, error: deckCardsError } = await supabase
+    .from('cards')
+    .select('id, front, back, created_at')
+    .eq('deck_id', deckId)
+    .order('created_at', { ascending: true });
+
+  if (deckCardsError) {
+    console.error('Error fetching deck cards for numbering:', deckCardsError);
+    return { error: 'Failed to build card history references.' };
+  }
+
+  const cardReference = new Map<string, { card_number: number; front: string; back: string }>();
+  for (const [index, card] of (deckCards ?? []).entries()) {
+    cardReference.set(card.id, {
+      card_number: index + 1,
+      front: card.front,
+      back: card.back,
+    });
+  }
+
+  const { data: quizResults, error: quizResultsError } = await supabase
+    .from('quiz_results')
+    .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
+    .eq('deck_id', deckId)
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (quizResultsError) {
+    console.error('Error fetching quiz history:', quizResultsError);
+    return { error: 'Failed to fetch quiz history.' };
+  }
+
+  if (!quizResults || quizResults.length === 0) {
+    return { history: [] as QuizHistoryEntry[] };
+  }
+
+  const { data: quizCardRows, error: quizCardRowsError } = await supabase
+    .from('quiz_card_results')
+    .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
+    .in('quiz_result_id', quizResults.map((row) => row.id))
+    .limit(20000);
+
+  if (quizCardRowsError) {
+    console.error('Error fetching quiz history card rows:', quizCardRowsError);
+    return { error: 'Failed to fetch quiz history details.' };
+  }
+
+  const rowsByQuizResultId = new Map<string, Array<{
+    quiz_result_id: string;
+    card_id: string;
+    correct: boolean;
+    prompt_text: string | null;
+    correct_answer_text: string | null;
+    user_answer_text: string | null;
+  }>>();
+
+  for (const row of quizCardRows ?? []) {
+    const existing = rowsByQuizResultId.get(row.quiz_result_id) ?? [];
+    existing.push(row);
+    rowsByQuizResultId.set(row.quiz_result_id, existing);
+  }
+
+  const history: QuizHistoryEntry[] = quizResults.map((result) => {
+    const details = rowsByQuizResultId.get(result.id) ?? [];
+    const incorrectAnswers = details
+      .filter((detail) => !detail.correct)
+      .map((detail) => {
+        const reference = cardReference.get(detail.card_id);
+
+        return {
+          card_id: detail.card_id,
+          card_number: reference?.card_number ?? null,
+          prompt: reference?.back ?? detail.prompt_text ?? 'Card content unavailable',
+          correct_answer: reference?.front ?? detail.correct_answer_text ?? 'Card term unavailable',
+          user_answer: detail.user_answer_text ?? '',
+        };
+      });
+
+    const totalCards = result.total_cards > 0 ? result.total_cards : 1;
+    const scorePercentage = Math.round((result.correct_cards / totalCards) * 100);
+
+    return {
+      id: result.id,
+      deck_id: result.deck_id,
+      mode: result.mode,
+      total_cards: result.total_cards,
+      correct_cards: result.correct_cards,
+      score_percentage: scorePercentage,
+      wrong_count: incorrectAnswers.length,
+      duration_ms: result.duration_ms,
+      created_at: result.created_at,
+      incorrect_answers: incorrectAnswers,
+    };
+  });
+
+  return { history };
 }

@@ -8,6 +8,8 @@ import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
 import { Layers } from 'lucide-react';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
+import { getQuizHistory } from '../actions';
+import { QuizHistoryList } from '@/components/ui/shared/QuizHistoryList';
 
 export default async function Dashboard() {
   const supabase = await createClient();

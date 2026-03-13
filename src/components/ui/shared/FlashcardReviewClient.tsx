@@ -391,7 +391,7 @@ export function FlashcardReviewClient({
                       transition={{ duration: 0.15 }}
                       className="text-lg leading-relaxed line-clamp-6"
                     >
-                      {showAnswer ? active.back : active.front}
+                      {showAnswer ? active.front : active.back}
                     </motion.p>
                   </AnimatePresence>
                 </button>

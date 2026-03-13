@@ -6,12 +6,14 @@ import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
 import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
+import { QuizHistoryList } from '@/components/ui/shared/QuizHistoryList';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
 import { getSessionCardBounds } from '@/lib/study';
+import { getQuizHistory } from '@/app/actions';
 
 function getMasteryBarClass(masteryPercentage: number) {
   if (masteryPercentage >= 85) return 'bg-sky-400';
@@ -118,6 +120,9 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       mastery = snapshots.get(deckId) ?? mastery;
     }
   }
+
+  const historyResult = await getQuizHistory(deckId);
+  const history = (historyResult && 'history' in historyResult ? historyResult.history : []) ?? [];
 
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
@@ -298,21 +303,26 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       </FadeInUp>
 
       {cards && cards.length > 0 ? (
-        <StaggerContainer className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((card) => (
-            <StaggerItem key={card.id}>
-              <FlashcardWithActions
-                cardId={card.id}
-                deckId={deckId}
-                question={card.front}
-                answer={card.back}
-                source={card.source ?? 'manual'}
-                importedBy={card.imported_by ?? null}
-                quizReady={Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2}
-              />
-            </StaggerItem>
-          ))}
-        </StaggerContainer>
+        <>
+          <StaggerContainer className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {cards.map((card) => (
+              <StaggerItem key={card.id}>
+                <FlashcardWithActions
+                  cardId={card.id}
+                  deckId={deckId}
+                  question={card.front}
+                  answer={card.back}
+                  source={card.source ?? 'manual'}
+                  importedBy={card.imported_by ?? null}
+                  quizReady={Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2}
+                />
+              </StaggerItem>
+            ))}
+          </StaggerContainer>
+          <FadeInUp delay={0.2}>
+            <QuizHistoryList history={history} />
+          </FadeInUp>
+        </>
       ) : (
         <FadeInUp delay={0.2}>
           <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
@@ -322,6 +332,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
               Add your first flashcard above to start studying, or generate cards from your notes in the next step.
             </p>
           </div>
+          <QuizHistoryList history={history} />
         </FadeInUp>
       )}
     </div>

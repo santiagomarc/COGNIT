@@ -58,5 +58,29 @@ export interface QuizCardResult {
   quiz_result_id: string;
   card_id: string;
   correct: boolean;
+  prompt_text: string | null;
+  correct_answer_text: string | null;
+  user_answer_text: string | null;
   created_at: string;
+}
+
+export interface QuizHistoryMistake {
+  card_id: string;
+  card_number: number | null;
+  prompt: string;
+  correct_answer: string;
+  user_answer: string;
+}
+
+export interface QuizHistoryEntry {
+  id: string;
+  deck_id: string;
+  mode: 'mcq' | 'identification';
+  total_cards: number;
+  correct_cards: number;
+  score_percentage: number;
+  wrong_count: number;
+  duration_ms: number;
+  created_at: string;
+  incorrect_answers: QuizHistoryMistake[];
 }
