@@ -7,11 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Sparkles, ArrowRight, Layers, BarChart3, Brain } from 'lucide-react';
 
-type HeroSectionProps = {
-  isAuthenticated?: boolean;
-};
-
-export function HeroSection({ isAuthenticated = false }: HeroSectionProps) {
+export function HeroSection() {
   const reduced = useReducedMotion();
   const containerRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
@@ -22,10 +18,6 @@ export function HeroSection({ isAuthenticated = false }: HeroSectionProps) {
   const mockupY = useTransform(scrollYProgress, [0, 1], [0, 120]);
   const mockupRotate = useTransform(scrollYProgress, [0, 1], [2, -4]);
   const mockupScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
-  const primaryHref = isAuthenticated ? '/dashboard' : '/login?mode=signup';
-  const primaryLabel = isAuthenticated ? 'Open Dashboard' : 'Start Free';
-  const secondaryHref = isAuthenticated ? '/login' : '/login?mode=login';
-  const secondaryLabel = isAuthenticated ? 'Account' : 'Sign In';
 
   return (
     <section ref={containerRef} className="relative min-h-screen overflow-hidden">
@@ -40,12 +32,12 @@ export function HeroSection({ isAuthenticated = false }: HeroSectionProps) {
 
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Link href={secondaryHref}>
-            <Button variant="ghost" size="sm">{secondaryLabel}</Button>
+          <Link href="/login?mode=login">
+            <Button variant="ghost" size="sm">Sign In</Button>
           </Link>
-          <Link href={primaryHref}>
+          <Link href="/login?mode=signup">
             <Button size="sm" className="hidden sm:inline-flex">
-              {primaryLabel}
+              Sign Up
               <ArrowRight className="ml-1 h-3.5 w-3.5" />
             </Button>
           </Link>
@@ -100,26 +92,17 @@ export function HeroSection({ isAuthenticated = false }: HeroSectionProps) {
             transition={{ duration: 0.5, delay: 0.35 }}
             className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4"
           >
-            <Link href={primaryHref}>
+            <Link href="/login?mode=signup">
               <Button size="lg" className="w-full px-8 text-base sm:w-auto">
-                {primaryLabel}
+                Sign Up
                 <ArrowRight className="ml-1.5 h-4 w-4" />
               </Button>
             </Link>
-            {isAuthenticated && (
-              <Link href="/login">
-                <Button variant="outline" size="lg" className="w-full px-8 text-base sm:w-auto">
-                  Manage Account
-                </Button>
-              </Link>
-            )}
-            {!isAuthenticated && (
-            <a href="#how-it-works">
+            <Link href="/login?mode=login">
               <Button variant="outline" size="lg" className="w-full px-8 text-base sm:w-auto">
-                See How It Works
+                Sign In
               </Button>
-            </a>
-            )}
+            </Link>
           </motion.div>
         </div>
 

@@ -15,7 +15,6 @@ type StudyPageProps = {
 export default async function DeckStudyPage({ params, searchParams }: StudyPageProps) {
   const { deckId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count);
 
   const supabase = await createClient();
   const {
@@ -41,6 +40,8 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     .from('cards')
     .select('id', { count: 'exact', head: true })
     .eq('deck_id', deckId);
+
+  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0);
 
   // Fetch cards that are due for review:
   //   • next_review_at <= now  (overdue / due today)

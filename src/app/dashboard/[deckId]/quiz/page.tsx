@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { QuizAssessmentClient } from '@/components/ui/shared/QuizAssessmentClient';
 import {
+  getSessionCardBounds,
   normalizeQuizMode,
   normalizeSessionCardCount,
   shuffleItems,
@@ -48,7 +49,6 @@ function toStudyCard(card: {
 export default async function DeckQuizPage({ params, searchParams }: QuizPageProps) {
   const { deckId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
-  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count);
   const mode = normalizeQuizMode(resolvedSearchParams?.mode);
 
   const supabase = await createClient();
@@ -75,13 +75,17 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
     .select('id', { count: 'exact', head: true })
     .eq('deck_id', deckId);
 
+  const availableCardCount = totalInDeck ?? 0;
+  const { max: maxQuizCards } = getSessionCardBounds(availableCardCount);
+  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, availableCardCount);
+
   const { data: allCards } = await supabase
     .from('cards')
     .select('id, front, back, state, interval, ease_factor, repetition_count, mcq_distractors, id_question')
     .eq('deck_id', deckId)
     .order('created_at', { ascending: true });
 
-  const cards = shuffleItems((allCards ?? []).map(toStudyCard)).slice(0, sessionCardCount);
+  const cards = shuffleItems((allCards ?? []).map(toStudyCard)).slice(0, maxQuizCards > 0 ? sessionCardCount : 0);
 
   return (
     <QuizAssessmentClient

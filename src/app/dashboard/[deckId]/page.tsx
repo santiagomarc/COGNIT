@@ -11,6 +11,7 @@ import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
+import { getSessionCardBounds } from '@/lib/study';
 
 function getMasteryBarClass(masteryPercentage: number) {
   if (masteryPercentage >= 85) return 'bg-sky-400';
@@ -80,6 +81,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   const totalCards = cards?.length ?? 0;
+  const sessionBounds = getSessionCardBounds(totalCards);
   const quizReadyCards = (cards ?? []).filter(
     (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
   ).length;
@@ -202,12 +204,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     <Input
                       name="count"
                       type="number"
-                      min={5}
-                      max={50}
+                      min={sessionBounds.min || undefined}
+                      max={sessionBounds.max || undefined}
                       step={1}
-                      defaultValue={10}
+                      defaultValue={sessionBounds.defaultCount || undefined}
                       className="w-28"
                       aria-label="Number of flashcards to review"
+                      disabled={totalCards === 0}
                     />
                   </label>
                   <Button type="submit" disabled={totalCards === 0}>Review Flashcards</Button>
@@ -235,12 +238,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     <Input
                       name="count"
                       type="number"
-                      min={5}
-                      max={50}
+                      min={sessionBounds.min || undefined}
+                      max={sessionBounds.max || undefined}
                       step={1}
-                      defaultValue={10}
+                      defaultValue={sessionBounds.defaultCount || undefined}
                       className="w-28"
                       aria-label="Number of quiz cards"
+                      disabled={totalCards === 0}
                     />
                   </label>
 

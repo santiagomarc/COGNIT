@@ -18,15 +18,34 @@ export type StudySessionCard = {
   id_question: string | null;
 };
 
-export function normalizeSessionCardCount(rawCount: string | string[] | undefined): number {
-  const countValue = Array.isArray(rawCount) ? rawCount[0] : rawCount;
-  const parsedCount = Number.parseInt(countValue ?? '', 10);
+export function getSessionCardBounds(availableCount: number) {
+  const safeAvailableCount = Math.max(0, availableCount);
 
-  if (!Number.isFinite(parsedCount)) {
-    return DEFAULT_SESSION_CARD_COUNT;
+  if (safeAvailableCount === 0) {
+    return { min: 0, max: 0, defaultCount: 0 };
   }
 
-  return Math.min(MAX_SESSION_CARD_COUNT, Math.max(MIN_SESSION_CARD_COUNT, parsedCount));
+  const max = Math.min(MAX_SESSION_CARD_COUNT, safeAvailableCount);
+  const min = Math.min(MIN_SESSION_CARD_COUNT, max);
+  const defaultCount = Math.min(DEFAULT_SESSION_CARD_COUNT, max);
+
+  return { min, max, defaultCount };
+}
+
+export function normalizeSessionCardCount(rawCount: string | string[] | undefined, availableCount = MAX_SESSION_CARD_COUNT): number {
+  const countValue = Array.isArray(rawCount) ? rawCount[0] : rawCount;
+  const parsedCount = Number.parseInt(countValue ?? '', 10);
+  const { min, max, defaultCount } = getSessionCardBounds(availableCount);
+
+  if (max === 0) {
+    return 0;
+  }
+
+  if (!Number.isFinite(parsedCount)) {
+    return defaultCount;
+  }
+
+  return Math.min(max, Math.max(min, parsedCount));
 }
 
 export function normalizeQuizMode(rawMode: string | string[] | undefined): QuizMode {

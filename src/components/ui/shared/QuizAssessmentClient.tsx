@@ -76,18 +76,21 @@ export function QuizAssessmentClient({
 
   const requestedEnrichmentIds = useRef<Set<string>>(new Set());
   const didPersistResult = useRef(false);
+  const active = sessionCards[index];
+  const completed = index >= sessionCards.length;
+  const sessionDuration = nowMs - sessionStartMs;
 
   useEffect(() => {
+    if (completed) {
+      return;
+    }
+
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, []);
-
-  const active = sessionCards[index];
-  const completed = index >= sessionCards.length;
-  const sessionDuration = nowMs - sessionStartMs;
+  }, [completed]);
 
   const progress = useMemo(() => {
     if (sessionCards.length === 0) return 0;
