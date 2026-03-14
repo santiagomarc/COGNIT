@@ -8,14 +8,16 @@ import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { updateCard, deleteCard, enrichCards } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
 
 type FlashcardWithActionsProps = {
   cardId: string;
   deckId: string;
-  question: string;
-  answer: string;
+  cardNumber?: number;
+  term: string;
+  description: string;
   source: CardSource;
   importedBy: string | null;
   quizReady: boolean;
@@ -31,22 +33,28 @@ const SOURCE_LABELS: Record<CardSource, string> = {
 export function FlashcardWithActions({
   cardId,
   deckId,
-  question,
-  answer,
+  cardNumber,
+  term,
+  description,
   source,
   importedBy,
   quizReady,
 }: FlashcardWithActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [front, setFront] = useState(question);
-  const [back, setBack] = useState(answer);
+  const [editableTerm, setEditableTerm] = useState(term);
+  const [editableDescription, setEditableDescription] = useState(description);
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [, startEnrichmentTransition] = useTransition();
 
   async function handleSave() {
     setIsLoading(true);
-    const result = await updateCard({ id: cardId, deck_id: deckId, front, back });
+    const result = await updateCard({
+      id: cardId,
+      deck_id: deckId,
+      front: editableTerm,
+      back: editableDescription,
+    });
     if (result?.error) {
       toast.error(typeof result.error === 'string' ? result.error : 'Failed to update card');
     } else {
@@ -84,26 +92,27 @@ export function FlashcardWithActions({
             className="glass-card glow-border flex h-56 flex-col gap-3 rounded-2xl p-5"
           >
             <Input
-              value={front}
-              onChange={(e) => setFront(e.target.value)}
-              placeholder="Question"
+              value={editableTerm}
+              onChange={(e) => setEditableTerm(e.target.value)}
+              placeholder="Term (answer)"
               className="neon-focus text-sm"
               autoFocus
             />
-            <Input
-              value={back}
-              onChange={(e) => setBack(e.target.value)}
-              placeholder="Answer"
-              className="neon-focus text-sm"
+            <Textarea
+              value={editableDescription}
+              onChange={(e) => setEditableDescription(e.target.value)}
+              placeholder="Description (question)"
+              className="neon-focus min-h-0 flex-1 resize-none text-sm leading-relaxed"
             />
+
             <div className="mt-auto flex items-center justify-end gap-2">
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => {
                   setIsEditing(false);
-                  setFront(question);
-                  setBack(answer);
+                  setEditableTerm(term);
+                  setEditableDescription(description);
                 }}
                 disabled={isLoading}
               >
@@ -126,55 +135,58 @@ export function FlashcardWithActions({
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
+            className="space-y-2"
           >
-            <Flashcard question={front} answer={back} />
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex max-w-[75%] flex-wrap gap-1">
+                {typeof cardNumber === 'number' ? (
+                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
+                    Card #{cardNumber}
+                  </span>
+                ) : null}
+                <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
+                  {SOURCE_LABELS[source]}
+                </span>
+                <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+                  {quizReady ? 'Quiz Ready' : 'Quiz Pending'}
+                </span>
+                {importedBy ? (
+                  <span className="rounded-full border border-primary/15 bg-card/80 px-2 py-1 text-[10px] text-muted-foreground backdrop-blur-sm">
+                    {importedBy}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="z-20 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditing(true);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  title="Edit card"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowDeleteConfirm(true);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-destructive/20 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  title="Delete card"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <Flashcard question={description} answer={term} />
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Action buttons — visible on hover when not editing */}
-      {!isEditing && (
-        <div className="absolute right-2 top-2 z-20 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsEditing(true);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-            title="Edit card"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDeleteConfirm(true);
-            }}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-destructive/20 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-            title="Delete card"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
-
-      {!isEditing && (
-        <div className="pointer-events-none absolute left-2 top-2 z-10 flex max-w-[70%] flex-wrap gap-1">
-          <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
-            {SOURCE_LABELS[source]}
-          </span>
-          <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
-            {quizReady ? 'Quiz Ready' : 'Quiz Pending'}
-          </span>
-          {importedBy ? (
-            <span className="rounded-full border border-primary/15 bg-card/80 px-2 py-1 text-[10px] text-muted-foreground backdrop-blur-sm">
-              {importedBy}
-            </span>
-          ) : null}
-        </div>
-      )}
 
       <ConfirmDialog
         open={showDeleteConfirm}

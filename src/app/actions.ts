@@ -961,7 +961,10 @@ export async function getQuizHistory(deckId: string) {
           card_number: reference?.card_number ?? null,
           prompt: reference?.back ?? detail.prompt_text ?? 'Card content unavailable',
           correct_answer: reference?.front ?? detail.correct_answer_text ?? 'Card term unavailable',
-          user_answer: detail.user_answer_text ?? '',
+          user_answer:
+            typeof detail.user_answer_text === 'string' && detail.user_answer_text.trim().length > 0
+              ? detail.user_answer_text
+              : null,
         };
       });
 

@@ -72,7 +72,10 @@ export function QuizHistoryList({ history }: { history: QuizHistoryEntry[] }) {
                         <div className="grid grid-cols-2 gap-2 text-xs">
                           <div className="flex items-start gap-1 text-red-400">
                             <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>You answered: <br/><strong className="opacity-80">{mistake.user_answer || 'Skipped'}</strong></span>
+                            <span>
+                              You answered: <br/>
+                              <strong className="opacity-80">{mistake.user_answer ?? 'Not recorded for this attempt'}</strong>
+                            </span>
                           </div>
                           <div className="flex items-start gap-1 text-green-400">
                             <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />

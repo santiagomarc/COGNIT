@@ -83,6 +83,11 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   const totalCards = cards?.length ?? 0;
+  const cardNumberById = new Map(
+    [...(cards ?? [])]
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .map((card, index) => [card.id, index + 1])
+  );
   const sessionBounds = getSessionCardBounds(totalCards);
   const quizReadyCards = (cards ?? []).filter(
     (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
@@ -310,8 +315,9 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <FlashcardWithActions
                   cardId={card.id}
                   deckId={deckId}
-                  question={card.front}
-                  answer={card.back}
+                  cardNumber={cardNumberById.get(card.id)}
+                  term={card.front}
+                  description={card.back}
                   source={card.source ?? 'manual'}
                   importedBy={card.imported_by ?? null}
                   quizReady={Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2}

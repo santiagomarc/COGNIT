@@ -69,7 +69,7 @@ export interface QuizHistoryMistake {
   card_number: number | null;
   prompt: string;
   correct_answer: string;
-  user_answer: string;
+  user_answer: string | null;
 }
 
 export interface QuizHistoryEntry {
