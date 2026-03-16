@@ -16,12 +16,15 @@ import {
 import { sm2, GRADE_MAP, type StudyGrade } from '@/lib/sm2';
 import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath } from 'next/cache';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_CHARS = 120_000;
 const ENRICH_BATCH_SIZE = 10;
+const TERM_MAX_WORDS = 4;
+const TERM_HARD_MAX_WORDS = 6;
+const TERM_MAX_CHARS = 60;
 
 type EnrichmentRow = {
   id: string;
@@ -72,6 +75,74 @@ function chunkArray<T>(items: T[], size: number) {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+function normalizeWhitespace(value: string) {
+  return value
+    .replace(/\r/g, '\n')
+    .replace(/\t/g, ' ')
+    .replace(/[ \u00A0]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function sanitizePdfText(rawText: string) {
+  const stripped = rawText
+    .replace(/https?:\/\/\S+/gi, ' ')
+    .replace(/\bPage\s+\d+(?:\s+of\s+\d+)?\b/gi, ' ')
+    .replace(/\b(?:Figure|Table)\s+\d+[.:]?\b/gi, ' ');
+
+  const cleanedLines = stripped
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !/^\d+$/.test(line))
+    .filter((line) => {
+      const words = line.split(/\s+/);
+      const looksLikeBullet = /^(?:[-*•]|\d+[.)]|[a-zA-Z][.)])\s+/.test(line);
+      return !(looksLikeBullet && words.length <= 12);
+    });
+
+  return normalizeWhitespace(cleanedLines.join('\n'));
+}
+
+function isValidTermFront(front: string) {
+  if (!front) {
+    return false;
+  }
+
+  if (front.length > TERM_MAX_CHARS) {
+    return false;
+  }
+
+  if (/\?|\n/.test(front)) {
+    return false;
+  }
+
+  if (/^[\d\s.)-]+$/.test(front)) {
+    return false;
+  }
+
+  if (/^(what|which|how|why|when|where|who|define|explain|describe)\b/i.test(front)) {
+    return false;
+  }
+
+  if (/[;:,.!?]$/.test(front)) {
+    return false;
+  }
+
+  const words = front.split(/\s+/).filter(Boolean);
+  if (words.length < 1 || words.length > TERM_HARD_MAX_WORDS) {
+    return false;
+  }
+
+  return true;
+}
+
+function normalizeGeneratedCard(card: { front: string; back: string }) {
+  const front = normalizeWhitespace(card.front).replace(/^['"`]+|['"`]+$/g, '');
+  const back = normalizeWhitespace(card.back);
+  return { front, back };
 }
 
 async function requireOwnedDeck(deckId: string) {
@@ -710,31 +781,63 @@ export async function generateCards(formData: FormData) {
     return { error: 'The PDF does not contain enough readable text (minimum ~50 characters).' };
   }
 
+  // Clean noisy PDF artifacts before truncation to improve extraction quality.
+  const sanitizedText = sanitizePdfText(extractedText);
   // Truncate to stay within token limits
-  const trimmedText = extractedText.slice(0, MAX_TEXT_CHARS);
+  const trimmedText = sanitizedText.slice(0, MAX_TEXT_CHARS);
 
   // ── 6. Call Gemini 2.0 Flash ──
   const model = getGeminiJsonModel();
 
   const systemPrompt = [
-    'You are an expert educator that creates high-quality flashcards for active recall study.',
-    'Given a body of text, generate exactly the requested number of flashcards.',
-    'Each flashcard has a concise "front" (a question or prompt) and a clear "back" (the answer).',
-    'Cover the most important concepts, definitions, and relationships in the text.',
-    'Vary question types: definitions, comparisons, cause/effect, true/false, fill-in-the-blank.',
+    'You are an expert AI extraction tool that creates high-quality term-and-definition flashcards from academic text.',
+    'Generate term-description cards only. Do not create question-answer cards.',
+    'STRICT RULES:',
+    `1. FRONT MUST be a single core term/concept (${TERM_MAX_WORDS} words max; hard limit ${TERM_HARD_MAX_WORDS}).`,
+    '2. Never use full sentences, conversational phrasing, or questions on the front.',
+    '3. Ignore enumerations, bullet points, and procedural steps as card fronts.',
+    '4. BACK must be a concise, factual description of that exact term based on the provided text.',
+    '5. Do not invent facts not present in the text.',
     'Return ONLY valid JSON in this exact shape:',
-    '{ "cards": [ { "front": "...", "back": "..." } ] }',
+    '{ "cards": [ { "front": "Term", "back": "Description" } ] }',
   ].join('\n');
+
+  const responseSchema: Schema = {
+    type: SchemaType.OBJECT,
+    required: ['cards'],
+    properties: {
+      cards: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          required: ['front', 'back'],
+          properties: {
+            front: { type: SchemaType.STRING },
+            back: { type: SchemaType.STRING },
+          },
+        },
+      },
+    },
+  };
+
+  const extraCardBuffer = Math.min(8, Math.max(2, Math.ceil(parsed.data.count * 0.4)));
+  const targetGenerationCount = parsed.data.count + extraCardBuffer;
 
   let cards: { front: string; back: string }[];
   try {
     const result = await model.generateContent({
       systemInstruction: systemPrompt,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema,
+      },
       contents: [
         {
           role: 'user',
           parts: [
-            { text: `Generate ${parsed.data.count} flashcards from the following text:\n\n${trimmedText}` },
+            {
+              text: `Generate ${targetGenerationCount} term-description flashcards from the following text.\n\n${trimmedText}`,
+            },
           ],
         },
       ],
@@ -747,8 +850,11 @@ export async function generateCards(formData: FormData) {
       return { error: 'AI returned an unexpected format. Please try again.' };
     }
 
-    // Validate each card has front + back strings
-    cards = json.cards
+    // Validate and strictly filter each card to enforce term-definition format.
+    const dedupe = new Set<string>();
+    const generatedCards = Array.isArray(json.cards) ? (json.cards as unknown[]) : [];
+
+    cards = generatedCards
       .filter(
         (c: unknown): c is { front: string; back: string } =>
           typeof c === 'object' &&
@@ -758,6 +864,17 @@ export async function generateCards(formData: FormData) {
           (c as Record<string, unknown>).front !== '' &&
           (c as Record<string, unknown>).back !== ''
       )
+      .map(normalizeGeneratedCard)
+      .filter((card: { front: string; back: string }) => isValidTermFront(card.front))
+      .filter((card: { front: string; back: string }) => card.back.length >= 16)
+      .filter((card: { front: string; back: string }) => {
+        const key = card.front.toLowerCase();
+        if (dedupe.has(key)) {
+          return false;
+        }
+        dedupe.add(key);
+        return true;
+      })
       .slice(0, parsed.data.count);
 
     if (cards.length === 0) {
