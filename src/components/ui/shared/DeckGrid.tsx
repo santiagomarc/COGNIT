@@ -6,7 +6,8 @@ import { BookOpen } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
-import { StaggerContainer, StaggerItem, FadeInUp } from '@/components/motion';
+import { FadeInUp } from '@/components/motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function getMasteryBadgeClass(masteryPercentage: number) {
   if (masteryPercentage >= 85) return 'border-sky-500/20 bg-sky-500/10 text-sky-300';
@@ -74,13 +75,26 @@ export function DeckGrid({ decks }: DeckGridProps) {
           </div>
         </FadeInUp>
       ) : (
-        <StaggerContainer className="grid gap-4 sm:grid-cols-2">
-          {filtered.map((deck) => {
-            const cardCount = deck.cards?.[0]?.count ?? 0;
-            return (
-              <StaggerItem key={deck.id}>
-                <Card className="glass-card glow-border group relative rounded-2xl transition-all duration-300">
-                  <CardHeader>
+        <motion.div className="grid gap-4 sm:grid-cols-2" layout>
+          <AnimatePresence mode="popLayout">
+            {filtered.map((deck, i) => {
+              const cardCount = deck.cards?.[0]?.count ?? 0;
+              return (
+                <motion.div 
+                  key={deck.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.96, y: 24 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: -24 }}
+                  transition={{ 
+                    type: 'spring', 
+                    stiffness: 260, 
+                    damping: 20,
+                    delay: Math.min(i * 0.05, 0.3) 
+                  }}
+                >
+                  <Card className="glass-card glow-border group relative rounded-2xl transition-all duration-300">
+                    <CardHeader>
                     <div className="flex justify-between items-start">
                       <Link
                         href={`/dashboard/${deck.id}`}
@@ -103,10 +117,11 @@ export function DeckGrid({ decks }: DeckGridProps) {
                     </div>
                   </CardHeader>
                 </Card>
-              </StaggerItem>
+              </motion.div>
             );
           })}
-        </StaggerContainer>
+          </AnimatePresence>
+        </motion.div>
       )}
     </div>
   );

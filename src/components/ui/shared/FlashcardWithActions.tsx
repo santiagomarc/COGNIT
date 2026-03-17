@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pencil, Trash2, X, Check } from 'lucide-react';
+import { Pencil, Trash2, X, Check, Square, CheckSquare } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { updateCard, deleteCard, enrichCards } from '@/app/actions';
@@ -21,6 +21,10 @@ type FlashcardWithActionsProps = {
   source: CardSource;
   importedBy: string | null;
   quizReady: boolean;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelected?: () => void;
+  onDeleted?: () => void;
 };
 
 const SOURCE_LABELS: Record<CardSource, string> = {
@@ -39,6 +43,10 @@ export function FlashcardWithActions({
   source,
   importedBy,
   quizReady,
+  selectionMode = false,
+  selected = false,
+  onToggleSelected,
+  onDeleted,
 }: FlashcardWithActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editableTerm, setEditableTerm] = useState(term);
@@ -74,13 +82,14 @@ export function FlashcardWithActions({
       toast.error(typeof result.error === 'string' ? result.error : 'Failed to delete card');
     } else {
       toast.success('Card deleted');
+      onDeleted?.();
     }
     setIsLoading(false);
     setShowDeleteConfirm(false);
   }
 
   return (
-    <div className="group relative">
+    <div className={`group relative ${selectionMode && selected ? 'rounded-2xl ring-2 ring-primary/40 ring-offset-2 ring-offset-background' : ''}`}>
       <AnimatePresence mode="wait">
         {isEditing ? (
           <motion.div
@@ -157,30 +166,45 @@ export function FlashcardWithActions({
                 ) : null}
               </div>
 
-              <div className="z-20 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100">
+              {selectionMode ? (
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    setIsEditing(true);
+                    onToggleSelected?.();
                   }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                  title="Edit card"
+                  className="z-20 flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  title={selected ? 'Unselect card' : 'Select card'}
+                  aria-pressed={selected}
                 >
-                  <Pencil className="h-3.5 w-3.5" />
+                  {selected ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
                 </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowDeleteConfirm(true);
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-destructive/20 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                  title="Delete card"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
-              </div>
+              ) : (
+                <div className="z-20 flex gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100 max-sm:opacity-100">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsEditing(true);
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    title="Edit card"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowDeleteConfirm(true);
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-destructive/20 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    title="Delete card"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
             </div>
 
             <Flashcard question={description} answer={term} />

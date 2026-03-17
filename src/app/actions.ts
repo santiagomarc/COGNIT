@@ -534,6 +534,55 @@ export async function deleteCard(cardId: string, deckId: string) {
   return { success: true };
 }
 
+export async function bulkDeleteCards(cardIds: string[], deckId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Unauthorized' };
+  }
+
+  const normalizedIds = Array.from(
+    new Set(
+      cardIds
+        .map((id) => id?.trim())
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+
+  if (normalizedIds.length === 0) {
+    return { error: 'No cards selected.' };
+  }
+
+  // Verify deck ownership before deleting cards.
+  const { data: ownedDeck, error: deckError } = await supabase
+    .from('decks')
+    .select('id')
+    .eq('id', deckId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (deckError || !ownedDeck) {
+    return { error: 'Deck not found or access denied.' };
+  }
+
+  const { error } = await supabase
+    .from('cards')
+    .delete()
+    .in('id', normalizedIds)
+    .eq('deck_id', deckId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/dashboard/${deckId}`);
+  revalidatePath(`/dashboard/${deckId}/study`);
+  revalidatePath(`/dashboard/${deckId}/quiz`);
+  revalidatePath('/dashboard');
+  return { success: true, deletedCount: normalizedIds.length };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // STUDY / SM-2 GRADING
 // ═══════════════════════════════════════════════════════════════════

@@ -1,14 +1,14 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { ArrowLeft, BookOpen, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
+import { ArrowLeft, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
 import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
-import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
+import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
 import { QuizHistoryList } from '@/components/ui/shared/QuizHistoryList';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
+import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
@@ -83,11 +83,6 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   const totalCards = cards?.length ?? 0;
-  const cardNumberById = new Map(
-    [...(cards ?? [])]
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-      .map((card, index) => [card.id, index + 1])
-  );
   const sessionBounds = getSessionCardBounds(totalCards);
   const quizReadyCards = (cards ?? []).filter(
     (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
@@ -307,40 +302,11 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
         <PDFUploadZone deckId={deckId} />
       </FadeInUp>
 
-      {cards && cards.length > 0 ? (
-        <>
-          <StaggerContainer className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {cards.map((card) => (
-              <StaggerItem key={card.id}>
-                <FlashcardWithActions
-                  cardId={card.id}
-                  deckId={deckId}
-                  cardNumber={cardNumberById.get(card.id)}
-                  term={card.front}
-                  description={card.back}
-                  source={card.source ?? 'manual'}
-                  importedBy={card.imported_by ?? null}
-                  quizReady={Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2}
-                />
-              </StaggerItem>
-            ))}
-          </StaggerContainer>
-          <FadeInUp delay={0.2}>
-            <QuizHistoryList history={history} />
-          </FadeInUp>
-        </>
-      ) : (
-        <FadeInUp delay={0.2}>
-          <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
-            <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
-            <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
-            <p className="mt-2 max-w-md text-sm text-muted-foreground">
-              Add your first flashcard above to start studying, or generate cards from your notes in the next step.
-            </p>
-          </div>
-          <QuizHistoryList history={history} />
-        </FadeInUp>
-      )}
+      <DeckCardsManager deckId={deckId} cards={cards ?? []} />
+
+      <FadeInUp delay={0.2}>
+        <QuizHistoryList history={history} />
+      </FadeInUp>
     </div>
   );
 }
