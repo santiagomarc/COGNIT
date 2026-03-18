@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
@@ -6,10 +7,8 @@ import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
-import { Layers } from 'lucide-react';
+import { ArrowRight, Layers, Sparkles } from 'lucide-react';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
-import { getQuizHistory } from '../actions';
-import { QuizHistoryList } from '@/components/ui/shared/QuizHistoryList';
 
 export default async function Dashboard() {
   const supabase = await createClient();
@@ -51,6 +50,9 @@ export default async function Dashboard() {
     .sort((a, b) => b.dueCount - a.dueCount);
 
   const totalDue = dueCards?.length ?? 0;
+  const totalDecks = deckRows.length;
+  const totalCards = deckRows.reduce((sum, deck) => sum + (deck.cards?.[0]?.count ?? 0), 0);
+  const topDueDeck = deckBreakdown[0] ?? null;
 
   // ── Compute study streak from study_logs ──
   const { data: studyDays } = await supabase
@@ -184,17 +186,58 @@ export default async function Dashboard() {
               <p className="text-sm text-muted-foreground">Welcome back, {user.email}</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <CreateDeckModal />
-            <ThemeToggle />
-          </div>
+          <ThemeToggle />
         </div>
       </FadeInUp>
 
       {/* ── Stats Row: Due Today + Activity Board ── */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <DueTodayCard totalDue={totalDue} deckBreakdown={deckBreakdown} />
-        <div className="md:col-span-2">
+      <div className="grid items-stretch gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:h-full md:min-h-0 md:grid-rows-[7fr_5fr]">
+          <DueTodayCard totalDue={totalDue} deckBreakdown={deckBreakdown} className="min-h-0" />
+
+          <div className="glass-card glow-border h-full rounded-2xl p-3">
+            <div className="relative h-full overflow-hidden rounded-xl border border-primary/15 bg-card/35 p-3">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_48%)]" />
+
+              <div className="relative flex h-full flex-col justify-between gap-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick Actions</p>
+                    <p className="mt-1 text-sm font-medium text-foreground">Keep momentum today</p>
+                  </div>
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-foreground/85">
+                    {totalDecks} deck{totalDecks !== 1 ? 's' : ''}
+                  </span>
+                  <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-foreground/85">
+                    {totalCards} total card{totalCards !== 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div className="grid gap-2">
+                  <CreateDeckModal
+                    triggerLabel="Create New Deck"
+                    triggerClassName="w-full justify-between rounded-lg border border-primary/25 bg-card/80 px-3 text-sm font-semibold text-foreground shadow-none hover:bg-primary/10 hover:text-primary"
+                  />
+
+                  <Link
+                    href={topDueDeck ? `/dashboard/${topDueDeck.deckId}/study` : '#deck-collection'}
+                    className="inline-flex h-9 items-center justify-between rounded-lg border border-primary/15 bg-card/70 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+                  >
+                    <span>{topDueDeck ? `Review ${topDueDeck.deckTitle}` : 'Browse deck collection'}</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="md:col-span-2 md:h-full">
           <StudyStreakCard
             streak={streak}
             longestStreak={longestStreak}
@@ -208,6 +251,7 @@ export default async function Dashboard() {
 
       {/* ── Deck Grid with Search ── */}
       <FadeInUp delay={0.15}>
+        <div id="deck-collection" className="scroll-mt-24">
         <DeckGrid
           decks={deckRows.map((deck) => {
             const mastery = masteryByDeck.get(deck.id);
@@ -219,6 +263,7 @@ export default async function Dashboard() {
             };
           })}
         />
+        </div>
       </FadeInUp>
     </div>
   );

@@ -8,9 +8,15 @@ import { createDeckSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-export function CreateDeckModal() {
+type CreateDeckModalProps = {
+  triggerClassName?: string;
+  triggerLabel?: string;
+};
+
+export function CreateDeckModal({ triggerClassName, triggerLabel = 'New Deck' }: CreateDeckModalProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -90,9 +96,9 @@ export function CreateDeckModal() {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="gap-2">
+      <Button onClick={() => setOpen(true)} className={cn('gap-2', triggerClassName)}>
         <Plus className="h-4 w-4" />
-        New Deck
+        {triggerLabel}
       </Button>
 
       <AnimatePresence>

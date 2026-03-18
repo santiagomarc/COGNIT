@@ -3,13 +3,15 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Clock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 type DueTodayCardProps = {
   totalDue: number;
   deckBreakdown: { deckId: string; deckTitle: string; dueCount: number }[];
+  className?: string;
 };
 
-export function DueTodayCard({ totalDue, deckBreakdown }: DueTodayCardProps) {
+export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCardProps) {
   const reduced = useReducedMotion();
 
   return (
@@ -17,7 +19,7 @@ export function DueTodayCard({ totalDue, deckBreakdown }: DueTodayCardProps) {
       initial={reduced ? undefined : { opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-      className="glass-card glow-border rounded-2xl p-5"
+      className={cn('glass-card glow-border flex h-full flex-col rounded-2xl p-4', className)}
     >
       <div className="flex items-start gap-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
@@ -39,12 +41,12 @@ export function DueTodayCard({ totalDue, deckBreakdown }: DueTodayCardProps) {
       </div>
 
       {totalDue > 0 && deckBreakdown.length > 0 && (
-        <div className="mt-4 space-y-2">
-          {deckBreakdown.slice(0, 3).map((deck) => (
+        <div className="mt-3 space-y-2 overflow-y-auto pr-1">
+          {deckBreakdown.map((deck) => (
             <Link
               key={deck.deckId}
               href={`/dashboard/${deck.deckId}/study`}
-              className="group flex items-center justify-between rounded-lg border border-primary/10 bg-card/30 px-3 py-2 transition-all hover:border-primary/25 hover:bg-primary/5"
+              className="group flex items-center justify-between rounded-lg border border-primary/10 bg-card/30 px-3 py-1.5 transition-all hover:border-primary/25 hover:bg-primary/5"
             >
               <span className="text-sm font-medium truncate">{deck.deckTitle}</span>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-primary transition-colors">
@@ -53,11 +55,6 @@ export function DueTodayCard({ totalDue, deckBreakdown }: DueTodayCardProps) {
               </span>
             </Link>
           ))}
-          {deckBreakdown.length > 3 && (
-            <p className="text-xs text-muted-foreground text-center pt-1">
-              +{deckBreakdown.length - 3} more deck{deckBreakdown.length - 3 !== 1 ? 's' : ''}
-            </p>
-          )}
         </div>
       )}
 
