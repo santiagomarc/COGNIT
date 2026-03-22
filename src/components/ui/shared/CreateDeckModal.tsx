@@ -96,10 +96,13 @@ export function CreateDeckModal({ triggerClassName, triggerLabel = 'New Deck' }:
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className={cn('gap-2', triggerClassName)}>
+      <button
+        onClick={() => setOpen(true)}
+        className={cn('inline-flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50', triggerClassName)}
+      >
         <Plus className="h-4 w-4" />
-        {triggerLabel}
-      </Button>
+        <span>{triggerLabel}</span>
+      </button>
 
       <AnimatePresence>
         {open && (

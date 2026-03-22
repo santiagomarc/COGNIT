@@ -222,16 +222,8 @@ export default async function Dashboard() {
                 <div className="grid gap-2">
                   <CreateDeckModal
                     triggerLabel="Create New Deck"
-                    triggerClassName="w-full justify-between rounded-lg border border-primary/25 bg-card/80 px-3 text-sm font-semibold text-foreground shadow-none hover:bg-primary/10 hover:text-primary"
+                    triggerClassName="w-full h-15 justify-center gap-2 rounded-xl border border-primary/45 bg-card/120 px-4 text-sm font-semibold text-foreground shadow-none hover:bg-primary/10 hover:text-primary transition-all active:scale-[0.98]"
                   />
-
-                  <Link
-                    href={topDueDeck ? `/dashboard/${topDueDeck.deckId}/study` : '#deck-collection'}
-                    className="inline-flex h-9 items-center justify-between rounded-lg border border-primary/15 bg-card/70 px-3 text-sm text-muted-foreground transition-colors hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
-                  >
-                    <span>{topDueDeck ? `Review ${topDueDeck.deckTitle}` : 'Browse deck collection'}</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
                 </div>
               </div>
             </div>
