@@ -179,9 +179,6 @@ export function QuizAssessmentClient({
         duration_ms: sessionDuration,
         results: results.map((entry) => ({
           card_id: entry.cardId,
-          correct: entry.correct,
-          prompt: entry.prompt,
-          correct_answer: entry.correctAnswer,
           user_answer: entry.userAnswer,
         })),
       });

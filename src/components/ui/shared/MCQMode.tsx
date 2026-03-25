@@ -45,6 +45,17 @@ export function MCQMode({
     return shuffle([card.front, ...distractors]).slice(0, Math.max(2, distractors.length + 1));
   }, [card.front, card.mcq_distractors]);
 
+  const prompt = card.id_question ?? card.back;
+  const wasCorrect = selectedOption === card.front;
+
+  const handleContinue = useCallback(() => {
+    if (disabled || !resolved || !selectedOption) {
+      return;
+    }
+
+    onResolve(wasCorrect ? 'easy' : 'again', wasCorrect, selectedOption);
+  }, [disabled, onResolve, resolved, selectedOption, wasCorrect]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (disabled || resolved) {
@@ -73,37 +84,6 @@ export function MCQMode({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [disabled, options, resolved]);
 
-  if (!Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2) {
-    return (
-      <div className="glass-card glow-border rounded-3xl p-7">
-        <div className="rounded-2xl border border-primary/10 bg-card/20 p-5 text-center">
-          <p className="text-lg font-semibold">Preparing quiz data</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {enrichmentPending
-              ? 'AI is generating plausible distractors for this card.'
-              : 'This card does not have enough distractors yet.'}
-          </p>
-          <div className="mt-4 flex justify-center gap-3">
-            <Button type="button" variant="outline" onClick={onFallbackToIdentification}>
-              Switch to Identification
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const prompt = card.id_question ?? card.back;
-  const wasCorrect = selectedOption === card.front;
-
-  const handleContinue = useCallback(() => {
-    if (disabled || !resolved || !selectedOption) {
-      return;
-    }
-
-    onResolve(wasCorrect ? 'easy' : 'again', wasCorrect, selectedOption);
-  }, [disabled, onResolve, resolved, selectedOption, wasCorrect]);
-
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!resolved || disabled || !selectedOption) {
@@ -128,6 +108,26 @@ export function MCQMode({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [disabled, handleContinue, resolved, selectedOption]);
+
+  if (!Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2) {
+    return (
+      <div className="glass-card glow-border rounded-3xl p-7">
+        <div className="rounded-2xl border border-primary/10 bg-card/20 p-5 text-center">
+          <p className="text-lg font-semibold">Preparing quiz data</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {enrichmentPending
+              ? 'AI is generating plausible distractors for this card.'
+              : 'This card does not have enough distractors yet.'}
+          </p>
+          <div className="mt-4 flex justify-center gap-3">
+            <Button type="button" variant="outline" onClick={onFallbackToIdentification}>
+              Switch to Identification
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-card glow-border rounded-3xl p-7">

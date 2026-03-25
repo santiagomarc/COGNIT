@@ -149,9 +149,6 @@ export const logQuizResultSchema = z.object({
   results: z.array(
     z.object({
       card_id: z.uuid({ message: 'Invalid card id' }),
-      correct: z.boolean(),
-      prompt: z.string().trim().min(1).max(2000),
-      correct_answer: z.string().trim().min(1).max(1000),
       user_answer: z.string().trim().max(1000).default(''),
     })
   ).min(1, { message: 'At least one quiz result is required' }).max(200, { message: 'Too many quiz results provided' }),

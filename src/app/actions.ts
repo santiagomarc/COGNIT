@@ -14,6 +14,7 @@ import {
   getHintSchema, GetHintInput,
 } from '@/lib/schemas';
 import { sm2, GRADE_MAP, type StudyGrade } from '@/lib/sm2';
+import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath } from 'next/cache';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
@@ -26,10 +27,41 @@ const TERM_MAX_WORDS = 4;
 const TERM_HARD_MAX_WORDS = 6;
 const TERM_MAX_CHARS = 60;
 
+type AiActionName = 'generate_cards' | 'enrich_cards' | 'sanitize_notes' | 'get_hint';
+
+const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests: number }> = {
+  generate_cards: { windowMinutes: 60, maxRequests: 8 },
+  enrich_cards: { windowMinutes: 60, maxRequests: 120 },
+  sanitize_notes: { windowMinutes: 60, maxRequests: 30 },
+  get_hint: { windowMinutes: 60, maxRequests: 90 },
+};
+
 type EnrichmentRow = {
   id: string;
   mcq_distractors: string[];
   id_question: string;
+};
+
+const ENRICHMENT_RESPONSE_SCHEMA: Schema = {
+  type: SchemaType.OBJECT,
+  required: ['cards'],
+  properties: {
+    cards: {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        required: ['id', 'mcq_distractors', 'id_question'],
+        properties: {
+          id: { type: SchemaType.STRING },
+          mcq_distractors: {
+            type: SchemaType.ARRAY,
+            items: { type: SchemaType.STRING },
+          },
+          id_question: { type: SchemaType.STRING },
+        },
+      },
+    },
+  },
 };
 
 function getGeminiClient() {
@@ -84,6 +116,61 @@ function normalizeWhitespace(value: string) {
     .replace(/[ \u00A0]{2,}/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function normalizeForMatch(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isMissingAiUsageTableError(message: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
+}
+
+async function enforceAiRateLimit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  action: AiActionName,
+) {
+  const policy = AI_RATE_LIMITS[action];
+  const cutoffIso = new Date(Date.now() - policy.windowMinutes * 60_000).toISOString();
+
+  const { count, error } = await supabase
+    .from('ai_usage_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('action', action)
+    .gte('created_at', cutoffIso);
+
+  if (error) {
+    if (isMissingAiUsageTableError(error.message)) {
+      return null;
+    }
+    return 'Unable to check AI usage limits right now. Please try again.';
+  }
+
+  if ((count ?? 0) >= policy.maxRequests) {
+    return `AI limit reached for ${action.replace('_', ' ')}. Try again in about ${policy.windowMinutes} minutes.`;
+  }
+
+  return null;
+}
+
+async function recordAiUsage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  action: AiActionName,
+  metadata: Record<string, unknown> = {},
+) {
+  const { error } = await supabase.from('ai_usage_logs').insert({
+    user_id: userId,
+    action,
+    metadata,
+  });
+
+  if (error && !isMissingAiUsageTableError(error.message)) {
+    console.error('[ai_usage_logs] failed to insert usage row:', error.message);
+  }
 }
 
 function sanitizePdfText(rawText: string) {
@@ -407,7 +494,7 @@ export async function enrichCards(data: EnrichCardsInput) {
     return { error: deckAccess.error };
   }
 
-  const { supabase } = deckAccess;
+  const { supabase, user } = deckAccess;
   const uniqueCardIds = [...new Set(result.data.card_ids)];
   const { data: cards, error } = await supabase
     .from('cards')
@@ -422,6 +509,11 @@ export async function enrichCards(data: EnrichCardsInput) {
   const pendingCards = (cards ?? []).filter((card) => !card.id_question || !Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2);
   if (pendingCards.length === 0) {
     return { success: true, enrichedCount: 0, skippedCount: uniqueCardIds.length };
+  }
+
+  const limitError = await enforceAiRateLimit(supabase, user.id, 'enrich_cards');
+  if (limitError) {
+    return { error: limitError };
   }
 
   const model = getGeminiJsonModel();
@@ -441,6 +533,10 @@ export async function enrichCards(data: EnrichCardsInput) {
           'Return only valid JSON in this shape:',
           '{ "cards": [{ "id": "...", "mcq_distractors": ["...", "...", "..."], "id_question": "..." }] }',
         ].join('\n'),
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseSchema: ENRICHMENT_RESPONSE_SCHEMA,
+          },
         contents: [
           {
             role: 'user',
@@ -489,6 +585,12 @@ export async function enrichCards(data: EnrichCardsInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath(`/dashboard/${result.data.deck_id}/study`);
+
+  await recordAiUsage(supabase, user.id, 'enrich_cards', {
+    requested_cards: uniqueCardIds.length,
+    pending_cards: pendingCards.length,
+    enriched_cards: enrichedCount,
+  });
 
   return {
     success: enrichedCount > 0,
@@ -690,7 +792,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
   const uniqueCardIds = [...new Set(result.data.results.map((entry) => entry.card_id))];
   const { data: ownedCards, error: ownedCardsError } = await supabase
     .from('cards')
-    .select('id')
+    .select('id, front, back, id_question, mcq_distractors')
     .eq('deck_id', result.data.deck_id)
     .in('id', uniqueCardIds);
 
@@ -698,19 +800,50 @@ export async function logQuizResult(data: LogQuizResultInput) {
     return { error: ownedCardsError.message };
   }
 
-  const ownedCardIds = new Set((ownedCards ?? []).map((card) => card.id));
+  const cardsById = new Map((ownedCards ?? []).map((card) => [card.id, card]));
+  const ownedCardIds = new Set(cardsById.keys());
   if (ownedCardIds.size !== uniqueCardIds.length) {
     return { error: 'One or more quiz results referenced cards outside this deck.' };
   }
 
-  const correctCards = result.data.results.filter((entry) => entry.correct).length;
+  const evaluatedResults = result.data.results.map((entry) => {
+    const card = cardsById.get(entry.card_id);
+    if (!card) {
+      return null;
+    }
+
+    const userAnswer = entry.user_answer;
+    const correct = result.data.mode === 'identification'
+      ? similarity(userAnswer, card.front) >= 0.7
+      : normalizeForMatch(userAnswer) === normalizeForMatch(card.front);
+
+    return {
+      card_id: entry.card_id,
+      correct,
+      prompt_text: card.id_question ?? card.back,
+      correct_answer_text: card.front,
+      user_answer_text: userAnswer,
+    };
+  }).filter((entry): entry is {
+    card_id: string;
+    correct: boolean;
+    prompt_text: string;
+    correct_answer_text: string;
+    user_answer_text: string;
+  } => entry !== null);
+
+  if (evaluatedResults.length !== result.data.results.length) {
+    return { error: 'Failed to evaluate one or more quiz answers.' };
+  }
+
+  const correctCards = evaluatedResults.filter((entry) => entry.correct).length;
   const { data: insertedQuizResult, error: quizResultError } = await supabase
     .from('quiz_results')
     .insert({
       user_id: user.id,
       deck_id: result.data.deck_id,
       mode: result.data.mode,
-      total_cards: result.data.results.length,
+      total_cards: evaluatedResults.length,
       correct_cards: correctCards,
       duration_ms: result.data.duration_ms,
     })
@@ -724,13 +857,13 @@ export async function logQuizResult(data: LogQuizResultInput) {
   const { error: quizCardResultsError } = await supabase
     .from('quiz_card_results')
     .insert(
-      result.data.results.map((entry) => ({
+      evaluatedResults.map((entry) => ({
         quiz_result_id: insertedQuizResult.id,
         card_id: entry.card_id,
         correct: entry.correct,
-        prompt_text: entry.prompt,
-        correct_answer_text: entry.correct_answer,
-        user_answer_text: entry.user_answer,
+        prompt_text: entry.prompt_text,
+        correct_answer_text: entry.correct_answer_text,
+        user_answer_text: entry.user_answer_text,
       }))
     );
 
@@ -745,7 +878,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
     success: true,
     quizResultId: insertedQuizResult.id,
     correctCards,
-    totalCards: result.data.results.length,
+    totalCards: evaluatedResults.length,
   };
 }
 
@@ -769,6 +902,11 @@ export async function generateCards(formData: FormData) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
     return { error: 'You must be logged in.' };
+  }
+
+  const limitError = await enforceAiRateLimit(supabase, user.id, 'generate_cards');
+  if (limitError) {
+    return { error: limitError };
   }
 
   // ── 2. Parse & validate metadata ──
@@ -958,6 +1096,12 @@ export async function generateCards(formData: FormData) {
   revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   revalidatePath('/dashboard');
 
+  await recordAiUsage(supabase, user.id, 'generate_cards', {
+    requested_count: parsed.data.count,
+    generated_count: cards.length,
+    file_size_bytes: file.size,
+  });
+
   return {
     success: true,
     count: cards.length,
@@ -972,6 +1116,17 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
     return { error: result.error.flatten().fieldErrors };
   }
 
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: 'You must be logged in.' };
+  }
+
+  const limitError = await enforceAiRateLimit(supabase, user.id, 'sanitize_notes');
+  if (limitError) {
+    return { error: limitError };
+  }
+
   try {
     const model = getGeminiTextModel();
     const response = await model.generateContent({
@@ -984,7 +1139,13 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
       contents: [{ role: 'user', parts: [{ text: result.data.raw_text }] }],
     });
 
-    return { success: true, text: response.response.text().trim() };
+    const sanitizedText = response.response.text().trim();
+    await recordAiUsage(supabase, user.id, 'sanitize_notes', {
+      input_chars: result.data.raw_text.length,
+      output_chars: sanitizedText.length,
+    });
+
+    return { success: true, text: sanitizedText };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[sanitizeNotes] Gemini error:', message);
@@ -1003,7 +1164,13 @@ export async function getHint(data: GetHintInput) {
     return { error: deckAccess.error };
   }
 
-  const { supabase } = deckAccess;
+  const { supabase, user } = deckAccess;
+
+  const limitError = await enforceAiRateLimit(supabase, user.id, 'get_hint');
+  if (limitError) {
+    return { error: limitError };
+  }
+
   const { data: card, error } = await supabase
     .from('cards')
     .select('front, back')
@@ -1036,7 +1203,13 @@ export async function getHint(data: GetHintInput) {
       ],
     });
 
-    return { success: true, hint: response.response.text().trim() };
+    const hint = response.response.text().trim();
+    await recordAiUsage(supabase, user.id, 'get_hint', {
+      card_id: result.data.card_id,
+      hint_chars: hint.length,
+    });
+
+    return { success: true, hint };
   } catch (hintError) {
     const message = hintError instanceof Error ? hintError.message : String(hintError);
     console.error('[getHint] Gemini error:', message);

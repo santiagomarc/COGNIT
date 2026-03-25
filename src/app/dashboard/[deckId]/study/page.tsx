@@ -29,6 +29,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     .from('decks')
     .select('id, title')
     .eq('id', deckId)
+    .eq('user_id', user.id)
     .single();
 
   if (!deck) {

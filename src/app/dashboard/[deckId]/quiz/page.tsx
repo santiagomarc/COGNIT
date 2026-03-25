@@ -64,6 +64,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
     .from('decks')
     .select('id, title')
     .eq('id', deckId)
+    .eq('user_id', user.id)
     .single();
 
   if (!deck) {
