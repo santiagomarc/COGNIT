@@ -9,6 +9,7 @@ import { updateCard, deleteCard, enrichCards } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
 
@@ -69,7 +70,10 @@ export function FlashcardWithActions({
       toast.success('Card updated');
       setIsEditing(false);
       startEnrichmentTransition(async () => {
-        await enrichCards({ deck_id: deckId, card_ids: [cardId] });
+        const enrichmentResult = await enrichCards({ deck_id: deckId, card_ids: [cardId] });
+        if (enrichmentResult?.error) {
+          toast(formatActionError(enrichmentResult.error, 'Quiz enhancement will be prepared later.'));
+        }
       });
     }
     setIsLoading(false);

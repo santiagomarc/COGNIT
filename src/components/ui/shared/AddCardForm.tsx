@@ -2,6 +2,7 @@
 
 import { useState, useRef, useTransition } from 'react';
 import { createCard, enrichCards } from '@/app/actions';
+import { formatActionError } from '@/lib/ai-feedback';
 import { createCardSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,10 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
       setErrors({});
       if (result.cardId) {
         startEnrichmentTransition(async () => {
-          await enrichCards({ deck_id: deckId, card_ids: [result.cardId] });
+          const enrichmentResult = await enrichCards({ deck_id: deckId, card_ids: [result.cardId] });
+          if (enrichmentResult?.error) {
+            toast(formatActionError(enrichmentResult.error, 'Quiz enhancement will be prepared later.'));
+          }
         });
       }
     }

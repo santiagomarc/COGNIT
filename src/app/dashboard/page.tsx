@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
@@ -7,7 +6,7 @@ import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
-import { ArrowRight, Layers, Sparkles } from 'lucide-react';
+import { Layers, Sparkles } from 'lucide-react';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
 
 export default async function Dashboard() {
@@ -52,7 +51,6 @@ export default async function Dashboard() {
   const totalDue = dueCards?.length ?? 0;
   const totalDecks = deckRows.length;
   const totalCards = deckRows.reduce((sum, deck) => sum + (deck.cards?.[0]?.count ?? 0), 0);
-  const topDueDeck = deckBreakdown[0] ?? null;
 
   // ── Compute study streak from study_logs ──
   const { data: studyDays } = await supabase

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Lightbulb } from 'lucide-react';
 import { getHint } from '@/app/actions';
 import { Button } from '@/components/ui/button';
+import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
 
 type HintButtonProps = {
@@ -27,7 +28,7 @@ export function HintButton({ cardId, deckId, disabled = false }: HintButtonProps
     setIsLoading(false);
 
     if (result?.error) {
-      toast.error(typeof result.error === 'string' ? result.error : 'Hint generation failed');
+      toast.error(formatActionError(result.error, 'Hint generation failed'));
       return;
     }
 

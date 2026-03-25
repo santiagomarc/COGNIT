@@ -18,6 +18,7 @@ import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
 import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
 import type { QuizMode, StudySessionCard } from '@/lib/study';
+import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
 
 type QuizAssessmentClientProps = {
@@ -158,7 +159,7 @@ export function QuizAssessmentClient({
     startEnrichmentTransition(async () => {
       const result = await enrichCards({ deck_id: deckId, card_ids: missingIds });
       if (result?.error) {
-        toast.error(typeof result.error === 'string' ? result.error : 'Failed to prepare quiz data');
+        toast.error(formatActionError(result.error, 'Failed to prepare quiz data'));
         return;
       }
 
@@ -185,7 +186,7 @@ export function QuizAssessmentClient({
 
       if (saveResult?.error) {
         didPersistResult.current = false;
-        toast.error(typeof saveResult.error === 'string' ? saveResult.error : 'Failed to save quiz results');
+        toast.error(formatActionError(saveResult.error, 'Failed to save quiz results'));
         return;
       }
 

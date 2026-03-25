@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from 'react';
 import { generateCards, enrichCards } from '@/app/actions';
 import { Button } from '@/components/ui/button';
+import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, Brain, Sparkles, X, CheckCircle2 } from 'lucide-react';
@@ -87,10 +88,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       const result = await generateCards(formData);
 
       if (result.error) {
-        const msg = typeof result.error === 'string'
-          ? result.error
-          : Object.values(result.error).flat().join(', ');
-        toast.error(msg);
+        toast.error(formatActionError(result.error, 'Failed to generate cards.'));
       } else if (result.success && result.cards) {
         toast.success(`${result.count} cards generated and saved!`);
         setGeneratedCards(result.cards);
@@ -102,7 +100,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           void enrichCards({ deck_id: deckId, card_ids: result.cardIds })
             .then((enrichmentResult) => {
               if (enrichmentResult?.error) {
-                toast.error(typeof enrichmentResult.error === 'string' ? enrichmentResult.error : 'Quiz enrichment failed');
+                toast(formatActionError(enrichmentResult.error, 'Cards are saved. Quiz enhancement will finish later.'));
                 return;
               }
 

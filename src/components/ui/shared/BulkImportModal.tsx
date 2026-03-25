@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { parseDelimitedNotes } from '@/lib/parser';
+import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
 
 type BulkImportModalProps = {
@@ -71,7 +72,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
     setIsCleaning(false);
 
     if (result?.error) {
-      toast.error(typeof result.error === 'string' ? result.error : 'Failed to clean notes');
+      toast.error(formatActionError(result.error, 'Failed to clean notes'));
       return;
     }
 
@@ -102,7 +103,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
       });
 
       if (result?.error) {
-        toast.error(typeof result.error === 'string' ? result.error : 'Import failed');
+        toast.error(formatActionError(result.error, 'Import failed'));
         return;
       }
 
@@ -118,7 +119,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
           });
 
           if (enrichmentResult?.error) {
-            toast.error(typeof enrichmentResult.error === 'string' ? enrichmentResult.error : 'Quiz enrichment failed');
+            toast(formatActionError(enrichmentResult.error, 'Import completed. Quiz enhancement will finish later.'));
             return;
           }
 
