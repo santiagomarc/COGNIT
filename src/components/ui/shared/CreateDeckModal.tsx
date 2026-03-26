@@ -1,74 +1,38 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Plus, Sparkles, X } from 'lucide-react';
 import { createDeck } from '@/app/actions';
 import { createDeckSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 type CreateDeckModalProps = {
-  triggerClassName?: string;
-  triggerLabel?: string;
+  totalDecks: number;
+  totalCards: number;
 };
 
-export function CreateDeckModal({ triggerClassName, triggerLabel = 'New Deck' }: CreateDeckModalProps) {
+export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Focus management
   useEffect(() => {
     if (open) {
-      triggerRef.current = document.activeElement as HTMLElement;
-      requestAnimationFrame(() => {
-        const input = dialogRef.current?.querySelector('input');
-        input?.focus();
-      });
-    } else if (triggerRef.current) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+
+    if (triggerRef.current) {
       triggerRef.current.focus();
-      triggerRef.current = null;
     }
   }, [open]);
-
-  // Escape to close + trap Tab
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (!open) return;
-      if (e.key === 'Escape') {
-        if (!isLoading) setOpen(false);
-        return;
-      }
-      if (e.key === 'Tab' && dialogRef.current) {
-        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-          'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        );
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    },
-    [open, isLoading]
-  );
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
 
   async function handleSubmit(formData: FormData) {
     setFieldError(null);
@@ -95,79 +59,107 @@ export function CreateDeckModal({ triggerClassName, triggerLabel = 'New Deck' }:
   }
 
   return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className={cn('inline-flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50', triggerClassName)}
-      >
-        <Plus className="h-4 w-4" />
-        <span>{triggerLabel}</span>
-      </button>
+    <div className="glass-card glow-border h-full rounded-2xl p-3">
+      <div className="relative h-full overflow-hidden rounded-xl border border-primary/15 bg-card/35 p-3">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_48%)]" />
 
-      <AnimatePresence>
-        {open && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center">
-            {/* Backdrop */}
+        <AnimatePresence mode="wait" initial={false}>
+          {!open ? (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              onClick={() => !isLoading && setOpen(false)}
-            />
-
-            {/* Modal */}
-            <motion.div
-              ref={dialogRef}
-              initial={{ opacity: 0, scale: 0.92, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 10 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 28 }}
-              className="glass-card relative z-10 mx-4 w-full max-w-md max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-primary/15 p-6 shadow-2xl"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="create-deck-title"
+              key="quick-actions-face"
+              initial={{ opacity: 0, rotateX: -6, y: 6 }}
+              animate={{ opacity: 1, rotateX: 0, y: 0 }}
+              exit={{ opacity: 0, rotateX: 6, y: -6 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="relative flex h-full flex-col justify-between gap-3"
             >
-              {/* Close button */}
-              <button
-                type="button"
-                onClick={() => !isLoading && setOpen(false)}
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-
-              <div className="mb-5 space-y-1">
-                <h2 id="create-deck-title" className="text-lg font-semibold tracking-tight">
-                  Create New Deck
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Start a new collection of flashcards.
-                </p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick Actions</p>
+                  <p className="mt-1 text-sm font-medium text-foreground">Keep momentum today</p>
+                </div>
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                  <Sparkles className="h-4 w-4" />
+                </span>
               </div>
 
-              <form ref={formRef} action={handleSubmit} className="space-y-4">
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-foreground/85">
+                  {totalDecks} deck{totalDecks !== 1 ? 's' : ''}
+                </span>
+                <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-foreground/85">
+                  {totalCards} total card{totalCards !== 1 ? 's' : ''}
+                </span>
+              </div>
+
+              <div className="grid gap-2">
+                <button
+                  ref={triggerRef}
+                  type="button"
+                  onClick={() => setOpen(true)}
+                  className="inline-flex h-15 w-full items-center justify-center gap-2 rounded-xl border border-primary/45 bg-card/120 px-4 text-sm font-semibold text-foreground shadow-none transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Create New Deck</span>
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="create-deck-face"
+              initial={{ opacity: 0, rotateX: 6, y: 6 }}
+              animate={{ opacity: 1, rotateX: 0, y: 0 }}
+              exit={{ opacity: 0, rotateX: -6, y: -6 }}
+              transition={{ duration: 0.22, ease: 'easeOut' }}
+              className="relative flex h-full flex-col justify-between gap-3"
+              role="dialog"
+              aria-modal="false"
+              aria-labelledby="create-deck-title"
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && !isLoading) {
+                  setOpen(false);
+                }
+              }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 id="create-deck-title" className="text-sm font-semibold tracking-tight text-foreground">
+                    Create New Deck
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Name it and start adding cards.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !isLoading && setOpen(false)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+                  aria-label="Close create deck form"
+                  disabled={isLoading}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <form ref={formRef} action={handleSubmit} className="space-y-3">
                 <div className="space-y-2">
-                  <Label htmlFor="modal-title">Deck Title</Label>
+                  <Label htmlFor="inline-deck-title">Deck Title</Label>
                   <Input
-                    id="modal-title"
+                    ref={inputRef}
+                    id="inline-deck-title"
                     name="title"
                     placeholder="e.g. Automata Theory"
                     required
                     aria-invalid={!!fieldError}
-                    aria-describedby={fieldError ? 'modal-title-error' : undefined}
+                    aria-describedby={fieldError ? 'inline-title-error' : undefined}
                     onChange={() => fieldError && setFieldError(null)}
                   />
                   {fieldError && (
-                    <p id="modal-title-error" className="text-xs text-destructive" role="alert">
+                    <p id="inline-title-error" className="text-xs text-destructive" role="alert">
                       {fieldError}
                     </p>
                   )}
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2">
+                <div className="flex items-center justify-end gap-2 pt-1">
                   <Button
                     type="button"
                     variant="ghost"
@@ -183,9 +175,9 @@ export function CreateDeckModal({ triggerClassName, triggerLabel = 'New Deck' }:
                 </div>
               </form>
             </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
 }
