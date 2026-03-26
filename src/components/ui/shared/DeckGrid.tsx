@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -39,27 +39,32 @@ type DeckGridProps = {
 
 export function DeckGrid({ decks }: DeckGridProps) {
   const [search, setSearch] = useState('');
+  const [localDecks, setLocalDecks] = useState(decks);
+
+  useEffect(() => {
+    setLocalDecks(decks);
+  }, [decks]);
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return decks;
+    if (!search.trim()) return localDecks;
     const q = search.toLowerCase();
-    return decks.filter((d) => d.title.toLowerCase().includes(q));
-  }, [decks, search]);
+    return localDecks.filter((d) => d.title.toLowerCase().includes(q));
+  }, [localDecks, search]);
 
   return (
     <div className="space-y-4">
       {/* Search input */}
-      {decks.length > 0 && (
+      {localDecks.length > 0 && (
         <DashboardSearch
           value={search}
           onChange={setSearch}
           resultCount={filtered.length}
-          totalCount={decks.length}
+          totalCount={localDecks.length}
         />
       )}
 
       {/* Deck list */}
-      {decks.length === 0 ? (
+      {localDecks.length === 0 ? (
         <FadeInUp delay={0.2}>
           <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/40 backdrop-blur-md p-8 text-center">
             <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
@@ -113,7 +118,23 @@ export function DeckGrid({ decks }: DeckGridProps) {
                           </span>
                         </CardDescription>
                       </Link>
-                      <DeckActions deckId={deck.id} currentTitle={deck.title} />
+                      <DeckActions
+                        deckId={deck.id}
+                        currentTitle={deck.title}
+                        onDeleteOptimistic={() => {
+                          setLocalDecks((prev) => prev.filter((item) => item.id !== deck.id));
+                        }}
+                        onDeleteRollback={() => {
+                          setLocalDecks((prev) => {
+                            if (prev.some((item) => item.id === deck.id)) {
+                              return prev;
+                            }
+                            return [deck, ...prev].sort((a, b) =>
+                              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                            );
+                          });
+                        }}
+                      />
                     </div>
                   </CardHeader>
                 </Card>

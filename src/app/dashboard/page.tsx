@@ -17,21 +17,54 @@ export default async function Dashboard() {
     redirect('/login');
   }
 
-  // ── Fetch decks with card counts ──
-  const { data: decks } = await supabase
-    .from('decks')
-    .select('id, title, created_at, cards(count)')
-    .order('created_at', { ascending: false });
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
+
+  const [
+    { data: decks },
+    { data: dueCards },
+    { data: studyDays },
+    { data: recentActivityLogs },
+    { count: totalStudiedCards },
+    { data: quizResults, error: quizResultsError },
+  ] = await Promise.all([
+    supabase
+      .from('decks')
+      .select('id, title, created_at, cards(count)')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('cards')
+      .select('id, deck_id')
+      .lte('next_review_at', nowIso),
+    supabase
+      .from('study_logs')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    supabase
+      .from('study_logs')
+      .select('created_at')
+      .eq('user_id', user.id)
+      .gte('created_at', sixMonthsAgo.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(10000),
+    supabase
+      .from('study_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    supabase
+      .from('quiz_results')
+      .select('id, deck_id, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+  ]);
 
   const deckRows = (decks as { id: string; title: string; created_at: string; cards: { count: number }[] }[] | null) ?? [];
   const totalCardsByDeck = new Map(deckRows.map((deck) => [deck.id, deck.cards?.[0]?.count ?? 0]));
-
-  // ── Fetch cards due today (next_review_at <= now) ──
-  const now = new Date().toISOString();
-  const { data: dueCards } = await supabase
-    .from('cards')
-    .select('id, deck_id')
-    .lte('next_review_at', now);
 
   // Build "due today" per-deck breakdown
   const dueByDeck = new Map<string, number>();
@@ -52,42 +85,11 @@ export default async function Dashboard() {
   const totalDecks = deckRows.length;
   const totalCards = deckRows.reduce((sum, deck) => sum + (deck.cards?.[0]?.count ?? 0), 0);
 
-  // ── Compute study streak from study_logs ──
-  const { data: studyDays } = await supabase
-    .from('study_logs')
-    .select('created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5000);
-
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
-
-  const { data: recentActivityLogs } = await supabase
-    .from('study_logs')
-    .select('created_at')
-    .eq('user_id', user.id)
-    .gte('created_at', sixMonthsAgo.toISOString())
-    .order('created_at', { ascending: true })
-    .limit(10000);
-
-  const { count: totalStudiedCards } = await supabase
-    .from('study_logs')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id);
-
   let masteryByDeck = computeDeckMasterySnapshots({
     totalCardsByDeck,
     quizResults: [],
     quizCardResults: [],
   });
-
-  const { data: quizResults, error: quizResultsError } = await supabase
-    .from('quiz_results')
-    .select('id, deck_id, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5000);
 
   if (!quizResultsError && quizResults && quizResults.length > 0) {
     const { data: quizCardResults, error: quizCardResultsError } = await supabase

@@ -62,21 +62,35 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     redirect('/login');
   }
 
-  const { data: deck, error: deckError } = await supabase
-    .from('decks')
-    .select('id, title, description, created_at')
-    .eq('id', deckId)
-    .single();
+  const [
+    { data: deck, error: deckError },
+    { data: cards, error: cardsError },
+    { data: quizResults, error: quizResultsError },
+    historyResult,
+  ] = await Promise.all([
+    supabase
+      .from('decks')
+      .select('id, title, description, created_at')
+      .eq('id', deckId)
+      .single(),
+    supabase
+      .from('cards')
+      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question')
+      .eq('deck_id', deckId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('quiz_results')
+      .select('id, deck_id, created_at')
+      .eq('user_id', user.id)
+      .eq('deck_id', deckId)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    getQuizHistory(deckId),
+  ]);
 
   if (deckError || !deck) {
     notFound();
   }
-
-  const { data: cards, error: cardsError } = await supabase
-    .from('cards')
-    .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question')
-    .eq('deck_id', deckId)
-    .order('created_at', { ascending: false });
 
   if (cardsError) {
     throw new Error(cardsError.message);
@@ -96,14 +110,6 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     lastQuizAt: null as string | null,
   };
 
-  const { data: quizResults, error: quizResultsError } = await supabase
-    .from('quiz_results')
-    .select('id, deck_id, created_at')
-    .eq('user_id', user.id)
-    .eq('deck_id', deckId)
-    .order('created_at', { ascending: false })
-    .limit(5000);
-
   if (!quizResultsError && quizResults && quizResults.length > 0) {
     const { data: quizCardResults, error: quizCardResultsError } = await supabase
       .from('quiz_card_results')
@@ -121,7 +127,6 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     }
   }
 
-  const historyResult = await getQuizHistory(deckId);
   const history = (historyResult && 'history' in historyResult ? historyResult.history : []) ?? [];
 
   return (

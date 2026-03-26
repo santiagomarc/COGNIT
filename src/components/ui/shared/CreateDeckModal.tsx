@@ -19,6 +19,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -34,9 +35,9 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
     }
   }, [open]);
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit() {
     setFieldError(null);
-    const title = (formData.get('title') as string).trim();
+    const title = draftTitle.trim();
 
     const parsed = createDeckSchema.safeParse({ title, is_public: false });
     if (!parsed.success) {
@@ -45,15 +46,19 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
       return;
     }
 
+    const submittedTitle = title;
+    setOpen(false);
     setIsLoading(true);
     const result = await createDeck(parsed.data);
     if (result?.error) {
+      setDraftTitle(submittedTitle);
+      setOpen(true);
       toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
     } else {
       toast.success('Deck created successfully');
       formRef.current?.reset();
+      setDraftTitle('');
       setFieldError(null);
-      setOpen(false);
     }
     setIsLoading(false);
   }
@@ -148,9 +153,15 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                     name="title"
                     placeholder="e.g. Automata Theory"
                     required
+                    value={draftTitle}
                     aria-invalid={!!fieldError}
                     aria-describedby={fieldError ? 'inline-title-error' : undefined}
-                    onChange={() => fieldError && setFieldError(null)}
+                    onChange={(e) => {
+                      setDraftTitle(e.target.value);
+                      if (fieldError) {
+                        setFieldError(null);
+                      }
+                    }}
                   />
                   {fieldError && (
                     <p id="inline-title-error" className="text-xs text-destructive" role="alert">

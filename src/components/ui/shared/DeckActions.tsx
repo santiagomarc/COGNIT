@@ -11,9 +11,11 @@ import { toast } from 'sonner';
 interface DeckActionsProps {
     deckId: string;
     currentTitle: string;
+    onDeleteOptimistic?: () => void;
+    onDeleteRollback?: () => void;
 }
 
-export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
+export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDeleteRollback }: DeckActionsProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(currentTitle);
     const [isLoading, setIsLoading] = useState(false);
@@ -21,8 +23,10 @@ export function DeckActions({ deckId, currentTitle }: DeckActionsProps) {
 
     async function handleDelete() {
         setIsLoading(true);
+        onDeleteOptimistic?.();
         const result = await deleteDeck(deckId);
         if (result?.error) {
+            onDeleteRollback?.();
             toast.error(typeof result.error === 'string' ? result.error : 'Failed to delete deck');
         } else {
             toast.success('Deck deleted');
