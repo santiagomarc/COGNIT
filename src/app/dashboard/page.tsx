@@ -7,7 +7,6 @@ import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
 import { Layers } from 'lucide-react';
-import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
 
 export default async function Dashboard() {
   const supabase = await createClient();
@@ -28,7 +27,7 @@ export default async function Dashboard() {
     { data: studyDays },
     { data: recentActivityLogs },
     { count: totalStudiedCards },
-    { data: quizResults, error: quizResultsError },
+    { data: masteryStateRows, error: masteryStateError },
   ] = await Promise.all([
     supabase
       .from('decks')
@@ -56,15 +55,13 @@ export default async function Dashboard() {
       .select('*', { count: 'exact', head: true })
       .eq('user_id', user.id),
     supabase
-      .from('quiz_results')
-      .select('id, deck_id, created_at')
+      .from('card_mastery_state')
+      .select('deck_id, correct, last_quiz_at')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(5000),
+      .limit(20000),
   ]);
 
   const deckRows = (decks as { id: string; title: string; created_at: string; cards: { count: number }[] }[] | null) ?? [];
-  const totalCardsByDeck = new Map(deckRows.map((deck) => [deck.id, deck.cards?.[0]?.count ?? 0]));
 
   // Build "due today" per-deck breakdown
   const dueByDeck = new Map<string, number>();
@@ -85,26 +82,28 @@ export default async function Dashboard() {
   const totalDecks = deckRows.length;
   const totalCards = deckRows.reduce((sum, deck) => sum + (deck.cards?.[0]?.count ?? 0), 0);
 
-  let masteryByDeck = computeDeckMasterySnapshots({
-    totalCardsByDeck,
-    quizResults: [],
-    quizCardResults: [],
-  });
+  const masteryByDeck = new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();
+  for (const row of masteryStateRows ?? []) {
+    const existing = masteryByDeck.get(row.deck_id) ?? {
+      assessedCards: 0,
+      masteredCards: 0,
+      lastQuizAt: null,
+    };
 
-  if (!quizResultsError && quizResults && quizResults.length > 0) {
-    const { data: quizCardResults, error: quizCardResultsError } = await supabase
-      .from('quiz_card_results')
-      .select('quiz_result_id, card_id, correct')
-      .in('quiz_result_id', quizResults.map((row) => row.id))
-      .limit(20000);
-
-    if (!quizCardResultsError && quizCardResults) {
-      masteryByDeck = computeDeckMasterySnapshots({
-        totalCardsByDeck,
-        quizResults,
-        quizCardResults,
-      });
+    existing.assessedCards += 1;
+    if (row.correct) {
+      existing.masteredCards += 1;
     }
+
+    if (!existing.lastQuizAt || existing.lastQuizAt < row.last_quiz_at) {
+      existing.lastQuizAt = row.last_quiz_at;
+    }
+
+    masteryByDeck.set(row.deck_id, existing);
+  }
+
+  if (masteryStateError && !masteryStateError.message.toLowerCase().includes('does not exist')) {
+    console.error('[dashboard] failed to read card mastery state:', masteryStateError.message);
   }
 
   // Deduplicate by date (UTC)
@@ -215,9 +214,14 @@ export default async function Dashboard() {
         <DeckGrid
           decks={deckRows.map((deck) => {
             const mastery = masteryByDeck.get(deck.id);
+            const deckTotalCards = deck.cards?.[0]?.count ?? 0;
+            const masteryPercentage = deckTotalCards > 0 && mastery
+              ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
+              : 0;
+
             return {
               ...deck,
-              masteryPercentage: mastery?.masteryPercentage ?? 0,
+              masteryPercentage,
               assessedCards: mastery?.assessedCards ?? 0,
               lastQuizAt: mastery?.lastQuizAt ?? null,
             };

@@ -127,6 +127,11 @@ function isMissingAiUsageTableError(message: string) {
   return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
 }
 
+function isMissingTableError(message: string, tableName: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes(tableName.toLowerCase()) && normalized.includes('does not exist');
+}
+
 async function enforceAiRateLimit(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -848,7 +853,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
       correct_cards: correctCards,
       duration_ms: result.data.duration_ms,
     })
-    .select('id')
+    .select('id, created_at')
     .single();
 
   if (quizResultError || !insertedQuizResult) {
@@ -870,6 +875,25 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   if (quizCardResultsError) {
     return { error: quizCardResultsError.message };
+  }
+
+  const attemptTimestamp = insertedQuizResult.created_at ?? new Date().toISOString();
+  const { error: masteryStateError } = await supabase
+    .from('card_mastery_state')
+    .upsert(
+      evaluatedResults.map((entry) => ({
+        user_id: user.id,
+        deck_id: result.data.deck_id,
+        card_id: entry.card_id,
+        correct: entry.correct,
+        last_quiz_at: attemptTimestamp,
+        updated_at: new Date().toISOString(),
+      })),
+      { onConflict: 'user_id,deck_id,card_id' }
+    );
+
+  if (masteryStateError && !isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
+    console.error('[card_mastery_state] failed to upsert rows:', masteryStateError.message);
   }
 
   revalidatePath('/dashboard');

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { ArrowLeft, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
@@ -6,14 +7,12 @@ import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
 import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
 import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
-import { QuizHistoryList } from '@/components/ui/shared/QuizHistoryList';
+import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
 import { getSessionCardBounds } from '@/lib/study';
-import { getQuizHistory } from '@/app/actions';
 
 function getMasteryBarClass(masteryPercentage: number) {
   if (masteryPercentage >= 85) return 'bg-sky-400';
@@ -65,8 +64,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   const [
     { data: deck, error: deckError },
     { data: cards, error: cardsError },
-    { data: quizResults, error: quizResultsError },
-    historyResult,
+    { data: masteryRows, error: masteryRowsError },
   ] = await Promise.all([
     supabase
       .from('decks')
@@ -79,13 +77,10 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       .eq('deck_id', deckId)
       .order('created_at', { ascending: false }),
     supabase
-      .from('quiz_results')
-      .select('id, deck_id, created_at')
+      .from('card_mastery_state')
+      .select('correct, last_quiz_at')
       .eq('user_id', user.id)
-      .eq('deck_id', deckId)
-      .order('created_at', { ascending: false })
-      .limit(5000),
-    getQuizHistory(deckId),
+      .eq('deck_id', deckId),
   ]);
 
   if (deckError || !deck) {
@@ -102,32 +97,23 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
   ).length;
 
-  let mastery = {
-    masteryPercentage: 0,
-    assessedCards: 0,
-    masteredCards: 0,
-    totalCards,
-    lastQuizAt: null as string | null,
-  };
+  let lastQuizAt: string | null = null;
+  let masteredCards = 0;
+  for (const row of masteryRows ?? []) {
+    if (row.correct) {
+      masteredCards += 1;
+    }
 
-  if (!quizResultsError && quizResults && quizResults.length > 0) {
-    const { data: quizCardResults, error: quizCardResultsError } = await supabase
-      .from('quiz_card_results')
-      .select('quiz_result_id, card_id, correct')
-      .in('quiz_result_id', quizResults.map((row) => row.id))
-      .limit(20000);
-
-    if (!quizCardResultsError && quizCardResults) {
-      const snapshots = computeDeckMasterySnapshots({
-        totalCardsByDeck: new Map([[deckId, totalCards]]),
-        quizResults,
-        quizCardResults,
-      });
-      mastery = snapshots.get(deckId) ?? mastery;
+    if (!lastQuizAt || lastQuizAt < row.last_quiz_at) {
+      lastQuizAt = row.last_quiz_at;
     }
   }
 
-  const history = (historyResult && 'history' in historyResult ? historyResult.history : []) ?? [];
+  if (masteryRowsError && !masteryRowsError.message.toLowerCase().includes('does not exist')) {
+    console.error('[deck-page] failed to read card mastery state:', masteryRowsError.message);
+  }
+
+  const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
 
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
@@ -173,21 +159,21 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     Deck Mastery
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {formatLastQuizLabel(mastery.lastQuizAt)}
+                    {formatLastQuizLabel(lastQuizAt)}
                   </p>
                 </div>
                 <div className="text-left md:text-right">
-                  <p className="text-3xl font-bold tracking-tight text-foreground">{mastery.masteryPercentage}%</p>
+                  <p className="text-3xl font-bold tracking-tight text-foreground">{masteryPercentage}%</p>
                   <p className="text-xs text-muted-foreground">
-                    {mastery.masteredCards}/{mastery.totalCards} cards currently proven in quizzes
+                    {masteredCards}/{totalCards} cards currently proven in quizzes
                   </p>
                 </div>
               </div>
 
               <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted/50">
                 <div
-                  className={`h-full rounded-full transition-all ${getMasteryBarClass(mastery.masteryPercentage)}`}
-                  style={{ width: `${Math.min(mastery.masteryPercentage, 100)}%` }}
+                  className={`h-full rounded-full transition-all ${getMasteryBarClass(masteryPercentage)}`}
+                  style={{ width: `${Math.min(masteryPercentage, 100)}%` }}
                 />
               </div>
             </div>
@@ -310,7 +296,9 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       <DeckCardsManager deckId={deckId} cards={cards ?? []} />
 
       <FadeInUp delay={0.2}>
-        <QuizHistoryList history={history} />
+        <Suspense fallback={<QuizHistorySkeleton />}>
+          <QuizHistorySection deckId={deckId} />
+        </Suspense>
       </FadeInUp>
     </div>
   );
