@@ -17,6 +17,7 @@ import { sm2, GRADE_MAP, type StudyGrade } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath } from 'next/cache';
+import { isMissingTableError } from '@/lib/supabase-errors';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 
@@ -125,11 +126,6 @@ function normalizeForMatch(value: string) {
 function isMissingAiUsageTableError(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
-}
-
-function isMissingTableError(message: string, tableName: string) {
-  const normalized = message.toLowerCase();
-  return normalized.includes(tableName.toLowerCase()) && normalized.includes('does not exist');
 }
 
 async function enforceAiRateLimit(
