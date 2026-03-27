@@ -14,14 +14,18 @@ type PDFUploadZoneProps = {
 
 type GeneratedCard = { front: string; back: string };
 
+const PDF_GENERATION_MAX_COUNT = 30;
+
 export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [cardCount, setCardCount] = useState(10);
+  const [maxCardChoice, setMaxCardChoice] = useState<string>('10');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
   const [isEnriching, setIsEnriching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const resolvedMaxCardCount = maxCardChoice === 'max' ? PDF_GENERATION_MAX_COUNT : Number(maxCardChoice);
 
   // ── Drag handlers ──
   const handleDragEnter = useCallback((e: DragEvent) => {
@@ -83,14 +87,18 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('deck_id', deckId);
-      formData.append('count', String(cardCount));
+      formData.append('count', maxCardChoice);
 
       const result = await generateCards(formData);
 
       if (result.error) {
         toast.error(formatActionError(result.error, 'Failed to generate cards.'));
       } else if (result.success && result.cards) {
-        toast.success(`${result.count} cards generated and saved!`);
+        if (result.count < resolvedMaxCardCount) {
+          toast.success(`${result.count} cards generated (AI stopped early after covering the material).`);
+        } else {
+          toast.success(`${result.count} cards generated and saved!`);
+        }
         setGeneratedCards(result.cards);
         setSelectedFile(null);
         if (inputRef.current) inputRef.current.value = '';
@@ -218,19 +226,20 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           >
             <div className="flex items-center gap-2">
               <label htmlFor="card-count" className="text-sm text-muted-foreground">
-                Cards to generate:
+                Max cards to generate:
               </label>
               <select
                 id="card-count"
-                value={cardCount}
-                onChange={(e) => setCardCount(Number(e.target.value))}
+                value={maxCardChoice}
+                onChange={(e) => setMaxCardChoice(e.target.value)}
                 className="h-8 rounded-lg border border-primary/20 bg-card/60 px-2 text-sm backdrop-blur-sm outline-none focus:border-primary focus:ring-2 focus:ring-glow"
               >
-                {[5, 10, 15, 20, 25, 30].map((n) => (
+                {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
                 ))}
+                <option value="max">Max</option>
               </select>
             </div>
 

@@ -87,7 +87,7 @@ export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 
 export const generateCardsSchema = z.object({
     deck_id: z.uuid({ message: "Invalid deck id" }),
-    /** Number of flashcards to generate. 5-30 range keeps cost sane. */
+  /** Maximum flashcards to generate. AI may return fewer when coverage is complete. */
     count: z.number().int().min(5).max(30).default(10),
 });
 
