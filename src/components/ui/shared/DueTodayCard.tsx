@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Clock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -12,11 +12,9 @@ type DueTodayCardProps = {
 };
 
 export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCardProps) {
-  const reduced = useReducedMotion();
-
   return (
     <motion.div
-      initial={reduced ? undefined : { opacity: 0, y: 20, scale: 0.96 }}
+      initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
       className={cn('glass-card glow-border flex h-full flex-col rounded-2xl p-4', className)}

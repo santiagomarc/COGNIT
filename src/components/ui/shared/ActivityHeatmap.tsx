@@ -10,6 +10,7 @@ type ActivityPoint = {
 type ActivityHeatmapProps = {
   activity: ActivityPoint[];
   monthsToShow?: number;
+  anchorDate?: string;
 };
 
 type HeatmapCell = {
@@ -21,8 +22,13 @@ function toISODateUTC(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-function buildHeatmapWeeks(activity: ActivityPoint[], monthsToShow: number): HeatmapCell[][] {
-  const today = new Date();
+function buildHeatmapWeeks(
+  activity: ActivityPoint[],
+  monthsToShow: number,
+  anchorDate?: string,
+): HeatmapCell[][] {
+  const parsedAnchor = anchorDate ? new Date(`${anchorDate}T00:00:00Z`) : null;
+  const today = parsedAnchor && !Number.isNaN(parsedAnchor.getTime()) ? parsedAnchor : new Date();
   const end = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
 
   const from = new Date(end);
@@ -77,8 +83,8 @@ function getCellClass(intensity: 0 | 1 | 2 | 3 | 4): string {
   }
 }
 
-export function ActivityHeatmap({ activity, monthsToShow = 6 }: ActivityHeatmapProps) {
-  const weeks = buildHeatmapWeeks(activity, monthsToShow);
+export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: ActivityHeatmapProps) {
+  const weeks = buildHeatmapWeeks(activity, monthsToShow, anchorDate);
 
   return (
     <div className="space-y-3">

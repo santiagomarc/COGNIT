@@ -38,12 +38,28 @@ type DeckGridProps = {
   decks: DeckWithCount[];
 };
 
+function sortDecksByQuizCards(items: DeckWithCount[]) {
+  return [...items].sort((a, b) => {
+    if (b.assessedCards !== a.assessedCards) {
+      return b.assessedCards - a.assessedCards;
+    }
+
+    const aCardCount = a.cards?.[0]?.count ?? 0;
+    const bCardCount = b.cards?.[0]?.count ?? 0;
+    if (bCardCount !== aCardCount) {
+      return bCardCount - aCardCount;
+    }
+
+    return a.title.localeCompare(b.title);
+  });
+}
+
 export function DeckGrid({ decks }: DeckGridProps) {
   const [search, setSearch] = useState('');
-  const [localDecks, setLocalDecks] = useState(decks);
+  const [localDecks, setLocalDecks] = useState(() => sortDecksByQuizCards(decks));
 
   useEffect(() => {
-    setLocalDecks(decks);
+    setLocalDecks(sortDecksByQuizCards(decks));
   }, [decks]);
 
   const filtered = useMemo(() => {
@@ -131,9 +147,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                             if (prev.some((item) => item.id === deck.id)) {
                               return prev;
                             }
-                            return [deck, ...prev].sort((a, b) =>
-                              new Date((b.updated_at || b.created_at)).getTime() - new Date((a.updated_at || a.created_at)).getTime()
-                            );
+                            return sortDecksByQuizCards([deck, ...prev]);
                           });
                         }}
                       />

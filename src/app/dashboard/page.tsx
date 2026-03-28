@@ -358,6 +358,7 @@ export default async function Dashboard() {
             studiedToday={studiedToday}
             totalStudiedCards={totalStudiedCards ?? 0}
             todayStudiedCount={todayStudiedCount}
+            todayIso={today}
             activity={activity}
           />
         </div>
@@ -367,20 +368,34 @@ export default async function Dashboard() {
       <FadeInUp delay={0.15}>
         <div id="deck-collection" className="scroll-mt-24">
         <DeckGrid
-          decks={deckRows.map((deck) => {
-            const mastery = masteryByDeck.get(deck.id);
-            const deckTotalCards = deck.cards?.[0]?.count ?? 0;
-            const masteryPercentage = deckTotalCards > 0 && mastery
-              ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
-              : 0;
+          decks={deckRows
+            .map((deck) => {
+              const mastery = masteryByDeck.get(deck.id);
+              const deckTotalCards = deck.cards?.[0]?.count ?? 0;
+              const masteryPercentage = deckTotalCards > 0 && mastery
+                ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
+                : 0;
 
-            return {
-              ...deck,
-              masteryPercentage,
-              assessedCards: mastery?.assessedCards ?? 0,
-              lastQuizAt: mastery?.lastQuizAt ?? null,
-            };
-          })}
+              return {
+                ...deck,
+                masteryPercentage,
+                assessedCards: mastery?.assessedCards ?? 0,
+                lastQuizAt: mastery?.lastQuizAt ?? null,
+              };
+            })
+            .sort((a, b) => {
+              if (b.assessedCards !== a.assessedCards) {
+                return b.assessedCards - a.assessedCards;
+              }
+
+              const aCardCount = a.cards?.[0]?.count ?? 0;
+              const bCardCount = b.cards?.[0]?.count ?? 0;
+              if (bCardCount !== aCardCount) {
+                return bCardCount - aCardCount;
+              }
+
+              return a.title.localeCompare(b.title);
+            })}
         />
         </div>
       </FadeInUp>

@@ -8,12 +8,16 @@ import {
   ChevronRight,
   CircleAlert,
   CircleCheckBig,
+  Pause,
+  Play,
   RotateCcw,
   Sparkles,
   Timer,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { enrichCards, logQuizResult } from '@/app/actions';
+import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
 import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
@@ -36,6 +40,12 @@ type QuizQuestionResult = {
   userAnswer: string;
   correct: boolean;
   score?: number;
+};
+
+type QuizBadge = {
+  title: string;
+  description: string;
+  tone: 'emerald' | 'primary' | 'amber';
 };
 
 function formatDuration(ms: number): string {
@@ -65,33 +75,44 @@ export function QuizAssessmentClient({
   totalInDeck,
   mode,
 }: QuizAssessmentClientProps) {
-  const [sessionStartMs, setSessionStartMs] = useState(() => Date.now());
-  const [nowMs, setNowMs] = useState(() => Date.now());
+  const router = useRouter();
+  const [sessionDurationMs, setSessionDurationMs] = useState(0);
   const [sessionCards, setSessionCards] = useState(cards);
   const [quizMode, setQuizMode] = useState<QuizMode>(mode);
   const [index, setIndex] = useState(0);
   const [results, setResults] = useState<QuizQuestionResult[]>([]);
   const [hasSavedResult, setHasSavedResult] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [quitDialogOpen, setQuitDialogOpen] = useState(false);
+  const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
   const [isEnriching, startEnrichmentTransition] = useTransition();
   const [isSavingResult, startSavingResultTransition] = useTransition();
 
   const requestedEnrichmentIds = useRef<Set<string>>(new Set());
   const didPersistResult = useRef(false);
+  const lastTickMs = useRef<number | null>(null);
   const active = sessionCards[index];
   const completed = index >= sessionCards.length;
-  const sessionDuration = nowMs - sessionStartMs;
+  const sessionDuration = sessionDurationMs;
+  const shouldProtectProgress = !completed && sessionCards.length > 0;
 
   useEffect(() => {
-    if (completed) {
+    if (completed || isPaused) {
+      lastTickMs.current = null;
       return;
     }
 
+    lastTickMs.current = Date.now();
     const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
+      const now = Date.now();
+      const previous = lastTickMs.current ?? now;
+      const delta = now - previous;
+      lastTickMs.current = now;
+      setSessionDurationMs((current) => current + Math.max(delta, 0));
+    }, 250);
 
     return () => window.clearInterval(intervalId);
-  }, [completed]);
+  }, [completed, isPaused]);
 
   const progress = useMemo(() => {
     if (sessionCards.length === 0) return 0;
@@ -108,6 +129,48 @@ export function QuizAssessmentClient({
       letterGrade: getLetterGrade(percentage),
     };
   }, [results]);
+
+  const averagePerQuestionMs = useMemo(() => {
+    if (results.length === 0) {
+      return 0;
+    }
+
+    return Math.round(sessionDuration / results.length);
+  }, [results.length, sessionDuration]);
+
+  const quizBadges = useMemo(() => {
+    const badges: QuizBadge[] = [];
+
+    if (results.length === 0) {
+      return badges;
+    }
+
+    if (scoreSummary.percentage === 100) {
+      badges.push({
+        title: 'Flawless Victory',
+        description: 'Perfect score on this run.',
+        tone: 'emerald',
+      });
+    }
+
+    if (scoreSummary.percentage >= 80 && averagePerQuestionMs > 0 && averagePerQuestionMs <= 3000) {
+      badges.push({
+        title: 'Speed Demon',
+        description: '80%+ accuracy with less than 3 seconds per question.',
+        tone: 'primary',
+      });
+    }
+
+    if (scoreSummary.percentage >= 85 && averagePerQuestionMs > 3000) {
+      badges.push({
+        title: 'Steady & Sure',
+        description: 'Strong accuracy with deliberate pacing.',
+        tone: 'amber',
+      });
+    }
+
+    return badges;
+  }, [averagePerQuestionMs, results.length, scoreSummary.percentage]);
 
   const applyEnrichment = useCallback((rows: Array<{ id: string; mcq_distractors: string[]; id_question: string }>) => {
     if (rows.length === 0) {
@@ -194,23 +257,88 @@ export function QuizAssessmentClient({
     });
   }, [completed, deckId, quizMode, results, sessionDuration]);
 
+  useEffect(() => {
+    if (!shouldProtectProgress) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [shouldProtectProgress]);
+
+  const requestQuit = useCallback(
+    (href: string) => {
+      if (!shouldProtectProgress) {
+        router.push(href);
+        return;
+      }
+
+      setPendingQuitHref(href);
+      setQuitDialogOpen(true);
+    },
+    [router, shouldProtectProgress]
+  );
+
+  const confirmQuit = useCallback(() => {
+    if (!pendingQuitHref) {
+      setQuitDialogOpen(false);
+      return;
+    }
+
+    setQuitDialogOpen(false);
+    setIsPaused(false);
+    router.push(pendingQuitHref);
+    setPendingQuitHref(null);
+  }, [pendingQuitHref, router]);
+
   const resolveQuestion = useCallback((result: QuizQuestionResult) => {
     setResults((current) => [...current, result]);
     setIndex((current) => current + 1);
-    setNowMs(Date.now());
   }, []);
 
   const restart = () => {
-    const nextNow = Date.now();
     setSessionCards(cards);
     setQuizMode(mode);
     setIndex(0);
     setResults([]);
     setHasSavedResult(false);
+    setIsPaused(false);
+    setSessionDurationMs(0);
+    setQuitDialogOpen(false);
+    setPendingQuitHref(null);
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
-    setSessionStartMs(nextNow);
-    setNowMs(nextNow);
+    lastTickMs.current = null;
+  };
+
+  const rematchMissed = () => {
+    const missedIds = results.filter((entry) => !entry.correct).map((entry) => entry.cardId);
+    if (missedIds.length === 0) {
+      return;
+    }
+
+    const missedCards = missedIds
+      .map((cardId) => sessionCards.find((card) => card.id === cardId))
+      .filter((card): card is StudySessionCard => Boolean(card));
+
+    if (missedCards.length === 0) {
+      return;
+    }
+
+    setSessionCards(missedCards);
+    setIndex(0);
+    setResults([]);
+    setHasSavedResult(false);
+    setIsPaused(false);
+    setSessionDurationMs(0);
+    requestedEnrichmentIds.current.clear();
+    didPersistResult.current = false;
+    lastTickMs.current = null;
   };
 
   if (sessionCards.length === 0) {
@@ -244,13 +372,14 @@ export function QuizAssessmentClient({
   return (
     <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
       <div className="flex items-center justify-between gap-4">
-        <Link
-          href={`/dashboard/${deckId}`}
+        <button
+          type="button"
+          onClick={() => requestQuit(`/dashboard/${deckId}`)}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Deck
-        </Link>
+        </button>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span>{deckTitle}</span>
           <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 text-xs font-medium text-foreground">
@@ -260,6 +389,18 @@ export function QuizAssessmentClient({
             <Timer className="h-3 w-3" />
             {formatDuration(sessionDuration)}
           </span>
+          {!completed ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5"
+              onClick={() => setIsPaused((value) => !value)}
+            >
+              {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+              {isPaused ? 'Resume' : 'Pause'}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -282,6 +423,11 @@ export function QuizAssessmentClient({
               <Timer className="h-3 w-3" />
               {formatDuration(sessionDuration)}
             </span>
+            {isPaused && !completed ? (
+              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-200">
+                Paused
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
@@ -333,10 +479,33 @@ export function QuizAssessmentClient({
                     <p className="mt-1 text-xs text-muted-foreground">Missed</p>
                   </div>
                   <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
-                    <p className="text-2xl font-bold text-primary">{results.length > 0 ? formatDuration(Math.round(sessionDuration / results.length)) : '0s'}</p>
+                    <p className="text-2xl font-bold text-primary">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Avg. per Question</p>
                   </div>
                 </div>
+
+                {quizBadges.length > 0 ? (
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {quizBadges.map((badge) => {
+                      const toneClass =
+                        badge.tone === 'emerald'
+                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
+                          : badge.tone === 'amber'
+                            ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+                            : 'border-primary/20 bg-primary/10 text-primary';
+
+                      return (
+                        <span
+                          key={badge.title}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-medium ${toneClass}`}
+                          title={badge.description}
+                        >
+                          {badge.title}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
 
                 <div className="mt-6 rounded-2xl border border-primary/10 bg-card/20 p-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2 text-foreground">
@@ -423,6 +592,12 @@ export function QuizAssessmentClient({
             </div>
 
             <div className="flex flex-wrap justify-center gap-3">
+              {incorrectResults.length > 0 ? (
+                <Button onClick={rematchMissed} className="gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Rematch Missed ({incorrectResults.length})
+                </Button>
+              ) : null}
               <Button onClick={restart} variant="outline" className="gap-2">
                 <RotateCcw className="h-4 w-4" />
                 Retake Quiz
@@ -454,7 +629,7 @@ export function QuizAssessmentClient({
               <MCQMode
                 key={active.id}
                 card={active}
-                disabled={false}
+                disabled={isPaused}
                 enrichmentPending={isEnriching && activeNeedsMcq}
                 onResolve={(_, wasCorrect, answer) =>
                   resolveQuestion({
@@ -472,7 +647,7 @@ export function QuizAssessmentClient({
                 key={active.id}
                 deckId={deckId}
                 card={active}
-                disabled={false}
+                disabled={isPaused}
                 enrichmentPending={isEnriching && activeNeedsIdentificationPrompt}
                 onResolve={(_, score, answer) =>
                   resolveQuestion({
@@ -489,6 +664,56 @@ export function QuizAssessmentClient({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {isPaused && !completed ? (
+          <motion.div
+            key="quiz-paused-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+              className="glass-card mx-4 w-full max-w-md rounded-3xl p-8 text-center"
+            >
+              <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Quiz Paused</p>
+              <h3 className="mt-3 text-2xl font-semibold tracking-tight">Timer is on hold</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Resume when you are ready to continue. Your progress is preserved.
+              </p>
+              <Button
+                type="button"
+                className="mt-6 gap-2"
+                onClick={() => setIsPaused(false)}
+              >
+                <Play className="h-4 w-4" />
+                Resume Quiz
+              </Button>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <ConfirmDialog
+        open={quitDialogOpen}
+        onOpenChange={(open) => {
+          setQuitDialogOpen(open);
+          if (!open) {
+            setPendingQuitHref(null);
+          }
+        }}
+        title="Quit this quiz?"
+        description="Are you sure you want to quit? This quiz won't be recorded."
+        confirmLabel="Quit Quiz"
+        cancelLabel="Continue Quiz"
+        variant="destructive"
+        onConfirm={confirmQuit}
+      />
     </div>
   );
 }

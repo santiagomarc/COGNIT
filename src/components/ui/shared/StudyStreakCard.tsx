@@ -10,6 +10,7 @@ type StudyStreakCardProps = {
   studiedToday: boolean;
   totalStudiedCards: number;
   todayStudiedCount: number;
+  todayIso: string;
   activity: { date: string; count: number }[];
 };
 
@@ -43,6 +44,7 @@ export function StudyStreakCard({
   studiedToday,
   totalStudiedCards,
   todayStudiedCount,
+  todayIso,
   activity,
 }: StudyStreakCardProps) {
   const reduced = useReducedMotion();
@@ -61,7 +63,7 @@ export function StudyStreakCard({
 
   return (
     <motion.div
-      initial={reduced ? undefined : { opacity: 0, y: 20, scale: 0.96 }}
+      initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.05 }}
       className="glass-card glow-border rounded-2xl p-5 md:p-6"
@@ -179,7 +181,7 @@ export function StudyStreakCard({
             <p className="text-xs text-emerald-400/80">You logged activity today.</p>
           )}
         </div>
-        <ActivityHeatmap activity={activity} monthsToShow={6} />
+        <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={todayIso} />
       </div>
     </motion.div>
   );

@@ -27,30 +27,46 @@ type DeckCardsManagerProps = {
   cards: DeckCard[];
 };
 
-function sortCardsNewestFirst(items: DeckCard[]) {
-  return [...items].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+function mapCardNumbersByCreation(items: DeckCard[]) {
+  const oldestFirst = [...items].sort(
+    (a, b) => {
+      const byCreatedAt = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (byCreatedAt !== 0) {
+        return byCreatedAt;
+      }
+
+      return a.id.localeCompare(b.id);
+    }
   );
+
+  return new Map(oldestFirst.map((card, index) => [card.id, index + 1]));
+}
+
+function sortCardsByNumberDesc(items: DeckCard[]) {
+  const cardNumberById = mapCardNumbersByCreation(items);
+  return [...items].sort((a, b) => {
+    const aNumber = cardNumberById.get(a.id) ?? 0;
+    const bNumber = cardNumberById.get(b.id) ?? 0;
+    return bNumber - aNumber;
+  });
 }
 
 export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
   const router = useRouter();
-  const [deckCards, setDeckCards] = useState(() => sortCardsNewestFirst(cards));
+  const [deckCards, setDeckCards] = useState(() => sortCardsByNumberDesc(cards));
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
-    setDeckCards(sortCardsNewestFirst(cards));
+    setDeckCards(sortCardsByNumberDesc(cards));
   }, [cards]);
 
   const selectedCount = selectedIds.size;
   const allSelected = deckCards.length > 0 && selectedCount === deckCards.length;
 
-  const cardNumberById = useMemo(() => {
-    return new Map(deckCards.map((card, index) => [card.id, index + 1]));
-  }, [deckCards]);
+  const cardNumberById = useMemo(() => mapCardNumbersByCreation(deckCards), [deckCards]);
 
   function handleSelectionModeToggle() {
     setSelectionMode((prev) => {

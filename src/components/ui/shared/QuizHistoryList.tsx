@@ -5,6 +5,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Target, Calendar, XCircle, CheckCircle2 } from 'lucide-react';
 
+const quizHistoryDateFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  timeZone: 'UTC',
+});
+
 function getScoreClass(percentage: number) {
   if (percentage >= 80) return 'bg-green-500/20 text-green-400';
   if (percentage >= 50) return 'bg-yellow-500/20 text-yellow-400';
@@ -32,9 +40,7 @@ export function QuizHistoryList({ history }: { history: QuizHistoryEntry[] }) {
       <Accordion type="single" collapsible className="w-full space-y-2">
         {history.map((result) => {
           const percentage = result.score_percentage;
-          const date = new Date(result.created_at).toLocaleDateString('en-US', { 
-            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' 
-          });
+          const date = quizHistoryDateFormatter.format(new Date(result.created_at));
 
           return (
             <AccordionItem value={result.id} key={result.id} className="glass-card border-primary/20 px-4 rounded-xl">
