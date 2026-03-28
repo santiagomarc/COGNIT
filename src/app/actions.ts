@@ -186,6 +186,22 @@ async function recordAiUsage(
   }
 }
 
+async function touchDeckUpdatedAt(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  deckId: string,
+  userId: string,
+) {
+  const { error } = await supabase
+    .from('decks')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', deckId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.warn('[decks] failed to update updated_at:', error.message);
+  }
+}
+
 function sanitizePdfText(rawText: string) {
   const stripped = rawText
     .replace(/https?:\/\/\S+/gi, ' ')
@@ -525,7 +541,7 @@ export async function updateDeck(deckId: string, title: string) {
 
   const { error } = await supabase
     .from('decks')
-    .update({ title })
+    .update({ title, updated_at: new Date().toISOString() })
     .eq('id', deckId)
     .eq('user_id', user.id);
 
@@ -548,7 +564,7 @@ export async function createCard(data: CreateCardInput) {
     return { error: deckAccess.error === 'You must be logged in.' ? 'You must be logged in to add a card.' : deckAccess.error };
   }
 
-  const { supabase } = deckAccess;
+  const { supabase, user } = deckAccess;
 
   const { data: insertedCard, error } = await supabase
     .from('cards')
@@ -565,6 +581,8 @@ export async function createCard(data: CreateCardInput) {
   if (error) {
     return { error: error.message };
   }
+
+  await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
@@ -612,7 +630,10 @@ export async function updateCard(data: UpdateCardInput) {
     return { error: error.message };
   }
 
+  await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
+
   revalidatePath(`/dashboard/${result.data.deck_id}`);
+  revalidatePath('/dashboard');
   return { success: true };
 }
 
@@ -627,7 +648,7 @@ export async function bulkImportCards(data: BulkImportInput) {
     return { error: deckAccess.error };
   }
 
-  const { supabase } = deckAccess;
+  const { supabase, user } = deckAccess;
   const rows = result.data.cards.map((card) => ({
     deck_id: result.data.deck_id,
     front: card.front,
@@ -644,6 +665,8 @@ export async function bulkImportCards(data: BulkImportInput) {
   if (error) {
     return { error: error.message };
   }
+
+  await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
@@ -758,6 +781,11 @@ export async function enrichCards(data: EnrichCardsInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath(`/dashboard/${result.data.deck_id}/study`);
+  revalidatePath('/dashboard');
+
+  if (enrichedCount > 0) {
+    await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
+  }
 
   await recordAiUsage(supabase, user.id, 'enrich_cards', {
     requested_cards: uniqueCardIds.length,
@@ -803,6 +831,8 @@ export async function deleteCard(cardId: string, deckId: string) {
   if (error) {
     return { error: error.message };
   }
+
+  await touchDeckUpdatedAt(supabase, deckId, user.id);
 
   revalidatePath(`/dashboard/${deckId}`);
   revalidatePath('/dashboard');
@@ -850,6 +880,8 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   if (error) {
     return { error: error.message };
   }
+
+  await touchDeckUpdatedAt(supabase, deckId, user.id);
 
   revalidatePath(`/dashboard/${deckId}`);
   revalidatePath(`/dashboard/${deckId}/study`);
@@ -1298,6 +1330,8 @@ export async function generateCards(formData: FormData) {
   if (insertErr) {
     return { error: 'Cards were generated but failed to save: ' + insertErr.message };
   }
+
+  await touchDeckUpdatedAt(supabase, parsed.data.deck_id, user.id);
 
   revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   revalidatePath('/dashboard');

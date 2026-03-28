@@ -27,6 +27,7 @@ type DeckWithCount = {
   id: string;
   title: string;
   created_at: string;
+  updated_at: string;
   cards: { count: number }[];
   masteryPercentage: number;
   assessedCards: number;
@@ -84,6 +85,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
           <AnimatePresence mode="popLayout">
             {filtered.map((deck, i) => {
               const cardCount = deck.cards?.[0]?.count ?? 0;
+              const modifiedAt = deck.updated_at || deck.created_at;
               return (
                 <motion.div 
                   key={deck.id}
@@ -109,7 +111,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                           {deck.title}
                         </CardTitle>
                         <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
-                          <span>{deckDateFormatter.format(new Date(deck.created_at))}</span>
+                          <span>{deckDateFormatter.format(new Date(modifiedAt))}</span>
                           <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
                             {cardCount} card{cardCount !== 1 ? 's' : ''}
                           </span>
@@ -130,7 +132,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                               return prev;
                             }
                             return [deck, ...prev].sort((a, b) =>
-                              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                              new Date((b.updated_at || b.created_at)).getTime() - new Date((a.updated_at || a.created_at)).getTime()
                             );
                           });
                         }}
