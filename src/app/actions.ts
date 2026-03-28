@@ -28,6 +28,8 @@ const ENRICH_BATCH_SIZE = 10;
 const TERM_MAX_WORDS = 4;
 const TERM_HARD_MAX_WORDS = 6;
 const TERM_MAX_CHARS = 60;
+const MIN_BACK_CHARS = 16;
+const MAX_PDF_GENERATION_PASSES = 2;
 
 type AiActionName = 'generate_cards' | 'enrich_cards' | 'sanitize_notes' | 'get_hint';
 
@@ -42,6 +44,15 @@ type EnrichmentRow = {
   id: string;
   mcq_distractors: string[];
   id_question: string;
+};
+
+type CardDifficultyBand = 'foundational' | 'intermediate' | 'advanced';
+
+type CandidateCard = {
+  front: string;
+  back: string;
+  score: number;
+  difficulty: CardDifficultyBand;
 };
 
 const ENRICHMENT_RESPONSE_SCHEMA: Schema = {
@@ -232,6 +243,165 @@ function normalizeGeneratedCard(card: { front: string; back: string }) {
   const front = normalizeWhitespace(card.front).replace(/^['"`]+|['"`]+$/g, '');
   const back = normalizeWhitespace(card.back);
   return { front, back };
+}
+
+function normalizeFrontKey(front: string) {
+  return normalizeForMatch(front).replace(/[^a-z0-9\s-]/gi, '');
+}
+
+function isEnumerationLike(text: string) {
+  if (/^\s*(?:[-*•]|\d+[.)]|[a-z][.)])\s+/i.test(text)) {
+    return true;
+  }
+
+  const numberedPoints = text.match(/\b\d+[.)]\s+/g)?.length ?? 0;
+  if (numberedPoints >= 2) {
+    return true;
+  }
+
+  const ordinalHits = text.match(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b/gi)?.length ?? 0;
+  if (ordinalHits >= 2) {
+    return true;
+  }
+
+  return false;
+}
+
+function classifyCardDifficulty(card: { front: string; back: string }): CardDifficultyBand {
+  const frontWords = card.front.split(/\s+/).filter(Boolean).length;
+  const backLen = card.back.length;
+
+  if (frontWords <= 2 && backLen <= 120) {
+    return 'foundational';
+  }
+
+  if (frontWords >= 3 || backLen >= 210) {
+    return 'advanced';
+  }
+
+  return 'intermediate';
+}
+
+function scoreCandidateCard(card: { front: string; back: string }, sourceTextLower: string) {
+  const words = card.front.split(/\s+/).filter(Boolean);
+  let score = 0;
+
+  if (words.length <= 2) {
+    score += 6;
+  } else if (words.length <= TERM_MAX_WORDS) {
+    score += 3;
+  } else {
+    score -= 4;
+  }
+
+  const frontLower = card.front.toLowerCase();
+  if (sourceTextLower.includes(frontLower)) {
+    score += 5;
+  } else {
+    const tokenMatches = words.filter((word) => word.length > 2 && sourceTextLower.includes(word.toLowerCase())).length;
+    score += tokenMatches;
+  }
+
+  if (card.back.length >= 40 && card.back.length <= 260) {
+    score += 4;
+  } else if (card.back.length > 420) {
+    score -= 5;
+  }
+
+  if (/\b(is|are|refers to|defined as|describes|means)\b/i.test(card.back)) {
+    score += 2;
+  }
+
+  if (/\?/.test(card.back)) {
+    score -= 3;
+  }
+
+  if (isEnumerationLike(card.back)) {
+    score -= 7;
+  }
+
+  return score;
+}
+
+function pickBalancedCards(candidates: CandidateCard[], maxCount: number) {
+  if (candidates.length <= maxCount) {
+    return candidates;
+  }
+
+  const groups: Record<CardDifficultyBand, CandidateCard[]> = {
+    foundational: [],
+    intermediate: [],
+    advanced: [],
+  };
+
+  for (const candidate of candidates) {
+    groups[candidate.difficulty].push(candidate);
+  }
+
+  const targets: Record<CardDifficultyBand, number> = {
+    foundational: Math.max(1, Math.round(maxCount * 0.35)),
+    intermediate: Math.max(1, Math.round(maxCount * 0.45)),
+    advanced: Math.max(1, maxCount - Math.round(maxCount * 0.35) - Math.round(maxCount * 0.45)),
+  };
+
+  const selected: CandidateCard[] = [];
+  for (const band of ['foundational', 'intermediate', 'advanced'] as const) {
+    selected.push(...groups[band].slice(0, targets[band]));
+  }
+
+  if (selected.length < maxCount) {
+    const seen = new Set(selected.map((card) => normalizeFrontKey(card.front)));
+    const remaining = candidates.filter((card) => !seen.has(normalizeFrontKey(card.front)));
+    selected.push(...remaining.slice(0, maxCount - selected.length));
+  }
+
+  return selected.slice(0, maxCount);
+}
+
+function parseAndRankGeneratedCards(
+  rawCards: unknown[],
+  sourceTextLower: string,
+  usedFrontKeys: Set<string>,
+) {
+  const uniqueCandidates = new Map<string, CandidateCard>();
+
+  for (const item of rawCards) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const maybeCard = item as Record<string, unknown>;
+    if (typeof maybeCard.front !== 'string' || typeof maybeCard.back !== 'string') {
+      continue;
+    }
+
+    const normalized = normalizeGeneratedCard({ front: maybeCard.front, back: maybeCard.back });
+    if (!isValidTermFront(normalized.front)) {
+      continue;
+    }
+
+    if (normalized.back.length < MIN_BACK_CHARS || isEnumerationLike(normalized.back)) {
+      continue;
+    }
+
+    const frontKey = normalizeFrontKey(normalized.front);
+    if (!frontKey || usedFrontKeys.has(frontKey)) {
+      continue;
+    }
+
+    const candidate: CandidateCard = {
+      ...normalized,
+      score: scoreCandidateCard(normalized, sourceTextLower),
+      difficulty: classifyCardDifficulty(normalized),
+    };
+
+    const existing = uniqueCandidates.get(frontKey);
+    if (!existing || candidate.score > existing.score) {
+      uniqueCandidates.set(frontKey, candidate);
+    }
+  }
+
+  return [...uniqueCandidates.values()].sort((a, b) => b.score - a.score);
 }
 
 async function requireOwnedDeck(deckId: string) {
@@ -1006,6 +1176,7 @@ export async function generateCards(formData: FormData) {
     'Generate term-description cards only. Do not create question-answer cards.',
     'The requested number is a strict MAXIMUM, not a requirement. Return fewer cards when the uploaded material is already sufficiently covered.',
     'Prefer broad concept coverage and avoid redundant variants of the same concept.',
+    'When possible, balance foundational, intermediate, and advanced terms.',
     'STRICT RULES:',
     `1. FRONT MUST be a single core term/concept (${TERM_MAX_WORDS} words max; hard limit ${TERM_HARD_MAX_WORDS}).`,
     '2. Never use full sentences, conversational phrasing, or questions on the front.',
@@ -1035,59 +1206,69 @@ export async function generateCards(formData: FormData) {
     },
   };
 
-  let cards: { front: string; back: string }[];
+  const sourceTextLower = trimmedText.toLowerCase();
+  const usedFrontKeys = new Set<string>();
+  const cards: { front: string; back: string }[] = [];
+
   try {
-    const result = await model.generateContent({
-      systemInstruction: systemPrompt,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema,
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: `Generate up to ${parsed.data.count} term-description flashcards from the following text.\nIf the core concepts are fully covered before reaching the maximum, stop early and return fewer cards.\n\n${trimmedText}`,
-            },
-          ],
+    for (let pass = 0; pass < MAX_PDF_GENERATION_PASSES; pass += 1) {
+      if (cards.length >= parsed.data.count) {
+        break;
+      }
+
+      const remaining = parsed.data.count - cards.length;
+      const passBuffer = Math.max(2, Math.ceil(remaining * 0.4));
+      const targetForPass = Math.min(PDF_CARD_GENERATION_MAX_COUNT, remaining + passBuffer);
+      const excludedTerms = cards.map((card) => card.front);
+
+      const result = await model.generateContent({
+        systemInstruction: systemPrompt,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema,
         },
-      ],
-    });
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: [
+                  `Generate up to ${targetForPass} term-description flashcards from the following text.`,
+                  'If the core concepts are fully covered before reaching the maximum, stop early and return fewer cards.',
+                  pass > 0 && excludedTerms.length > 0
+                    ? `Do not repeat these already accepted terms: ${excludedTerms.join(', ')}.`
+                    : '',
+                  '',
+                  trimmedText,
+                ].filter(Boolean).join('\n'),
+              },
+            ],
+          },
+        ],
+      });
 
-    const raw = result.response.text();
-    const json = JSON.parse(raw);
+      const raw = result.response.text();
+      const json = JSON.parse(raw);
+      if (!json || typeof json !== 'object' || !Array.isArray((json as { cards?: unknown }).cards)) {
+        continue;
+      }
 
-    if (!Array.isArray(json.cards)) {
-      return { error: 'AI returned an unexpected format. Please try again.' };
-    }
+      const generatedCards = (json as { cards: unknown[] }).cards;
+      const rankedCandidates = parseAndRankGeneratedCards(generatedCards, sourceTextLower, usedFrontKeys);
+      const balancedCandidates = pickBalancedCards(rankedCandidates, remaining);
 
-    // Validate and strictly filter each card to enforce term-definition format.
-    const dedupe = new Set<string>();
-    const generatedCards = Array.isArray(json.cards) ? (json.cards as unknown[]) : [];
-
-    cards = generatedCards
-      .filter(
-        (c: unknown): c is { front: string; back: string } =>
-          typeof c === 'object' &&
-          c !== null &&
-          typeof (c as Record<string, unknown>).front === 'string' &&
-          typeof (c as Record<string, unknown>).back === 'string' &&
-          (c as Record<string, unknown>).front !== '' &&
-          (c as Record<string, unknown>).back !== ''
-      )
-      .map(normalizeGeneratedCard)
-      .filter((card: { front: string; back: string }) => isValidTermFront(card.front))
-      .filter((card: { front: string; back: string }) => card.back.length >= 16)
-      .filter((card: { front: string; back: string }) => {
-        const key = card.front.toLowerCase();
-        if (dedupe.has(key)) {
-          return false;
+      for (const candidate of balancedCandidates) {
+        if (cards.length >= parsed.data.count) {
+          break;
         }
-        dedupe.add(key);
-        return true;
-      })
-      .slice(0, parsed.data.count);
+        const key = normalizeFrontKey(candidate.front);
+        if (!key || usedFrontKeys.has(key)) {
+          continue;
+        }
+        usedFrontKeys.add(key);
+        cards.push({ front: candidate.front, back: candidate.back });
+      }
+    }
 
     if (cards.length === 0) {
       return { error: 'AI could not generate valid cards from this PDF.' };

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { bulkDeleteCards } from '@/app/actions';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
-import { FadeInUp, StaggerContainer, StaggerItem } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
@@ -28,27 +27,29 @@ type DeckCardsManagerProps = {
   cards: DeckCard[];
 };
 
+function sortCardsNewestFirst(items: DeckCard[]) {
+  return [...items].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
 export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
   const router = useRouter();
-  const [deckCards, setDeckCards] = useState(cards);
+  const [deckCards, setDeckCards] = useState(() => sortCardsNewestFirst(cards));
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   useEffect(() => {
-    setDeckCards(cards);
+    setDeckCards(sortCardsNewestFirst(cards));
   }, [cards]);
 
   const selectedCount = selectedIds.size;
   const allSelected = deckCards.length > 0 && selectedCount === deckCards.length;
 
   const cardNumberById = useMemo(() => {
-    return new Map(
-      [...deckCards]
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-        .map((card, index) => [card.id, index + 1])
-    );
+    return new Map(deckCards.map((card, index) => [card.id, index + 1]));
   }, [deckCards]);
 
   function handleSelectionModeToggle() {
@@ -120,15 +121,13 @@ export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
 
   if (deckCards.length === 0) {
     return (
-      <FadeInUp delay={0.2}>
-        <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
-          <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
-          <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
-            Add your first flashcard above to start studying, or generate cards from your notes in the next step.
-          </p>
-        </div>
-      </FadeInUp>
+      <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
+        <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
+        <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
+        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+          Add your first flashcard above to start studying, or generate cards from your notes in the next step.
+        </p>
+      </div>
     );
   }
 
@@ -173,9 +172,9 @@ export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
         </div>
       </div>
 
-      <StaggerContainer className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {deckCards.map((card) => (
-          <StaggerItem key={card.id}>
+          <div key={card.id}>
             <FlashcardWithActions
               cardId={card.id}
               deckId={deckId}
@@ -190,9 +189,9 @@ export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
               onToggleSelected={() => handleToggleCardSelection(card.id)}
               onDeleted={() => handleCardDeleted(card.id)}
             />
-          </StaggerItem>
+          </div>
         ))}
-      </StaggerContainer>
+      </div>
 
       <ConfirmDialog
         open={showBulkDeleteConfirm}

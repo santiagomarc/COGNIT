@@ -13,9 +13,9 @@ export default function DashboardLayout({
 }) {
   return (
     <>
-      <main id="main-content" className="pb-28">
+      <div id="main-content" className="pb-28" role="main">
         {children}
-      </main>
+      </div>
       <DockNav />
     </>
   );
