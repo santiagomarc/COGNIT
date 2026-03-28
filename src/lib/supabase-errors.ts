@@ -17,7 +17,9 @@ export function isMissingColumnError(message: string, columnName: string) {
   const referencesColumn =
     normalized.includes(normalizedColumn) || normalized.includes(`public.${normalizedColumn}`);
   const indicatesMissingColumn =
-    normalized.includes('does not exist') || normalized.includes('could not find the column');
+    normalized.includes('does not exist') ||
+    normalized.includes('could not find the column') ||
+    (normalized.includes('could not find') && normalized.includes('column'));
 
   return referencesColumn && indicatesMissingColumn;
 }

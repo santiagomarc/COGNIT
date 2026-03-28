@@ -15,7 +15,7 @@ import {
   Timer,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { enrichCards, logQuizResult } from '@/app/actions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
@@ -90,10 +90,16 @@ export function QuizAssessmentClient({
   mode,
 }: QuizAssessmentClientProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isDev = process.env.NODE_ENV !== 'production';
-  const debugStorageKey = useMemo(() => `quiz-debug-state:${deckId}:${mode}`, [deckId, mode]);
+  const launchToken = searchParams.get('launch');
+  const debugStorageKey = useMemo(
+    () => `quiz-debug-state:${deckId}:${mode}:${launchToken ?? 'pending-launch'}`,
+    [deckId, launchToken, mode]
+  );
   const initialDebugState = useMemo<PersistedQuizDebugState | null>(() => {
-    if (!isDev || typeof window === 'undefined') {
+    if (!isDev || typeof window === 'undefined' || !launchToken) {
       return null;
     }
 
@@ -112,7 +118,19 @@ export function QuizAssessmentClient({
     } catch {
       return null;
     }
-  }, [debugStorageKey, isDev]);
+  }, [debugStorageKey, isDev, launchToken]);
+
+  useEffect(() => {
+    if (!isDev || launchToken) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    const fallbackToken = `${Math.round(performance.now() * 1000)}`;
+    const token = typeof window.crypto?.randomUUID === 'function' ? window.crypto.randomUUID() : fallbackToken;
+    nextParams.set('launch', token);
+    router.replace(`${pathname}?${nextParams.toString()}`);
+  }, [isDev, launchToken, pathname, router, searchParams]);
 
   const [sessionDurationMs, setSessionDurationMs] = useState(() => initialDebugState?.sessionDurationMs ?? 0);
   const [sessionCards, setSessionCards] = useState(() => initialDebugState?.sessionCards ?? cards);
@@ -154,7 +172,7 @@ export function QuizAssessmentClient({
   }, [completed, isPaused]);
 
   useEffect(() => {
-    if (!isDev) {
+    if (!isDev || !launchToken) {
       return;
     }
 
@@ -182,6 +200,7 @@ export function QuizAssessmentClient({
     isDev,
     isPaused,
     isRematchSession,
+    launchToken,
     quizMode,
     results,
     sessionCards,
