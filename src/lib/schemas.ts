@@ -146,6 +146,7 @@ export const logQuizResultSchema = z.object({
   deck_id: z.uuid({ message: 'Invalid deck id' }),
   mode: quizModeSchema,
   duration_ms: z.number().int().min(0).default(0),
+  include_in_history: z.boolean().default(true),
   results: z.array(
     z.object({
       card_id: z.uuid({ message: 'Invalid card id' }),

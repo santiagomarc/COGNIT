@@ -17,7 +17,7 @@ import { sm2, GRADE_MAP, type StudyGrade } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath } from 'next/cache';
-import { isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingColumnError, isMissingTableError } from '@/lib/supabase-errors';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 
@@ -1042,18 +1042,33 @@ export async function logQuizResult(data: LogQuizResultInput) {
   }
 
   const correctCards = evaluatedResults.filter((entry) => entry.correct).length;
-  const { data: insertedQuizResult, error: quizResultError } = await supabase
+  const insertQuizResultBase = {
+    user_id: user.id,
+    deck_id: result.data.deck_id,
+    mode: result.data.mode,
+    total_cards: evaluatedResults.length,
+    correct_cards: correctCards,
+    duration_ms: result.data.duration_ms,
+  };
+
+  let quizResultInsert = await supabase
     .from('quiz_results')
     .insert({
-      user_id: user.id,
-      deck_id: result.data.deck_id,
-      mode: result.data.mode,
-      total_cards: evaluatedResults.length,
-      correct_cards: correctCards,
-      duration_ms: result.data.duration_ms,
+      ...insertQuizResultBase,
+      include_in_history: result.data.include_in_history,
     })
     .select('id, created_at')
     .single();
+
+  if (quizResultInsert.error && isMissingColumnError(quizResultInsert.error.message, 'include_in_history')) {
+    quizResultInsert = await supabase
+      .from('quiz_results')
+      .insert(insertQuizResultBase)
+      .select('id, created_at')
+      .single();
+  }
+
+  const { data: insertedQuizResult, error: quizResultError } = quizResultInsert;
 
   if (quizResultError || !insertedQuizResult) {
     return { error: quizResultError?.message ?? 'Failed to save quiz result.' };
@@ -1077,6 +1092,21 @@ export async function logQuizResult(data: LogQuizResultInput) {
   }
 
   const attemptTimestamp = insertedQuizResult.created_at ?? new Date().toISOString();
+  const { data: existingMasteryRows, error: existingMasteryError } = await supabase
+    .from('card_mastery_state')
+    .select('card_id, correct')
+    .eq('user_id', user.id)
+    .eq('deck_id', result.data.deck_id)
+    .in('card_id', evaluatedResults.map((entry) => entry.card_id));
+
+  if (existingMasteryError && !isMissingTableError(existingMasteryError.message, 'card_mastery_state')) {
+    console.error('[card_mastery_state] failed to read existing rows:', existingMasteryError.message);
+  }
+
+  const existingMasteryByCardId = new Map(
+    (existingMasteryRows ?? []).map((row) => [row.card_id, row.correct])
+  );
+
   const { error: masteryStateError } = await supabase
     .from('card_mastery_state')
     .upsert(
@@ -1084,7 +1114,8 @@ export async function logQuizResult(data: LogQuizResultInput) {
         user_id: user.id,
         deck_id: result.data.deck_id,
         card_id: entry.card_id,
-        correct: entry.correct,
+        // Persist the highest-ever quiz mastery for this card.
+        correct: Boolean(existingMasteryByCardId.get(entry.card_id)) || entry.correct,
         last_quiz_at: attemptTimestamp,
         updated_at: new Date().toISOString(),
       })),
@@ -1487,13 +1518,23 @@ export async function getQuizHistory(deckId: string) {
     });
   }
 
-  const { data: quizResults, error: quizResultsError } = await supabase
-    .from('quiz_results')
-    .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
-    .eq('deck_id', deckId)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const buildQuizHistoryQuery = (applyHistoryFilter: boolean) => {
+    const query = supabase
+      .from('quiz_results')
+      .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
+      .eq('deck_id', deckId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    return applyHistoryFilter ? query.eq('include_in_history', true) : query;
+  };
+
+  let { data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(true);
+
+  if (quizResultsError && isMissingColumnError(quizResultsError.message, 'include_in_history')) {
+    ({ data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(false));
+  }
 
   if (quizResultsError) {
     console.error('Error fetching quiz history:', quizResultsError);

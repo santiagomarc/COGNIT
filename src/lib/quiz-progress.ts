@@ -30,7 +30,7 @@ export function computeDeckMasterySnapshots({
   quizCardResults,
 }: ComputeDeckMasteryInput): Map<string, DeckMasterySnapshot> {
   const quizResultById = new Map(quizResults.map((row) => [row.id, row]));
-  const latestByDeckCard = new Map<string, { createdAt: string; correct: boolean }>();
+  const bestByDeckCard = new Map<string, { lastAttemptAt: string; everCorrect: boolean }>();
 
   for (const row of quizCardResults) {
     const quizResult = quizResultById.get(row.quiz_result_id);
@@ -39,13 +39,19 @@ export function computeDeckMasterySnapshots({
     }
 
     const key = `${quizResult.deck_id}:${row.card_id}`;
-    const existing = latestByDeckCard.get(key);
-    if (!existing || existing.createdAt < quizResult.created_at) {
-      latestByDeckCard.set(key, {
-        createdAt: quizResult.created_at,
-        correct: row.correct,
+    const existing = bestByDeckCard.get(key);
+    if (!existing) {
+      bestByDeckCard.set(key, {
+        lastAttemptAt: quizResult.created_at,
+        everCorrect: row.correct,
       });
+      continue;
     }
+
+    bestByDeckCard.set(key, {
+      lastAttemptAt: existing.lastAttemptAt < quizResult.created_at ? quizResult.created_at : existing.lastAttemptAt,
+      everCorrect: existing.everCorrect || row.correct,
+    });
   }
 
   const deckSnapshots = new Map<string, DeckMasterySnapshot>();
@@ -59,7 +65,7 @@ export function computeDeckMasterySnapshots({
     });
   }
 
-  for (const [key, latest] of latestByDeckCard.entries()) {
+  for (const [key, mastery] of bestByDeckCard.entries()) {
     const separatorIndex = key.indexOf(':');
     const deckId = key.slice(0, separatorIndex);
     const snapshot = deckSnapshots.get(deckId);
@@ -69,9 +75,9 @@ export function computeDeckMasterySnapshots({
     }
 
     snapshot.assessedCards += 1;
-    snapshot.masteredCards += latest.correct ? 1 : 0;
-    if (!snapshot.lastQuizAt || snapshot.lastQuizAt < latest.createdAt) {
-      snapshot.lastQuizAt = latest.createdAt;
+    snapshot.masteredCards += mastery.everCorrect ? 1 : 0;
+    if (!snapshot.lastQuizAt || snapshot.lastQuizAt < mastery.lastAttemptAt) {
+      snapshot.lastQuizAt = mastery.lastAttemptAt;
     }
   }
 

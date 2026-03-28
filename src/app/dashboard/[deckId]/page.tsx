@@ -173,6 +173,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
+  const unprovenCards = Math.max(totalCards - masteredCards, 0);
 
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
@@ -316,6 +317,22 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                       </label>
                     </div>
                   </fieldset>
+                </div>
+
+                <div className="mt-4 space-y-2 rounded-xl border border-primary/10 bg-background/30 p-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                    <input
+                      type="checkbox"
+                      name="focus_unproven"
+                      value="1"
+                      className="accent-primary"
+                      disabled={totalCards === 0}
+                    />
+                    Force include all unproven cards ({unprovenCards})
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    If enabled, quiz size auto-expands to include every card not yet proven in quiz mastery.
+                  </p>
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-3">

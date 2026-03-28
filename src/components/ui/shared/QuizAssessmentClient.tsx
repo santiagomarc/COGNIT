@@ -48,6 +48,20 @@ type QuizBadge = {
   tone: 'emerald' | 'primary' | 'amber';
 };
 
+type PersistedQuizDebugState = {
+  version: 1;
+  sessionCards: StudySessionCard[];
+  quizMode: QuizMode;
+  index: number;
+  results: QuizQuestionResult[];
+  hasSavedResult: boolean;
+  isRematchSession: boolean;
+  isPaused: boolean;
+  sessionDurationMs: number;
+};
+
+const QUIZ_DEBUG_STATE_VERSION = 1;
+
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   if (seconds < 60) return `${seconds}s`;
@@ -76,20 +90,45 @@ export function QuizAssessmentClient({
   mode,
 }: QuizAssessmentClientProps) {
   const router = useRouter();
-  const [sessionDurationMs, setSessionDurationMs] = useState(0);
-  const [sessionCards, setSessionCards] = useState(cards);
-  const [quizMode, setQuizMode] = useState<QuizMode>(mode);
-  const [index, setIndex] = useState(0);
-  const [results, setResults] = useState<QuizQuestionResult[]>([]);
-  const [hasSavedResult, setHasSavedResult] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
+  const isDev = process.env.NODE_ENV !== 'production';
+  const debugStorageKey = useMemo(() => `quiz-debug-state:${deckId}:${mode}`, [deckId, mode]);
+  const initialDebugState = useMemo<PersistedQuizDebugState | null>(() => {
+    if (!isDev || typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      const raw = window.sessionStorage.getItem(debugStorageKey);
+      if (!raw) {
+        return null;
+      }
+
+      const parsed = JSON.parse(raw) as PersistedQuizDebugState;
+      if (parsed.version !== QUIZ_DEBUG_STATE_VERSION) {
+        return null;
+      }
+
+      return parsed;
+    } catch {
+      return null;
+    }
+  }, [debugStorageKey, isDev]);
+
+  const [sessionDurationMs, setSessionDurationMs] = useState(() => initialDebugState?.sessionDurationMs ?? 0);
+  const [sessionCards, setSessionCards] = useState(() => initialDebugState?.sessionCards ?? cards);
+  const [quizMode, setQuizMode] = useState<QuizMode>(() => initialDebugState?.quizMode ?? mode);
+  const [index, setIndex] = useState(() => initialDebugState?.index ?? 0);
+  const [results, setResults] = useState<QuizQuestionResult[]>(() => initialDebugState?.results ?? []);
+  const [hasSavedResult, setHasSavedResult] = useState(() => initialDebugState?.hasSavedResult ?? false);
+  const [isRematchSession, setIsRematchSession] = useState(() => initialDebugState?.isRematchSession ?? false);
+  const [isPaused, setIsPaused] = useState(() => initialDebugState?.isPaused ?? false);
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
   const [isEnriching, startEnrichmentTransition] = useTransition();
   const [isSavingResult, startSavingResultTransition] = useTransition();
 
   const requestedEnrichmentIds = useRef<Set<string>>(new Set());
-  const didPersistResult = useRef(false);
+  const didPersistResult = useRef(initialDebugState?.hasSavedResult ?? false);
   const lastTickMs = useRef<number | null>(null);
   const active = sessionCards[index];
   const completed = index >= sessionCards.length;
@@ -113,6 +152,41 @@ export function QuizAssessmentClient({
 
     return () => window.clearInterval(intervalId);
   }, [completed, isPaused]);
+
+  useEffect(() => {
+    if (!isDev) {
+      return;
+    }
+
+    const payload: PersistedQuizDebugState = {
+      version: QUIZ_DEBUG_STATE_VERSION,
+      sessionCards,
+      quizMode,
+      index,
+      results,
+      hasSavedResult,
+      isRematchSession,
+      isPaused,
+      sessionDurationMs,
+    };
+
+    try {
+      window.sessionStorage.setItem(debugStorageKey, JSON.stringify(payload));
+    } catch {
+      // Ignore storage failures in debug persistence.
+    }
+  }, [
+    debugStorageKey,
+    hasSavedResult,
+    index,
+    isDev,
+    isPaused,
+    isRematchSession,
+    quizMode,
+    results,
+    sessionCards,
+    sessionDurationMs,
+  ]);
 
   const progress = useMemo(() => {
     if (sessionCards.length === 0) return 0;
@@ -241,6 +315,7 @@ export function QuizAssessmentClient({
         deck_id: deckId,
         mode: quizMode,
         duration_ms: sessionDuration,
+        include_in_history: !isRematchSession,
         results: results.map((entry) => ({
           card_id: entry.cardId,
           user_answer: entry.userAnswer,
@@ -255,7 +330,7 @@ export function QuizAssessmentClient({
 
       setHasSavedResult(true);
     });
-  }, [completed, deckId, quizMode, results, sessionDuration]);
+  }, [completed, deckId, isRematchSession, quizMode, results, sessionDuration]);
 
   useEffect(() => {
     if (!shouldProtectProgress) {
@@ -290,11 +365,15 @@ export function QuizAssessmentClient({
       return;
     }
 
+    if (isDev) {
+      window.sessionStorage.removeItem(debugStorageKey);
+    }
+
     setQuitDialogOpen(false);
     setIsPaused(false);
     router.push(pendingQuitHref);
     setPendingQuitHref(null);
-  }, [pendingQuitHref, router]);
+  }, [debugStorageKey, isDev, pendingQuitHref, router]);
 
   const resolveQuestion = useCallback((result: QuizQuestionResult) => {
     setResults((current) => [...current, result]);
@@ -307,6 +386,7 @@ export function QuizAssessmentClient({
     setIndex(0);
     setResults([]);
     setHasSavedResult(false);
+    setIsRematchSession(false);
     setIsPaused(false);
     setSessionDurationMs(0);
     setQuitDialogOpen(false);
@@ -331,9 +411,11 @@ export function QuizAssessmentClient({
     }
 
     setSessionCards(missedCards);
+    setQuizMode(mode);
     setIndex(0);
     setResults([]);
     setHasSavedResult(false);
+    setIsRematchSession(true);
     setIsPaused(false);
     setSessionDurationMs(0);
     requestedEnrichmentIds.current.clear();
@@ -368,6 +450,7 @@ export function QuizAssessmentClient({
     active && (!Array.isArray(active.mcq_distractors) || active.mcq_distractors.length < 2)
   );
   const incorrectResults = results.filter((entry) => !entry.correct);
+  const resultActionButtonClass = 'gap-2 min-w-[11.5rem] justify-center';
 
   return (
     <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
@@ -513,9 +596,15 @@ export function QuizAssessmentClient({
                     Mastery is updated from quiz performance. Daily streaks still come from flashcard review.
                   </div>
                   {isSavingResult ? (
-                    <p className="mt-2">Saving this quiz attempt...</p>
+                    <p className="mt-2">
+                      {isRematchSession ? 'Saving this rematch attempt...' : 'Saving this quiz attempt...'}
+                    </p>
                   ) : hasSavedResult ? (
-                    <p className="mt-2">This attempt has been recorded in your deck mastery progress.</p>
+                    <p className="mt-2">
+                      {isRematchSession
+                        ? 'Rematch attempts update mastery but stay out of quiz history.'
+                        : 'This attempt has been recorded in your deck mastery progress.'}
+                    </p>
                   ) : (
                     <p className="mt-2">This attempt is ready to be recorded once saving completes.</p>
                   )}
@@ -557,6 +646,31 @@ export function QuizAssessmentClient({
               </div>
             </div>
 
+            <div className="flex flex-wrap justify-center gap-5">
+              {incorrectResults.length > 0 ? (
+                <Button onClick={rematchMissed} size="lg" className={resultActionButtonClass}>
+                  <RotateCcw className="h-4 w-4" />
+                  Rematch Missed ({incorrectResults.length})
+                </Button>
+              ) : null}
+              <Button onClick={restart} variant="outline" size="lg" className={resultActionButtonClass}>
+                <RotateCcw className="h-4 w-4" />
+                Retake Quiz
+              </Button>
+              <Button asChild variant="outline" size="lg" className={resultActionButtonClass}>
+                <Link href={`/dashboard/${deckId}/study`}>
+                  Review Flashcards
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </Button>
+              <Button asChild size="lg" className={resultActionButtonClass}>
+                <Link href={`/dashboard/${deckId}`}>
+                  Back to Deck
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
             <div className="glass-card rounded-3xl p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -591,30 +705,7 @@ export function QuizAssessmentClient({
               </div>
             </div>
 
-            <div className="flex flex-wrap justify-center gap-3">
-              {incorrectResults.length > 0 ? (
-                <Button onClick={rematchMissed} className="gap-2">
-                  <RotateCcw className="h-4 w-4" />
-                  Rematch Missed ({incorrectResults.length})
-                </Button>
-              ) : null}
-              <Button onClick={restart} variant="outline" className="gap-2">
-                <RotateCcw className="h-4 w-4" />
-                Retake Quiz
-              </Button>
-              <Link href={`/dashboard/${deckId}/study`}>
-                <Button variant="outline" className="gap-2">
-                  Review Flashcards
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href={`/dashboard/${deckId}`}>
-                <Button className="gap-2">
-                  Back to Deck
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
+            
           </motion.div>
         ) : (
           <motion.div

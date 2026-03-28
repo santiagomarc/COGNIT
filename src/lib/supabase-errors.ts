@@ -10,3 +10,14 @@ export function isMissingTableError(message: string, tableName: string) {
 
   return referencesTable && indicatesMissingTable;
 }
+
+export function isMissingColumnError(message: string, columnName: string) {
+  const normalized = message.toLowerCase();
+  const normalizedColumn = columnName.toLowerCase();
+  const referencesColumn =
+    normalized.includes(normalizedColumn) || normalized.includes(`public.${normalizedColumn}`);
+  const indicatesMissingColumn =
+    normalized.includes('does not exist') || normalized.includes('could not find the column');
+
+  return referencesColumn && indicatesMissingColumn;
+}
