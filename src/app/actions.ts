@@ -24,7 +24,7 @@ import { PDFParse } from 'pdf-parse';
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_TEXT_CHARS = 120_000;
 const PDF_CARD_GENERATION_MAX_COUNT = 30;
-const ENRICH_BATCH_SIZE = 10;
+const ENRICH_BATCH_SIZE = 25;
 const TERM_MAX_WORDS = 4;
 const TERM_HARD_MAX_WORDS = 6;
 const TERM_MAX_CHARS = 60;
@@ -34,7 +34,7 @@ const MAX_PDF_GENERATION_PASSES = 2;
 type AiActionName = 'generate_cards' | 'enrich_cards' | 'sanitize_notes' | 'get_hint';
 
 const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests: number }> = {
-  generate_cards: { windowMinutes: 60, maxRequests: 8 },
+  generate_cards: { windowMinutes: 60, maxRequests: 20 },
   enrich_cards: { windowMinutes: 60, maxRequests: 120 },
   sanitize_notes: { windowMinutes: 60, maxRequests: 30 },
   get_hint: { windowMinutes: 60, maxRequests: 90 },
