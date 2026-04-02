@@ -38,7 +38,23 @@ type DeckGridProps = {
   decks: DeckWithCount[];
 };
 
-function sortDecksByQuizCards(items: DeckWithCount[]) {
+type DeckSortMode = 'newest' | 'most-studied';
+
+function sortDecksNewestFirst(items: DeckWithCount[]) {
+  return [...items].sort((a, b) => {
+    if (b.created_at !== a.created_at) {
+      return b.created_at.localeCompare(a.created_at);
+    }
+
+    if (b.updated_at !== a.updated_at) {
+      return b.updated_at.localeCompare(a.updated_at);
+    }
+
+    return a.title.localeCompare(b.title);
+  });
+}
+
+function sortDecksMostStudied(items: DeckWithCount[]) {
   return [...items].sort((a, b) => {
     if (b.assessedCards !== a.assessedCards) {
       return b.assessedCards - a.assessedCards;
@@ -50,34 +66,79 @@ function sortDecksByQuizCards(items: DeckWithCount[]) {
       return bCardCount - aCardCount;
     }
 
+    if (b.updated_at !== a.updated_at) {
+      return b.updated_at.localeCompare(a.updated_at);
+    }
+
     return a.title.localeCompare(b.title);
   });
 }
 
+function sortDecks(items: DeckWithCount[], sortMode: DeckSortMode) {
+  if (sortMode === 'most-studied') {
+    return sortDecksMostStudied(items);
+  }
+  return sortDecksNewestFirst(items);
+}
+
 export function DeckGrid({ decks }: DeckGridProps) {
   const [search, setSearch] = useState('');
-  const [localDecks, setLocalDecks] = useState(() => sortDecksByQuizCards(decks));
+  const [sortMode, setSortMode] = useState<DeckSortMode>('newest');
+  const [localDecks, setLocalDecks] = useState(() => decks);
 
   useEffect(() => {
-    setLocalDecks(sortDecksByQuizCards(decks));
+    setLocalDecks(decks);
   }, [decks]);
 
+  const orderedDecks = useMemo(() => sortDecks(localDecks, sortMode), [localDecks, sortMode]);
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return localDecks;
+    if (!search.trim()) return orderedDecks;
     const q = search.toLowerCase();
-    return localDecks.filter((d) => d.title.toLowerCase().includes(q));
-  }, [localDecks, search]);
+    return orderedDecks.filter((d) => d.title.toLowerCase().includes(q));
+  }, [orderedDecks, search]);
 
   return (
     <div className="space-y-4">
       {/* Search input */}
       {localDecks.length > 0 && (
-        <DashboardSearch
-          value={search}
-          onChange={setSearch}
-          resultCount={filtered.length}
-          totalCount={localDecks.length}
-        />
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="md:w-full md:max-w-xl">
+            <DashboardSearch
+              value={search}
+              onChange={setSearch}
+              resultCount={filtered.length}
+              totalCount={orderedDecks.length}
+            />
+          </div>
+
+          <div
+            className="inline-flex self-start rounded-xl border border-primary/20 bg-card/60 p-1 backdrop-blur-sm"
+            role="group"
+            aria-label="Deck sort mode"
+          >
+            <button
+              type="button"
+              onClick={() => setSortMode('newest')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${sortMode === 'newest'
+                ? 'bg-primary/15 text-primary shadow-[0_0_10px_-3px_var(--glow)]'
+                : 'text-muted-foreground hover:text-foreground'}`}
+              aria-pressed={sortMode === 'newest'}
+            >
+              Newest
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortMode('most-studied')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${sortMode === 'most-studied'
+                ? 'bg-primary/15 text-primary shadow-[0_0_10px_-3px_var(--glow)]'
+                : 'text-muted-foreground hover:text-foreground'}`}
+              aria-pressed={sortMode === 'most-studied'}
+            >
+              Most Studied
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Deck list */}
@@ -147,7 +208,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                             if (prev.some((item) => item.id === deck.id)) {
                               return prev;
                             }
-                            return sortDecksByQuizCards([deck, ...prev]);
+                            return [deck, ...prev];
                           });
                         }}
                       />

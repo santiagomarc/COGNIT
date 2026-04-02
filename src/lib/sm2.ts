@@ -60,6 +60,23 @@ export interface SM2Output {
 const MIN_EASE_FACTOR = 1.3;
 const DEFAULT_EASE_FACTOR = 2.5;
 const LEARNING_STEPS_MINUTES = [1, 10]; // minutes until first real review
+const MAX_INTERVAL_DAYS = 365;
+
+function toSafeNonNegativeInt(value: number, fallback = 0) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(0, Math.floor(value));
+}
+
+function toSafeEaseFactor(value: number) {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_EASE_FACTOR;
+  }
+
+  return Math.max(value, MIN_EASE_FACTOR);
+}
 
 // ── Algorithm ──
 
@@ -72,12 +89,15 @@ const LEARNING_STEPS_MINUTES = [1, 10]; // minutes until first real review
  */
 export function sm2(grade: SM2Grade, prev: SM2Input): SM2Output {
   const now = new Date();
+  const safeRepetitionCount = toSafeNonNegativeInt(prev.repetitionCount, 0);
+  const safeEaseFactor = toSafeEaseFactor(prev.easeFactor);
+  const safeInterval = toSafeNonNegativeInt(prev.interval, 0);
 
   // ── Failed review (grade < 3) → Reset ──
   if (grade < 3) {
     return {
       repetitionCount: 0,
-      easeFactor: Math.max(prev.easeFactor - 0.2, MIN_EASE_FACTOR),
+      easeFactor: Math.max(safeEaseFactor - 0.2, MIN_EASE_FACTOR),
       interval: 0,
       state: prev.state === 'new' ? 'learning' : 'relearning',
       nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[0]),
@@ -85,7 +105,9 @@ export function sm2(grade: SM2Grade, prev: SM2Input): SM2Output {
   }
 
   // ── Successful review (grade ≥ 3) ──
-  let { repetitionCount, easeFactor, interval } = prev;
+  let repetitionCount = safeRepetitionCount;
+  let easeFactor = safeEaseFactor;
+  let interval = safeInterval;
 
   // Update ease factor using SM-2 formula
   easeFactor =
@@ -122,7 +144,10 @@ export function sm2(grade: SM2Grade, prev: SM2Input): SM2Output {
   }
 
   // Cap at 365 days (1 year max interval)
-  interval = Math.min(interval, 365);
+  if (!Number.isFinite(interval)) {
+    interval = 0;
+  }
+  interval = Math.max(0, Math.min(interval, MAX_INTERVAL_DAYS));
 
   repetitionCount += 1;
 

@@ -81,7 +81,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: relationalDecks, error: relationalDecksError } = await supabase
     .from('decks')
     .select('id, title, created_at, updated_at, cards(count)')
-    .order('updated_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (!relationalDecksError) {
     return {
@@ -94,7 +94,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: decks, error: decksError } = await supabase
     .from('decks')
     .select('id, title, created_at, updated_at')
-    .order('updated_at', { ascending: false });
+    .order('created_at', { ascending: false });
 
   if (decksError || !decks) {
     return {
@@ -382,19 +382,6 @@ export default async function Dashboard() {
                 assessedCards: mastery?.assessedCards ?? 0,
                 lastQuizAt: mastery?.lastQuizAt ?? null,
               };
-            })
-            .sort((a, b) => {
-              if (b.assessedCards !== a.assessedCards) {
-                return b.assessedCards - a.assessedCards;
-              }
-
-              const aCardCount = a.cards?.[0]?.count ?? 0;
-              const bCardCount = b.cards?.[0]?.count ?? 0;
-              if (bCardCount !== aCardCount) {
-                return bCardCount - aCardCount;
-              }
-
-              return a.title.localeCompare(b.title);
             })}
         />
         </div>

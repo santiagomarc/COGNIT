@@ -22,9 +22,11 @@ import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-
 import { PDFParse } from 'pdf-parse';
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
+const MIN_PDF_HEADER_BYTES = 5;
 const MAX_TEXT_CHARS = 120_000;
 const PDF_CARD_GENERATION_MAX_COUNT = 30;
 const ENRICH_BATCH_SIZE = 25;
+const BULK_DELETE_MAX_COUNT = 200;
 const TERM_MAX_WORDS = 4;
 const TERM_HARD_MAX_WORDS = 6;
 const TERM_MAX_CHARS = 60;
@@ -138,6 +140,39 @@ function normalizeForMatch(value: string) {
 function isMissingAiUsageTableError(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
+}
+
+function isMissingDatabaseFunctionError(message: string, functionName: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes(functionName.toLowerCase()) && normalized.includes('does not exist');
+}
+
+const AI_INJECTION_PATTERNS = [
+  /\b(?:ignore|disregard|forget|override|bypass)\b[\s\S]{0,120}\b(?:instructions?|prompt|system|developer)\b/gi,
+  /(?:^|\n)\s*(?:system|assistant|developer|user)\s*:/gi,
+  /```[\s\S]*?```/g,
+];
+
+function sanitizeAiInputText(rawText: string, maxChars = 50_000) {
+  const bounded = rawText.replace(/\u0000/g, '').slice(0, maxChars);
+  const sanitized = AI_INJECTION_PATTERNS.reduce(
+    (acc, pattern) => acc.replace(pattern, '[redacted]'),
+    bounded
+  ).trim();
+
+  return sanitized.length > 0 ? sanitized : bounded.trim();
+}
+
+function hasPdfMagicBytes(data: Uint8Array) {
+  if (data.length < MIN_PDF_HEADER_BYTES) {
+    return false;
+  }
+
+  return data[0] === 0x25
+    && data[1] === 0x50
+    && data[2] === 0x44
+    && data[3] === 0x46
+    && data[4] === 0x2d;
 }
 
 async function enforceAiRateLimit(
@@ -718,6 +753,12 @@ export async function enrichCards(data: EnrichCardsInput) {
   const enrichedCards: EnrichmentRow[] = [];
 
   for (const batch of batches) {
+    const aiBatchPayload = batch.map((card) => ({
+      id: card.id,
+      front: sanitizeAiInputText(card.front, 400),
+      back: sanitizeAiInputText(card.back, 1_500),
+    }));
+
     try {
       const response = await model.generateContent({
         systemInstruction: [
@@ -738,11 +779,7 @@ export async function enrichCards(data: EnrichCardsInput) {
             role: 'user',
             parts: [
               {
-                text: `Enrich these flashcards:\n${JSON.stringify(batch.map((card) => ({
-                  id: card.id,
-                  front: card.front,
-                  back: card.back,
-                })))}`,
+                text: `Enrich these flashcards:\n${JSON.stringify(aiBatchPayload)}`,
               },
             ],
           },
@@ -859,6 +896,10 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
     return { error: 'No cards selected.' };
   }
 
+  if (normalizedIds.length > BULK_DELETE_MAX_COUNT) {
+    return { error: `You can delete at most ${BULK_DELETE_MAX_COUNT} cards at once.` };
+  }
+
   // Verify deck ownership before deleting cards.
   const { data: ownedDeck, error: deckError } = await supabase
     .from('decks')
@@ -871,23 +912,45 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
     return { error: 'Deck not found or access denied.' };
   }
 
-  const { error } = await supabase
-    .from('cards')
-    .delete()
-    .in('id', normalizedIds)
-    .eq('deck_id', deckId);
+  let deletedCount = 0;
+  const { data: rpcDeletedCount, error: rpcError } = await supabase.rpc('delete_owned_cards_batch', {
+    p_deck_id: deckId,
+    p_card_ids: normalizedIds,
+  });
 
-  if (error) {
-    return { error: error.message };
+  if (rpcError && !isMissingDatabaseFunctionError(rpcError.message, 'delete_owned_cards_batch')) {
+    return { error: rpcError.message };
   }
 
-  await touchDeckUpdatedAt(supabase, deckId, user.id);
+  if (!rpcError) {
+    const parsedDeletedCount = typeof rpcDeletedCount === 'number'
+      ? rpcDeletedCount
+      : Number(rpcDeletedCount ?? 0);
+
+    deletedCount = Number.isFinite(parsedDeletedCount) ? parsedDeletedCount : 0;
+  } else {
+    const { data: deletedRows, error } = await supabase
+      .from('cards')
+      .delete()
+      .in('id', normalizedIds)
+      .eq('deck_id', deckId)
+      .select('id');
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    deletedCount = deletedRows?.length ?? 0;
+    if (deletedCount > 0) {
+      await touchDeckUpdatedAt(supabase, deckId, user.id);
+    }
+  }
 
   revalidatePath(`/dashboard/${deckId}`);
   revalidatePath(`/dashboard/${deckId}/study`);
   revalidatePath(`/dashboard/${deckId}/quiz`);
   revalidatePath('/dashboard');
-  return { success: true, deletedCount: normalizedIds.length };
+  return { success: true, deletedCount, requestedCount: normalizedIds.length };
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1196,22 +1259,24 @@ export async function generateCards(formData: FormData) {
   if (file.size > MAX_PDF_BYTES) {
     return { error: 'PDF must be under 10 MB.' };
   }
-  // Accept 'application/pdf' and also 'application/octet-stream' (some OSes/browsers
-  // don't set the correct MIME type for PDFs). Fall back to checking the file name.
-  const isPdf =
-    file.type === 'application/pdf' ||
-    file.type === 'application/octet-stream' ||
-    file.name.toLowerCase().endsWith('.pdf');
-  if (!isPdf) {
-    return { error: 'Only PDF files are supported.' };
+
+  let pdfBytes: Uint8Array;
+  try {
+    const arrayBuf = await file.arrayBuffer();
+    pdfBytes = new Uint8Array(arrayBuf);
+  } catch (readErr) {
+    console.error('[generateCards] failed to read uploaded file:', readErr);
+    return { error: 'Failed to read the uploaded file.' };
+  }
+
+  if (!hasPdfMagicBytes(pdfBytes)) {
+    return { error: 'Only valid PDF files are supported.' };
   }
 
   // ── 5. Extract text with pdf-parse ──
   let extractedText: string;
   try {
-    const arrayBuf = await file.arrayBuffer();
-    const uint8 = new Uint8Array(arrayBuf);
-    const pdf = new PDFParse({ data: uint8 });
+    const pdf = new PDFParse({ data: pdfBytes });
     const textResult = await pdf.getText();
     extractedText = textResult.text;
     await pdf.destroy();
@@ -1227,8 +1292,12 @@ export async function generateCards(formData: FormData) {
 
   // Clean noisy PDF artifacts before truncation to improve extraction quality.
   const sanitizedText = sanitizePdfText(extractedText);
-  // Truncate to stay within token limits
-  const trimmedText = sanitizedText.slice(0, MAX_TEXT_CHARS);
+  // Truncate and sanitize again before passing user-controlled content to the model.
+  const trimmedText = sanitizeAiInputText(sanitizedText, MAX_TEXT_CHARS);
+
+  if (!trimmedText || trimmedText.length < 50) {
+    return { error: 'The PDF content was too noisy to generate reliable cards.' };
+  }
 
   // ── 6. Call Gemini 2.0 Flash ──
   const model = getGeminiJsonModel();
@@ -1400,6 +1469,12 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
 
   try {
     const model = getGeminiTextModel();
+    const sanitizedInput = sanitizeAiInputText(result.data.raw_text, 50_000);
+
+    if (!sanitizedInput) {
+      return { error: 'Notes are empty after sanitization.' };
+    }
+
     const response = await model.generateContent({
       systemInstruction: [
         'You clean and reformat messy study notes.',
@@ -1408,12 +1483,12 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
         'Do not invent information. Preserve the original meaning and wording as closely as possible.',
         'Return plain text only. No markdown, no numbering, no commentary.',
       ].join('\n'),
-      contents: [{ role: 'user', parts: [{ text: result.data.raw_text }] }],
+      contents: [{ role: 'user', parts: [{ text: sanitizedInput }] }],
     });
 
     const sanitizedText = response.response.text().trim();
     await recordAiUsage(supabase, user.id, 'sanitize_notes', {
-      input_chars: result.data.raw_text.length,
+      input_chars: sanitizedInput.length,
       output_chars: sanitizedText.length,
     });
 
@@ -1456,6 +1531,9 @@ export async function getHint(data: GetHintInput) {
 
   try {
     const model = getGeminiTextModel();
+    const sanitizedFront = sanitizeAiInputText(card.front, 200);
+    const sanitizedBack = sanitizeAiInputText(card.back, 1_500);
+
     const response = await model.generateContent({
       systemInstruction: [
         'You generate hints for flashcard answers.',
@@ -1469,7 +1547,7 @@ export async function getHint(data: GetHintInput) {
           role: 'user',
           parts: [
             {
-              text: `Answer term: ${card.front}\nDescription/context: ${card.back}`,
+              text: `Answer term: ${sanitizedFront}\nDescription/context: ${sanitizedBack}`,
             },
           ],
         },
