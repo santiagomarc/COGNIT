@@ -28,6 +28,8 @@ const AUTH_ERROR_MAP: Record<string, string> = {
   email_address_invalid: 'Please enter a valid email address.',
 };
 
+const EMAIL_CONFIRM_REQUIRED_MESSAGE = 'Please confirm your email before accessing the dashboard.';
+
 function sanitizeAuthError(error: { message: string; code?: string }): string {
   // Check by error code first (most reliable)
   if (error.code && AUTH_ERROR_MAP[error.code]) {
@@ -71,13 +73,18 @@ export async function login(data: LoginInput & { redirectTo?: string | null }) {
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
 
   if (error) {
     return { error: sanitizeAuthError(error) };
+  }
+
+  if (!signInData.user?.email_confirmed_at) {
+    await supabase.auth.signOut();
+    return { error: EMAIL_CONFIRM_REQUIRED_MESSAGE };
   }
 
   revalidatePath('/', 'layout');
@@ -110,7 +117,10 @@ export async function signup(data: SignupInput) {
     return { error: sanitizeAuthError(error) };
   }
 
-  return { success: true, message: 'Check your email for a confirmation link!' };
+  return {
+    success: true,
+    message: 'Check your email for a confirmation link. You must verify before accessing the dashboard.',
+  };
 }
 
 // ─── FORGOT PASSWORD ───

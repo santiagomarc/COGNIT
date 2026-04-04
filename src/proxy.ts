@@ -43,13 +43,24 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
+  const isProtectedPath = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
+  const isEmailVerified = Boolean(user?.email_confirmed_at);
 
   // ── Protect dashboard routes ──
-  if (!user && PROTECTED_PATHS.some((p) => pathname.startsWith(p))) {
+  if (!user && isProtectedPath) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     // Preserve the intended destination so we can redirect back after login
     url.searchParams.set('redirectTo', pathname);
+    return NextResponse.redirect(url);
+  }
+
+  // ── Enforce verified-email access for protected routes ──
+  if (user && !isEmailVerified && isProtectedPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('redirectTo', pathname);
+    url.searchParams.set('error', 'Please confirm your email before accessing the dashboard.');
     return NextResponse.redirect(url);
   }
 
