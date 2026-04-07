@@ -105,35 +105,15 @@ export function FlashcardReviewClient({
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [gradeLog, setGradeLog] = useState<StudyGrade[]>([]);
-  const [resumeState, setResumeState] = useState<PersistedStudySessionState | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  const cardStart = useRef(sessionStartMs);
-
-  useEffect(() => {
-    if (resumeState) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [resumeState]);
-
-  useEffect(() => {
-    setSessionCards(cards);
-
+  const [resumeState, setResumeState] = useState<PersistedStudySessionState | null>(() => {
     if (typeof window === 'undefined') {
-      return;
+      return null;
     }
 
     try {
       const raw = window.sessionStorage.getItem(storageKey);
       if (!raw) {
-        setResumeState(null);
-        return;
+        return null;
       }
 
       const parsed = JSON.parse(raw) as PersistedStudySessionState;
@@ -153,16 +133,30 @@ export function FlashcardReviewClient({
         !hasValidGradeLog
       ) {
         window.sessionStorage.removeItem(storageKey);
-        setResumeState(null);
-        return;
+        return null;
       }
 
-      setResumeState(parsed);
+      return parsed;
     } catch {
       window.sessionStorage.removeItem(storageKey);
-      setResumeState(null);
+      return null;
     }
-  }, [cards, sessionCardIds, storageKey]);
+  });
+  const [isPending, startTransition] = useTransition();
+
+  const cardStart = useRef(sessionStartMs);
+
+  useEffect(() => {
+    if (resumeState) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [resumeState]);
 
   const active = sessionCards[index];
   const next = sessionCards[index + 1];

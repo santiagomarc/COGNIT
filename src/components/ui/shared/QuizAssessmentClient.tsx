@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleAlert,
   CircleCheckBig,
+  Keyboard,
   Pause,
   Play,
   RotateCcw,
@@ -15,7 +16,7 @@ import {
   Timer,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { enrichCards, logQuizResult } from '@/app/actions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
@@ -48,7 +49,7 @@ type QuizBadge = {
   tone: 'emerald' | 'primary' | 'amber';
 };
 
-type PersistedQuizDebugState = {
+type PersistedQuizSessionState = {
   version: 1;
   sessionCards: StudySessionCard[];
   quizMode: QuizMode;
@@ -60,7 +61,7 @@ type PersistedQuizDebugState = {
   sessionDurationMs: number;
 };
 
-const QUIZ_DEBUG_STATE_VERSION = 1;
+const QUIZ_SESSION_STATE_VERSION = 1;
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
@@ -90,63 +91,68 @@ export function QuizAssessmentClient({
   mode,
 }: QuizAssessmentClientProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const isDev = process.env.NODE_ENV !== 'production';
-  const launchToken = searchParams.get('launch');
-  const debugStorageKey = useMemo(
-    () => `quiz-debug-state:${deckId}:${mode}:${launchToken ?? 'pending-launch'}`,
-    [deckId, launchToken, mode]
+  const sessionCardIds = useMemo(() => cards.map((card) => card.id), [cards]);
+  const storageKey = useMemo(
+    () => `quiz-session:${deckId}:${mode}:${sessionCardIds.join('|')}`,
+    [deckId, mode, sessionCardIds]
   );
-  const initialDebugState = useMemo<PersistedQuizDebugState | null>(() => {
-    if (!isDev || typeof window === 'undefined' || !launchToken) {
+
+  const [sessionDurationMs, setSessionDurationMs] = useState(0);
+  const [sessionCards, setSessionCards] = useState(cards);
+  const [quizMode, setQuizMode] = useState<QuizMode>(mode);
+  const [index, setIndex] = useState(0);
+  const [results, setResults] = useState<QuizQuestionResult[]>([]);
+  const [hasSavedResult, setHasSavedResult] = useState(false);
+  const [isRematchSession, setIsRematchSession] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [resumeState, setResumeState] = useState<PersistedQuizSessionState | null>(() => {
+    if (typeof window === 'undefined') {
       return null;
     }
 
     try {
-      const raw = window.sessionStorage.getItem(debugStorageKey);
+      const raw = window.sessionStorage.getItem(storageKey);
       if (!raw) {
         return null;
       }
 
-      const parsed = JSON.parse(raw) as PersistedQuizDebugState;
-      if (parsed.version !== QUIZ_DEBUG_STATE_VERSION) {
+      const parsed = JSON.parse(raw) as PersistedQuizSessionState;
+      const hasMatchingCards =
+        Array.isArray(parsed.sessionCards) &&
+        parsed.sessionCards.length === sessionCardIds.length &&
+        parsed.sessionCards.every((card, cardIndex) => card.id === sessionCardIds[cardIndex]);
+      const hasValidMode = parsed.quizMode === 'mcq' || parsed.quizMode === 'identification';
+      const hasValidIndex = Number.isInteger(parsed.index) && parsed.index > 0 && parsed.index < sessionCardIds.length;
+      const hasValidResults = Array.isArray(parsed.results) && parsed.results.length <= parsed.index;
+      const hasValidDuration = Number.isFinite(parsed.sessionDurationMs) && parsed.sessionDurationMs >= 0;
+
+      if (
+        parsed.version !== QUIZ_SESSION_STATE_VERSION ||
+        !hasMatchingCards ||
+        !hasValidMode ||
+        !hasValidIndex ||
+        !hasValidResults ||
+        !hasValidDuration ||
+        parsed.hasSavedResult
+      ) {
+        window.sessionStorage.removeItem(storageKey);
         return null;
       }
 
       return parsed;
     } catch {
+      window.sessionStorage.removeItem(storageKey);
       return null;
     }
-  }, [debugStorageKey, isDev, launchToken]);
-
-  useEffect(() => {
-    if (!isDev || launchToken) {
-      return;
-    }
-
-    const nextParams = new URLSearchParams(searchParams.toString());
-    const fallbackToken = `${Math.round(performance.now() * 1000)}`;
-    const token = typeof window.crypto?.randomUUID === 'function' ? window.crypto.randomUUID() : fallbackToken;
-    nextParams.set('launch', token);
-    router.replace(`${pathname}?${nextParams.toString()}`);
-  }, [isDev, launchToken, pathname, router, searchParams]);
-
-  const [sessionDurationMs, setSessionDurationMs] = useState(() => initialDebugState?.sessionDurationMs ?? 0);
-  const [sessionCards, setSessionCards] = useState(() => initialDebugState?.sessionCards ?? cards);
-  const [quizMode, setQuizMode] = useState<QuizMode>(() => initialDebugState?.quizMode ?? mode);
-  const [index, setIndex] = useState(() => initialDebugState?.index ?? 0);
-  const [results, setResults] = useState<QuizQuestionResult[]>(() => initialDebugState?.results ?? []);
-  const [hasSavedResult, setHasSavedResult] = useState(() => initialDebugState?.hasSavedResult ?? false);
-  const [isRematchSession, setIsRematchSession] = useState(() => initialDebugState?.isRematchSession ?? false);
-  const [isPaused, setIsPaused] = useState(() => initialDebugState?.isPaused ?? false);
+  });
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
   const [isEnriching, startEnrichmentTransition] = useTransition();
   const [isSavingResult, startSavingResultTransition] = useTransition();
 
   const requestedEnrichmentIds = useRef<Set<string>>(new Set());
-  const didPersistResult = useRef(initialDebugState?.hasSavedResult ?? false);
+  const didPersistResult = useRef(false);
   const lastTickMs = useRef<number | null>(null);
   const active = sessionCards[index];
   const completed = index >= sessionCards.length;
@@ -154,7 +160,7 @@ export function QuizAssessmentClient({
   const shouldProtectProgress = !completed && sessionCards.length > 0;
 
   useEffect(() => {
-    if (completed || isPaused) {
+    if (completed || isPaused || resumeState) {
       lastTickMs.current = null;
       return;
     }
@@ -169,15 +175,20 @@ export function QuizAssessmentClient({
     }, 250);
 
     return () => window.clearInterval(intervalId);
-  }, [completed, isPaused]);
+  }, [completed, isPaused, resumeState]);
 
   useEffect(() => {
-    if (!isDev || !launchToken) {
+    if (typeof window === 'undefined' || resumeState) {
       return;
     }
 
-    const payload: PersistedQuizDebugState = {
-      version: QUIZ_DEBUG_STATE_VERSION,
+    if (sessionCards.length === 0 || completed) {
+      window.sessionStorage.removeItem(storageKey);
+      return;
+    }
+
+    const payload: PersistedQuizSessionState = {
+      version: QUIZ_SESSION_STATE_VERSION,
       sessionCards,
       quizMode,
       index,
@@ -189,22 +200,22 @@ export function QuizAssessmentClient({
     };
 
     try {
-      window.sessionStorage.setItem(debugStorageKey, JSON.stringify(payload));
+      window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
     } catch {
-      // Ignore storage failures in debug persistence.
+      // Ignore storage failures.
     }
   }, [
-    debugStorageKey,
+    completed,
     hasSavedResult,
     index,
-    isDev,
     isPaused,
     isRematchSession,
-    launchToken,
     quizMode,
+    resumeState,
     results,
     sessionCards,
     sessionDurationMs,
+    storageKey,
   ]);
 
   const progress = useMemo(() => {
@@ -365,6 +376,38 @@ export function QuizAssessmentClient({
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [shouldProtectProgress]);
 
+  useEffect(() => {
+    if (!shouldProtectProgress || resumeState) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      const lowerKey = event.key.toLowerCase();
+      if (lowerKey === 'p') {
+        event.preventDefault();
+        setIsPaused((value) => !value);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [resumeState, shouldProtectProgress]);
+
+  const clearStoredSession = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.sessionStorage.removeItem(storageKey);
+  }, [storageKey]);
+
   const requestQuit = useCallback(
     (href: string) => {
       if (!shouldProtectProgress) {
@@ -384,22 +427,21 @@ export function QuizAssessmentClient({
       return;
     }
 
-    if (isDev) {
-      window.sessionStorage.removeItem(debugStorageKey);
-    }
+    clearStoredSession();
 
     setQuitDialogOpen(false);
     setIsPaused(false);
     router.push(pendingQuitHref);
     setPendingQuitHref(null);
-  }, [debugStorageKey, isDev, pendingQuitHref, router]);
+  }, [clearStoredSession, pendingQuitHref, router]);
 
   const resolveQuestion = useCallback((result: QuizQuestionResult) => {
     setResults((current) => [...current, result]);
     setIndex((current) => current + 1);
   }, []);
 
-  const restart = () => {
+  const startFreshSession = useCallback(() => {
+    clearStoredSession();
     setSessionCards(cards);
     setQuizMode(mode);
     setIndex(0);
@@ -410,9 +452,38 @@ export function QuizAssessmentClient({
     setSessionDurationMs(0);
     setQuitDialogOpen(false);
     setPendingQuitHref(null);
+    setResumeState(null);
+    setShowShortcutHelp(false);
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     lastTickMs.current = null;
+  }, [cards, clearStoredSession, mode]);
+
+  const resumePreviousSession = useCallback(() => {
+    if (!resumeState) {
+      return;
+    }
+
+    const safeIndex = Math.max(0, Math.min(resumeState.index, resumeState.sessionCards.length - 1));
+    setSessionCards(resumeState.sessionCards);
+    setQuizMode(resumeState.quizMode);
+    setIndex(safeIndex);
+    setResults(resumeState.results.slice(0, safeIndex));
+    setHasSavedResult(false);
+    setIsRematchSession(Boolean(resumeState.isRematchSession));
+    setIsPaused(Boolean(resumeState.isPaused));
+    setSessionDurationMs(Math.max(0, resumeState.sessionDurationMs));
+    setQuitDialogOpen(false);
+    setPendingQuitHref(null);
+    setResumeState(null);
+    requestedEnrichmentIds.current.clear();
+    didPersistResult.current = false;
+    lastTickMs.current = null;
+    toast.success('Resumed previous quiz session');
+  }, [resumeState]);
+
+  const restart = () => {
+    startFreshSession();
   };
 
   const rematchMissed = () => {
@@ -437,6 +508,9 @@ export function QuizAssessmentClient({
     setIsRematchSession(true);
     setIsPaused(false);
     setSessionDurationMs(0);
+    setResumeState(null);
+    setShowShortcutHelp(false);
+    clearStoredSession();
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     lastTickMs.current = null;
@@ -458,6 +532,34 @@ export function QuizAssessmentClient({
           </p>
           <Link href={`/dashboard/${deckId}`} className="mt-6 inline-block">
             <Button>Back to Deck</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (resumeState) {
+    return (
+      <div className="container mx-auto p-6 md:p-8">
+        <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+            <Brain className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="text-2xl font-semibold">Resume your previous quiz?</h1>
+          <p className="mt-2 text-muted-foreground">
+            Pick up from question {Math.min(resumeState.index + 1, resumeState.sessionCards.length)} of {resumeState.sessionCards.length}.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Last recorded progress: {formatDuration(resumeState.sessionDurationMs)} of quiz time.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={startFreshSession} variant="outline">Start New Quiz</Button>
+            <Button onClick={resumePreviousSession}>Resume Quiz</Button>
+          </div>
+
+          <Link href={`/dashboard/${deckId}`} className="mt-4 inline-block">
+            <Button variant="ghost">Back to Deck</Button>
           </Link>
         </div>
       </div>
@@ -503,6 +605,16 @@ export function QuizAssessmentClient({
               {isPaused ? 'Resume' : 'Pause'}
             </Button>
           ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5"
+            onClick={() => setShowShortcutHelp((value) => !value)}
+          >
+            <Keyboard className="h-3.5 w-3.5" />
+            Shortcuts
+          </Button>
         </div>
       </div>
 
@@ -540,6 +652,40 @@ export function QuizAssessmentClient({
           />
         </div>
       </div>
+
+      {showShortcutHelp ? (
+        <div className="glass-card rounded-2xl border border-primary/15 p-4 text-sm">
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Keyboard Shortcuts</p>
+          <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
+            {quizMode === 'mcq' ? (
+              <>
+                <p>
+                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">1-4</span>{' '}
+                  Select an MCQ option
+                </p>
+                <p>
+                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
+                  Continue after feedback
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>{' '}
+                  Check typed answer
+                </p>
+                <p>
+                  Use keyboard focus + Enter to trigger Continue
+                </p>
+              </>
+            )}
+            <p>
+              <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">P</span>{' '}
+              Pause or resume the quiz
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {completed
