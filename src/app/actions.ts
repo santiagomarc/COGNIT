@@ -16,7 +16,7 @@ import {
 import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry } from '@/index';
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
 import { isMissingColumnError, isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeAiServiceError, sanitizeDatabaseError } from '@/lib/server-errors';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
@@ -50,6 +50,15 @@ type EnrichmentRow = {
 };
 
 type CardDifficultyBand = 'foundational' | 'intermediate' | 'advanced';
+
+type QuizCardHistoryRow = {
+  quiz_result_id: string;
+  card_id: string;
+  correct: boolean;
+  prompt_text: string | null;
+  correct_answer_text: string | null;
+  user_answer_text: string | null;
+};
 
 type CandidateCard = {
   front: string;
@@ -146,6 +155,16 @@ function isMissingAiUsageTableError(message: string) {
 function isMissingDatabaseFunctionError(message: string, functionName: string) {
   const normalized = message.toLowerCase();
   return normalized.includes(functionName.toLowerCase()) && normalized.includes('does not exist');
+}
+
+function invalidateDashboardCache(userId: string) {
+  revalidateTag(`dashboard:${userId}`, 'max');
+}
+
+function invalidateDeckCache(userId: string, deckId: string) {
+  revalidateTag(`dashboard:${userId}`, 'max');
+  revalidateTag(`deck:${deckId}`, 'max');
+  revalidateTag(`quiz-history:${deckId}:${userId}`, 'max');
 }
 
 const AI_INJECTION_PATTERNS = [
@@ -543,6 +562,7 @@ export async function createDeck(data: CreateDeckInput) {
 
   // 4. Refresh the UI
   revalidatePath('/dashboard');
+  invalidateDashboardCache(user.id);
   return { success: true, deckId: deck.id };
 }
 
@@ -566,6 +586,7 @@ export async function deleteDeck(deckId: string) {
   }
 
   revalidatePath('/dashboard');
+  invalidateDashboardCache(user.id);
 }
 
 export async function updateDeck(deckId: string, title: string) {
@@ -593,6 +614,7 @@ export async function updateDeck(deckId: string, title: string) {
   }
 
   revalidatePath('/dashboard');
+  invalidateDashboardCache(user.id);
 }
 
 export async function createCard(data: CreateCardInput) {
@@ -630,6 +652,7 @@ export async function createCard(data: CreateCardInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, result.data.deck_id);
   return { success: true, cardId: insertedCard?.id ?? null };
 }
 
@@ -679,6 +702,7 @@ export async function updateCard(data: UpdateCardInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, result.data.deck_id);
   return { success: true };
 }
 
@@ -716,6 +740,7 @@ export async function bulkImportCards(data: BulkImportInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, result.data.deck_id);
 
   return {
     success: true,
@@ -831,6 +856,7 @@ export async function enrichCards(data: EnrichCardsInput) {
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath(`/dashboard/${result.data.deck_id}/study`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, result.data.deck_id);
 
   if (enrichedCount > 0) {
     await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
@@ -886,6 +912,7 @@ export async function deleteCard(cardId: string, deckId: string) {
 
   revalidatePath(`/dashboard/${deckId}`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, deckId);
   return { success: true };
 }
 
@@ -965,6 +992,7 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   revalidatePath(`/dashboard/${deckId}/study`);
   revalidatePath(`/dashboard/${deckId}/quiz`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, deckId);
   return { success: true, deletedCount, requestedCount: normalizedIds.length };
 }
 
@@ -1026,31 +1054,60 @@ export async function gradeCard(data: GradeCardInput) {
     state: (card.state as CardState) ?? 'new',
   });
 
-  // Update the card
-  const { error: updateErr } = await supabase
-    .from('cards')
-    .update({
-      state: sm2Result.state,
-      interval: sm2Result.interval,
-      ease_factor: sm2Result.easeFactor,
-      repetition_count: sm2Result.repetitionCount,
-      next_review_at: sm2Result.nextReviewAt.toISOString(),
-      last_review_at: new Date().toISOString(),
-    })
-    .eq('id', card.id)
-    .eq('deck_id', result.data.deck_id);
+  const nowIso = new Date().toISOString();
+  const rpcGradePayload = {
+    p_deck_id: result.data.deck_id,
+    p_card_id: card.id,
+    p_state: sm2Result.state,
+    p_interval: sm2Result.interval,
+    p_ease_factor: sm2Result.easeFactor,
+    p_repetition_count: sm2Result.repetitionCount,
+    p_next_review_at: sm2Result.nextReviewAt.toISOString(),
+    p_last_review_at: nowIso,
+    p_grade: numericGrade,
+    p_review_duration_ms: result.data.duration_ms ?? 0,
+  };
 
-  if (updateErr) {
-    return { error: 'Failed to update card schedule.' };
+  const { error: gradePersistError } = await supabase.rpc('grade_owned_card', rpcGradePayload);
+
+  if (gradePersistError && !isMissingDatabaseFunctionError(gradePersistError.message, 'grade_owned_card')) {
+    console.error('[gradeCard] rpc error:', gradePersistError.code, gradePersistError.message);
+    return { error: sanitizeDatabaseError(gradePersistError, 'Failed to save card grade.') };
   }
 
-  // Insert study log (immutable audit trail)
-  await supabase.from('study_logs').insert({
-    user_id: user.id,
-    card_id: card.id,
-    grade: numericGrade,
-    review_duration_ms: result.data.duration_ms ?? 0,
-  });
+  if (gradePersistError) {
+    const { error: updateErr } = await supabase
+      .from('cards')
+      .update({
+        state: sm2Result.state,
+        interval: sm2Result.interval,
+        ease_factor: sm2Result.easeFactor,
+        repetition_count: sm2Result.repetitionCount,
+        next_review_at: sm2Result.nextReviewAt.toISOString(),
+        last_review_at: nowIso,
+      })
+      .eq('id', card.id)
+      .eq('deck_id', result.data.deck_id);
+
+    if (updateErr) {
+      console.error('[gradeCard] fallback update error:', updateErr.code, updateErr.message);
+      return { error: sanitizeDatabaseError(updateErr, 'Failed to update card schedule.') };
+    }
+
+    const { error: logErr } = await supabase.from('study_logs').insert({
+      user_id: user.id,
+      card_id: card.id,
+      grade: numericGrade,
+      review_duration_ms: result.data.duration_ms ?? 0,
+    });
+
+    if (logErr) {
+      console.error('[gradeCard] fallback log error:', logErr.code, logErr.message);
+      return { error: sanitizeDatabaseError(logErr, 'Card was graded, but history log failed to save.') };
+    }
+  }
+
+  invalidateDeckCache(user.id, result.data.deck_id);
 
   return {
     success: true,
@@ -1211,6 +1268,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   revalidatePath('/dashboard');
   revalidatePath(`/dashboard/${result.data.deck_id}`);
+  invalidateDeckCache(user.id, result.data.deck_id);
 
   return {
     success: true,
@@ -1456,6 +1514,7 @@ export async function generateCards(formData: FormData) {
 
   revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   revalidatePath('/dashboard');
+  invalidateDeckCache(user.id, parsed.data.deck_id);
 
   await recordAiUsage(supabase, user.id, 'generate_cards', {
     requested_count: parsed.data.count,
@@ -1595,116 +1654,98 @@ export async function getQuizHistory(deckId: string) {
     return { error: deckAccess.error };
   }
 
-  const { supabase, user } = deckAccess;
+  const { user } = deckAccess;
+  const getCachedQuizHistory = unstable_cache(
+    async () => {
+      const supabase = await createClient();
 
-  const { data: deckCards, error: deckCardsError } = await supabase
-    .from('cards')
-    .select('id, front, back, created_at')
-    .eq('deck_id', deckId)
-    .order('created_at', { ascending: true });
+      const buildQuizHistoryQuery = (applyHistoryFilter: boolean) => {
+        const query = supabase
+          .from('quiz_results')
+          .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
+          .eq('deck_id', deckId)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(200);
 
-  if (deckCardsError) {
-    console.error('Error fetching deck cards for numbering:', deckCardsError);
-    return { error: 'Failed to build card history references.' };
-  }
+        return applyHistoryFilter ? query.eq('include_in_history', true) : query;
+      };
 
-  const cardReference = new Map<string, { card_number: number; front: string; back: string }>();
-  for (const [index, card] of (deckCards ?? []).entries()) {
-    cardReference.set(card.id, {
-      card_number: index + 1,
-      front: card.front,
-      back: card.back,
-    });
-  }
+      let { data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(true);
 
-  const buildQuizHistoryQuery = (applyHistoryFilter: boolean) => {
-    const query = supabase
-      .from('quiz_results')
-      .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
-      .eq('deck_id', deckId)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(200);
+      if (quizResultsError && isMissingColumnError(quizResultsError.message, 'include_in_history')) {
+        ({ data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(false));
+      }
 
-    return applyHistoryFilter ? query.eq('include_in_history', true) : query;
-  };
+      if (quizResultsError) {
+        console.error('[getQuizHistory] quiz results error:', quizResultsError.code, quizResultsError.message);
+        return { error: 'Failed to fetch quiz history.' };
+      }
 
-  let { data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(true);
+      if (!quizResults || quizResults.length === 0) {
+        return { history: [] as QuizHistoryEntry[] };
+      }
 
-  if (quizResultsError && isMissingColumnError(quizResultsError.message, 'include_in_history')) {
-    ({ data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(false));
-  }
+      const { data: quizCardRows, error: quizCardRowsError } = await supabase
+        .from('quiz_card_results')
+        .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
+        .in('quiz_result_id', quizResults.map((row) => row.id))
+        .limit(20000);
 
-  if (quizResultsError) {
-    console.error('Error fetching quiz history:', quizResultsError);
-    return { error: 'Failed to fetch quiz history.' };
-  }
+      if (quizCardRowsError) {
+        console.error('[getQuizHistory] quiz card rows error:', quizCardRowsError.code, quizCardRowsError.message);
+        return { error: 'Failed to fetch quiz history details.' };
+      }
 
-  if (!quizResults || quizResults.length === 0) {
-    return { history: [] as QuizHistoryEntry[] };
-  }
+      const rowsByQuizResultId = new Map<string, QuizCardHistoryRow[]>();
+      for (const row of quizCardRows ?? []) {
+        const existing = rowsByQuizResultId.get(row.quiz_result_id) ?? [];
+        existing.push(row);
+        rowsByQuizResultId.set(row.quiz_result_id, existing);
+      }
 
-  const { data: quizCardRows, error: quizCardRowsError } = await supabase
-    .from('quiz_card_results')
-    .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
-    .in('quiz_result_id', quizResults.map((row) => row.id))
-    .limit(20000);
+      const history: QuizHistoryEntry[] = quizResults.map((result) => {
+        const details = rowsByQuizResultId.get(result.id) ?? [];
+        const incorrectAnswers = details
+          .filter((detail) => !detail.correct)
+          .map((detail) => {
+            return {
+              card_id: detail.card_id,
+              card_number: null,
+              prompt: detail.prompt_text ?? 'Card content unavailable',
+              correct_answer: detail.correct_answer_text ?? 'Card term unavailable',
+              user_answer:
+                typeof detail.user_answer_text === 'string' && detail.user_answer_text.trim().length > 0
+                  ? detail.user_answer_text
+                  : null,
+            };
+          });
 
-  if (quizCardRowsError) {
-    console.error('Error fetching quiz history card rows:', quizCardRowsError);
-    return { error: 'Failed to fetch quiz history details.' };
-  }
-
-  const rowsByQuizResultId = new Map<string, Array<{
-    quiz_result_id: string;
-    card_id: string;
-    correct: boolean;
-    prompt_text: string | null;
-    correct_answer_text: string | null;
-    user_answer_text: string | null;
-  }>>();
-
-  for (const row of quizCardRows ?? []) {
-    const existing = rowsByQuizResultId.get(row.quiz_result_id) ?? [];
-    existing.push(row);
-    rowsByQuizResultId.set(row.quiz_result_id, existing);
-  }
-
-  const history: QuizHistoryEntry[] = quizResults.map((result) => {
-    const details = rowsByQuizResultId.get(result.id) ?? [];
-    const incorrectAnswers = details
-      .filter((detail) => !detail.correct)
-      .map((detail) => {
-        const reference = cardReference.get(detail.card_id);
+        const totalCards = result.total_cards > 0 ? result.total_cards : 1;
+        const scorePercentage = Math.round((result.correct_cards / totalCards) * 100);
 
         return {
-          card_id: detail.card_id,
-          card_number: reference?.card_number ?? null,
-          prompt: reference?.back ?? detail.prompt_text ?? 'Card content unavailable',
-          correct_answer: reference?.front ?? detail.correct_answer_text ?? 'Card term unavailable',
-          user_answer:
-            typeof detail.user_answer_text === 'string' && detail.user_answer_text.trim().length > 0
-              ? detail.user_answer_text
-              : null,
+          id: result.id,
+          deck_id: result.deck_id,
+          mode: result.mode,
+          total_cards: result.total_cards,
+          correct_cards: result.correct_cards,
+          score_percentage: scorePercentage,
+          wrong_count: incorrectAnswers.length,
+          duration_ms: result.duration_ms,
+          created_at: result.created_at,
+          incorrect_answers: incorrectAnswers,
         };
       });
 
-    const totalCards = result.total_cards > 0 ? result.total_cards : 1;
-    const scorePercentage = Math.round((result.correct_cards / totalCards) * 100);
+      return { history };
+    },
+    [`quiz-history:${deckId}:${user.id}`],
+    {
+      revalidate: 60,
+      tags: [`quiz-history:${deckId}:${user.id}`, `deck:${deckId}`, `dashboard:${user.id}`],
+    }
+  );
 
-    return {
-      id: result.id,
-      deck_id: result.deck_id,
-      mode: result.mode,
-      total_cards: result.total_cards,
-      correct_cards: result.correct_cards,
-      score_percentage: scorePercentage,
-      wrong_count: incorrectAnswers.length,
-      duration_ms: result.duration_ms,
-      created_at: result.created_at,
-      incorrect_answers: incorrectAnswers,
-    };
-  });
-
-  return { history };
+  return getCachedQuizHistory();
 }
