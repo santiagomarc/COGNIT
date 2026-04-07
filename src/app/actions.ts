@@ -523,21 +523,23 @@ export async function createDeck(data: CreateDeckInput) {
   }
 
   // 3. Database Mutation
-  const { error } = await supabase
+  const { data: deck, error } = await supabase
     .from('decks')
     .insert({
       title: result.data.title,
       description: result.data.description,
       user_id: user.id, // <--- We strictly bind this to the logged-in user
-    });
+    })
+    .select('id')
+    .single();
 
-  if (error) {
-    return { error: error.message };
+  if (error || !deck) {
+    return { error: error?.message ?? 'Failed to create deck.' };
   }
 
   // 4. Refresh the UI
   revalidatePath('/dashboard');
-  return { success: true };
+  return { success: true, deckId: deck.id };
 }
 
 export async function deleteDeck(deckId: string) {

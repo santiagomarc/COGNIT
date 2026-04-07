@@ -27,6 +27,17 @@ type FlashcardReviewClientProps = {
   totalInDeck: number;
 };
 
+type PersistedStudySessionState = {
+  version: 1;
+  cardIds: string[];
+  index: number;
+  showAnswer: boolean;
+  gradeLog: StudyGrade[];
+  sessionDurationMs: number;
+};
+
+const STUDY_SESSION_STATE_VERSION = 1;
+
 const GRADE_BUTTONS: {
   grade: StudyGrade;
   label: string;
@@ -83,27 +94,75 @@ export function FlashcardReviewClient({
   cards,
   totalInDeck,
 }: FlashcardReviewClientProps) {
+  const sessionCardIds = useMemo(() => cards.map((card) => card.id), [cards]);
+  const storageKey = useMemo(
+    () => `study-session:${deckId}:${sessionCardIds.join('|')}`,
+    [deckId, sessionCardIds]
+  );
   const [sessionStartMs, setSessionStartMs] = useState(() => Date.now());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [sessionCards, setSessionCards] = useState(cards);
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [gradeLog, setGradeLog] = useState<StudyGrade[]>([]);
+  const [resumeState, setResumeState] = useState<PersistedStudySessionState | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const cardStart = useRef(sessionStartMs);
 
   useEffect(() => {
+    if (resumeState) {
+      return;
+    }
+
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, []);
+  }, [resumeState]);
 
   useEffect(() => {
     setSessionCards(cards);
-  }, [cards]);
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const raw = window.sessionStorage.getItem(storageKey);
+      if (!raw) {
+        setResumeState(null);
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as PersistedStudySessionState;
+      const hasMatchingCards =
+        Array.isArray(parsed.cardIds) &&
+        parsed.cardIds.length === sessionCardIds.length &&
+        parsed.cardIds.every((id, cardIndex) => id === sessionCardIds[cardIndex]);
+      const hasValidIndex = Number.isInteger(parsed.index) && parsed.index > 0 && parsed.index < cards.length;
+      const hasValidDuration = Number.isFinite(parsed.sessionDurationMs) && parsed.sessionDurationMs >= 0;
+      const hasValidGradeLog = Array.isArray(parsed.gradeLog);
+
+      if (
+        parsed.version !== STUDY_SESSION_STATE_VERSION ||
+        !hasMatchingCards ||
+        !hasValidIndex ||
+        !hasValidDuration ||
+        !hasValidGradeLog
+      ) {
+        window.sessionStorage.removeItem(storageKey);
+        setResumeState(null);
+        return;
+      }
+
+      setResumeState(parsed);
+    } catch {
+      window.sessionStorage.removeItem(storageKey);
+      setResumeState(null);
+    }
+  }, [cards, sessionCardIds, storageKey]);
 
   const active = sessionCards[index];
   const next = sessionCards[index + 1];
@@ -145,19 +204,78 @@ export function FlashcardReviewClient({
     [active, deckId, isPending, startTransition]
   );
 
-  const restart = () => {
+  const clearStoredProgress = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.sessionStorage.removeItem(storageKey);
+  }, [storageKey]);
+
+  const startNewSession = useCallback(() => {
+    clearStoredProgress();
     const nextNow = Date.now();
     setSessionCards(cards);
     setIndex(0);
     setShowAnswer(false);
     setGradeLog([]);
+    setResumeState(null);
     setSessionStartMs(nextNow);
     setNowMs(nextNow);
     cardStart.current = nextNow;
-  };
+  }, [cards, clearStoredProgress]);
+
+  const resumePreviousSession = useCallback(() => {
+    if (!resumeState) {
+      return;
+    }
+
+    const nextNow = Date.now();
+    const safeIndex = Math.max(0, Math.min(resumeState.index, cards.length - 1));
+
+    setSessionCards(cards);
+    setIndex(safeIndex);
+    setShowAnswer(Boolean(resumeState.showAnswer));
+    setGradeLog(resumeState.gradeLog.slice(0, safeIndex));
+    setSessionStartMs(nextNow - Math.max(0, resumeState.sessionDurationMs));
+    setNowMs(nextNow);
+    setResumeState(null);
+    cardStart.current = nextNow;
+    toast.success('Resumed previous study session');
+  }, [cards, resumeState]);
+
+  const restart = useCallback(() => {
+    startNewSession();
+  }, [startNewSession]);
 
   useEffect(() => {
-    if (completed) return;
+    if (typeof window === 'undefined' || resumeState) {
+      return;
+    }
+
+    if (sessionCards.length === 0 || completed) {
+      window.sessionStorage.removeItem(storageKey);
+      return;
+    }
+
+    const payload: PersistedStudySessionState = {
+      version: STUDY_SESSION_STATE_VERSION,
+      cardIds: sessionCards.map((card) => card.id),
+      index,
+      showAnswer,
+      gradeLog,
+      sessionDurationMs: Math.max(0, nowMs - sessionStartMs),
+    };
+
+    try {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [completed, gradeLog, index, nowMs, resumeState, sessionCards, sessionStartMs, showAnswer, storageKey]);
+
+  useEffect(() => {
+    if (completed || resumeState) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -192,7 +310,21 @@ export function FlashcardReviewClient({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [commitGrade, completed, showAnswer]);
+  }, [commitGrade, completed, resumeState, showAnswer]);
+
+  useEffect(() => {
+    if (completed || resumeState || sessionCards.length === 0) {
+      return;
+    }
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [completed, resumeState, sessionCards.length]);
 
   if (sessionCards.length === 0) {
     return (
@@ -210,6 +342,34 @@ export function FlashcardReviewClient({
           </p>
           <Link href={`/dashboard/${deckId}`} className="mt-6 inline-block">
             <Button>Back to Deck</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (resumeState) {
+    return (
+      <div className="container mx-auto p-6 md:p-8">
+        <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+            <Brain className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="text-2xl font-semibold">Resume your previous session?</h1>
+          <p className="mt-2 text-muted-foreground">
+            Pick up from card {Math.min(resumeState.index + 1, sessionCards.length)} of {sessionCards.length}.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Last recorded progress: {formatDuration(resumeState.sessionDurationMs)} of active study time.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={startNewSession} variant="outline">Start New Session</Button>
+            <Button onClick={resumePreviousSession}>Resume Session</Button>
+          </div>
+
+          <Link href={`/dashboard/${deckId}`} className="mt-4 inline-block">
+            <Button variant="ghost">Back to Deck</Button>
           </Link>
         </div>
       </div>

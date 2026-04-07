@@ -22,7 +22,7 @@ export async function QuizHistorySection({ deckId }: QuizHistorySectionProps) {
   }
 
   const history = (historyResult && 'history' in historyResult ? historyResult.history : []) ?? [];
-  return <QuizHistoryList history={history} />;
+  return <QuizHistoryList history={history} deckId={deckId} />;
 }
 
 export function QuizHistorySkeleton() {

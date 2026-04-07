@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, Sparkles, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { createDeck } from '@/app/actions';
 import { createDeckSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ type CreateDeckModalProps = {
 };
 
 export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -59,6 +61,9 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
       formRef.current?.reset();
       setDraftTitle('');
       setFieldError(null);
+      if (result?.deckId) {
+        router.push(`/dashboard/${result.deckId}`);
+      }
     }
     setIsLoading(false);
   }

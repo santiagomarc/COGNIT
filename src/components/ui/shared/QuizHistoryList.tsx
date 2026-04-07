@@ -1,6 +1,7 @@
 'use client';
 
 import type { QuizHistoryEntry } from '@/index';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Target, Calendar, XCircle, CheckCircle2 } from 'lucide-react';
@@ -19,13 +20,19 @@ function getScoreClass(percentage: number) {
   return 'bg-red-500/20 text-red-400';
 }
 
-export function QuizHistoryList({ history }: { history: QuizHistoryEntry[] }) {
+export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry[]; deckId: string }) {
   if (!history || history.length === 0) {
     return (
       <Card className="glass-card border-primary/20 mt-8">
         <CardContent className="flex flex-col items-center justify-center p-8 text-muted-foreground">
           <Target className="w-12 h-12 mb-4 opacity-50" />
-          <p>No quiz history yet. Take a quiz to see your stats here!</p>
+          <p className="text-center">No quiz history yet. Take your first quiz to start your mastery timeline.</p>
+          <Link
+            href={`/dashboard/${deckId}/quiz?mode=mcq`}
+            className="mt-4 inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
+          >
+            Take your first quiz
+          </Link>
         </CardContent>
       </Card>
     );

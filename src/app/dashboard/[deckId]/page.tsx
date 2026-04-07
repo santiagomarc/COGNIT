@@ -174,6 +174,35 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
   const unprovenCards = Math.max(totalCards - masteredCards, 0);
+  const hasCards = totalCards > 0;
+
+  const addContentSection = (
+    <>
+      <FadeInUp delay={0.1}>
+        <div id="add-content" className="flex flex-wrap items-center justify-between gap-3 scroll-mt-28">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">
+              {hasCards ? 'Add Content' : 'Start Here: Add Your First Cards'}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {hasCards
+                ? 'Add individual cards, bulk-import structured notes, or generate cards from a PDF.'
+                : 'Add individual cards, bulk-import notes, or generate cards from a PDF to unlock study and quiz modes.'}
+            </p>
+          </div>
+          <BulkImportModal deckId={deckId} />
+        </div>
+      </FadeInUp>
+
+      <FadeInUp delay={0.12}>
+        <AddCardForm deckId={deckId} />
+      </FadeInUp>
+
+      <FadeInUp delay={0.15}>
+        <PDFUploadZone deckId={deckId} />
+      </FadeInUp>
+    </>
+  );
 
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
@@ -238,136 +267,133 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
               </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <BrainCircuit className="h-4 w-4 text-primary" />
-                      Review Flashcards
+            {hasCards ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <BrainCircuit className="h-4 w-4 text-primary" />
+                        Review Flashcards
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Build recall with spaced repetition. This is the flow that advances your daily review count, streak, and heatmap.
+                      </p>
                     </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Build recall with spaced repetition. This is the flow that advances your daily review count, streak, and heatmap.
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-end gap-3">
+                    <label className="space-y-1 text-left">
+                      <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                        Session cards
+                      </span>
+                      <Input
+                        name="count"
+                        type="number"
+                        min={sessionBounds.min || undefined}
+                        max={sessionBounds.max || undefined}
+                        step={1}
+                        defaultValue={sessionBounds.defaultCount || undefined}
+                        className="w-28"
+                        aria-label="Number of flashcards to review"
+                      />
+                    </label>
+                    <Button type="submit">Review Flashcards</Button>
+                  </div>
+                </form>
+
+                <form action={`/dashboard/${deckId}/quiz`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        Take Quiz
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Test what you know in a dedicated assessment flow. Quiz results update this deck&apos;s mastery score.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+                    <label className="space-y-1 text-left">
+                      <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                        Quiz cards
+                      </span>
+                      <Input
+                        name="count"
+                        type="number"
+                        min={sessionBounds.min || undefined}
+                        max={sessionBounds.max || undefined}
+                        step={1}
+                        defaultValue={sessionBounds.defaultCount || undefined}
+                        className="w-28"
+                        aria-label="Number of quiz cards"
+                      />
+                    </label>
+
+                    <fieldset className="space-y-2">
+                      <legend className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Mode</legend>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                          <input type="radio" name="mode" value="mcq" defaultChecked className="accent-primary" />
+                          MCQ
+                        </label>
+                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                          <input type="radio" name="mode" value="identification" className="accent-primary" />
+                          Identification
+                        </label>
+                      </div>
+                    </fieldset>
+                  </div>
+
+                  <div className="mt-4 space-y-2 rounded-xl border border-primary/10 bg-background/30 p-3">
+                    <label className="inline-flex items-center gap-2 text-sm text-foreground">
+                      <input
+                        type="checkbox"
+                        name="focus_unproven"
+                        value="1"
+                        className="accent-primary"
+                      />
+                      Force include all unproven cards ({unprovenCards})
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      If enabled, quiz size auto-expands to include every card not yet proven in quiz mastery.
                     </p>
                   </div>
-                </div>
 
-                <div className="mt-5 flex flex-wrap items-end gap-3">
-                  <label className="space-y-1 text-left">
-                    <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      Session cards
-                    </span>
-                    <Input
-                      name="count"
-                      type="number"
-                      min={sessionBounds.min || undefined}
-                      max={sessionBounds.max || undefined}
-                      step={1}
-                      defaultValue={sessionBounds.defaultCount || undefined}
-                      className="w-28"
-                      aria-label="Number of flashcards to review"
-                      disabled={totalCards === 0}
-                    />
-                  </label>
-                  <Button type="submit" disabled={totalCards === 0}>Review Flashcards</Button>
-                </div>
-              </form>
-
-              <form action={`/dashboard/${deckId}/quiz`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      Take Quiz
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Test what you know in a dedicated assessment flow. Quiz results update this deck&apos;s mastery score.
+                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      {quizReadyCards < totalCards
+                        ? 'Some cards still need AI enrichment. The quiz route will prepare missing prompts automatically.'
+                        : 'All cards are ready for both quiz modes.'}
+                    </p>
+                    <Button type="submit" variant="outline">Start Quiz</Button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">This deck is empty. Add your first cards to unlock Study and Quiz.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Start by writing one card, bulk importing your notes, or generating cards from a PDF.
                     </p>
                   </div>
+                  <Button asChild>
+                    <Link href="#add-content">Add Cards Now</Link>
+                  </Button>
                 </div>
-
-                <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
-                  <label className="space-y-1 text-left">
-                    <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      Quiz cards
-                    </span>
-                    <Input
-                      name="count"
-                      type="number"
-                      min={sessionBounds.min || undefined}
-                      max={sessionBounds.max || undefined}
-                      step={1}
-                      defaultValue={sessionBounds.defaultCount || undefined}
-                      className="w-28"
-                      aria-label="Number of quiz cards"
-                      disabled={totalCards === 0}
-                    />
-                  </label>
-
-                  <fieldset className="space-y-2">
-                    <legend className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Mode</legend>
-                    <div className="flex flex-wrap gap-2">
-                      <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
-                        <input type="radio" name="mode" value="mcq" defaultChecked className="accent-primary" />
-                        MCQ
-                      </label>
-                      <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
-                        <input type="radio" name="mode" value="identification" className="accent-primary" />
-                        Identification
-                      </label>
-                    </div>
-                  </fieldset>
-                </div>
-
-                <div className="mt-4 space-y-2 rounded-xl border border-primary/10 bg-background/30 p-3">
-                  <label className="inline-flex items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
-                      name="focus_unproven"
-                      value="1"
-                      className="accent-primary"
-                      disabled={totalCards === 0}
-                    />
-                    Force include all unproven cards ({unprovenCards})
-                  </label>
-                  <p className="text-xs text-muted-foreground">
-                    If enabled, quiz size auto-expands to include every card not yet proven in quiz mastery.
-                  </p>
-                </div>
-
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-xs text-muted-foreground">
-                    {quizReadyCards < totalCards
-                      ? 'Some cards still need AI enrichment. The quiz route will prepare missing prompts automatically.'
-                      : 'All cards are ready for both quiz modes.'}
-                  </p>
-                  <Button type="submit" variant="outline" disabled={totalCards === 0}>Start Quiz</Button>
-                </div>
-              </form>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </FadeInUp>
 
-      <FadeInUp delay={0.1}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Add Content</h2>
-            <p className="text-sm text-muted-foreground">
-              Add individual cards, bulk-import structured notes, or generate cards from a PDF.
-            </p>
-          </div>
-          <BulkImportModal deckId={deckId} />
-        </div>
-      </FadeInUp>
+      {!hasCards ? addContentSection : null}
 
-      <FadeInUp delay={0.12}>
-        <AddCardForm deckId={deckId} />
-      </FadeInUp>
-
-      <FadeInUp delay={0.15}>
-        <PDFUploadZone deckId={deckId} />
-      </FadeInUp>
+      {hasCards ? addContentSection : null}
 
       <DeckCardsManager deckId={deckId} cards={cards ?? []} />
 
