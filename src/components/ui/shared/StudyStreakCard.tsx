@@ -2,7 +2,9 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import { Flame, Target, Trophy } from 'lucide-react';
+import { type CSSProperties } from 'react';
 import { ActivityHeatmap } from './ActivityHeatmap';
+import { motionSprings } from '@/lib/motion-configs';
 
 type StudyStreakCardProps = {
   streak: number;
@@ -60,16 +62,29 @@ export function StudyStreakCard({
           100,
           Math.round(((totalStudiedCards - level.min) / (nextLevelTarget - level.min)) * 100),
         );
+  const streakGlow =
+    streak >= 45
+      ? 'rgba(244, 63, 94, 0.32)'
+      : streak >= 21
+        ? 'rgba(251, 146, 60, 0.33)'
+        : streak >= 7
+          ? 'rgba(245, 158, 11, 0.3)'
+          : 'rgba(129, 140, 248, 0.24)';
 
   return (
     <motion.div
       initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.05 }}
+      transition={reduced ? { duration: 0 } : { ...motionSprings.listItem, delay: 0.05 }}
       className="glass-card glow-border rounded-2xl p-5 md:p-6"
     >
-      <div className="relative overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-background p-4 md:p-5">
+      <div
+        className="relative overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-background p-4 md:p-5"
+        style={{ '--streak-glow': streakGlow } as CSSProperties}
+      >
+        <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(90%_70%_at_8%_8%,var(--streak-glow),transparent_64%)]" />
         <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/15 blur-xl" />
+        <div className="pointer-events-none absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-[var(--streak-glow)] blur-2xl" />
 
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -149,7 +164,7 @@ export function StudyStreakCard({
               <motion.div
                 initial={reduced ? undefined : { width: 0 }}
                 animate={{ width: `${dailyGoalProgress}%` }}
-                transition={{ duration: 0.6, ease: 'easeOut' }}
+                transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
                 className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-primary"
               />
             </div>
@@ -164,7 +179,7 @@ export function StudyStreakCard({
               <motion.div
                 initial={reduced ? undefined : { width: 0 }}
                 animate={{ width: `${levelProgress}%` }}
-                transition={{ duration: 0.7, ease: 'easeOut' }}
+                transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
                 className="h-full rounded-full bg-gradient-to-r from-primary to-sky-400"
               />
             </div>

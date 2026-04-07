@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { BookOpen } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -8,12 +8,61 @@ import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
 import { FadeInUp } from '@/components/motion';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getCappedStaggerDelay, motionSprings } from '@/lib/motion-configs';
 
 function getMasteryBadgeClass(masteryPercentage: number) {
-  if (masteryPercentage >= 85) return 'border-sky-500/20 bg-sky-500/10 text-sky-300';
-  if (masteryPercentage >= 60) return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300';
-  if (masteryPercentage >= 30) return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+  if (masteryPercentage >= 85) return 'border-sky-500/30 bg-sky-500/15 text-sky-700 dark:text-sky-300';
+  if (masteryPercentage >= 60) return 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
+  if (masteryPercentage >= 30) return 'border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300';
   return 'border-primary/20 bg-primary/5 text-primary';
+}
+
+function getMasteryGlowColor(masteryPercentage: number, assessedCards: number) {
+  if (assessedCards === 0) return 'var(--glow)';
+  if (masteryPercentage >= 85) return 'rgba(56, 189, 248, 0.38)';
+  if (masteryPercentage >= 60) return 'rgba(16, 185, 129, 0.35)';
+  if (masteryPercentage >= 30) return 'rgba(245, 158, 11, 0.34)';
+  return 'rgba(99, 102, 241, 0.32)';
+}
+
+const TAG_ACCENTS: Array<{ tag: string; keywords: string[]; glow: string }> = [
+  { tag: 'ai', keywords: ['ai', 'ml', 'llm', 'neural'], glow: 'rgba(139, 92, 246, 0.36)' },
+  { tag: 'cs', keywords: ['algorithm', 'data structure', 'system', 'os', 'computer', 'programming'], glow: 'rgba(59, 130, 246, 0.36)' },
+  { tag: 'math', keywords: ['math', 'calculus', 'algebra', 'geometry', 'statistics'], glow: 'rgba(14, 165, 233, 0.36)' },
+  { tag: 'bio', keywords: ['biology', 'cell', 'anatomy', 'genetics', 'physiology'], glow: 'rgba(16, 185, 129, 0.36)' },
+  { tag: 'chem', keywords: ['chemistry', 'organic', 'reaction', 'molecule', 'stoichiometry'], glow: 'rgba(6, 182, 212, 0.35)' },
+  { tag: 'physics', keywords: ['physics', 'quantum', 'mechanics', 'thermo', 'electromagnetic'], glow: 'rgba(245, 158, 11, 0.35)' },
+  { tag: 'history', keywords: ['history', 'civilization', 'war', 'empire', 'revolution'], glow: 'rgba(249, 115, 22, 0.35)' },
+  { tag: 'language', keywords: ['language', 'vocab', 'grammar', 'spanish', 'french', 'english'], glow: 'rgba(236, 72, 153, 0.34)' },
+  { tag: 'law', keywords: ['law', 'legal', 'jurisprudence', 'contract'], glow: 'rgba(168, 85, 247, 0.34)' },
+  { tag: 'business', keywords: ['finance', 'economics', 'business', 'accounting', 'marketing'], glow: 'rgba(34, 197, 94, 0.34)' },
+];
+
+function getExplicitTag(title: string) {
+  const bracketTag = title.match(/\[([a-z0-9-]+)]/i)?.[1]?.toLowerCase();
+  if (bracketTag) return bracketTag;
+  const hashTag = title.match(/#([a-z0-9-]+)/i)?.[1]?.toLowerCase();
+  return hashTag ?? null;
+}
+
+function inferDeckTag(title: string, description?: string | null) {
+  const explicit = getExplicitTag(title);
+  if (explicit) return explicit;
+
+  const source = `${title} ${description ?? ''}`.toLowerCase();
+  for (const candidate of TAG_ACCENTS) {
+    if (candidate.keywords.some((keyword) => source.includes(keyword))) {
+      return candidate.tag;
+    }
+  }
+
+  return null;
+}
+
+function getTagGlowColor(tag: string | null) {
+  if (!tag) return null;
+  const match = TAG_ACCENTS.find((candidate) => candidate.tag === tag);
+  return match?.glow ?? 'rgba(129, 140, 248, 0.34)';
 }
 
 const deckDateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -26,6 +75,7 @@ const deckDateFormatter = new Intl.DateTimeFormat('en-US', {
 type DeckWithCount = {
   id: string;
   title: string;
+  description?: string | null;
   created_at: string;
   updated_at: string;
   cards: { count: number }[];
@@ -163,21 +213,28 @@ export function DeckGrid({ decks }: DeckGridProps) {
             {filtered.map((deck, i) => {
               const cardCount = deck.cards?.[0]?.count ?? 0;
               const modifiedAt = deck.updated_at || deck.created_at;
+              const inferredTag = inferDeckTag(deck.title, deck.description);
+              const tagGlow = getTagGlowColor(inferredTag);
+              const deckGlow = tagGlow ?? getMasteryGlowColor(deck.masteryPercentage, deck.assessedCards);
+              const deckStyle = {
+                '--deck-glow': deckGlow,
+              } as CSSProperties;
               return (
-                <motion.div 
+                <motion.div
                   key={deck.id}
                   layout
                   initial={{ opacity: 0, scale: 0.96, y: 24 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96, y: -24 }}
-                  transition={{ 
-                    type: 'spring', 
-                    stiffness: 260, 
-                    damping: 20,
-                    delay: Math.min(i * 0.05, 0.3) 
+                  transition={{
+                    ...motionSprings.listItem,
+                    delay: getCappedStaggerDelay(i),
                   }}
                 >
-                  <Card className="glass-card glow-border group relative rounded-2xl transition-all duration-300">
+                  <Card
+                    className="glass-card glow-border group relative rounded-2xl transition-all duration-300 hover:shadow-[0_0_30px_-10px_var(--deck-glow)]"
+                    style={deckStyle}
+                  >
                     <CardHeader>
                     <div className="flex justify-between items-start">
                       <Link
@@ -195,6 +252,15 @@ export function DeckGrid({ decks }: DeckGridProps) {
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getMasteryBadgeClass(deck.masteryPercentage)}`}>
                             {deck.assessedCards > 0 ? `${deck.masteryPercentage}% mastery` : 'No quiz data'}
                           </span>
+                          {inferredTag ? (
+                            <span
+                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+                              style={{ borderColor: deckGlow, backgroundColor: 'color-mix(in srgb, var(--deck-glow) 28%, transparent)', color: 'var(--foreground)' }}
+                            >
+                              {inferredTag}
+                            </span>
+                          ) : null}
+                          <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: deckGlow }} />
                         </CardDescription>
                       </Link>
                       <DeckActions

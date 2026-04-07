@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { motion, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion';
+import { motionSprings, tiltSpring } from '@/lib/motion-configs';
 
 type FlashcardProps = {
   question: string;
@@ -10,23 +11,38 @@ type FlashcardProps = {
 
 export function Flashcard({ question, answer }: FlashcardProps) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [supportsCursorTilt, setSupportsCursorTilt] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const prefersReducedMotion = useReducedMotion();
 
   // ─── Tilt-toward-cursor hover effect ───
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [8, -8]), {
-    stiffness: 300,
-    damping: 30,
-  });
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-8, 8]), {
-    stiffness: 300,
-    damping: 30,
-  });
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [8, -8]), tiltSpring);
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-8, 8]), tiltSpring);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const hoverQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const updateTiltAvailability = () => {
+      setSupportsCursorTilt(hoverQuery.matches && !prefersReducedMotion);
+    };
+
+    updateTiltAvailability();
+
+    if (typeof hoverQuery.addEventListener === 'function') {
+      hoverQuery.addEventListener('change', updateTiltAvailability);
+      return () => hoverQuery.removeEventListener('change', updateTiltAvailability);
+    }
+
+    hoverQuery.addListener(updateTiltAvailability);
+    return () => hoverQuery.removeListener(updateTiltAvailability);
+  }, [prefersReducedMotion]);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
-    if (!cardRef.current) return;
+    if (!supportsCursorTilt || !cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left) / rect.width - 0.5;
     const y = (e.clientY - rect.top) / rect.height - 0.5;
@@ -35,6 +51,7 @@ export function Flashcard({ question, answer }: FlashcardProps) {
   }
 
   function handleMouseLeave() {
+    if (!supportsCursorTilt) return;
     mouseX.set(0);
     mouseY.set(0);
   }
@@ -46,19 +63,19 @@ export function Flashcard({ question, answer }: FlashcardProps) {
       className="group w-full text-left perspective-1000"
       aria-label="Flip flashcard"
       aria-pressed={isFlipped}
-      whileTap={{ scale: 0.97 }}
+      whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
     >
       <motion.div
         ref={cardRef}
         className="relative h-56 w-full"
-        style={{ rotateX, rotateY, transformStyle: 'preserve-3d' }}
+        style={supportsCursorTilt ? { rotateX, rotateY, transformStyle: 'preserve-3d' } : { transformStyle: 'preserve-3d' }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
         <motion.div
           className="relative h-full w-full"
           animate={{ rotateY: isFlipped ? 180 : 0 }}
-          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          transition={prefersReducedMotion ? { duration: 0 } : motionSprings.flip}
           style={{ transformStyle: 'preserve-3d' }}
         >
           {/* Front face (Question) */}

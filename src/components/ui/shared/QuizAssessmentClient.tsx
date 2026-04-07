@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   ArrowLeft,
   Brain,
@@ -24,6 +24,7 @@ import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
 import type { QuizMode, StudySessionCard } from '@/lib/study';
 import { formatActionError } from '@/lib/ai-feedback';
+import { motionSprings } from '@/lib/motion-configs';
 import { toast } from 'sonner';
 
 type QuizAssessmentClientProps = {
@@ -91,6 +92,7 @@ export function QuizAssessmentClient({
   mode,
 }: QuizAssessmentClientProps) {
   const router = useRouter();
+  const reduced = useReducedMotion();
   const sessionCardIds = useMemo(() => cards.map((card) => card.id), [cards]);
   const storageKey = useMemo(
     () => `quiz-session:${deckId}:${mode}:${sessionCardIds.join('|')}`,
@@ -648,7 +650,7 @@ export function QuizAssessmentClient({
           <motion.div
             className="h-full rounded-full bg-primary"
             animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={{ type: 'spring', stiffness: 180, damping: 24 }}
+            transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
           />
         </div>
       </div>
@@ -699,6 +701,7 @@ export function QuizAssessmentClient({
             key="summary"
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={reduced ? { duration: 0 } : motionSprings.quizPanel}
             className="mx-auto max-w-4xl space-y-6"
           >
             <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
@@ -878,7 +881,7 @@ export function QuizAssessmentClient({
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -18 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            transition={reduced ? { duration: 0 } : motionSprings.quizPanel}
             className="mx-auto w-full max-w-2xl space-y-4"
           >
             {quizMode === 'mcq' ? (
@@ -928,13 +931,14 @@ export function QuizAssessmentClient({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={reduced ? { duration: 0 } : motionSprings.overlay}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-md"
           >
             <motion.div
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+              transition={reduced ? { duration: 0 } : motionSprings.modal}
               className="glass-card mx-4 w-full max-w-md rounded-3xl p-8 text-center"
             >
               <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Quiz Paused</p>

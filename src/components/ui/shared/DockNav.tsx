@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Layers, Brain, UserRound, LogOut } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { logout } from '@/app/auth/actions';
+import { motionSprings } from '@/lib/motion-configs';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Layers },
@@ -16,25 +17,30 @@ const navItems = [
 export function DockNav() {
   const pathname = usePathname();
   const [visible, setVisible] = useState(true);
-  const [lastY, setLastY] = useState(0);
+  const lastYRef = useRef(0);
   const [loggingOut, setLoggingOut] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     const onScroll = () => {
       const currentY = window.scrollY;
+      const delta = currentY - lastYRef.current;
+
       if (currentY < 20) {
         setVisible(true);
-      } else if (currentY > lastY) {
+      } else if (Math.abs(delta) >= 6 && delta > 0) {
         setVisible(false);
-      } else {
+      } else if (Math.abs(delta) >= 6) {
         setVisible(true);
       }
-      setLastY(currentY);
+
+      lastYRef.current = currentY;
     };
 
+    onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [lastY]);
+  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -48,11 +54,11 @@ export function DockNav() {
           initial={{ opacity: 0, y: 30, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 24, scale: 0.95 }}
-          transition={{ type: 'spring', stiffness: 280, damping: 24 }}
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2"
+          transition={prefersReducedMotion ? { duration: 0 } : motionSprings.dock}
+          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-50 w-[calc(100%-1.25rem)] max-w-fit -translate-x-1/2"
           aria-label="Primary navigation"
         >
-          <div className="glass-card flex items-center gap-1 rounded-2xl border border-primary/20 px-2 py-2 shadow-2xl">
+          <div className="glass-card mx-auto flex items-center gap-1 rounded-2xl border border-primary/20 px-2 py-2 shadow-2xl">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = item.href === '/dashboard'
@@ -86,7 +92,7 @@ export function DockNav() {
                     <motion.span
                       layoutId="dock-active"
                       className="absolute inset-0 rounded-xl border border-primary/30 bg-primary/10 shadow-[0_0_14px_-6px_var(--glow)]"
-                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                      transition={prefersReducedMotion ? { duration: 0 } : motionSprings.activePill}
                     />
                   )}
                   <Icon className="relative z-10 h-5 w-5" />

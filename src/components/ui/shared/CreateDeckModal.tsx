@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createDeck } from '@/app/actions';
@@ -9,6 +9,7 @@ import { createDeckSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { motionSprings } from '@/lib/motion-configs';
 import { toast } from 'sonner';
 
 type CreateDeckModalProps = {
@@ -25,6 +26,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const reduced = useReducedMotion();
 
   useEffect(() => {
     if (open) {
@@ -80,7 +82,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
               initial={{ opacity: 0, rotateX: -6, y: 6 }}
               animate={{ opacity: 1, rotateX: 0, y: 0 }}
               exit={{ opacity: 0, rotateX: 6, y: -6 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
+              transition={reduced ? { duration: 0 } : motionSprings.modal}
               className="relative flex h-full flex-col justify-between gap-3"
             >
               <div className="flex items-start justify-between gap-3">
@@ -120,7 +122,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
               initial={{ opacity: 0, rotateX: 6, y: 6 }}
               animate={{ opacity: 1, rotateX: 0, y: 0 }}
               exit={{ opacity: 0, rotateX: -6, y: -6 }}
-              transition={{ duration: 0.22, ease: 'easeOut' }}
+              transition={reduced ? { duration: 0 } : motionSprings.modal}
               className="relative flex h-full flex-col justify-between gap-3"
               role="dialog"
               aria-modal="false"

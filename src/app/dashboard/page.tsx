@@ -11,7 +11,14 @@ import { isMissingTableError } from '@/lib/supabase-errors';
 import { Layers } from 'lucide-react';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-type DashboardDeckRow = { id: string; title: string; created_at: string; updated_at: string; cards: { count: number }[] };
+type DashboardDeckRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  cards: { count: number }[];
+};
 
 async function loadLegacyDeckMastery(
   supabase: SupabaseServerClient,
@@ -80,7 +87,7 @@ async function loadLegacyDeckMastery(
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: relationalDecks, error: relationalDecksError } = await supabase
     .from('decks')
-    .select('id, title, created_at, updated_at, cards(count)')
+    .select('id, title, description, created_at, updated_at, cards(count)')
     .order('created_at', { ascending: false });
 
   if (!relationalDecksError) {
@@ -93,7 +100,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
 
   const { data: decks, error: decksError } = await supabase
     .from('decks')
-    .select('id, title, created_at, updated_at')
+    .select('id, title, description, created_at, updated_at')
     .order('created_at', { ascending: false });
 
   if (decksError || !decks) {
@@ -119,6 +126,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
       const deckRowsWithoutCounts: DashboardDeckRow[] = decks.map((deck) => ({
         id: deck.id,
         title: deck.title,
+        description: deck.description,
         created_at: deck.created_at,
         updated_at: deck.updated_at,
         cards: [{ count: 0 }],
@@ -140,6 +148,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const deckRows: DashboardDeckRow[] = decks.map((deck) => ({
     id: deck.id,
     title: deck.title,
+    description: deck.description,
     created_at: deck.created_at,
     updated_at: deck.updated_at,
     cards: [{ count: cardsByDeck.get(deck.id) ?? 0 }],

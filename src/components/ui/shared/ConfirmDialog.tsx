@@ -1,9 +1,10 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useRef, useCallback } from 'react';
+import { motionSprings } from '@/lib/motion-configs';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -31,6 +32,7 @@ export function ConfirmDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const reduced = useReducedMotion();
 
   // Capture the trigger element on open, auto-focus cancel, restore focus on close
   useEffect(() => {
@@ -95,7 +97,7 @@ export function ConfirmDialog({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={reduced ? { duration: 0 } : motionSprings.overlay}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => !loading && onOpenChange(false)}
           />
@@ -105,7 +107,7 @@ export function ConfirmDialog({
             initial={{ opacity: 0, scale: 0.92, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 10 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            transition={reduced ? { duration: 0 } : motionSprings.modal}
             ref={dialogRef}
             className="glass-card relative z-10 mx-4 w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-primary/15 p-6 shadow-2xl"
             role="alertdialog"

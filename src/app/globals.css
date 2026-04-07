@@ -55,13 +55,15 @@
   --accent: #ede9fe;
   --accent-foreground: #1e293b;
   --destructive: #ef4444;
-  --border: rgba(15, 23, 42, 0.08);
-  --input: rgba(15, 23, 42, 0.08);
+  --border: rgba(15, 23, 42, 0.12);
+  --input: rgba(15, 23, 42, 0.12);
   --ring: #3b82f6;
   --neon: #6366f1;
   --neon-foreground: #ffffff;
   --glow: rgba(99, 102, 241, 0.25);
-  --shadow-base: rgba(15, 23, 42, 0.08); /* Lighter shadow for light mode */
+  --shadow-base: rgba(15, 23, 42, 0.14); /* Lighter shadow for light mode */
+  --skeleton-base: rgba(148, 163, 184, 0.2);
+  --skeleton-shine: rgba(99, 102, 241, 0.24);
 }
 
 /* ─── Dark Mode: "Deep Navy" (#020617) ─── */
@@ -89,6 +91,8 @@
   --neon-foreground: #020617;
   --glow: rgba(129, 140, 248, 0.35);
   --shadow-base: rgba(0, 0, 0, 0.35); /* Darker shadow for dark mode */
+  --skeleton-base: rgba(148, 163, 184, 0.18);
+  --skeleton-shine: rgba(129, 140, 248, 0.22);
 }
 
 @layer base {
@@ -168,6 +172,7 @@
   border: 1px solid var(--border);
   box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.05),
               0 4px 16px -4px var(--shadow-base);
+  transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
 .glass-card:hover {
@@ -195,6 +200,28 @@
   border-color: rgba(99, 102, 241, 0.4);
   box-shadow: 0 0 16px -4px var(--glow),
               0 4px 12px -4px var(--shadow-base);
+}
+
+.glass-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--skeleton-base);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+
+.glass-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 18%, var(--skeleton-shine) 50%, transparent 82%);
+  transform: translateX(-120%);
+  animation: glass-shimmer 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes glass-shimmer {
+  to {
+    transform: translateX(120%);
+  }
 }
 
 .sonner-toast {
@@ -242,6 +269,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .glass-skeleton::after {
+    animation: none;
   }
 }
 
