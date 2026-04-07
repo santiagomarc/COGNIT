@@ -141,7 +141,8 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   if (cardsError) {
-    throw new Error(cardsError.message);
+    console.error('[deck-page] failed to read cards:', cardsError.code, cardsError.message);
+    throw new Error('Failed to load deck cards.');
   }
 
   const totalCards = cards?.length ?? 0;

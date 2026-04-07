@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
 import { normalizeSessionCardCount, type StudySessionCard } from '@/lib/study';
+import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 
 type StudyPageProps = {
   params: Promise<{
@@ -64,7 +65,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     back: c.back,
     state: (c.state ?? 'new') as 'new' | 'learning' | 'review' | 'relearning',
     interval: c.interval ?? 0,
-    ease_factor: c.ease_factor ?? 2.5,
+    ease_factor: c.ease_factor ?? DEFAULT_EASE_FACTOR,
     repetition_count: c.repetition_count ?? 0,
     mcq_distractors: Array.isArray(c.mcq_distractors) ? c.mcq_distractors.filter((value): value is string => typeof value === 'string') : null,
     id_question: typeof c.id_question === 'string' ? c.id_question : null,

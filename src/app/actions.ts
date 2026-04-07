@@ -13,11 +13,12 @@ import {
   sanitizeNotesSchema, SanitizeNotesInput,
   getHintSchema, GetHintInput,
 } from '@/lib/schemas';
-import { sm2, GRADE_MAP, type StudyGrade } from '@/lib/sm2';
+import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath } from 'next/cache';
 import { isMissingColumnError, isMissingTableError } from '@/lib/supabase-errors';
+import { sanitizeAiServiceError, sanitizeDatabaseError } from '@/lib/server-errors';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 
@@ -534,7 +535,10 @@ export async function createDeck(data: CreateDeckInput) {
     .single();
 
   if (error || !deck) {
-    return { error: error?.message ?? 'Failed to create deck.' };
+    if (error) {
+      console.error('[createDeck] db error:', error.code, error.message);
+    }
+    return { error: sanitizeDatabaseError(error, 'Failed to create deck.') };
   }
 
   // 4. Refresh the UI
@@ -557,7 +561,8 @@ export async function deleteDeck(deckId: string) {
     .eq('user_id', user.id); // Security: Ensure user owns the deck
 
   if (error) {
-    return { error: error.message };
+    console.error('[deleteDeck] db error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to delete deck.') };
   }
 
   revalidatePath('/dashboard');
@@ -583,7 +588,8 @@ export async function updateDeck(deckId: string, title: string) {
     .eq('user_id', user.id);
 
   if (error) {
-    return { error: error.message };
+    console.error('[updateDeck] db error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to update deck.') };
   }
 
   revalidatePath('/dashboard');
@@ -616,7 +622,8 @@ export async function createCard(data: CreateCardInput) {
     .single();
 
   if (error) {
-    return { error: error.message };
+    console.error('[createCard] db error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to create card.') };
   }
 
   await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
@@ -664,7 +671,8 @@ export async function updateCard(data: UpdateCardInput) {
     .eq('deck_id', result.data.deck_id);
 
   if (error) {
-    return { error: error.message };
+    console.error('[updateCard] db error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to update card.') };
   }
 
   await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
@@ -700,7 +708,8 @@ export async function bulkImportCards(data: BulkImportInput) {
     .select('id');
 
   if (error) {
-    return { error: error.message };
+    console.error('[bulkImportCards] db error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to import cards.') };
   }
 
   await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
@@ -735,7 +744,8 @@ export async function enrichCards(data: EnrichCardsInput) {
     .in('id', uniqueCardIds);
 
   if (error) {
-    return { error: error.message };
+    console.error('[enrichCards] cards fetch error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to load cards for enrichment.') };
   }
 
   const pendingCards = (cards ?? []).filter((card) => !card.id_question || !Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2);
@@ -868,7 +878,8 @@ export async function deleteCard(cardId: string, deckId: string) {
     .eq('deck_id', deckId);
 
   if (error) {
-    return { error: error.message };
+    console.error('[deleteCard] db error:', error.code, error.message);
+    return { error: sanitizeDatabaseError(error, 'Failed to delete card.') };
   }
 
   await touchDeckUpdatedAt(supabase, deckId, user.id);
@@ -921,7 +932,8 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   });
 
   if (rpcError && !isMissingDatabaseFunctionError(rpcError.message, 'delete_owned_cards_batch')) {
-    return { error: rpcError.message };
+    console.error('[bulkDeleteCards] rpc error:', rpcError.code, rpcError.message);
+    return { error: sanitizeDatabaseError(rpcError, 'Failed to delete selected cards.') };
   }
 
   if (!rpcError) {
@@ -939,7 +951,8 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
       .select('id');
 
     if (error) {
-      return { error: error.message };
+      console.error('[bulkDeleteCards] fallback delete error:', error.code, error.message);
+      return { error: sanitizeDatabaseError(error, 'Failed to delete selected cards.') };
     }
 
     deletedCount = deletedRows?.length ?? 0;
@@ -1008,7 +1021,7 @@ export async function gradeCard(data: GradeCardInput) {
   const numericGrade = GRADE_MAP[result.data.grade as StudyGrade];
   const sm2Result = sm2(numericGrade, {
     repetitionCount: card.repetition_count ?? 0,
-    easeFactor: card.ease_factor ?? 2.5,
+    easeFactor: card.ease_factor ?? DEFAULT_EASE_FACTOR,
     interval: card.interval ?? 0,
     state: (card.state as CardState) ?? 'new',
   });
@@ -1067,7 +1080,8 @@ export async function logQuizResult(data: LogQuizResultInput) {
     .in('id', uniqueCardIds);
 
   if (ownedCardsError) {
-    return { error: ownedCardsError.message };
+    console.error('[logQuizResult] owned cards fetch error:', ownedCardsError.code, ownedCardsError.message);
+    return { error: sanitizeDatabaseError(ownedCardsError, 'Failed to validate quiz cards.') };
   }
 
   const cardsById = new Map((ownedCards ?? []).map((card) => [card.id, card]));
@@ -1136,7 +1150,10 @@ export async function logQuizResult(data: LogQuizResultInput) {
   const { data: insertedQuizResult, error: quizResultError } = quizResultInsert;
 
   if (quizResultError || !insertedQuizResult) {
-    return { error: quizResultError?.message ?? 'Failed to save quiz result.' };
+    if (quizResultError) {
+      console.error('[logQuizResult] quiz result insert error:', quizResultError.code, quizResultError.message);
+    }
+    return { error: sanitizeDatabaseError(quizResultError, 'Failed to save quiz result.') };
   }
 
   const { error: quizCardResultsError } = await supabase
@@ -1153,7 +1170,8 @@ export async function logQuizResult(data: LogQuizResultInput) {
     );
 
   if (quizCardResultsError) {
-    return { error: quizCardResultsError.message };
+    console.error('[logQuizResult] quiz card results insert error:', quizCardResultsError.code, quizCardResultsError.message);
+    return { error: sanitizeDatabaseError(quizCardResultsError, 'Failed to save quiz details.') };
   }
 
   const attemptTimestamp = insertedQuizResult.created_at ?? new Date().toISOString();
@@ -1412,9 +1430,9 @@ export async function generateCards(formData: FormData) {
     console.error('[generateCards] Gemini error:', msg);
     // Surface quota / rate-limit errors clearly instead of a generic message
     if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests')) {
-      return { error: 'Gemini free-tier quota exceeded for today. Enable billing at ai.google.dev or try again tomorrow.' };
+      return { error: 'AI is under heavy demand right now. Please try again in a little while.' };
     }
-    return { error: `AI generation failed: ${msg}` };
+    return { error: sanitizeAiServiceError(msg, 'AI generation failed. Please try again shortly.') };
   }
 
   // ── 7. Batch insert into the cards table ──
@@ -1430,7 +1448,8 @@ export async function generateCards(formData: FormData) {
     .insert(rows)
     .select('id');
   if (insertErr) {
-    return { error: 'Cards were generated but failed to save: ' + insertErr.message };
+    console.error('[generateCards] insert error:', insertErr.code, insertErr.message);
+    return { error: sanitizeDatabaseError(insertErr, 'Cards were generated but failed to save.') };
   }
 
   await touchDeckUpdatedAt(supabase, parsed.data.deck_id, user.id);
@@ -1498,7 +1517,7 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[sanitizeNotes] Gemini error:', message);
-    return { error: `AI cleaning failed: ${message}` };
+    return { error: sanitizeAiServiceError(message, 'AI cleaning failed. Please try again shortly.') };
   }
 }
 
@@ -1566,7 +1585,7 @@ export async function getHint(data: GetHintInput) {
   } catch (hintError) {
     const message = hintError instanceof Error ? hintError.message : String(hintError);
     console.error('[getHint] Gemini error:', message);
-    return { error: `Hint generation failed: ${message}` };
+    return { error: sanitizeAiServiceError(message, 'Hint generation failed. Please try again shortly.') };
   }
 }
 

@@ -58,7 +58,7 @@ export interface SM2Output {
 // ── Constants ──
 
 const MIN_EASE_FACTOR = 1.3;
-const DEFAULT_EASE_FACTOR = 2.5;
+export const DEFAULT_EASE_FACTOR = 2.5;
 const LEARNING_STEPS_MINUTES = [1, 10]; // minutes until first real review
 const MAX_INTERVAL_DAYS = 365;
 

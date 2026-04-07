@@ -143,6 +143,7 @@ export function FlashcardReviewClient({
     }
   });
   const [isPending, startTransition] = useTransition();
+  const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
 
   const cardStart = useRef(sessionStartMs);
 
@@ -172,30 +173,35 @@ export function FlashcardReviewClient({
 
   const commitGrade = useCallback(
     (grade: StudyGrade) => {
-      if (!active || isPending) return;
+      if (!active || isPending || isSubmittingGrade) return;
       const durationMs = Date.now() - cardStart.current;
+      setIsSubmittingGrade(true);
 
       startTransition(async () => {
-        const result = await gradeCard({
-          card_id: active.id,
-          deck_id: deckId,
-          grade,
-          duration_ms: durationMs,
-        });
+        try {
+          const result = await gradeCard({
+            card_id: active.id,
+            deck_id: deckId,
+            grade,
+            duration_ms: durationMs,
+          });
 
-        if (result?.error) {
-          toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
-          return;
+          if (result?.error) {
+            toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
+            return;
+          }
+
+          setGradeLog((prev) => [...prev, grade]);
+          setShowAnswer(false);
+          setIndex((prev) => prev + 1);
+          cardStart.current = Date.now();
+          setNowMs(Date.now());
+        } finally {
+          setIsSubmittingGrade(false);
         }
-
-        setGradeLog((prev) => [...prev, grade]);
-        setShowAnswer(false);
-        setIndex((prev) => prev + 1);
-        cardStart.current = Date.now();
-        setNowMs(Date.now());
       });
     },
-    [active, deckId, isPending, startTransition]
+    [active, deckId, isPending, isSubmittingGrade, startTransition]
   );
 
   const clearStoredProgress = useCallback(() => {
@@ -566,7 +572,7 @@ export function FlashcardReviewClient({
                       key={button.grade}
                       type="button"
                       onClick={() => commitGrade(button.grade)}
-                      disabled={isPending}
+                      disabled={isPending || isSubmittingGrade}
                       className={`flex flex-col items-center gap-1 rounded-xl border ${button.borderColor} ${button.bgColor} px-3 py-3 transition-all duration-150 disabled:opacity-50`}
                     >
                       <span className={`text-sm font-semibold ${button.color}`}>{button.label}</span>

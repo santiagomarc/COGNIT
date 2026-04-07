@@ -9,6 +9,7 @@ import {
   type QuizMode,
   type StudySessionCard,
 } from '@/lib/study';
+import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { isMissingTableError } from '@/lib/supabase-errors';
 
 type QuizPageProps = {
@@ -49,7 +50,7 @@ function toStudyCard(card: {
     back: card.back,
     state: (card.state ?? 'new') as StudySessionCard['state'],
     interval: card.interval ?? 0,
-    ease_factor: card.ease_factor ?? 2.5,
+    ease_factor: card.ease_factor ?? DEFAULT_EASE_FACTOR,
     repetition_count: card.repetition_count ?? 0,
     mcq_distractors: Array.isArray(card.mcq_distractors)
       ? card.mcq_distractors.filter((value): value is string => typeof value === 'string')
