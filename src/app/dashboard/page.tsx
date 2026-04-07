@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
@@ -18,6 +19,18 @@ type DashboardDeckRow = {
   created_at: string;
   updated_at: string;
   cards: { count: number }[];
+};
+
+type DashboardSnapshot = {
+  deckRows: DashboardDeckRow[];
+  deckQueryUsedFallback: boolean;
+  deckQueryErrorMessage: string | null;
+  dueCards: Array<{ id: string; deck_id: string }>;
+  studyDays: Array<{ created_at: string }>;
+  recentActivityLogs: Array<{ created_at: string }>;
+  totalStudiedCards: number;
+  masteryStateRows: Array<{ deck_id: string; correct: boolean; last_quiz_at: string }>;
+  masteryStateErrorMessage: string | null;
 };
 
 async function loadLegacyDeckMastery(
@@ -161,14 +174,8 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   };
 }
 
-export default async function Dashboard() {
+async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
   const now = new Date();
   const nowIso = now.toISOString();
   const sixMonthsAgo = new Date(now);
@@ -194,26 +201,70 @@ export default async function Dashboard() {
     supabase
       .from('study_logs')
       .select('created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(5000),
     supabase
       .from('study_logs')
       .select('created_at')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .gte('created_at', sixMonthsAgo.toISOString())
       .order('created_at', { ascending: true })
       .limit(10000),
     supabase
       .from('study_logs')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id),
+      .eq('user_id', userId),
     supabase
       .from('card_mastery_state')
       .select('deck_id, correct, last_quiz_at')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .limit(20000),
   ]);
+
+  return {
+    deckRows,
+    deckQueryUsedFallback,
+    deckQueryErrorMessage,
+    dueCards: dueCards ?? [],
+    studyDays: studyDays ?? [],
+    recentActivityLogs: recentActivityLogs ?? [],
+    totalStudiedCards: totalStudiedCards ?? 0,
+    masteryStateRows: masteryStateRows ?? [],
+    masteryStateErrorMessage: masteryStateError?.message ?? null,
+  };
+}
+
+function getCachedDashboardSnapshot(userId: string) {
+  return unstable_cache(
+    () => loadDashboardSnapshot(userId),
+    [`dashboard-snapshot:${userId}`],
+    {
+      revalidate: 60,
+      tags: [`dashboard:${userId}`],
+    }
+  )();
+}
+
+export default async function Dashboard() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect('/login');
+  }
+
+  const {
+    deckRows,
+    deckQueryUsedFallback,
+    deckQueryErrorMessage,
+    dueCards,
+    studyDays,
+    recentActivityLogs,
+    totalStudiedCards,
+    masteryStateRows,
+    masteryStateErrorMessage,
+  } = await getCachedDashboardSnapshot(user.id);
 
   if (deckQueryUsedFallback && deckQueryErrorMessage) {
     console.warn('[dashboard] relational deck count query failed, fallback was used:', deckQueryErrorMessage);
@@ -259,14 +310,14 @@ export default async function Dashboard() {
     masteryByDeck.set(row.deck_id, existing);
   }
 
-  if (masteryStateError) {
-    if (isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
+  if (masteryStateErrorMessage) {
+    if (isMissingTableError(masteryStateErrorMessage, 'card_mastery_state')) {
       const legacyMasteryByDeck = await loadLegacyDeckMastery(supabase, user.id, totalCardsByDeck);
       for (const [deckId, snapshot] of legacyMasteryByDeck.entries()) {
         masteryByDeck.set(deckId, snapshot);
       }
     } else {
-      console.error('[dashboard] failed to read card mastery state:', masteryStateError.message);
+      console.error('[dashboard] failed to read card mastery state:', masteryStateErrorMessage);
     }
   }
 
@@ -365,7 +416,7 @@ export default async function Dashboard() {
             streak={streak}
             longestStreak={longestStreak}
             studiedToday={studiedToday}
-            totalStudiedCards={totalStudiedCards ?? 0}
+            totalStudiedCards={totalStudiedCards}
             todayStudiedCount={todayStudiedCount}
             todayIso={today}
             activity={activity}

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
+import { unstable_cache } from 'next/cache';
 import { ArrowLeft, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
@@ -15,8 +16,37 @@ import { Input } from '@/components/ui/input';
 import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { getSessionCardBounds } from '@/lib/study';
+import type { CardSource } from '@/index';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+type DeckDetailSnapshot = {
+  deck: {
+    id: string;
+    title: string;
+    description: string | null;
+    created_at: string;
+  } | null;
+  deckErrorMessage: string | null;
+  cards: Array<{
+    id: string;
+    deck_id: string;
+    front: string;
+    back: string;
+    created_at: string;
+    source: CardSource | null;
+    imported_by: string | null;
+    mcq_distractors: string[] | null;
+    id_question: string | null;
+  }>;
+  cardsErrorMessage: string | null;
+  cardsErrorCode: string | null;
+  masteryRows: Array<{
+    correct: boolean;
+    last_quiz_at: string;
+  }>;
+  masteryRowsErrorMessage: string | null;
+};
 
 async function loadLegacyDeckMastery(
   supabase: SupabaseServerClient,
@@ -94,6 +124,53 @@ function formatLastQuizLabel(lastQuizAt: string | null) {
   return `Last quizzed ${dayDiff} days ago`;
 }
 
+async function loadDeckDetailSnapshot(userId: string, deckId: string): Promise<DeckDetailSnapshot> {
+  const supabase = await createClient();
+
+  const [
+    { data: deck, error: deckError },
+    { data: cards, error: cardsError },
+    { data: masteryRows, error: masteryRowsError },
+  ] = await Promise.all([
+    supabase
+      .from('decks')
+      .select('id, title, description, created_at')
+      .eq('id', deckId)
+      .single(),
+    supabase
+      .from('cards')
+      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question')
+      .eq('deck_id', deckId)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('card_mastery_state')
+      .select('correct, last_quiz_at')
+      .eq('user_id', userId)
+      .eq('deck_id', deckId),
+  ]);
+
+  return {
+    deck,
+    deckErrorMessage: deckError?.message ?? null,
+    cards: cards ?? [],
+    cardsErrorMessage: cardsError?.message ?? null,
+    cardsErrorCode: cardsError?.code ?? null,
+    masteryRows: masteryRows ?? [],
+    masteryRowsErrorMessage: masteryRowsError?.message ?? null,
+  };
+}
+
+function getCachedDeckDetailSnapshot(userId: string, deckId: string) {
+  return unstable_cache(
+    () => loadDeckDetailSnapshot(userId, deckId),
+    [`deck-detail:${deckId}:${userId}`],
+    {
+      revalidate: 60,
+      tags: [`deck:${deckId}`, `dashboard:${userId}`],
+    }
+  )();
+}
+
 type DeckDetailPageProps = {
   params: Promise<{
     deckId: string;
@@ -115,45 +192,35 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   const [
-    { data: deck, error: deckError },
-    { data: cards, error: cardsError },
-    { data: masteryRows, error: masteryRowsError },
-  ] = await Promise.all([
-    supabase
-      .from('decks')
-      .select('id, title, description, created_at')
-      .eq('id', deckId)
-      .single(),
-    supabase
-      .from('cards')
-      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question')
-      .eq('deck_id', deckId)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('card_mastery_state')
-      .select('correct, last_quiz_at')
-      .eq('user_id', user.id)
-      .eq('deck_id', deckId),
-  ]);
+    {
+      deck,
+      deckErrorMessage,
+      cards,
+      cardsErrorMessage,
+      cardsErrorCode,
+      masteryRows,
+      masteryRowsErrorMessage,
+    },
+  ] = await Promise.all([getCachedDeckDetailSnapshot(user.id, deckId)]);
 
-  if (deckError || !deck) {
+  if (deckErrorMessage || !deck) {
     notFound();
   }
 
-  if (cardsError) {
-    console.error('[deck-page] failed to read cards:', cardsError.code, cardsError.message);
+  if (cardsErrorMessage) {
+    console.error('[deck-page] failed to read cards:', cardsErrorCode, cardsErrorMessage);
     throw new Error('Failed to load deck cards.');
   }
 
-  const totalCards = cards?.length ?? 0;
+  const totalCards = cards.length;
   const sessionBounds = getSessionCardBounds(totalCards);
-  const quizReadyCards = (cards ?? []).filter(
+  const quizReadyCards = cards.filter(
     (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
   ).length;
 
   let lastQuizAt: string | null = null;
   let masteredCards = 0;
-  for (const row of masteryRows ?? []) {
+  for (const row of masteryRows) {
     if (row.correct) {
       masteredCards += 1;
     }
@@ -163,13 +230,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     }
   }
 
-  if (masteryRowsError) {
-    if (isMissingTableError(masteryRowsError.message, 'card_mastery_state')) {
+  if (masteryRowsErrorMessage) {
+    if (isMissingTableError(masteryRowsErrorMessage, 'card_mastery_state')) {
       const fallback = await loadLegacyDeckMastery(supabase, user.id, deckId, totalCards);
       masteredCards = fallback.masteredCards;
       lastQuizAt = fallback.lastQuizAt;
     } else {
-      console.error('[deck-page] failed to read card mastery state:', masteryRowsError.message);
+      console.error('[deck-page] failed to read card mastery state:', masteryRowsErrorMessage);
     }
   }
 
@@ -396,7 +463,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       {hasCards ? addContentSection : null}
 
-      <DeckCardsManager deckId={deckId} cards={cards ?? []} />
+      <DeckCardsManager deckId={deckId} cards={cards} />
 
       <FadeInUp delay={0.2}>
         <Suspense fallback={<QuizHistorySkeleton />}>
