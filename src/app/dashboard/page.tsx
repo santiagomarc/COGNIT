@@ -6,8 +6,9 @@ import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
+import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
 import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
-import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingTableError } from '@/lib/supabase-errors';
 import { Layers } from 'lucide-react';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -18,11 +19,6 @@ type DashboardDeckRow = {
   created_at: string;
   updated_at: string;
   cards: { count: number }[];
-};
-
-type DueCardsByDeckRow = {
-  deck_id: string;
-  due_count: number;
 };
 
 type DashboardSnapshot = {
@@ -36,46 +32,6 @@ type DashboardSnapshot = {
   masteryStateRows: Array<{ deck_id: string; correct: boolean; last_quiz_at: string }>;
   masteryStateErrorMessage: string | null;
 };
-
-async function loadDueByDeckRows(
-  supabase: SupabaseServerClient,
-  userId: string,
-  nowIso: string,
-): Promise<DueCardsByDeckRow[]> {
-  const { data: dueBreakdownRows, error: dueBreakdownError } = await supabase.rpc('get_due_cards_by_deck', {
-    p_user_id: userId,
-    p_now: nowIso,
-  });
-
-  if (dueBreakdownError && !isMissingDatabaseFunctionError(dueBreakdownError.message, 'get_due_cards_by_deck')) {
-    console.error('[dashboard] failed to read due cards breakdown:', dueBreakdownError.code, dueBreakdownError.message);
-    return [];
-  }
-
-  if (!dueBreakdownError) {
-    return (dueBreakdownRows ?? []).map((row: { deck_id: string; due_count: number | string | null }) => ({
-      deck_id: row.deck_id,
-      due_count: Number(row.due_count ?? 0),
-    }));
-  }
-
-  const { data: dueCards, error: dueCardsError } = await supabase
-    .from('cards')
-    .select('deck_id')
-    .lte('next_review_at', nowIso);
-
-  if (dueCardsError) {
-    console.error('[dashboard] fallback due cards query failed:', dueCardsError.message);
-    return [];
-  }
-
-  const dueByDeck = new Map<string, number>();
-  for (const row of dueCards ?? []) {
-    dueByDeck.set(row.deck_id, (dueByDeck.get(row.deck_id) ?? 0) + 1);
-  }
-
-  return Array.from(dueByDeck.entries()).map(([deck_id, due_count]) => ({ deck_id, due_count }));
-}
 
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: relationalDecks, error: relationalDecksError } = await supabase
