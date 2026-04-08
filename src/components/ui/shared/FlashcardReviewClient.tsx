@@ -175,7 +175,16 @@ export function FlashcardReviewClient({
     (grade: StudyGrade) => {
       if (!active || isPending || isSubmittingGrade) return;
       const durationMs = Date.now() - cardStart.current;
+      const previousIndex = index;
+      const previousShowAnswer = showAnswer;
       setIsSubmittingGrade(true);
+
+      // Optimistically advance to the next card for snappier grading UX.
+      setGradeLog((prev) => [...prev, grade]);
+      setShowAnswer(false);
+      setIndex((prev) => prev + 1);
+      cardStart.current = Date.now();
+      setNowMs(Date.now());
 
       startTransition(async () => {
         try {
@@ -188,20 +197,21 @@ export function FlashcardReviewClient({
 
           if (result?.error) {
             toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
+
+            // Roll back optimistic UI progression when persistence fails.
+            setIndex(previousIndex);
+            setShowAnswer(previousShowAnswer);
+            setGradeLog((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
+            cardStart.current = Date.now();
+            setNowMs(Date.now());
             return;
           }
-
-          setGradeLog((prev) => [...prev, grade]);
-          setShowAnswer(false);
-          setIndex((prev) => prev + 1);
-          cardStart.current = Date.now();
-          setNowMs(Date.now());
         } finally {
           setIsSubmittingGrade(false);
         }
       });
     },
-    [active, deckId, isPending, isSubmittingGrade, startTransition]
+    [active, deckId, index, isPending, isSubmittingGrade, showAnswer, startTransition]
   );
 
   const clearStoredProgress = useCallback(() => {

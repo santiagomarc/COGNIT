@@ -23,3 +23,8 @@ export function isMissingColumnError(message: string, columnName: string) {
 
   return referencesColumn && indicatesMissingColumn;
 }
+
+export function isMissingDatabaseFunctionError(message: string, functionName: string) {
+  const normalized = message.toLowerCase();
+  return normalized.includes(functionName.toLowerCase()) && normalized.includes('does not exist');
+}

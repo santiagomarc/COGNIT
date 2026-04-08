@@ -1,14 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { unstable_cache } from 'next/cache';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
-import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
-import { isMissingTableError } from '@/lib/supabase-errors';
+import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
+import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { Layers } from 'lucide-react';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -21,11 +20,16 @@ type DashboardDeckRow = {
   cards: { count: number }[];
 };
 
+type DueCardsByDeckRow = {
+  deck_id: string;
+  due_count: number;
+};
+
 type DashboardSnapshot = {
   deckRows: DashboardDeckRow[];
   deckQueryUsedFallback: boolean;
   deckQueryErrorMessage: string | null;
-  dueCards: Array<{ id: string; deck_id: string }>;
+  dueByDeckRows: DueCardsByDeckRow[];
   studyDays: Array<{ created_at: string }>;
   recentActivityLogs: Array<{ created_at: string }>;
   totalStudiedCards: number;
@@ -33,68 +37,44 @@ type DashboardSnapshot = {
   masteryStateErrorMessage: string | null;
 };
 
-async function loadLegacyDeckMastery(
+async function loadDueByDeckRows(
   supabase: SupabaseServerClient,
   userId: string,
-  totalCardsByDeck: Map<string, number>,
-) {
-  const deckIds = Array.from(totalCardsByDeck.keys());
-  if (deckIds.length === 0) {
-    return new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();
-  }
-
-  const { data: quizResults, error: quizResultsError } = await supabase
-    .from('quiz_results')
-    .select('id, deck_id, created_at')
-    .eq('user_id', userId)
-    .in('deck_id', deckIds)
-    .order('created_at', { ascending: false })
-    .limit(20000);
-
-  if (quizResultsError || !quizResults) {
-    console.error('[dashboard] failed to read legacy quiz results:', quizResultsError?.message);
-    return new Map();
-  }
-
-  if (quizResults.length === 0) {
-    return new Map();
-  }
-
-  const quizCardResults: { quiz_result_id: string; card_id: string; correct: boolean }[] = [];
-  const quizResultIds = quizResults.map((row) => row.id);
-  const chunkSize = 500;
-
-  for (let index = 0; index < quizResultIds.length; index += chunkSize) {
-    const chunk = quizResultIds.slice(index, index + chunkSize);
-    const { data, error } = await supabase
-      .from('quiz_card_results')
-      .select('quiz_result_id, card_id, correct')
-      .in('quiz_result_id', chunk);
-
-    if (error) {
-      console.error('[dashboard] failed to read legacy quiz card results:', error.message);
-      return new Map();
-    }
-
-    quizCardResults.push(...(data ?? []));
-  }
-
-  const snapshots = computeDeckMasterySnapshots({
-    totalCardsByDeck,
-    quizResults,
-    quizCardResults,
+  nowIso: string,
+): Promise<DueCardsByDeckRow[]> {
+  const { data: dueBreakdownRows, error: dueBreakdownError } = await supabase.rpc('get_due_cards_by_deck', {
+    p_user_id: userId,
+    p_now: nowIso,
   });
 
-  const masteryByDeck = new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();
-  for (const [deckId, snapshot] of snapshots.entries()) {
-    masteryByDeck.set(deckId, {
-      assessedCards: snapshot.assessedCards,
-      masteredCards: snapshot.masteredCards,
-      lastQuizAt: snapshot.lastQuizAt,
-    });
+  if (dueBreakdownError && !isMissingDatabaseFunctionError(dueBreakdownError.message, 'get_due_cards_by_deck')) {
+    console.error('[dashboard] failed to read due cards breakdown:', dueBreakdownError.code, dueBreakdownError.message);
+    return [];
   }
 
-  return masteryByDeck;
+  if (!dueBreakdownError) {
+    return (dueBreakdownRows ?? []).map((row: { deck_id: string; due_count: number | string | null }) => ({
+      deck_id: row.deck_id,
+      due_count: Number(row.due_count ?? 0),
+    }));
+  }
+
+  const { data: dueCards, error: dueCardsError } = await supabase
+    .from('cards')
+    .select('deck_id')
+    .lte('next_review_at', nowIso);
+
+  if (dueCardsError) {
+    console.error('[dashboard] fallback due cards query failed:', dueCardsError.message);
+    return [];
+  }
+
+  const dueByDeck = new Map<string, number>();
+  for (const row of dueCards ?? []) {
+    dueByDeck.set(row.deck_id, (dueByDeck.get(row.deck_id) ?? 0) + 1);
+  }
+
+  return Array.from(dueByDeck.entries()).map(([deck_id, due_count]) => ({ deck_id, due_count }));
 }
 
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
@@ -187,17 +167,14 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     errorMessage: deckQueryErrorMessage,
   } = await loadDeckRowsWithFallback(supabase);
 
+  const dueByDeckRows = await loadDueByDeckRows(supabase, userId, nowIso);
+
   const [
-    { data: dueCards },
     { data: studyDays },
     { data: recentActivityLogs },
     { count: totalStudiedCards },
     { data: masteryStateRows, error: masteryStateError },
   ] = await Promise.all([
-    supabase
-      .from('cards')
-      .select('id, deck_id')
-      .lte('next_review_at', nowIso),
     supabase
       .from('study_logs')
       .select('created_at')
@@ -226,24 +203,13 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     deckRows,
     deckQueryUsedFallback,
     deckQueryErrorMessage,
-    dueCards: dueCards ?? [],
+    dueByDeckRows,
     studyDays: studyDays ?? [],
     recentActivityLogs: recentActivityLogs ?? [],
     totalStudiedCards: totalStudiedCards ?? 0,
     masteryStateRows: masteryStateRows ?? [],
     masteryStateErrorMessage: masteryStateError?.message ?? null,
   };
-}
-
-function getCachedDashboardSnapshot(userId: string) {
-  return unstable_cache(
-    () => loadDashboardSnapshot(userId),
-    [`dashboard-snapshot:${userId}`],
-    {
-      revalidate: 60,
-      tags: [`dashboard:${userId}`],
-    }
-  )();
 }
 
 export default async function Dashboard() {
@@ -258,23 +224,20 @@ export default async function Dashboard() {
     deckRows,
     deckQueryUsedFallback,
     deckQueryErrorMessage,
-    dueCards,
+    dueByDeckRows,
     studyDays,
     recentActivityLogs,
     totalStudiedCards,
     masteryStateRows,
     masteryStateErrorMessage,
-  } = await getCachedDashboardSnapshot(user.id);
+  } = await loadDashboardSnapshot(user.id);
 
   if (deckQueryUsedFallback && deckQueryErrorMessage) {
     console.warn('[dashboard] relational deck count query failed, fallback was used:', deckQueryErrorMessage);
   }
 
   // Build "due today" per-deck breakdown
-  const dueByDeck = new Map<string, number>();
-  for (const card of dueCards ?? []) {
-    dueByDeck.set(card.deck_id, (dueByDeck.get(card.deck_id) ?? 0) + 1);
-  }
+  const dueByDeck = new Map(dueByDeckRows.map((row) => [row.deck_id, row.due_count]));
 
   const deckBreakdown = deckRows
     .filter((d) => dueByDeck.has(d.id))
@@ -285,7 +248,7 @@ export default async function Dashboard() {
     }))
     .sort((a, b) => b.dueCount - a.dueCount);
 
-  const totalDue = dueCards?.length ?? 0;
+  const totalDue = dueByDeckRows.reduce((total, row) => total + row.due_count, 0);
   const totalDecks = deckRows.length;
   const totalCards = deckRows.reduce((sum, deck) => sum + (deck.cards?.[0]?.count ?? 0), 0);
   const totalCardsByDeck = new Map(deckRows.map((deck) => [deck.id, deck.cards?.[0]?.count ?? 0]));
@@ -312,7 +275,7 @@ export default async function Dashboard() {
 
   if (masteryStateErrorMessage) {
     if (isMissingTableError(masteryStateErrorMessage, 'card_mastery_state')) {
-      const legacyMasteryByDeck = await loadLegacyDeckMastery(supabase, user.id, totalCardsByDeck);
+      const legacyMasteryByDeck = await loadLegacyDeckMasterySnapshots(supabase, user.id, totalCardsByDeck);
       for (const [deckId, snapshot] of legacyMasteryByDeck.entries()) {
         masteryByDeck.set(deckId, snapshot);
       }

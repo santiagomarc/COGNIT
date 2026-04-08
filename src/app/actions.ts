@@ -16,8 +16,8 @@ import {
 import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry } from '@/index';
-import { revalidatePath, revalidateTag, unstable_cache } from 'next/cache';
-import { isMissingColumnError, isMissingTableError } from '@/lib/supabase-errors';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import { isMissingColumnError, isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeAiServiceError, sanitizeDatabaseError } from '@/lib/server-errors';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
@@ -150,11 +150,6 @@ function normalizeForMatch(value: string) {
 function isMissingAiUsageTableError(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
-}
-
-function isMissingDatabaseFunctionError(message: string, functionName: string) {
-  const normalized = message.toLowerCase();
-  return normalized.includes(functionName.toLowerCase()) && normalized.includes('does not exist');
 }
 
 function invalidateDashboardCache(userId: string) {
@@ -1654,98 +1649,86 @@ export async function getQuizHistory(deckId: string) {
     return { error: deckAccess.error };
   }
 
-  const { user } = deckAccess;
-  const getCachedQuizHistory = unstable_cache(
-    async () => {
-      const supabase = await createClient();
+  const { supabase, user } = deckAccess;
 
-      const buildQuizHistoryQuery = (applyHistoryFilter: boolean) => {
-        const query = supabase
-          .from('quiz_results')
-          .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
-          .eq('deck_id', deckId)
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(200);
+  const buildQuizHistoryQuery = (applyHistoryFilter: boolean) => {
+    const query = supabase
+      .from('quiz_results')
+      .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
+      .eq('deck_id', deckId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(200);
 
-        return applyHistoryFilter ? query.eq('include_in_history', true) : query;
-      };
+    return applyHistoryFilter ? query.eq('include_in_history', true) : query;
+  };
 
-      let { data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(true);
+  let { data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(true);
 
-      if (quizResultsError && isMissingColumnError(quizResultsError.message, 'include_in_history')) {
-        ({ data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(false));
-      }
+  if (quizResultsError && isMissingColumnError(quizResultsError.message, 'include_in_history')) {
+    ({ data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(false));
+  }
 
-      if (quizResultsError) {
-        console.error('[getQuizHistory] quiz results error:', quizResultsError.code, quizResultsError.message);
-        return { error: 'Failed to fetch quiz history.' };
-      }
+  if (quizResultsError) {
+    console.error('[getQuizHistory] quiz results error:', quizResultsError.code, quizResultsError.message);
+    return { error: 'Failed to fetch quiz history.' };
+  }
 
-      if (!quizResults || quizResults.length === 0) {
-        return { history: [] as QuizHistoryEntry[] };
-      }
+  if (!quizResults || quizResults.length === 0) {
+    return { history: [] as QuizHistoryEntry[] };
+  }
 
-      const { data: quizCardRows, error: quizCardRowsError } = await supabase
-        .from('quiz_card_results')
-        .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
-        .in('quiz_result_id', quizResults.map((row) => row.id))
-        .limit(20000);
+  const { data: quizCardRows, error: quizCardRowsError } = await supabase
+    .from('quiz_card_results')
+    .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
+    .in('quiz_result_id', quizResults.map((row) => row.id))
+    .limit(20000);
 
-      if (quizCardRowsError) {
-        console.error('[getQuizHistory] quiz card rows error:', quizCardRowsError.code, quizCardRowsError.message);
-        return { error: 'Failed to fetch quiz history details.' };
-      }
+  if (quizCardRowsError) {
+    console.error('[getQuizHistory] quiz card rows error:', quizCardRowsError.code, quizCardRowsError.message);
+    return { error: 'Failed to fetch quiz history details.' };
+  }
 
-      const rowsByQuizResultId = new Map<string, QuizCardHistoryRow[]>();
-      for (const row of quizCardRows ?? []) {
-        const existing = rowsByQuizResultId.get(row.quiz_result_id) ?? [];
-        existing.push(row);
-        rowsByQuizResultId.set(row.quiz_result_id, existing);
-      }
+  const rowsByQuizResultId = new Map<string, QuizCardHistoryRow[]>();
+  for (const row of quizCardRows ?? []) {
+    const existing = rowsByQuizResultId.get(row.quiz_result_id) ?? [];
+    existing.push(row);
+    rowsByQuizResultId.set(row.quiz_result_id, existing);
+  }
 
-      const history: QuizHistoryEntry[] = quizResults.map((result) => {
-        const details = rowsByQuizResultId.get(result.id) ?? [];
-        const incorrectAnswers = details
-          .filter((detail) => !detail.correct)
-          .map((detail) => {
-            return {
-              card_id: detail.card_id,
-              card_number: null,
-              prompt: detail.prompt_text ?? 'Card content unavailable',
-              correct_answer: detail.correct_answer_text ?? 'Card term unavailable',
-              user_answer:
-                typeof detail.user_answer_text === 'string' && detail.user_answer_text.trim().length > 0
-                  ? detail.user_answer_text
-                  : null,
-            };
-          });
-
-        const totalCards = result.total_cards > 0 ? result.total_cards : 1;
-        const scorePercentage = Math.round((result.correct_cards / totalCards) * 100);
-
+  const history: QuizHistoryEntry[] = quizResults.map((result) => {
+    const details = rowsByQuizResultId.get(result.id) ?? [];
+    const incorrectAnswers = details
+      .filter((detail) => !detail.correct)
+      .map((detail) => {
         return {
-          id: result.id,
-          deck_id: result.deck_id,
-          mode: result.mode,
-          total_cards: result.total_cards,
-          correct_cards: result.correct_cards,
-          score_percentage: scorePercentage,
-          wrong_count: incorrectAnswers.length,
-          duration_ms: result.duration_ms,
-          created_at: result.created_at,
-          incorrect_answers: incorrectAnswers,
+          card_id: detail.card_id,
+          card_number: null,
+          prompt: detail.prompt_text ?? 'Card content unavailable',
+          correct_answer: detail.correct_answer_text ?? 'Card term unavailable',
+          user_answer:
+            typeof detail.user_answer_text === 'string' && detail.user_answer_text.trim().length > 0
+              ? detail.user_answer_text
+              : null,
         };
       });
 
-      return { history };
-    },
-    [`quiz-history:${deckId}:${user.id}`],
-    {
-      revalidate: 60,
-      tags: [`quiz-history:${deckId}:${user.id}`, `deck:${deckId}`, `dashboard:${user.id}`],
-    }
-  );
+    const totalCards = result.total_cards > 0 ? result.total_cards : 1;
+    const scorePercentage = Math.round((result.correct_cards / totalCards) * 100);
 
-  return getCachedQuizHistory();
+    return {
+      id: result.id,
+      deck_id: result.deck_id,
+      mode: result.mode,
+      total_cards: result.total_cards,
+      correct_cards: result.correct_cards,
+      score_percentage: scorePercentage,
+      wrong_count: incorrectAnswers.length,
+      duration_ms: result.duration_ms,
+      created_at: result.created_at,
+      incorrect_answers: incorrectAnswers,
+    };
+  });
+
+  return { history };
 }

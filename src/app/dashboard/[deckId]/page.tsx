@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
-import { unstable_cache } from 'next/cache';
 import { ArrowLeft, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
@@ -13,12 +12,10 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { computeDeckMasterySnapshots } from '@/lib/quiz-progress';
+import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { getSessionCardBounds } from '@/lib/study';
 import type { CardSource } from '@/index';
-
-type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 type DeckDetailSnapshot = {
   deck: {
@@ -47,55 +44,6 @@ type DeckDetailSnapshot = {
   }>;
   masteryRowsErrorMessage: string | null;
 };
-
-async function loadLegacyDeckMastery(
-  supabase: SupabaseServerClient,
-  userId: string,
-  deckId: string,
-  totalCards: number,
-) {
-  const { data: quizResults, error: quizResultsError } = await supabase
-    .from('quiz_results')
-    .select('id, deck_id, created_at')
-    .eq('user_id', userId)
-    .eq('deck_id', deckId)
-    .order('created_at', { ascending: false })
-    .limit(20000);
-
-  if (quizResultsError || !quizResults || quizResults.length === 0) {
-    return { masteredCards: 0, lastQuizAt: null as string | null };
-  }
-
-  const quizCardResults: { quiz_result_id: string; card_id: string; correct: boolean }[] = [];
-  const quizResultIds = quizResults.map((row) => row.id);
-  const chunkSize = 500;
-
-  for (let index = 0; index < quizResultIds.length; index += chunkSize) {
-    const chunk = quizResultIds.slice(index, index + chunkSize);
-    const { data, error } = await supabase
-      .from('quiz_card_results')
-      .select('quiz_result_id, card_id, correct')
-      .in('quiz_result_id', chunk);
-
-    if (error) {
-      console.error('[deck-page] failed to read legacy quiz card results:', error.message);
-      return { masteredCards: 0, lastQuizAt: null as string | null };
-    }
-
-    quizCardResults.push(...(data ?? []));
-  }
-
-  const snapshot = computeDeckMasterySnapshots({
-    totalCardsByDeck: new Map([[deckId, totalCards]]),
-    quizResults,
-    quizCardResults,
-  }).get(deckId);
-
-  return {
-    masteredCards: snapshot?.masteredCards ?? 0,
-    lastQuizAt: snapshot?.lastQuizAt ?? null,
-  };
-}
 
 function getMasteryBarClass(masteryPercentage: number) {
   if (masteryPercentage >= 85) return 'bg-sky-400';
@@ -160,17 +108,6 @@ async function loadDeckDetailSnapshot(userId: string, deckId: string): Promise<D
   };
 }
 
-function getCachedDeckDetailSnapshot(userId: string, deckId: string) {
-  return unstable_cache(
-    () => loadDeckDetailSnapshot(userId, deckId),
-    [`deck-detail:${deckId}:${userId}`],
-    {
-      revalidate: 60,
-      tags: [`deck:${deckId}`, `dashboard:${userId}`],
-    }
-  )();
-}
-
 type DeckDetailPageProps = {
   params: Promise<{
     deckId: string;
@@ -201,7 +138,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       masteryRows,
       masteryRowsErrorMessage,
     },
-  ] = await Promise.all([getCachedDeckDetailSnapshot(user.id, deckId)]);
+  ] = await Promise.all([loadDeckDetailSnapshot(user.id, deckId)]);
 
   if (deckErrorMessage || !deck) {
     notFound();
@@ -232,9 +169,14 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   if (masteryRowsErrorMessage) {
     if (isMissingTableError(masteryRowsErrorMessage, 'card_mastery_state')) {
-      const fallback = await loadLegacyDeckMastery(supabase, user.id, deckId, totalCards);
-      masteredCards = fallback.masteredCards;
-      lastQuizAt = fallback.lastQuizAt;
+      const legacyMasteryByDeck = await loadLegacyDeckMasterySnapshots(
+        supabase,
+        user.id,
+        new Map([[deckId, totalCards]])
+      );
+      const fallback = legacyMasteryByDeck.get(deckId);
+      masteredCards = fallback?.masteredCards ?? 0;
+      lastQuizAt = fallback?.lastQuizAt ?? null;
     } else {
       console.error('[deck-page] failed to read card mastery state:', masteryRowsErrorMessage);
     }
