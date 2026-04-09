@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
 import { normalizeSessionCardCount, type StudySessionCard } from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
+import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 
 type StudyPageProps = {
   params: Promise<{
@@ -74,7 +75,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
   return (
     <FlashcardReviewClient
       deckId={deckId}
-      deckTitle={deck.title}
+      deckTitle={removeDeckTagFromTitle(deck.title)}
       cards={cards}
       totalInDeck={totalInDeck ?? 0}
     />

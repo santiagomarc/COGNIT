@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
 import { isMissingTableError } from '@/lib/supabase-errors';
+import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { getSessionCardBounds } from '@/lib/study';
 import type { CardSource } from '@/index';
 
@@ -150,6 +151,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   const totalCards = cards.length;
+  const deckTitleMeta = parseDeckTitleMetadata(deck.title);
   const sessionBounds = getSessionCardBounds(totalCards);
   const quizReadyCards = cards.filter(
     (card) => Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2
@@ -232,7 +234,14 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
           <div className="glass-card glow-border space-y-6 rounded-2xl p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="space-y-2">
-                <h1 className="glow-title text-3xl font-bold tracking-tight">{deck.title}</h1>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="glow-title text-3xl font-bold tracking-tight">{deckTitleMeta.cleanTitle}</h1>
+                  {deckTitleMeta.tag ? (
+                    <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                      {deckTitleMeta.tag}
+                    </span>
+                  ) : null}
+                </div>
                 {deck.description ? (
                   <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
                 ) : (

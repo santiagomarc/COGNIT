@@ -7,6 +7,7 @@ import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
 import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
+import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { Layers } from 'lucide-react';
@@ -199,7 +200,7 @@ export default async function Dashboard() {
     .filter((d) => dueByDeck.has(d.id))
     .map((d) => ({
       deckId: d.id,
-      deckTitle: d.title,
+      deckTitle: removeDeckTagFromTitle(d.title),
       dueCount: dueByDeck.get(d.id) ?? 0,
     }))
     .sort((a, b) => b.dueCount - a.dueCount);

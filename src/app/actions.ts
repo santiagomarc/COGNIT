@@ -19,6 +19,7 @@ import type { CardState, QuizHistoryEntry } from '@/index';
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { isMissingColumnError, isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeAiServiceError, sanitizeDatabaseError } from '@/lib/server-errors';
+import { buildDeckTitleWithTag, normalizeDeckTag, removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { GoogleGenerativeAI, SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 
@@ -537,11 +538,15 @@ export async function createDeck(data: CreateDeckInput) {
     return { error: "You must be logged in to create a deck." };
   }
 
+  const normalizedTitle = removeDeckTagFromTitle(result.data.title).trim();
+  const normalizedTag = normalizeDeckTag(result.data.accent_tag);
+  const persistedTitle = buildDeckTitleWithTag(normalizedTitle, normalizedTag);
+
   // 3. Database Mutation
   const { data: deck, error } = await supabase
     .from('decks')
     .insert({
-      title: result.data.title,
+      title: persistedTitle,
       description: result.data.description,
       user_id: user.id, // <--- We strictly bind this to the logged-in user
     })
@@ -584,11 +589,14 @@ export async function deleteDeck(deckId: string) {
   invalidateDashboardCache(user.id);
 }
 
-export async function updateDeck(deckId: string, title: string) {
+export async function updateDeck(deckId: string, title: string, accentTag?: string | null) {
   // Simple validation
-  if (!title || title.length < 3) {
+  const normalizedTitle = removeDeckTagFromTitle(title).trim();
+  if (!normalizedTitle || normalizedTitle.length < 3) {
     return { error: { title: ["Title must be at least 3 characters long"] } };
   }
+
+  const persistedTitle = buildDeckTitleWithTag(normalizedTitle, normalizeDeckTag(accentTag));
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -599,7 +607,7 @@ export async function updateDeck(deckId: string, title: string) {
 
   const { error } = await supabase
     .from('decks')
-    .update({ title, updated_at: new Date().toISOString() })
+    .update({ title: persistedTitle, updated_at: new Date().toISOString() })
     .eq('id', deckId)
     .eq('user_id', user.id);
 

@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { createDeck } from '@/app/actions';
 import { createDeckSchema } from '@/lib/schemas';
+import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,9 +17,14 @@ export function CreateDeckForm() {
   async function handleSubmit(formData: FormData) {
     setFieldError(null);
     const title = (formData.get('title') as string).trim();
+    const accentTag = (formData.get('accent_tag') as string | null)?.trim() ?? '';
 
     // Client-side validation
-    const parsed = createDeckSchema.safeParse({ title, is_public: false });
+    const parsed = createDeckSchema.safeParse({
+      title,
+      accent_tag: accentTag || undefined,
+      is_public: false,
+    });
     if (!parsed.success) {
       const msg = parsed.error.issues.find((e) => e.path.includes('title'))?.message;
       setFieldError(msg ?? 'Invalid input');
@@ -60,6 +66,23 @@ export function CreateDeckForm() {
             {fieldError}
           </p>
         )}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="accent_tag">Accent Tag</Label>
+        <select
+          id="accent_tag"
+          name="accent_tag"
+          className="neon-focus h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+          defaultValue=""
+        >
+          <option value="">None</option>
+          {DECK_TAG_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <Button type="submit" disabled={isLoading}>

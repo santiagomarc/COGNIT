@@ -11,6 +11,7 @@ import {
 } from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { isMissingTableError } from '@/lib/supabase-errors';
+import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 
 type QuizPageProps = {
   params: Promise<{
@@ -131,7 +132,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   return (
     <QuizAssessmentClient
       deckId={deckId}
-      deckTitle={deck.title}
+      deckTitle={removeDeckTagFromTitle(deck.title)}
       cards={cards}
       totalInDeck={totalInDeck ?? 0}
       mode={mode as QuizMode}

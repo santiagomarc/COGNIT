@@ -19,17 +19,19 @@ type DueCardsFallbackRow = {
   deck_id: string;
 };
 
+type AwaitableResult<T> = PromiseLike<T> | Promise<T>;
+
 type DueBreakdownSupabaseClient = {
   rpc: (
     fn: 'get_due_cards_by_deck',
     args: { p_user_id: string; p_now: string }
-  ) => Promise<{ data: RpcDueRow[] | null; error: RpcErrorLike | null }>;
+  ) => AwaitableResult<{ data: RpcDueRow[] | null; error: RpcErrorLike | null }>;
   from: (table: 'cards') => {
     select: (columns: 'deck_id') => {
       lte: (
         column: 'next_review_at',
         value: string
-      ) => Promise<{ data: DueCardsFallbackRow[] | null; error: { message: string } | null }>;
+      ) => AwaitableResult<{ data: DueCardsFallbackRow[] | null; error: { message: string } | null }>;
     };
   };
 };

@@ -6,6 +6,7 @@ import { Plus, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createDeck } from '@/app/actions';
 import { createDeckSchema } from '@/lib/schemas';
+import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   const [isLoading, setIsLoading] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
+  const [accentTag, setAccentTag] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -43,7 +45,11 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
     setFieldError(null);
     const title = draftTitle.trim();
 
-    const parsed = createDeckSchema.safeParse({ title, is_public: false });
+    const parsed = createDeckSchema.safeParse({
+      title,
+      accent_tag: accentTag || undefined,
+      is_public: false,
+    });
     if (!parsed.success) {
       const msg = parsed.error.issues.find((e) => e.path.includes('title'))?.message;
       setFieldError(msg ?? 'Invalid input');
@@ -62,6 +68,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
       toast.success('Deck created successfully');
       formRef.current?.reset();
       setDraftTitle('');
+      setAccentTag('');
       setFieldError(null);
       if (result?.deckId) {
         router.push(`/dashboard/${result.deckId}`);
@@ -175,6 +182,23 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                       {fieldError}
                     </p>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="inline-deck-tag">Accent Tag</Label>
+                  <select
+                    id="inline-deck-tag"
+                    value={accentTag}
+                    onChange={(event) => setAccentTag(event.target.value)}
+                    className="neon-focus h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                  >
+                    <option value="">None</option>
+                    {DECK_TAG_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-1">

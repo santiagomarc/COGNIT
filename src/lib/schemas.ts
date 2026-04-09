@@ -1,4 +1,5 @@
 import {z} from "zod";
+import { DECK_TAG_VALUES } from '@/lib/deck-tags';
 
 export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned']);
 
@@ -54,7 +55,15 @@ export type UpdatePasswordInput = z.infer<typeof updatePasswordSchema>;
 
 //properties of deck creation from the user
 export const createDeckSchema = z.object({
-    title: z.string().min(3,{ message: "Title must be at least 3 characters long" }),
+    title: z.string().trim().min(3,{ message: "Title must be at least 3 characters long" }),
+    accent_tag: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .optional()
+      .refine((value) => !value || DECK_TAG_VALUES.includes(value as (typeof DECK_TAG_VALUES)[number]), {
+        message: 'Select a valid deck tag',
+      }),
     description: z.string().max(500).optional(),
     is_public: z.boolean().default(false),
 });
