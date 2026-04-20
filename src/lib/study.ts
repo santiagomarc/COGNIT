@@ -16,6 +16,8 @@ export type StudySessionCard = {
   repetition_count: number;
   mcq_distractors: string[] | null;
   id_question: string | null;
+  topic_tags: string[] | null;
+  mnemonic: string | null;
 };
 
 export function getSessionCardBounds(availableCount: number) {

@@ -30,10 +30,10 @@ type IdentificationResult = {
 };
 
 function getGrade(score: number): StudyGrade {
-  if (score >= 0.8) {
+  if (score >= 0.85) {
     return 'good';
   }
-  if (score >= 0.6) {
+  if (score >= 0.7) {
     return 'hard';
   }
   return 'again';

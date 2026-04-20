@@ -7,6 +7,7 @@ import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
 import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
 import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
+import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp } from '@/components/motion';
@@ -36,6 +37,7 @@ type DeckDetailSnapshot = {
     imported_by: string | null;
     mcq_distractors: string[] | null;
     id_question: string | null;
+    topic_tags: string[] | null;
   }>;
   cardsErrorMessage: string | null;
   cardsErrorCode: string | null;
@@ -88,7 +90,7 @@ async function loadDeckDetailSnapshot(userId: string, deckId: string): Promise<D
       .single(),
     supabase
       .from('cards')
-      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question')
+      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags')
       .eq('deck_id', deckId)
       .order('created_at', { ascending: false }),
     supabase
@@ -187,6 +189,26 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
   const unprovenCards = Math.max(totalCards - masteredCards, 0);
   const hasCards = totalCards > 0;
+  const topTopics = Object.entries(
+    cards.reduce<Record<string, number>>((acc, card) => {
+      if (!Array.isArray(card.topic_tags)) {
+        return acc;
+      }
+
+      for (const rawTag of card.topic_tags) {
+        const tag = rawTag.trim();
+        if (!tag) {
+          continue;
+        }
+
+        acc[tag] = (acc[tag] ?? 0) + 1;
+      }
+
+      return acc;
+    }, {})
+  )
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
 
   const addContentSection = (
     <>
@@ -212,6 +234,10 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       <FadeInUp delay={0.15}>
         <PDFUploadZone deckId={deckId} />
+      </FadeInUp>
+
+      <FadeInUp delay={0.18}>
+        <DeckChatWidget deckId={deckId} />
       </FadeInUp>
     </>
   );
@@ -285,6 +311,26 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                 />
               </div>
             </div>
+
+            {topTopics.length > 0 ? (
+              <div className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">Top Concepts</p>
+                  <p className="text-xs text-muted-foreground">From AI topic tags</p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {topTopics.map(([topic, count]) => (
+                    <span
+                      key={topic}
+                      className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs text-sky-200"
+                    >
+                      <span>{topic}</span>
+                      <span className="text-sky-300/80">{count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {hasCards ? (
               <div className="grid gap-4 lg:grid-cols-2">

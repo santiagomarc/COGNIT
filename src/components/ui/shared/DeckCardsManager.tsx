@@ -20,6 +20,7 @@ type DeckCard = {
   imported_by: string | null;
   mcq_distractors: string[] | null;
   id_question: string | null;
+  topic_tags: string[] | null;
 };
 
 type DeckCardsManagerProps = {
@@ -197,6 +198,7 @@ export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
               cardNumber={cardNumberById.get(card.id)}
               term={card.front}
               description={card.back}
+              topicTags={card.topic_tags}
               source={card.source ?? 'manual'}
               importedBy={card.imported_by ?? null}
               quizReady={Boolean(card.id_question) && Array.isArray(card.mcq_distractors) && card.mcq_distractors.length >= 2}

@@ -2,10 +2,7 @@ function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function levenshteinDistance(a: string, b: string): number {
-  const left = normalize(a);
-  const right = normalize(b);
-
+function levenshteinDistanceRaw(left: string, right: string): number {
   if (left === right) {
     return 0;
   }
@@ -36,6 +33,12 @@ export function levenshteinDistance(a: string, b: string): number {
   return previousRow[right.length];
 }
 
+export function levenshteinDistance(a: string, b: string): number {
+  const left = normalize(a);
+  const right = normalize(b);
+  return levenshteinDistanceRaw(left, right);
+}
+
 export function similarity(a: string, b: string): number {
   const left = normalize(a);
   const right = normalize(b);
@@ -45,5 +48,5 @@ export function similarity(a: string, b: string): number {
     return 1;
   }
 
-  return 1 - levenshteinDistance(left, right) / longest;
+  return 1 - levenshteinDistanceRaw(left, right) / longest;
 }

@@ -44,6 +44,8 @@ function toStudyCard(card: {
   repetition_count: number | null;
   mcq_distractors: unknown;
   id_question: string | null;
+  topic_tags: unknown;
+  mnemonic: string | null;
 }): StudySessionCard {
   return {
     id: card.id,
@@ -57,6 +59,10 @@ function toStudyCard(card: {
       ? card.mcq_distractors.filter((value): value is string => typeof value === 'string')
       : null,
     id_question: typeof card.id_question === 'string' ? card.id_question : null,
+    topic_tags: Array.isArray(card.topic_tags)
+      ? card.topic_tags.filter((value): value is string => typeof value === 'string')
+      : null,
+    mnemonic: typeof card.mnemonic === 'string' ? card.mnemonic : null,
   };
 }
 
@@ -97,7 +103,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
 
   const { data: allCards } = await supabase
     .from('cards')
-    .select('id, front, back, state, interval, ease_factor, repetition_count, mcq_distractors, id_question')
+    .select('id, front, back, state, interval, ease_factor, repetition_count, mcq_distractors, id_question, topic_tags, mnemonic')
     .eq('deck_id', deckId)
     .order('created_at', { ascending: true });
 

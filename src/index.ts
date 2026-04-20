@@ -21,6 +21,10 @@ export interface Card {
   imported_by: string | null;
   mcq_distractors: string[] | null;
   id_question: string | null;
+  ai_hint: string | null;
+  topic_tags: string[] | null;
+  mnemonic: string | null;
+  embedding: number[] | null;
   
   // Spaced Repetition Data
   state: CardState;

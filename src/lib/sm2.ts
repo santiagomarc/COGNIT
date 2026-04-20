@@ -95,12 +95,14 @@ export function sm2(grade: SM2Grade, prev: SM2Input): SM2Output {
 
   // ── Failed review (grade < 3) → Reset ──
   if (grade < 3) {
+    const failedStepMinutes = grade <= 1 ? LEARNING_STEPS_MINUTES[0] : LEARNING_STEPS_MINUTES[1];
+
     return {
       repetitionCount: 0,
       easeFactor: Math.max(safeEaseFactor - 0.2, MIN_EASE_FACTOR),
       interval: 0,
       state: prev.state === 'new' ? 'learning' : 'relearning',
-      nextReviewAt: addMinutes(now, LEARNING_STEPS_MINUTES[0]),
+      nextReviewAt: addMinutes(now, failedStepMinutes),
     };
   }
 

@@ -27,20 +27,38 @@ type FlashcardReviewClientProps = {
   totalInDeck: number;
 };
 
+type GradeLogEntry = {
+  cardId: string;
+  grade: StudyGrade;
+};
+
 type PersistedStudySessionState = {
-  version: 1;
-  cardIds: string[];
+  version: 3;
+  sourceCardIds: string[];
+  queueCardIds: string[];
   index: number;
   showAnswer: boolean;
-  gradeLog: StudyGrade[];
+  gradeLog: GradeLogEntry[];
   sessionDurationMs: number;
 };
 
-const STUDY_SESSION_STATE_VERSION = 1;
+const STUDY_SESSION_STATE_VERSION = 3;
+
+const REQUEUE_DELAY_MS: Record<StudyGrade, number | null> = {
+  again: 2 * 60_000,
+  hard: 6 * 60_000,
+  good: null,
+  easy: null,
+};
+
+const MIN_REQUEUE_OFFSET = 1;
+const MAX_REQUEUE_OFFSET = 15;
+const MIN_ASSUMED_MS_PER_CARD = 8_000;
 
 const GRADE_BUTTONS: {
   grade: StudyGrade;
   label: string;
+  hint: string;
   color: string;
   bgColor: string;
   borderColor: string;
@@ -49,6 +67,7 @@ const GRADE_BUTTONS: {
   {
     grade: 'again',
     label: 'Again',
+    hint: '~2m',
     color: 'text-red-400',
     bgColor: 'bg-red-500/10 hover:bg-red-500/20',
     borderColor: 'border-red-500/20',
@@ -57,6 +76,7 @@ const GRADE_BUTTONS: {
   {
     grade: 'hard',
     label: 'Hard',
+    hint: '~6m',
     color: 'text-orange-400',
     bgColor: 'bg-orange-500/10 hover:bg-orange-500/20',
     borderColor: 'border-orange-500/20',
@@ -65,6 +85,7 @@ const GRADE_BUTTONS: {
   {
     grade: 'good',
     label: 'Good',
+    hint: 'done',
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10 hover:bg-emerald-500/20',
     borderColor: 'border-emerald-500/20',
@@ -73,6 +94,7 @@ const GRADE_BUTTONS: {
   {
     grade: 'easy',
     label: 'Easy',
+    hint: 'done',
     color: 'text-sky-400',
     bgColor: 'bg-sky-500/10 hover:bg-sky-500/20',
     borderColor: 'border-sky-500/20',
@@ -88,6 +110,10 @@ function formatDuration(ms: number): string {
   return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
 }
 
+function isStudyGrade(value: unknown): value is StudyGrade {
+  return value === 'again' || value === 'hard' || value === 'good' || value === 'easy';
+}
+
 export function FlashcardReviewClient({
   deckId,
   deckTitle,
@@ -99,12 +125,19 @@ export function FlashcardReviewClient({
     () => `study-session:${deckId}:${sessionCardIds.join('|')}`,
     [deckId, sessionCardIds]
   );
+  const cardsById = useMemo(() => {
+    const map = new Map<string, StudySessionCard>();
+    cards.forEach((card) => {
+      map.set(card.id, card);
+    });
+    return map;
+  }, [cards]);
   const [sessionStartMs, setSessionStartMs] = useState(() => Date.now());
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [sessionCards, setSessionCards] = useState(cards);
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [gradeLog, setGradeLog] = useState<StudyGrade[]>([]);
+  const [gradeLog, setGradeLog] = useState<GradeLogEntry[]>([]);
   const [resumeState, setResumeState] = useState<PersistedStudySessionState | null>(() => {
     if (typeof window === 'undefined') {
       return null;
@@ -117,17 +150,34 @@ export function FlashcardReviewClient({
       }
 
       const parsed = JSON.parse(raw) as PersistedStudySessionState;
-      const hasMatchingCards =
-        Array.isArray(parsed.cardIds) &&
-        parsed.cardIds.length === sessionCardIds.length &&
-        parsed.cardIds.every((id, cardIndex) => id === sessionCardIds[cardIndex]);
-      const hasValidIndex = Number.isInteger(parsed.index) && parsed.index > 0 && parsed.index < cards.length;
+      const hasMatchingSourceCards =
+        Array.isArray(parsed.sourceCardIds) &&
+        parsed.sourceCardIds.length === sessionCardIds.length &&
+        parsed.sourceCardIds.every((id, cardIndex) => id === sessionCardIds[cardIndex]);
+      const queueLength = Array.isArray(parsed.queueCardIds) ? parsed.queueCardIds.length : 0;
+      const hasValidQueue =
+        Array.isArray(parsed.queueCardIds) &&
+        parsed.queueCardIds.length > 0 &&
+        parsed.queueCardIds.every((id) => cardsById.has(id));
+      const hasValidIndex = Number.isInteger(parsed.index) && parsed.index > 0 && parsed.index < queueLength;
       const hasValidDuration = Number.isFinite(parsed.sessionDurationMs) && parsed.sessionDurationMs >= 0;
-      const hasValidGradeLog = Array.isArray(parsed.gradeLog);
+      const hasValidGradeLog =
+        Array.isArray(parsed.gradeLog) &&
+        parsed.gradeLog.length <= parsed.index &&
+        parsed.gradeLog.every((entry) => {
+          if (!entry || typeof entry !== 'object') {
+            return false;
+          }
+
+          const cardId = 'cardId' in entry ? entry.cardId : null;
+          const grade = 'grade' in entry ? entry.grade : null;
+          return typeof cardId === 'string' && cardsById.has(cardId) && isStudyGrade(grade);
+        });
 
       if (
         parsed.version !== STUDY_SESSION_STATE_VERSION ||
-        !hasMatchingCards ||
+        !hasMatchingSourceCards ||
+        !hasValidQueue ||
         !hasValidIndex ||
         !hasValidDuration ||
         !hasValidGradeLog
@@ -146,9 +196,12 @@ export function FlashcardReviewClient({
   const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
 
   const cardStart = useRef(sessionStartMs);
+  const active = sessionCards[index];
+  const next = sessionCards[index + 1];
+  const completed = index >= sessionCards.length;
 
   useEffect(() => {
-    if (resumeState) {
+    if (resumeState || completed) {
       return;
     }
 
@@ -157,11 +210,16 @@ export function FlashcardReviewClient({
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [resumeState]);
+  }, [completed, resumeState]);
 
-  const active = sessionCards[index];
-  const next = sessionCards[index + 1];
-  const completed = index >= sessionCards.length;
+  useEffect(() => {
+    if (!completed || resumeState) {
+      return;
+    }
+
+    // Freeze session duration at completion time.
+    setNowMs(Date.now());
+  }, [completed, resumeState]);
 
   const progress = useMemo(() => {
     if (sessionCards.length === 0) return 0;
@@ -171,16 +229,46 @@ export function FlashcardReviewClient({
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-220, 220], [-14, 14]);
 
+  const insertRequeueCard = useCallback(
+    (
+      currentCards: StudySessionCard[],
+      currentIndex: number,
+      card: StudySessionCard,
+      grade: StudyGrade,
+      averageMsPerCard: number
+    ) => {
+      const delayMs = REQUEUE_DELAY_MS[grade];
+      if (delayMs === null) {
+        return currentCards;
+      }
+
+      const rawOffset = Math.ceil(delayMs / Math.max(averageMsPerCard, MIN_ASSUMED_MS_PER_CARD));
+      const offset = Math.max(MIN_REQUEUE_OFFSET, Math.min(rawOffset, MAX_REQUEUE_OFFSET));
+
+      const insertIndex = Math.min(currentCards.length, currentIndex + offset + 1);
+      const nextCards = [...currentCards];
+      nextCards.splice(insertIndex, 0, card);
+      return nextCards;
+    },
+    []
+  );
+
   const commitGrade = useCallback(
     (grade: StudyGrade) => {
       if (!active || isPending || isSubmittingGrade) return;
       const durationMs = Date.now() - cardStart.current;
+      const previousCards = sessionCards;
       const previousIndex = index;
       const previousShowAnswer = showAnswer;
+      const elapsedSessionMs = Math.max(Date.now() - sessionStartMs, MIN_ASSUMED_MS_PER_CARD);
+      const reviewedCardsCount = Math.max(previousIndex + 1, 1);
+      const averageMsPerCard = Math.max(MIN_ASSUMED_MS_PER_CARD, elapsedSessionMs / reviewedCardsCount);
+      const nextCards = insertRequeueCard(previousCards, previousIndex, active, grade, averageMsPerCard);
       setIsSubmittingGrade(true);
 
       // Optimistically advance to the next card for snappier grading UX.
-      setGradeLog((prev) => [...prev, grade]);
+      setSessionCards(nextCards);
+      setGradeLog((prev) => [...prev, { cardId: active.id, grade }]);
       setShowAnswer(false);
       setIndex((prev) => prev + 1);
       cardStart.current = Date.now();
@@ -199,6 +287,7 @@ export function FlashcardReviewClient({
             toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
 
             // Roll back optimistic UI progression when persistence fails.
+            setSessionCards(previousCards);
             setIndex(previousIndex);
             setShowAnswer(previousShowAnswer);
             setGradeLog((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
@@ -206,12 +295,33 @@ export function FlashcardReviewClient({
             setNowMs(Date.now());
             return;
           }
+        } catch (error) {
+          console.error('[FlashcardReviewClient] gradeCard failed:', error);
+          toast.error('Failed to save card grade. Please try again.');
+
+          setSessionCards(previousCards);
+          setIndex(previousIndex);
+          setShowAnswer(previousShowAnswer);
+          setGradeLog((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
+          cardStart.current = Date.now();
+          setNowMs(Date.now());
         } finally {
           setIsSubmittingGrade(false);
         }
       });
     },
-    [active, deckId, index, isPending, isSubmittingGrade, showAnswer, startTransition]
+    [
+      active,
+      deckId,
+      index,
+      insertRequeueCard,
+      isPending,
+      isSubmittingGrade,
+      sessionCards,
+      sessionStartMs,
+      showAnswer,
+      startTransition,
+    ]
   );
 
   const clearStoredProgress = useCallback(() => {
@@ -240,10 +350,20 @@ export function FlashcardReviewClient({
       return;
     }
 
-    const nextNow = Date.now();
-    const safeIndex = Math.max(0, Math.min(resumeState.index, cards.length - 1));
+    const restoredSessionCards = resumeState.queueCardIds
+      .map((cardId) => cardsById.get(cardId))
+      .filter((card): card is StudySessionCard => Boolean(card));
 
-    setSessionCards(cards);
+    if (restoredSessionCards.length === 0) {
+      toast.error('Saved review session is no longer available. Starting a new session.');
+      startNewSession();
+      return;
+    }
+
+    const nextNow = Date.now();
+    const safeIndex = Math.max(0, Math.min(resumeState.index, restoredSessionCards.length - 1));
+
+    setSessionCards(restoredSessionCards);
     setIndex(safeIndex);
     setShowAnswer(Boolean(resumeState.showAnswer));
     setGradeLog(resumeState.gradeLog.slice(0, safeIndex));
@@ -252,7 +372,7 @@ export function FlashcardReviewClient({
     setResumeState(null);
     cardStart.current = nextNow;
     toast.success('Resumed previous study session');
-  }, [cards, resumeState]);
+  }, [cardsById, resumeState, startNewSession]);
 
   const restart = useCallback(() => {
     startNewSession();
@@ -270,7 +390,8 @@ export function FlashcardReviewClient({
 
     const payload: PersistedStudySessionState = {
       version: STUDY_SESSION_STATE_VERSION,
-      cardIds: sessionCards.map((card) => card.id),
+      sourceCardIds: sessionCardIds,
+      queueCardIds: sessionCards.map((card) => card.id),
       index,
       showAnswer,
       gradeLog,
@@ -282,7 +403,7 @@ export function FlashcardReviewClient({
     } catch {
       // Ignore storage failures.
     }
-  }, [completed, gradeLog, index, nowMs, resumeState, sessionCards, sessionStartMs, showAnswer, storageKey]);
+  }, [completed, gradeLog, index, nowMs, resumeState, sessionCardIds, sessionCards, sessionStartMs, showAnswer, storageKey]);
 
   useEffect(() => {
     if (completed || resumeState) return;
@@ -367,7 +488,7 @@ export function FlashcardReviewClient({
           </div>
           <h1 className="text-2xl font-semibold">Resume your previous session?</h1>
           <p className="mt-2 text-muted-foreground">
-            Pick up from card {Math.min(resumeState.index + 1, sessionCards.length)} of {sessionCards.length}.
+            Pick up from card {Math.min(resumeState.index + 1, resumeState.queueCardIds.length)} of {resumeState.queueCardIds.length}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             Last recorded progress: {formatDuration(resumeState.sessionDurationMs)} of active study time.
@@ -387,10 +508,21 @@ export function FlashcardReviewClient({
   }
 
   const sessionDuration = nowMs - sessionStartMs;
-  const againCount = gradeLog.filter((grade) => grade === 'again').length;
-  const hardCount = gradeLog.filter((grade) => grade === 'hard').length;
-  const goodCount = gradeLog.filter((grade) => grade === 'good').length;
-  const easyCount = gradeLog.filter((grade) => grade === 'easy').length;
+  const summaryGrades = useMemo(() => {
+    const latestGradeByCard = new Map<string, StudyGrade>();
+    gradeLog.forEach((entry) => {
+      latestGradeByCard.set(entry.cardId, entry.grade);
+    });
+
+    return sessionCardIds
+      .map((cardId) => latestGradeByCard.get(cardId))
+      .filter((grade): grade is StudyGrade => Boolean(grade));
+  }, [gradeLog, sessionCardIds]);
+  const reviewedCardCount = summaryGrades.length;
+  const againCount = summaryGrades.filter((grade) => grade === 'again').length;
+  const hardCount = summaryGrades.filter((grade) => grade === 'hard').length;
+  const goodCount = summaryGrades.filter((grade) => grade === 'good').length;
+  const easyCount = summaryGrades.filter((grade) => grade === 'easy').length;
 
   return (
     <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
@@ -429,7 +561,7 @@ export function FlashcardReviewClient({
 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {completed
-          ? `Flashcard review complete. ${gradeLog.length} cards reviewed.`
+          ? `Flashcard review complete. ${reviewedCardCount} cards reviewed.`
           : `Card ${index + 1} of ${sessionCards.length}.`}
       </div>
 
@@ -447,7 +579,7 @@ export function FlashcardReviewClient({
               </div>
               <h2 className="text-2xl font-bold tracking-tight">Review Complete</h2>
               <p className="mt-1 text-muted-foreground">
-                You reviewed {gradeLog.length} card{gradeLog.length !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
+                You reviewed {reviewedCardCount} card{reviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
               </p>
             </div>
 
@@ -479,7 +611,7 @@ export function FlashcardReviewClient({
                   Avg. per Card
                 </span>
                 <span className="text-sm font-medium">
-                  {gradeLog.length > 0 ? formatDuration(Math.round(sessionDuration / gradeLog.length)) : '—'}
+                  {reviewedCardCount > 0 ? formatDuration(Math.round(sessionDuration / reviewedCardCount)) : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between px-5 py-3">
@@ -488,7 +620,7 @@ export function FlashcardReviewClient({
                   Retention Rate
                 </span>
                 <span className="text-sm font-medium">
-                  {gradeLog.length > 0 ? `${Math.round(((goodCount + easyCount) / gradeLog.length) * 100)}%` : '—'}
+                  {reviewedCardCount > 0 ? `${Math.round(((goodCount + easyCount) / reviewedCardCount) * 100)}%` : '—'}
                 </span>
               </div>
             </div>
@@ -575,20 +707,29 @@ export function FlashcardReviewClient({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 12 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-                  className="grid grid-cols-4 gap-2"
+                  className="space-y-3"
                 >
-                  {GRADE_BUTTONS.map((button) => (
-                    <button
-                      key={button.grade}
-                      type="button"
-                      onClick={() => commitGrade(button.grade)}
-                      disabled={isPending || isSubmittingGrade}
-                      className={`flex flex-col items-center gap-1 rounded-xl border ${button.borderColor} ${button.bgColor} px-3 py-3 transition-all duration-150 disabled:opacity-50`}
-                    >
-                      <span className={`text-sm font-semibold ${button.color}`}>{button.label}</span>
-                      <span className="text-[10px] text-muted-foreground">{button.key}</span>
-                    </button>
-                  ))}
+                  {active.mnemonic ? (
+                    <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Memory Aid</p>
+                      <p className="mt-1 leading-relaxed">{active.mnemonic}</p>
+                    </div>
+                  ) : null}
+
+                  <div className="grid grid-cols-4 gap-2">
+                    {GRADE_BUTTONS.map((button) => (
+                      <button
+                        key={button.grade}
+                        type="button"
+                        onClick={() => commitGrade(button.grade)}
+                        disabled={isPending || isSubmittingGrade}
+                        className={`flex flex-col items-center gap-1 rounded-xl border ${button.borderColor} ${button.bgColor} px-3 py-3 transition-all duration-150 disabled:opacity-50`}
+                      >
+                        <span className={`text-sm font-semibold ${button.color}`}>{button.label}</span>
+                        <span className="text-[10px] text-muted-foreground">{button.key} · {button.hint}</span>
+                      </button>
+                    ))}
+                  </div>
                 </motion.div>
               ) : (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">

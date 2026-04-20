@@ -135,6 +135,43 @@ export const getHintSchema = z.object({
 
 export type GetHintInput = z.infer<typeof getHintSchema>;
 
+export const generateMnemonicSchema = z.object({
+  card_id: z.uuid({ message: 'Invalid card id' }),
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+});
+
+export type GenerateMnemonicInput = z.infer<typeof generateMnemonicSchema>;
+
+export const syncEmbeddingsSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+});
+
+export type SyncEmbeddingsInput = z.infer<typeof syncEmbeddingsSchema>;
+
+export const createDeckChatSessionSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  title: z.string().trim().min(1).max(120).optional(),
+});
+
+export type CreateDeckChatSessionInput = z.infer<typeof createDeckChatSessionSchema>;
+
+export const getDeckChatMessagesSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  session_id: z.uuid({ message: 'Invalid session id' }),
+  limit: z.number().int().min(1).max(100).default(50).optional(),
+});
+
+export type GetDeckChatMessagesInput = z.infer<typeof getDeckChatMessagesSchema>;
+
+export const chatWithDeckSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  session_id: z.uuid({ message: 'Invalid session id' }).optional(),
+  message: z.string().trim().min(3, { message: 'Message is too short' }).max(2000, { message: 'Message is too long' }),
+  top_k: z.number().int().min(1).max(10).default(5).optional(),
+});
+
+export type ChatWithDeckInput = z.infer<typeof chatWithDeckSchema>;
+
 /* ═══════════ Study / Grading Schema ═══════════ */
 
 export const quizModeSchema = z.enum(['mcq', 'identification']);

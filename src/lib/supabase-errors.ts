@@ -26,5 +26,11 @@ export function isMissingColumnError(message: string, columnName: string) {
 
 export function isMissingDatabaseFunctionError(message: string, functionName: string) {
   const normalized = message.toLowerCase();
-  return normalized.includes(functionName.toLowerCase()) && normalized.includes('does not exist');
+  const referencesFunction = normalized.includes(functionName.toLowerCase());
+  const indicatesMissingFunction =
+    normalized.includes('does not exist') ||
+    normalized.includes('could not find the function') ||
+    (normalized.includes('could not find') && normalized.includes('function'));
+
+  return referencesFunction && indicatesMissingFunction;
 }

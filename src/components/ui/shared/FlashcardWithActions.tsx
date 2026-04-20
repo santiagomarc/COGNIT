@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Pencil, Trash2, X, Check, Square, CheckSquare } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
-import { updateCard, deleteCard, enrichCards } from '@/app/actions';
+import { updateCard, deleteCard } from '@/app/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
 
@@ -19,6 +18,7 @@ type FlashcardWithActionsProps = {
   cardNumber?: number;
   term: string;
   description: string;
+  topicTags: string[] | null;
   source: CardSource;
   importedBy: string | null;
   quizReady: boolean;
@@ -41,6 +41,7 @@ export function FlashcardWithActions({
   cardNumber,
   term,
   description,
+  topicTags,
   source,
   importedBy,
   quizReady,
@@ -54,7 +55,6 @@ export function FlashcardWithActions({
   const [editableDescription, setEditableDescription] = useState(description);
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [, startEnrichmentTransition] = useTransition();
 
   async function handleSave() {
     setIsLoading(true);
@@ -69,12 +69,6 @@ export function FlashcardWithActions({
     } else {
       toast.success('Card updated');
       setIsEditing(false);
-      startEnrichmentTransition(async () => {
-        const enrichmentResult = await enrichCards({ deck_id: deckId, card_ids: [cardId] });
-        if (enrichmentResult?.error) {
-          toast(formatActionError(enrichmentResult.error, 'Quiz enhancement will be prepared later.'));
-        }
-      });
     }
     setIsLoading(false);
   }
@@ -212,6 +206,18 @@ export function FlashcardWithActions({
             </div>
 
             <Flashcard question={description} answer={term} />
+            {Array.isArray(topicTags) && topicTags.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1">
+                {topicTags.map((tag) => (
+                  <span
+                    key={`${cardId}-${tag}`}
+                    className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-300"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </motion.div>
         )}
       </AnimatePresence>

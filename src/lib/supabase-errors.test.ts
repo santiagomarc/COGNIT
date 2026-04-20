@@ -36,6 +36,10 @@ describe('isMissingDatabaseFunctionError', () => {
     expect(
       isMissingDatabaseFunctionError('function get_due_cards_by_deck(uuid, timestamptz) does not exist', 'get_due_cards_by_deck')
     ).toBe(true);
+
+    expect(
+      isMissingDatabaseFunctionError('Could not find the function public.grade_owned_card(p_deck_id, p_card_id) in schema cache', 'grade_owned_card')
+    ).toBe(true);
   });
 
   it('returns false when function name does not match', () => {

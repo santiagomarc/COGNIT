@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useRef, useTransition } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { createCard, enrichCards } from '@/app/actions';
-import { formatActionError } from '@/lib/ai-feedback';
+import { createCard } from '@/app/actions';
 import { createCardSchema } from '@/lib/schemas';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +17,6 @@ type AddCardFormProps = {
 export function AddCardForm({ deckId }: AddCardFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [, startEnrichmentTransition] = useTransition();
   const [errors, setErrors] = useState<{ front?: string; back?: string }>({});
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -58,14 +56,6 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
       formRef.current?.reset();
       setErrors({});
       router.refresh();
-      if (result.cardId) {
-        startEnrichmentTransition(async () => {
-          const enrichmentResult = await enrichCards({ deck_id: deckId, card_ids: [result.cardId] });
-          if (enrichmentResult?.error) {
-            toast(formatActionError(enrichmentResult.error, 'Quiz enhancement will be prepared later.'));
-          }
-        });
-      }
     }
 
     setIsLoading(false);

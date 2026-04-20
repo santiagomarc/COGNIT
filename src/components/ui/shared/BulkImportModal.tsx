@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Upload, X, Wand2 } from 'lucide-react';
-import { bulkImportCards, enrichCards, sanitizeNotes } from '@/app/actions';
+import { bulkImportCards, sanitizeNotes } from '@/app/actions';
 import { BulkImportPreview } from '@/components/ui/shared/BulkImportPreview';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,7 +24,6 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
   const [importedBy, setImportedBy] = useState('');
   const [isCleaning, setIsCleaning] = useState(false);
   const [isImporting, startImportTransition] = useTransition();
-  const [isEnriching, startEnrichmentTransition] = useTransition();
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
@@ -107,27 +106,8 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
         return;
       }
 
-      toast.success(`${result.count} cards imported. Quiz modes are being prepared in the background.`);
-      const importedCardIds = result.cardIds ?? [];
+      toast.success(`${result.count} cards imported.`);
       resetModal();
-
-      if (importedCardIds.length > 0) {
-        startEnrichmentTransition(async () => {
-          const enrichmentResult = await enrichCards({
-            deck_id: deckId,
-            card_ids: importedCardIds,
-          });
-
-          if (enrichmentResult?.error) {
-            toast(formatActionError(enrichmentResult.error, 'Import completed. Quiz enhancement will finish later.'));
-            return;
-          }
-
-          if (enrichmentResult?.enrichedCount) {
-            toast.success(`Quiz data prepared for ${enrichmentResult.enrichedCount} imported cards.`);
-          }
-        });
-      }
     });
   }
 
@@ -235,7 +215,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 px-6 py-4">
                 <div className="text-sm text-muted-foreground">
-                  {isEnriching ? 'Preparing quiz data in the background...' : 'Only valid preview rows will be imported.'}
+                  Only valid preview rows will be imported.
                 </div>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={isImporting || isCleaning}>

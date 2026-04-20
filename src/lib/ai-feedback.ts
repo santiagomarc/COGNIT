@@ -17,6 +17,18 @@ export function formatActionError(error: unknown, fallbackMessage: string): stri
         return 'Hint generation is temporarily limited. Try answering first, then request a hint again in a bit.';
       }
 
+      if (error.includes('chat with deck')) {
+        return 'Deck chat is temporarily rate-limited. Please try again shortly.';
+      }
+
+      if (error.includes('sync embeddings')) {
+        return 'Deck embedding sync is temporarily limited. You can still study while it catches up later.';
+      }
+
+      if (error.includes('generate mnemonic')) {
+        return 'Mnemonic generation is temporarily limited. You can continue reviewing and try again later.';
+      }
+
       return 'AI is temporarily rate-limited. Please try again shortly.';
     }
 

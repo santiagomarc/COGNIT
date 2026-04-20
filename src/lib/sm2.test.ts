@@ -32,6 +32,13 @@ describe('sm2', () => {
     expect(failedReview.interval).toBe(0);
   });
 
+  it('schedules hard failures later than again failures', () => {
+    const again = sm2(0, buildInput({ state: 'review', repetitionCount: 4, interval: 12, easeFactor: 2.5 }));
+    const hard = sm2(2, buildInput({ state: 'review', repetitionCount: 4, interval: 12, easeFactor: 2.5 }));
+
+    expect(hard.nextReviewAt.getTime()).toBeGreaterThan(again.nextReviewAt.getTime() + 8 * 60_000);
+  });
+
   it('applies first successful intervals from new cards (1 day then 6 days)', () => {
     const first = sm2(4, buildInput({ state: 'new', repetitionCount: 0, interval: 0 }));
     expect(first.interval).toBe(1);
