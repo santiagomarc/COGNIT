@@ -14,10 +14,11 @@ import {
   Flame,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { gradeCard } from '@/app/actions';
 import type { StudyGrade } from '@/lib/sm2';
-import type { StudySessionCard } from '@/lib/study';
+import type { StudyScope, StudySessionCard } from '@/lib/study';
 import { toast } from 'sonner';
 
 type FlashcardReviewClientProps = {
@@ -25,6 +26,7 @@ type FlashcardReviewClientProps = {
   deckTitle: string;
   cards: StudySessionCard[];
   totalInDeck: number;
+  studyScope: StudyScope;
 };
 
 type GradeLogEntry = {
@@ -119,11 +121,13 @@ export function FlashcardReviewClient({
   deckTitle,
   cards,
   totalInDeck,
+  studyScope,
 }: FlashcardReviewClientProps) {
+  const router = useRouter();
   const sessionCardIds = useMemo(() => cards.map((card) => card.id), [cards]);
   const storageKey = useMemo(
-    () => `study-session:${deckId}:${sessionCardIds.join('|')}`,
-    [deckId, sessionCardIds]
+    () => `study-session:${deckId}:${studyScope}:${sessionCardIds.join('|')}`,
+    [deckId, sessionCardIds, studyScope]
   );
   const cardsById = useMemo(() => {
     const map = new Map<string, StudySessionCard>();
@@ -225,6 +229,23 @@ export function FlashcardReviewClient({
     if (sessionCards.length === 0) return 0;
     return Math.round(((completed ? sessionCards.length : index) / sessionCards.length) * 100);
   }, [completed, index, sessionCards.length]);
+
+  const summaryGrades = useMemo(() => {
+    const latestGradeByCard = new Map<string, StudyGrade>();
+    gradeLog.forEach((entry) => {
+      latestGradeByCard.set(entry.cardId, entry.grade);
+    });
+
+    return sessionCardIds
+      .map((cardId) => latestGradeByCard.get(cardId))
+      .filter((grade): grade is StudyGrade => Boolean(grade));
+  }, [gradeLog, sessionCardIds]);
+
+  const reviewedCardCount = summaryGrades.length;
+  const againCount = summaryGrades.filter((grade) => grade === 'again').length;
+  const hardCount = summaryGrades.filter((grade) => grade === 'hard').length;
+  const goodCount = summaryGrades.filter((grade) => grade === 'good').length;
+  const easyCount = summaryGrades.filter((grade) => grade === 'easy').length;
 
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-220, 220], [-14, 14]);
@@ -378,6 +399,18 @@ export function FlashcardReviewClient({
     startNewSession();
   }, [startNewSession]);
 
+  const saveAndExit = useCallback(() => {
+    clearStoredProgress();
+
+    if (reviewedCardCount > 0) {
+      toast.success(`Saved progress for ${reviewedCardCount} card${reviewedCardCount !== 1 ? 's' : ''}.`);
+    } else {
+      toast.success('Session closed. You can continue reviewing anytime.');
+    }
+
+    router.push(`/dashboard/${deckId}`);
+  }, [clearStoredProgress, deckId, reviewedCardCount, router]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || resumeState) {
       return;
@@ -458,6 +491,10 @@ export function FlashcardReviewClient({
   }, [completed, resumeState, sessionCards.length]);
 
   if (sessionCards.length === 0) {
+    const emptyMessage = studyScope === 'unmastered_only'
+      ? 'No unmastered cards are left in this deck right now.'
+      : "No cards are due for review right now. Come back later or add more cards.";
+
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
@@ -466,7 +503,7 @@ export function FlashcardReviewClient({
           </div>
           <h1 className="text-2xl font-semibold">You&apos;re all caught up!</h1>
           <p className="mt-2 text-muted-foreground">
-            No cards are due for review right now. Come back later or add more cards.
+            {emptyMessage}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {totalInDeck} card{totalInDeck !== 1 ? 's' : ''} total in this deck
@@ -508,32 +545,20 @@ export function FlashcardReviewClient({
   }
 
   const sessionDuration = nowMs - sessionStartMs;
-  const summaryGrades = useMemo(() => {
-    const latestGradeByCard = new Map<string, StudyGrade>();
-    gradeLog.forEach((entry) => {
-      latestGradeByCard.set(entry.cardId, entry.grade);
-    });
-
-    return sessionCardIds
-      .map((cardId) => latestGradeByCard.get(cardId))
-      .filter((grade): grade is StudyGrade => Boolean(grade));
-  }, [gradeLog, sessionCardIds]);
-  const reviewedCardCount = summaryGrades.length;
-  const againCount = summaryGrades.filter((grade) => grade === 'again').length;
-  const hardCount = summaryGrades.filter((grade) => grade === 'hard').length;
-  const goodCount = summaryGrades.filter((grade) => grade === 'good').length;
-  const easyCount = summaryGrades.filter((grade) => grade === 'easy').length;
 
   return (
     <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
       <div className="flex items-center justify-between gap-4">
-        <Link
-          href={`/dashboard/${deckId}`}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={saveAndExit}
+          disabled={isPending || isSubmittingGrade}
+          className="inline-flex items-center gap-2 px-0 text-sm text-muted-foreground hover:bg-transparent hover:text-primary"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Deck
-        </Link>
+          Save & Exit
+        </Button>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span>{deckTitle}</span>
           <span className="flex items-center gap-1 text-xs">

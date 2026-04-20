@@ -347,7 +347,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </div>
                   </div>
 
-                  <div className="mt-5 flex flex-wrap items-end gap-3">
+                  <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
                     <label className="space-y-1 text-left">
                       <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                         Session cards
@@ -363,6 +363,34 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                         aria-label="Number of flashcards to review"
                       />
                     </label>
+
+                    <fieldset className="space-y-2">
+                      <legend className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Card scope</legend>
+                      <div className="flex flex-wrap gap-2">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                          <input type="radio" name="scope" value="due" defaultChecked className="accent-primary" />
+                          Due only (SM-2)
+                        </label>
+                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                          <input type="radio" name="scope" value="include_reviewed" className="accent-primary" />
+                          Force include reviewed
+                        </label>
+                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                          <input type="radio" name="scope" value="unmastered_only" className="accent-primary" />
+                          Only not reviewed/mastered
+                        </label>
+                      </div>
+                    </fieldset>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-primary/10 bg-background/30 p-3">
+                    <p className="text-xs text-muted-foreground">
+                      Due mode keeps normal SM-2 scheduling. Force include reviewed fills the session with scheduled cards even if they are not due yet.
+                      Unmastered mode includes cards still in new, learning, or relearning states.
+                    </p>
+                  </div>
+
+                  <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
                     <Button type="submit">Review Flashcards</Button>
                   </div>
                 </form>

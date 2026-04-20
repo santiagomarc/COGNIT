@@ -5,6 +5,7 @@ export const MIN_SESSION_CARD_COUNT = 5;
 export const MAX_SESSION_CARD_COUNT = 50;
 
 export type QuizMode = 'mcq' | 'identification';
+export type StudyScope = 'due' | 'include_reviewed' | 'unmastered_only';
 
 export type StudySessionCard = {
   id: string;
@@ -53,6 +54,20 @@ export function normalizeSessionCardCount(rawCount: string | string[] | undefine
 export function normalizeQuizMode(rawMode: string | string[] | undefined): QuizMode {
   const modeValue = Array.isArray(rawMode) ? rawMode[0] : rawMode;
   return modeValue === 'identification' ? 'identification' : 'mcq';
+}
+
+export function normalizeStudyScope(rawScope: string | string[] | undefined): StudyScope {
+  const scopeValue = Array.isArray(rawScope) ? rawScope[0] : rawScope;
+
+  if (scopeValue === 'include_reviewed') {
+    return 'include_reviewed';
+  }
+
+  if (scopeValue === 'unmastered_only') {
+    return 'unmastered_only';
+  }
+
+  return 'due';
 }
 
 export function shuffleItems<T>(items: T[]): T[] {

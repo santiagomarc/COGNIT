@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
-import { normalizeSessionCardCount, type StudySessionCard } from '@/lib/study';
+import { normalizeSessionCardCount, normalizeStudyScope, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 
@@ -11,6 +11,7 @@ type StudyPageProps = {
   }>;
   searchParams?: Promise<{
     count?: string | string[];
+    scope?: string | string[];
   }>;
 };
 
@@ -45,18 +46,29 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     .eq('deck_id', deckId);
 
   const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0);
+  const studyScope: StudyScope = normalizeStudyScope(resolvedSearchParams?.scope);
 
-  // Fetch cards that are due for review:
-  //   • next_review_at <= now  (overdue / due today)
-  //   • OR next_review_at IS NULL  (brand-new cards never reviewed)
-  // Order: new cards first, then oldest-due first
+  // Keep SM-2 ordering across all scopes: new (null next_review_at) first, then soonest review date.
+  // Scope behavior:
+  //   • due (default): only due/new cards
+  //   • include_reviewed: include scheduled review cards even if not due yet
+  //   • unmastered_only: only cards not yet in stable review state
   const now = new Date().toISOString();
 
-  const { data: dueCards } = await supabase
+  let cardQuery = supabase
     .from('cards')
     .select('id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question, topic_tags, mnemonic')
-    .eq('deck_id', deckId)
-    .or(`next_review_at.is.null,next_review_at.lte.${now}`)
+    .eq('deck_id', deckId);
+
+  if (studyScope === 'due') {
+    cardQuery = cardQuery.or(`next_review_at.is.null,next_review_at.lte.${now}`);
+  }
+
+  if (studyScope === 'unmastered_only') {
+    cardQuery = cardQuery.or('state.is.null,state.eq.new,state.eq.learning,state.eq.relearning');
+  }
+
+  const { data: dueCards } = await cardQuery
     .order('next_review_at', { ascending: true, nullsFirst: true })
     .limit(sessionCardCount);
 
@@ -80,6 +92,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
       deckTitle={removeDeckTagFromTitle(deck.title)}
       cards={cards}
       totalInDeck={totalInDeck ?? 0}
+      studyScope={studyScope}
     />
   );
 }
