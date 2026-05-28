@@ -197,11 +197,11 @@ export default function LoginClient() {
   return (
     <div className="flex min-h-screen">
       {/* ═══════════ Left panel (branding) ═══════════ */}
-      <div className="relative hidden w-[60%] overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background lg:flex">
+      <div className="relative hidden lg:w-1/2 xl:w-[58%] overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background lg:flex">
         {/* Gradient orbs */}
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-primary/8 blur-3xl" />
-          <div className="absolute -bottom-32 -right-32 h-[360px] w-[360px] rounded-full bg-neon/8 blur-3xl" />
+          <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute -bottom-32 -right-32 h-[360px] w-[360px] rounded-full bg-neon/10 blur-3xl" />
         </div>
 
         {/* Center content */}

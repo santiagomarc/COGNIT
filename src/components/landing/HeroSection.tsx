@@ -137,16 +137,16 @@ export function HeroSection() {
 
               <div className="grid gap-4 sm:grid-cols-3">
                 {[
-                  { icon: Layers, label: 'Automata Theory', count: '24 cards', color: 'primary' },
-                  { icon: Brain, label: 'Data Structures', count: '18 cards', color: 'neon' },
-                  { icon: BarChart3, label: 'Linear Algebra', count: '31 cards', color: 'primary' },
+                  { icon: Layers, label: 'Automata Theory', count: '24 cards', bgClass: 'bg-primary/10', borderClass: 'border-primary/20', textClass: 'text-primary' },
+                  { icon: Brain, label: 'Data Structures', count: '18 cards', bgClass: 'bg-neon/10', borderClass: 'border-neon/20', textClass: 'text-neon' },
+                  { icon: BarChart3, label: 'Linear Algebra', count: '31 cards', bgClass: 'bg-primary/10', borderClass: 'border-primary/20', textClass: 'text-primary' },
                 ].map((deck) => (
                   <div
                     key={deck.label}
                     className="rounded-xl border border-primary/10 bg-card/40 p-4 backdrop-blur-sm"
                   >
-                    <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-${deck.color}/10 border border-${deck.color}/20`}>
-                      <deck.icon className={`h-4.5 w-4.5 text-${deck.color}`} />
+                    <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${deck.bgClass} border ${deck.borderClass}`}>
+                      <deck.icon className={`h-4.5 w-4.5 ${deck.textClass}`} />
                     </div>
                     <div className="text-sm font-medium">{deck.label}</div>
                     <div className="mt-0.5 text-xs text-muted-foreground">{deck.count}</div>
@@ -157,7 +157,7 @@ export function HeroSection() {
           </div>
 
           {/* Glow underneath the mockup */}
-          <div className="absolute -inset-x-10 -bottom-10 -z-10 h-40 rounded-full bg-primary/8 blur-3xl" />
+          <div className="absolute -inset-x-10 -bottom-10 -z-10 h-40 rounded-full bg-primary/10 blur-3xl" />
         </motion.div>
       </div>
 

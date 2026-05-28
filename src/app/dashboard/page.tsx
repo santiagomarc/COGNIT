@@ -307,7 +307,7 @@ export default async function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 md:p-8 pb-28 space-y-8">
+    <div className="container mx-auto p-6 md:p-8 space-y-8">
       {/* ── Header ── */}
       <FadeInUp>
         <div className="flex justify-between items-center">
