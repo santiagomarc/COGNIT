@@ -230,22 +230,16 @@ export function FlashcardReviewClient({
     return Math.round(((completed ? sessionCards.length : index) / sessionCards.length) * 100);
   }, [completed, index, sessionCards.length]);
 
-  const summaryGrades = useMemo(() => {
-    const latestGradeByCard = new Map<string, StudyGrade>();
-    gradeLog.forEach((entry) => {
-      latestGradeByCard.set(entry.cardId, entry.grade);
-    });
+  const attemptGrades = useMemo(() => gradeLog.map((entry) => entry.grade), [gradeLog]);
+  const reviewedAttemptCount = attemptGrades.length;
+  const fallbackAttemptCount = Math.min(index, sessionCards.length);
+  const effectiveAttemptCount = Math.max(reviewedAttemptCount, fallbackAttemptCount);
+  const uniqueReviewedCardCount = useMemo(() => new Set(gradeLog.map((entry) => entry.cardId)).size, [gradeLog]);
 
-    return sessionCardIds
-      .map((cardId) => latestGradeByCard.get(cardId))
-      .filter((grade): grade is StudyGrade => Boolean(grade));
-  }, [gradeLog, sessionCardIds]);
-
-  const reviewedCardCount = summaryGrades.length;
-  const againCount = summaryGrades.filter((grade) => grade === 'again').length;
-  const hardCount = summaryGrades.filter((grade) => grade === 'hard').length;
-  const goodCount = summaryGrades.filter((grade) => grade === 'good').length;
-  const easyCount = summaryGrades.filter((grade) => grade === 'easy').length;
+  const againCount = attemptGrades.filter((grade) => grade === 'again').length;
+  const hardCount = attemptGrades.filter((grade) => grade === 'hard').length;
+  const goodCount = attemptGrades.filter((grade) => grade === 'good').length;
+  const easyCount = attemptGrades.filter((grade) => grade === 'easy').length;
 
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-220, 220], [-14, 14]);
@@ -402,14 +396,14 @@ export function FlashcardReviewClient({
   const saveAndExit = useCallback(() => {
     clearStoredProgress();
 
-    if (reviewedCardCount > 0) {
-      toast.success(`Saved progress for ${reviewedCardCount} card${reviewedCardCount !== 1 ? 's' : ''}.`);
+    if (effectiveAttemptCount > 0) {
+      toast.success(`Saved progress for ${effectiveAttemptCount} review${effectiveAttemptCount !== 1 ? 's' : ''}.`);
     } else {
       toast.success('Session closed. You can continue reviewing anytime.');
     }
 
     router.push(`/dashboard/${deckId}`);
-  }, [clearStoredProgress, deckId, reviewedCardCount, router]);
+  }, [clearStoredProgress, deckId, effectiveAttemptCount, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || resumeState) {
@@ -586,7 +580,7 @@ export function FlashcardReviewClient({
 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {completed
-          ? `Flashcard review complete. ${reviewedCardCount} cards reviewed.`
+          ? `Flashcard review complete. ${effectiveAttemptCount} reviews completed.`
           : `Card ${index + 1} of ${sessionCards.length}.`}
       </div>
 
@@ -604,7 +598,7 @@ export function FlashcardReviewClient({
               </div>
               <h2 className="text-2xl font-bold tracking-tight">Review Complete</h2>
               <p className="mt-1 text-muted-foreground">
-                You reviewed {reviewedCardCount} card{reviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
+                You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
               </p>
             </div>
 
@@ -633,10 +627,10 @@ export function FlashcardReviewClient({
               <div className="flex items-center justify-between px-5 py-3">
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Zap className="h-4 w-4" />
-                  Avg. per Card
+                  Avg. per Review
                 </span>
                 <span className="text-sm font-medium">
-                  {reviewedCardCount > 0 ? formatDuration(Math.round(sessionDuration / reviewedCardCount)) : '—'}
+                  {effectiveAttemptCount > 0 ? formatDuration(Math.round(sessionDuration / effectiveAttemptCount)) : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between px-5 py-3">
@@ -645,7 +639,7 @@ export function FlashcardReviewClient({
                   Retention Rate
                 </span>
                 <span className="text-sm font-medium">
-                  {reviewedCardCount > 0 ? `${Math.round(((goodCount + easyCount) / reviewedCardCount) * 100)}%` : '—'}
+                  {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
                 </span>
               </div>
             </div>
