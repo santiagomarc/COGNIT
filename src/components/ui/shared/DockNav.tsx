@@ -62,7 +62,7 @@ export function DockNav() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = item.href === '/dashboard'
-                ? pathname === '/dashboard' || pathname.startsWith('/dashboard/')
+                ? pathname === '/dashboard'
                 : pathname === item.href;
 
               if (item.disabled) {

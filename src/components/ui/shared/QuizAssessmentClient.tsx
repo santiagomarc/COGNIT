@@ -152,14 +152,6 @@ export function QuizAssessmentClient({
   const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
   const [isEnriching, startEnrichmentTransition] = useTransition();
   const [isSavingResult, startSavingResultTransition] = useTransition();
-  const [saveAttempts, setSaveAttempts] = useState(0);
-  const [saveError, setSaveError] = useState<string | null>(null);
-
-  const retrySave = useCallback(() => {
-    didPersistResult.current = false;
-    setSaveError(null);
-    setSaveAttempts((c) => c + 1);
-  }, []);
 
   const requestedEnrichmentIds = useRef<Set<string>>(new Set());
   const didPersistResult = useRef(false);
@@ -350,7 +342,6 @@ export function QuizAssessmentClient({
     }
 
     didPersistResult.current = true;
-    setSaveError(null);
     startSavingResultTransition(async () => {
       const saveResult = await logQuizResult({
         deck_id: deckId,
@@ -365,14 +356,13 @@ export function QuizAssessmentClient({
 
       if (saveResult?.error) {
         didPersistResult.current = false;
-        setSaveError(saveResult.error ? (typeof saveResult.error === 'string' ? saveResult.error : Object.values(saveResult.error).flat().join(', ')) : 'Failed to save results');
         toast.error(formatActionError(saveResult.error, 'Failed to save quiz results'));
         return;
       }
 
       setHasSavedResult(true);
     });
-  }, [completed, deckId, isRematchSession, quizMode, results, sessionDuration, saveAttempts]);
+  }, [completed, deckId, isRematchSession, quizMode, results, sessionDuration]);
 
   useEffect(() => {
     if (!shouldProtectProgress) {
@@ -469,8 +459,6 @@ export function QuizAssessmentClient({
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     lastTickMs.current = null;
-    setSaveAttempts(0);
-    setSaveError(null);
   }, [cards, clearStoredSession, mode]);
 
   const resumePreviousSession = useCallback(() => {
@@ -528,8 +516,6 @@ export function QuizAssessmentClient({
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     lastTickMs.current = null;
-    setSaveAttempts(0);
-    setSaveError(null);
   };
 
   if (sessionCards.length === 0) {
@@ -782,24 +768,11 @@ export function QuizAssessmentClient({
                       {isRematchSession ? 'Saving this rematch attempt...' : 'Saving this quiz attempt...'}
                     </p>
                   ) : hasSavedResult ? (
-                    <p className="mt-2 text-emerald-400">
+                    <p className="mt-2">
                       {isRematchSession
                         ? 'Rematch attempts update mastery but stay out of quiz history.'
                         : 'This attempt has been recorded in your deck mastery progress.'}
                     </p>
-                  ) : saveError ? (
-                    <div className="mt-3 space-y-3">
-                      <p className="text-red-400 font-medium">Failed to save results: {saveError}</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        className="h-8 gap-1.5"
-                        onClick={retrySave}
-                      >
-                        Retry Saving Results
-                      </Button>
-                    </div>
                   ) : (
                     <p className="mt-2">This attempt is ready to be recorded once saving completes.</p>
                   )}
