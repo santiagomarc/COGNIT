@@ -167,6 +167,8 @@ export function QuizAssessmentClient({
       return;
     }
 
+  useCallback() =>
+
     lastTickMs.current = Date.now();
     const intervalId = window.setInterval(() => {
       const now = Date.now();

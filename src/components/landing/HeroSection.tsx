@@ -112,7 +112,7 @@ export function HeroSection() {
           initial={reduced ? undefined : { opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.45, type: 'spring', stiffness: 100, damping: 20 }}
-          className="perspective-1000 relative z-10 mx-auto mt-16 max-w-4xl hidden sm:block"
+          className="perspective-1000 relative z-10 mx-auto mt-16 max-w-4xl"
         >
           <div className="glass-card overflow-hidden rounded-2xl border border-primary/15 shadow-2xl shadow-primary/5">
             {/* Browser chrome */}
