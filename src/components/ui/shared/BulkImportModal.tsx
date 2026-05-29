@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Upload, X, Wand2 } from 'lucide-react';
-import { bulkImportCards, sanitizeNotes } from '@/app/actions';
+import { bulkImportCards, sanitizeNotes, enrichCards } from '@/app/actions';
 import { BulkImportPreview } from '@/components/ui/shared/BulkImportPreview';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
   const [importedBy, setImportedBy] = useState('');
   const [isCleaning, setIsCleaning] = useState(false);
   const [isImporting, startImportTransition] = useTransition();
+  const [, startEnrichTransition] = useTransition();
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
 
@@ -108,6 +109,15 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
 
       toast.success(`${result.count} cards imported.`);
       resetModal();
+
+      // Fire enrichment in the background so quiz MCQ distractors and ID
+      // questions are ready before the user starts their first quiz.
+      const importedCardIds = result.cardIds ?? [];
+      if (importedCardIds.length > 0) {
+        startEnrichTransition(async () => {
+          await enrichCards({ deck_id: deckId, card_ids: importedCardIds });
+        });
+      }
     });
   }
 
