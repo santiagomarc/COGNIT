@@ -113,7 +113,19 @@
   transition-duration: 280ms;
   transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
   transition-delay: 0ms;
-  will-change: background-color, color, border-color, box-shadow, fill, stroke, text-shadow;
+  /*
+   * Scoped to direct children only — applying will-change to every * node
+   * at once promotes thousands of elements to GPU layers simultaneously,
+   * spiking compositor memory. The overlay + body are the only truly
+   * animated surfaces during a theme toggle.
+   */
+  will-change: auto;
+}
+
+/* Only hint the GPU for the surfaces that actually change visually */
+.theme-transitioning > *,
+.theme-transitioning body {
+  will-change: background-color, color;
 }
 
 .theme-fade-overlay {
@@ -138,6 +150,13 @@
   opacity: 0.58;
   backdrop-filter: blur(10px) saturate(1.03);
   -webkit-backdrop-filter: blur(10px) saturate(1.03);
+}
+
+/* Stop the overlay entirely for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  .theme-fade-overlay {
+    display: none;
+  }
 }
 
 /* ─── Glow title: gamified display font with neon text-shadow ─── */
@@ -224,6 +243,20 @@
   }
 }
 
+/*
+ * Named orb pulse animation — used on background gradient blobs in layout.tsx.
+ * Using a named class (instead of Tailwind animate-pulse) lets the CSS
+ * prefers-reduced-motion guard target it before JS hydration.
+ */
+@keyframes orb-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.bg-orb-pulse {
+  animation: orb-pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 .sonner-toast {
   background: var(--card) !important;
   color: var(--card-foreground) !important;
@@ -260,6 +293,26 @@
   transform: rotateY(180deg);
 }
 
+/*
+ * Promotes an element to its own GPU compositor layer before user interaction.
+ * Apply to the 3D flip container so the first flip doesn't trigger a
+ * layer-promotion surprise (which causes a single-frame jank).
+ */
+@utility gpu-layer {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/*
+ * Skip paint and layout for off-screen sections until they approach
+ * the viewport. Gives significant CWV improvements on content-heavy pages.
+ * Use contain-intrinsic-size to avoid layout-shift when content becomes visible.
+ */
+@utility cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
 /* ─── Reduced motion ─── */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -269,6 +322,25 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Revoke GPU hints — no benefit when animations are frozen */
+  .theme-transitioning,
+  .theme-transitioning *,
+  .theme-transitioning > *,
+  .theme-transitioning body {
+    will-change: auto;
+  }
+
+  .theme-fade-overlay,
+  .theme-fade-overlay.is-visible {
+    will-change: auto;
+  }
+
+  /* Kill the background orbs entirely at the CSS level — JS may not be
+     hydrated yet when the page first paints, so we need a CSS guard too. */
+  .bg-orb-pulse {
+    animation: none !important;
   }
 
   .glass-skeleton::after {

@@ -67,7 +67,7 @@ export function Flashcard({ question, answer }: FlashcardProps) {
     >
       <motion.div
         ref={cardRef}
-        className="relative h-56 w-full"
+        className="relative h-56 w-full gpu-layer"
         style={supportsCursorTilt ? { rotateX, rotateY, transformStyle: 'preserve-3d' } : { transformStyle: 'preserve-3d' }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
@@ -91,7 +91,7 @@ export function Flashcard({ question, answer }: FlashcardProps) {
 
           {/* Back face (Answer), pre-rotated 180deg so it appears when parent flips */}
           <div
-            className="backface-hidden rotate-y-180 absolute inset-0 rounded-2xl border border-neon/30 bg-card/60 backdrop-blur-xl p-6 text-card-foreground shadow-lg transition-shadow duration-300 group-hover:shadow-[0_0_24px_-4px_var(--glow)]"
+            className="backface-hidden rotate-y-180 absolute inset-0 rounded-2xl border border-neon/30 bg-card/60 backdrop-blur-md p-6 text-card-foreground shadow-lg transition-shadow duration-300 group-hover:shadow-[0_0_24px_-4px_var(--glow)]"
           >
             <div className="flex items-center gap-2 mb-3">
               <div className="h-1.5 w-1.5 rounded-full bg-neon animate-pulse" />
