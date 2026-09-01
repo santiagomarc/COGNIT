@@ -5,7 +5,6 @@ import { createDeckSchema, CreateDeckInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { buildDeckTitleWithTag, normalizeDeckTag, removeDeckTagFromTitle } from '@/lib/deck-tags';
-import { invalidateDashboardCache } from './_shared';
 
 export async function createDeck(data: CreateDeckInput) {
   // 1. "No-Vibe" Validation: Check the data again on the server
@@ -50,7 +49,6 @@ export async function createDeck(data: CreateDeckInput) {
 
   // 4. Refresh the UI
   revalidatePath('/dashboard');
-  invalidateDashboardCache(user.id);
   return { success: true, deckId: deck.id };
 }
 
@@ -74,7 +72,6 @@ export async function deleteDeck(deckId: string) {
   }
 
   revalidatePath('/dashboard');
-  invalidateDashboardCache(user.id);
 }
 
 export async function updateDeck(deckId: string, title: string, accentTag?: string | null) {
@@ -105,5 +102,4 @@ export async function updateDeck(deckId: string, title: string, accentTag?: stri
   }
 
   revalidatePath('/dashboard');
-  invalidateDashboardCache(user.id);
 }

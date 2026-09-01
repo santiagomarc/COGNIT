@@ -7,9 +7,9 @@ import {
   bulkImportSchema, BulkImportInput,
 } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
-import { isMissingColumnError, isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
+import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import { invalidateDeckCache, requireOwnedDeck, touchDeckUpdatedAt } from './_shared';
+import { requireOwnedDeck, touchDeckUpdatedAt } from './_shared';
 
 const BULK_DELETE_MAX_COUNT = 200;
 
@@ -53,7 +53,6 @@ export async function createCard(data: CreateCardInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, result.data.deck_id);
   return { success: true, cardId: insertedCard?.id ?? null };
 }
 
@@ -94,32 +93,11 @@ export async function updateCard(data: UpdateCardInput) {
     embedding: null,
   };
 
-  let { error } = await supabase
+  const { error } = await supabase
     .from('cards')
     .update(updatePayload)
     .eq('id', result.data.id)
     .eq('deck_id', result.data.deck_id);
-
-  if (
-    error
-    && (
-      isMissingColumnError(error.message, 'ai_hint')
-      || isMissingColumnError(error.message, 'topic_tags')
-      || isMissingColumnError(error.message, 'mnemonic')
-      || isMissingColumnError(error.message, 'embedding')
-    )
-  ) {
-    ({ error } = await supabase
-      .from('cards')
-      .update({
-        front: result.data.front,
-        back: result.data.back,
-        mcq_distractors: null,
-        id_question: null,
-      })
-      .eq('id', result.data.id)
-      .eq('deck_id', result.data.deck_id));
-  }
 
   if (error) {
     console.error('[updateCard] db error:', error.code, error.message);
@@ -130,7 +108,6 @@ export async function updateCard(data: UpdateCardInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, result.data.deck_id);
   return { success: true };
 }
 
@@ -168,7 +145,6 @@ export async function bulkImportCards(data: BulkImportInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, result.data.deck_id);
 
   return {
     success: true,
@@ -212,7 +188,6 @@ export async function deleteCard(cardId: string, deckId: string) {
 
   revalidatePath(`/dashboard/${deckId}`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, deckId);
   return { success: true };
 }
 
@@ -292,7 +267,6 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   revalidatePath(`/dashboard/${deckId}/study`);
   revalidatePath(`/dashboard/${deckId}/quiz`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, deckId);
   return { success: true, deletedCount, requestedCount: normalizedIds.length };
 }
 

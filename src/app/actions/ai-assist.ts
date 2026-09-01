@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { sanitizeNotesSchema, SanitizeNotesInput, getHintSchema, GetHintInput } from '@/lib/schemas';
-import { isMissingColumnError } from '@/lib/supabase-errors';
 import { sanitizeAiServiceError } from '@/lib/server-errors';
 import {
   enforceAiRateLimit, getGeminiTextModel, normalizeWhitespace, recordAiUsage,
@@ -137,7 +136,7 @@ export async function generateMnemonicForCard(
     .eq('id', card.id)
     .eq('deck_id', deckId);
 
-  if (error && !isMissingColumnError(error.message, 'mnemonic')) {
+  if (error) {
     throw error;
   }
 
@@ -235,30 +234,12 @@ export async function getHint(data: GetHintInput) {
     return { error: limitError };
   }
 
-  let card: { front: string; back: string; ai_hint?: string | null } | null = null;
-  let error: { message: string } | null = null;
-
-  const cardQuery = await supabase
+  const { data: card, error } = await supabase
     .from('cards')
     .select('front, back, ai_hint')
     .eq('id', result.data.card_id)
     .eq('deck_id', result.data.deck_id)
     .single();
-
-  if (cardQuery.error && isMissingColumnError(cardQuery.error.message, 'ai_hint')) {
-    const fallbackCardQuery = await supabase
-      .from('cards')
-      .select('front, back')
-      .eq('id', result.data.card_id)
-      .eq('deck_id', result.data.deck_id)
-      .single();
-
-    card = fallbackCardQuery.data ? { ...fallbackCardQuery.data, ai_hint: null } : null;
-    error = fallbackCardQuery.error;
-  } else {
-    card = cardQuery.data;
-    error = cardQuery.error;
-  }
 
   if (error || !card) {
     return { error: 'Card not found.' };
@@ -311,7 +292,7 @@ export async function getHint(data: GetHintInput) {
       .eq('id', result.data.card_id)
       .eq('deck_id', result.data.deck_id);
 
-    if (hintUpdateError && !isMissingColumnError(hintUpdateError.message, 'ai_hint')) {
+    if (hintUpdateError) {
       console.warn('[getHint] failed to cache ai_hint:', hintUpdateError.message);
     }
 

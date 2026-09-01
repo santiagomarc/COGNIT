@@ -5,9 +5,9 @@ import { revalidatePath } from 'next/cache';
 import { sm2, DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry, QuizMode } from '@/index';
-import { isMissingColumnError, isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import { invalidateDeckCache, normalizeForMatch, requireOwnedDeck } from './_shared';
+import { normalizeForMatch, requireOwnedDeck } from './_shared';
 
 type QuizCardHistoryRow = {
   quiz_result_id: string;
@@ -97,38 +97,62 @@ export async function logQuizResult(data: LogQuizResultInput) {
     };
   });
 
-  // Batch update cards scheduling in a single query per card (upsert by id)
-  for (const { card_id, sm2Result } of sm2Updates) {
-    const { error: cardUpdateErr } = await supabase
-      .from('cards')
-      .update({
-        state: sm2Result.state,
-        interval: sm2Result.interval,
-        ease_factor: sm2Result.easeFactor,
-        repetition_count: sm2Result.repetitionCount,
-        next_review_at: sm2Result.nextReviewAt.toISOString(),
-        last_review_at: now.toISOString(),
-      })
-      .eq('id', card_id)
-      .eq('deck_id', result.data.deck_id);
+  // Apply every card's scheduling update and study_logs row atomically in one
+  // round trip via the RPC. Falls back to the sequential per-card path if the
+  // migration hasn't been applied yet, matching the pattern used elsewhere in
+  // this codebase (e.g. grade_owned_card, search_deck_cards_by_embedding).
+  const batchRpcResult = await supabase.rpc('apply_quiz_sm2_batch', {
+    p_deck_id: result.data.deck_id,
+    p_updates: sm2Updates.map(({ card_id, sm2Result, grade }) => ({
+      card_id,
+      state: sm2Result.state,
+      interval: sm2Result.interval,
+      ease_factor: sm2Result.easeFactor,
+      repetition_count: sm2Result.repetitionCount,
+      next_review_at: sm2Result.nextReviewAt.toISOString(),
+      grade,
+    })),
+  });
 
-    if (cardUpdateErr) {
-      // Non-fatal: log and continue — quiz result should still be saved
-      console.warn('[logQuizResult] SM-2 card update failed for card', card_id, cardUpdateErr.message);
+  if (batchRpcResult.error) {
+    const missingRpcFunction = isMissingDatabaseFunctionError(batchRpcResult.error.message, 'apply_quiz_sm2_batch');
+    if (missingRpcFunction) {
+      console.warn('[logQuizResult] rpc unavailable, using fallback persistence path:', batchRpcResult.error.message);
+    } else {
+      console.warn('[logQuizResult] rpc failed, using fallback persistence path:', batchRpcResult.error.message);
     }
-  }
 
-  // Batch insert study_logs so quiz sessions appear in the activity heatmap + streak
-  const studyLogRows = sm2Updates.map(({ card_id, grade }) => ({
-    user_id: user.id,
-    card_id,
-    grade,
-    review_duration_ms: 0,
-  }));
+    for (const { card_id, sm2Result } of sm2Updates) {
+      const { error: cardUpdateErr } = await supabase
+        .from('cards')
+        .update({
+          state: sm2Result.state,
+          interval: sm2Result.interval,
+          ease_factor: sm2Result.easeFactor,
+          repetition_count: sm2Result.repetitionCount,
+          next_review_at: sm2Result.nextReviewAt.toISOString(),
+          last_review_at: now.toISOString(),
+        })
+        .eq('id', card_id)
+        .eq('deck_id', result.data.deck_id);
 
-  const { error: studyLogErr } = await supabase.from('study_logs').insert(studyLogRows);
-  if (studyLogErr) {
-    console.warn('[logQuizResult] study_logs batch insert failed:', studyLogErr.message);
+      if (cardUpdateErr) {
+        // Non-fatal: log and continue — quiz result should still be saved
+        console.warn('[logQuizResult] SM-2 card update failed for card', card_id, cardUpdateErr.message);
+      }
+    }
+
+    const studyLogRows = sm2Updates.map(({ card_id, grade }) => ({
+      user_id: user.id,
+      card_id,
+      grade,
+      review_duration_ms: 0,
+    }));
+
+    const { error: studyLogErr } = await supabase.from('study_logs').insert(studyLogRows);
+    if (studyLogErr) {
+      console.warn('[logQuizResult] study_logs batch insert failed:', studyLogErr.message);
+    }
   }
   // ────────────────────────────────────────────────────────────────────────
 
@@ -143,7 +167,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
     duration_ms: result.data.duration_ms,
   };
 
-  let quizResultInsert = await supabase
+  const { data: insertedQuizResult, error: quizResultError } = await supabase
     .from('quiz_results')
     .insert({
       ...insertQuizResultBase,
@@ -151,16 +175,6 @@ export async function logQuizResult(data: LogQuizResultInput) {
     })
     .select('id, created_at')
     .single();
-
-  if (quizResultInsert.error && isMissingColumnError(quizResultInsert.error.message, 'include_in_history')) {
-    quizResultInsert = await supabase
-      .from('quiz_results')
-      .insert(insertQuizResultBase)
-      .select('id, created_at')
-      .single();
-  }
-
-  const { data: insertedQuizResult, error: quizResultError } = quizResultInsert;
 
   if (quizResultError || !insertedQuizResult) {
     if (quizResultError) {
@@ -224,7 +238,6 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   revalidatePath('/dashboard');
   revalidatePath(`/dashboard/${result.data.deck_id}`);
-  invalidateDeckCache(user.id, result.data.deck_id);
 
   return {
     success: true,
@@ -257,23 +270,14 @@ export async function getQuizHistory(deckId: string) {
 
   const { supabase, user } = deckAccess;
 
-  const buildQuizHistoryQuery = (applyHistoryFilter: boolean) => {
-    const query = supabase
-      .from('quiz_results')
-      .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
-      .eq('deck_id', deckId)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(200);
-
-    return applyHistoryFilter ? query.eq('include_in_history', true) : query;
-  };
-
-  let { data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(true);
-
-  if (quizResultsError && isMissingColumnError(quizResultsError.message, 'include_in_history')) {
-    ({ data: quizResults, error: quizResultsError } = await buildQuizHistoryQuery(false));
-  }
+  const { data: quizResults, error: quizResultsError } = await supabase
+    .from('quiz_results')
+    .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
+    .eq('deck_id', deckId)
+    .eq('user_id', user.id)
+    .eq('include_in_history', true)
+    .order('created_at', { ascending: false })
+    .limit(200);
 
   if (quizResultsError) {
     console.error('[getQuizHistory] quiz results error:', quizResultsError.code, quizResultsError.message);

@@ -3,11 +3,10 @@
 import { enrichCardsSchema, EnrichCardsInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { SchemaType, type Schema } from '@google/generative-ai';
-import { isMissingColumnError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import {
-  chunkArray, enforceAiRateLimit, getGeminiJsonModel, invalidateDeckCache,
+  chunkArray, enforceAiRateLimit, getGeminiJsonModel,
   recordAiUsage, requireOwnedDeck, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
 
@@ -203,7 +202,7 @@ export async function enrichCards(data: EnrichCardsInput) {
   for (const writeWindow of writeWindows) {
     await Promise.all(
       writeWindow.map(async (row) => {
-        let updateError = (await supabase
+        const { error: updateError } = await supabase
           .from('cards')
           .update({
             mcq_distractors: row.mcq_distractors,
@@ -211,18 +210,7 @@ export async function enrichCards(data: EnrichCardsInput) {
             topic_tags: row.topic_tags,
           })
           .eq('id', row.id)
-          .eq('deck_id', result.data.deck_id)).error;
-
-        if (updateError && isMissingColumnError(updateError.message, 'topic_tags')) {
-          updateError = (await supabase
-            .from('cards')
-            .update({
-              mcq_distractors: row.mcq_distractors,
-              id_question: row.id_question,
-            })
-            .eq('id', row.id)
-            .eq('deck_id', result.data.deck_id)).error;
-        }
+          .eq('deck_id', result.data.deck_id);
 
         if (updateError) {
           console.warn('[enrichCards] db update failed for card', row.id, updateError.message);
@@ -239,7 +227,6 @@ export async function enrichCards(data: EnrichCardsInput) {
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath(`/dashboard/${result.data.deck_id}/study`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, result.data.deck_id);
 
   if (enrichedCount > 0) {
     await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);

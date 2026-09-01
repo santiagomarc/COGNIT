@@ -7,7 +7,7 @@ import { SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 import { sanitizeAiServiceError, sanitizeDatabaseError } from '@/lib/server-errors';
 import {
-  enforceAiRateLimit, getGeminiJsonModel, invalidateDeckCache, normalizeForMatch,
+  enforceAiRateLimit, getGeminiJsonModel, normalizeForMatch,
   normalizeWhitespace, recordAiUsage, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
 
@@ -498,7 +498,6 @@ export async function generateCards(formData: FormData) {
 
   revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   revalidatePath('/dashboard');
-  invalidateDeckCache(user.id, parsed.data.deck_id);
 
   await recordAiUsage(supabase, user.id, 'generate_cards', {
     requested_count: parsed.data.count,

@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { revalidateTag } from 'next/cache';
 import type { Json } from '@/lib/database.types';
 
 export type AiActionName =
@@ -87,16 +86,6 @@ export function normalizeForMatch(value: string) {
 function isMissingAiUsageTableError(message: string) {
   const normalized = message.toLowerCase();
   return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
-}
-
-export function invalidateDashboardCache(userId: string) {
-  revalidateTag(`dashboard:${userId}`, 'max');
-}
-
-export function invalidateDeckCache(userId: string, deckId: string) {
-  revalidateTag(`dashboard:${userId}`, 'max');
-  revalidateTag(`deck:${deckId}`, 'max');
-  revalidateTag(`quiz-history:${deckId}:${userId}`, 'max');
 }
 
 // Deliberately does not strip fenced code blocks: this app is used to study

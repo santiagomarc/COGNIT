@@ -477,6 +477,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      // Hand-added: matches supabase/migrations/202609010900_quiz_sm2_batch_rpc.sql,
+      // not yet applied to the live database. Re-running
+      // `supabase gen types typescript --linked` after applying it will replace
+      // this entry with the real generated one (which should match) — safe to
+      // remove this comment once that's confirmed.
+      apply_quiz_sm2_batch: {
+        Args: { p_deck_id: string; p_updates: Json }
+        Returns: number
+      }
       batch_grade_owned_cards:
         | { Args: { p_deck_id: string; p_updates: Json[] }; Returns: undefined }
         | {

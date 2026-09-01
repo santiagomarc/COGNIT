@@ -7,7 +7,7 @@ import {
   chatWithDeckSchema, ChatWithDeckInput,
 } from '@/lib/schemas';
 import { SchemaType, type Schema } from '@google/generative-ai';
-import { isMissingColumnError, isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import {
@@ -98,9 +98,6 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
     .eq('deck_id', parsed.data.deck_id);
 
   if (totalCountError) {
-    if (isMissingColumnError(totalCountError.message, 'embedding')) {
-      return { error: DECK_CHAT_MIGRATION_ERROR };
-    }
     return { error: sanitizeDatabaseError(totalCountError, 'Failed to load cards for embedding sync.') };
   }
 
@@ -111,9 +108,6 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
     .is('embedding', null);
 
   if (pendingCountError) {
-    if (isMissingColumnError(pendingCountError.message, 'embedding')) {
-      return { error: DECK_CHAT_MIGRATION_ERROR };
-    }
     return { error: sanitizeDatabaseError(pendingCountError, 'Failed to load cards for embedding sync.') };
   }
 

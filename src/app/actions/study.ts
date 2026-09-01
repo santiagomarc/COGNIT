@@ -2,11 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { gradeCardSchema, GradeCardInput } from '@/lib/schemas';
+import { revalidatePath } from 'next/cache';
 import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import type { CardState } from '@/index';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import { invalidateDeckCache } from './_shared';
 import { generateMnemonicForCard } from './ai-assist';
 
 export async function gradeCard(data: GradeCardInput) {
@@ -114,7 +114,6 @@ export async function gradeCard(data: GradeCardInput) {
     }
   }
 
-  invalidateDeckCache(user.id, result.data.deck_id);
 
   if (shouldGenerateMnemonic) {
     try {
@@ -124,11 +123,13 @@ export async function gradeCard(data: GradeCardInput) {
         back: card.back,
         mnemonic: card.mnemonic,
       });
-      invalidateDeckCache(user.id, result.data.deck_id);
     } catch (mnemonicError) {
       console.warn('[gradeCard] mnemonic generation skipped:', mnemonicError);
     }
   }
+
+  revalidatePath('/dashboard');
+  revalidatePath(`/dashboard/${result.data.deck_id}`);
 
   return {
     success: true,
