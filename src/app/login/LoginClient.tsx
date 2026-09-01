@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PasswordStrength } from '@/components/ui/shared/PasswordStrength';
-import { login, signup, resetPassword } from '@/app/auth/actions';
+import { login, signup, resetPassword, loginWithOAuth } from '@/app/auth/actions';
 import { loginSchema, signupSchema, resetPasswordSchema } from '@/lib/schemas';
 import {
   Sparkles,
@@ -21,7 +21,19 @@ import {
   Loader2,
   ArrowLeft,
   Mail,
+  Github,
 } from 'lucide-react';
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+      <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82Z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.1A12 12 0 0 0 12 24Z" />
+      <path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.26A12 12 0 0 0 0 12c0 1.94.46 3.77 1.26 5.38l4.01-3.1Z" />
+      <path fill="#EA4335" d="M12 4.76c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.62l4.01 3.1c.95-2.85 3.6-4.96 6.73-4.96Z" />
+    </svg>
+  );
+}
 import { toast } from 'sonner';
 
 /* ── Floating flashcard illustration props ── */
@@ -73,6 +85,7 @@ export default function LoginClient() {
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [oauthProvider, setOauthProvider] = useState<'google' | 'github' | null>(null);
 
   useEffect(() => {
     setGeneralError(searchParams.get('error'));
@@ -103,6 +116,18 @@ export default function LoginClient() {
       return next;
     });
     setGeneralError(null);
+  }
+
+  async function handleOAuthClick(provider: 'google' | 'github') {
+    setGeneralError(null);
+    setOauthProvider(provider);
+    const redirectTo = searchParams.get('redirectTo');
+    const result = await loginWithOAuth(provider, redirectTo);
+    // On success loginWithOAuth redirects and this line is never reached.
+    setOauthProvider(null);
+    if (result?.error) {
+      setGeneralError(result.error);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -476,6 +501,37 @@ export default function LoginClient() {
                     )}
                   </Button>
                 </form>
+
+                {/* OAuth providers (login / signup only) */}
+                {mode !== 'forgot' && (
+                  <div className="mt-6">
+                    <div className="relative flex items-center">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="px-3 text-xs text-muted-foreground">or continue with</span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleOAuthClick('google')}
+                        disabled={oauthProvider !== null || isPending}
+                      >
+                        {oauthProvider === 'google' ? <Loader2 className="h-4 w-4 animate-spin" /> : <GoogleIcon />}
+                        Google
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleOAuthClick('github')}
+                        disabled={oauthProvider !== null || isPending}
+                      >
+                        {oauthProvider === 'github' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Github className="h-4 w-4" />}
+                        GitHub
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Mode toggle */}
                 {mode !== 'forgot' && (

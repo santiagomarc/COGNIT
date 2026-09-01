@@ -29,6 +29,10 @@ export function formatActionError(error: unknown, fallbackMessage: string): stri
         return 'Mnemonic generation is temporarily limited. You can continue reviewing and try again later.';
       }
 
+      if (error.includes('semantic search')) {
+        return 'Search is temporarily rate-limited. Please try again shortly.';
+      }
+
       return 'AI is temporarily rate-limited. Please try again shortly.';
     }
 

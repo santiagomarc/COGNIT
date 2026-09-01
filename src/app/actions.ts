@@ -5,7 +5,8 @@
 export { createDeck, deleteDeck, updateDeck } from './actions/deck';
 export { createCard, updateCard, bulkImportCards, deleteCard, bulkDeleteCards } from './actions/card';
 export { gradeCard } from './actions/study';
-export { logQuizResult, getQuizHistory } from './actions/quiz';
+export { logQuizResult, getQuizHistory, getWeakestConcepts } from './actions/quiz';
+export type { WeakestConcept } from './actions/quiz';
 export { generateCards } from './actions/ai-generate';
 export { enrichCards } from './actions/ai-enrich';
 export { sanitizeNotes, getHint } from './actions/ai-assist';
@@ -15,4 +16,6 @@ export {
   getDeckChatSessions,
   getDeckChatMessages,
   chatWithDeck,
+  semanticSearchCards,
 } from './actions/chat';
+export type { SemanticSearchResult } from './actions/chat';

@@ -486,6 +486,26 @@ export type Database = {
         Args: { p_deck_id: string; p_updates: Json }
         Returns: number
       }
+      // Hand-added: matches supabase/migrations/202609011200_dashboard_aggregation_rpcs.sql,
+      // not yet applied. See comment above.
+      get_study_activity_days: {
+        Args: { p_user_id: string }
+        Returns: { activity_date: string; review_count: number }[]
+      }
+      get_deck_mastery_summary: {
+        Args: { p_user_id: string }
+        Returns: { deck_id: string; assessed_cards: number; mastered_cards: number; last_quiz_at: string }[]
+      }
+      // Hand-added: matches supabase/migrations/202609011300_weakest_concepts_rpc.sql.
+      get_weakest_concepts: {
+        Args: { p_deck_id?: string | null; p_limit?: number; p_min_attempts?: number; p_user_id: string }
+        Returns: { topic_tag: string; attempts: number; misses: number; error_rate: number }[]
+      }
+      // Hand-added: matches supabase/migrations/202609011400_cross_deck_semantic_search_rpc.sql.
+      search_user_cards_by_embedding: {
+        Args: { p_limit?: number; p_query_embedding: string; p_user_id: string }
+        Returns: { id: string; deck_id: string; deck_title: string; front: string; back: string; similarity: number }[]
+      }
       batch_grade_owned_cards:
         | { Args: { p_deck_id: string; p_updates: Json[] }; Returns: undefined }
         | {

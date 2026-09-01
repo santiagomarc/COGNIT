@@ -9,6 +9,7 @@ import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
 import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
 import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
+import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
@@ -496,6 +497,12 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       {hasCards ? addContentSection : null}
 
       <DeckCardsManager deckId={deckId} cards={cards} />
+
+      <FadeInUp delay={0.2}>
+        <Suspense fallback={<WeakestConceptsSkeleton />}>
+          <WeakestConcepts deckId={deckId} />
+        </Suspense>
+      </FadeInUp>
 
       <FadeInUp delay={0.2}>
         <Suspense fallback={<QuizHistorySkeleton />}>

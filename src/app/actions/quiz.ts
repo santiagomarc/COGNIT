@@ -344,3 +344,36 @@ export async function getQuizHistory(deckId: string) {
 
   return { history };
 }
+
+export type WeakestConcept = {
+  topic_tag: string;
+  attempts: number;
+  misses: number;
+  error_rate: number;
+};
+
+export async function getWeakestConcepts(deckId: string, limit = 8) {
+  const deckAccess = await requireOwnedDeck(deckId);
+  if ('error' in deckAccess) {
+    return { error: deckAccess.error };
+  }
+
+  const { supabase, user } = deckAccess;
+
+  const { data, error } = await supabase.rpc('get_weakest_concepts', {
+    p_user_id: user.id,
+    p_deck_id: deckId,
+    p_limit: limit,
+  });
+
+  if (error) {
+    if (isMissingDatabaseFunctionError(error.message, 'get_weakest_concepts')) {
+      // Migration not applied yet — an empty list degrades gracefully to the
+      // "not enough quiz history" empty state rather than an error.
+      return { concepts: [] as WeakestConcept[] };
+    }
+    return { error: sanitizeDatabaseError(error, 'Failed to load weakest concepts.') };
+  }
+
+  return { concepts: (data ?? []) as WeakestConcept[] };
+}

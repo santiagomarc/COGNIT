@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
+import { SemanticSearchModal } from '@/components/ui/shared/SemanticSearchModal';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
@@ -9,7 +10,7 @@ import { FadeInUp } from '@/components/motion';
 import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
-import { isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { Layers } from 'lucide-react';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -22,17 +23,118 @@ type DashboardDeckRow = {
   cards: { count: number }[];
 };
 
+type ActivityDayRow = { activity_date: string; review_count: number };
+type DeckMasterySummaryRow = { deck_id: string; assessed_cards: number; mastered_cards: number; last_quiz_at: string };
+
 type DashboardSnapshot = {
   deckRows: DashboardDeckRow[];
   deckQueryUsedFallback: boolean;
   deckQueryErrorMessage: string | null;
   dueByDeckRows: DueCardsByDeckRow[];
-  studyDays: Array<{ created_at: string }>;
-  recentActivityLogs: Array<{ created_at: string }>;
+  activityDays: ActivityDayRow[];
   totalStudiedCards: number;
-  masteryStateRows: Array<{ deck_id: string; correct: boolean; last_quiz_at: string }>;
-  masteryStateErrorMessage: string | null;
+  masterySummaryRows: DeckMasterySummaryRow[];
+  masteryTableMissing: boolean;
 };
+
+// One row per distinct day ever studied, with that day's review count —
+// replaces two raw study_logs fetches (capped at 5,000 and 10,000 rows) that
+// existed only to compute this same grouping in Node. Falls back to the old
+// per-row queries if the migration hasn't been applied yet.
+async function loadActivityDays(supabase: SupabaseServerClient, userId: string): Promise<ActivityDayRow[]> {
+  const rpcResult = await supabase.rpc('get_study_activity_days', { p_user_id: userId });
+
+  if (!rpcResult.error) {
+    return rpcResult.data ?? [];
+  }
+
+  if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_study_activity_days')) {
+    console.warn('[dashboard] get_study_activity_days rpc failed, using fallback:', rpcResult.error.message);
+  }
+
+  const now = new Date();
+  const sixMonthsAgo = new Date(now);
+  sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
+
+  const [{ data: recentLogsForStreak }, { data: recentLogsForHeatmap }] = await Promise.all([
+    supabase
+      .from('study_logs')
+      .select('created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    supabase
+      .from('study_logs')
+      .select('created_at')
+      .eq('user_id', userId)
+      .gte('created_at', sixMonthsAgo.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(10000),
+  ]);
+
+  const countByDay = new Map<string, number>();
+  for (const log of [...(recentLogsForStreak ?? []), ...(recentLogsForHeatmap ?? [])]) {
+    const day = (log.created_at ?? new Date().toISOString()).slice(0, 10);
+    countByDay.set(day, (countByDay.get(day) ?? 0) + 1);
+  }
+
+  return Array.from(countByDay.entries()).map(([activity_date, review_count]) => ({ activity_date, review_count }));
+}
+
+// Per-deck mastery totals grouped server-side — replaces fetching every
+// card_mastery_state row (up to 20,000) just to group them in Node.
+async function loadMasterySummary(
+  supabase: SupabaseServerClient,
+  userId: string,
+): Promise<{ rows: DeckMasterySummaryRow[]; tableMissing: boolean }> {
+  const rpcResult = await supabase.rpc('get_deck_mastery_summary', { p_user_id: userId });
+
+  if (!rpcResult.error) {
+    return { rows: rpcResult.data ?? [], tableMissing: false };
+  }
+
+  if (isMissingTableError(rpcResult.error.message, 'card_mastery_state')) {
+    return { rows: [], tableMissing: true };
+  }
+
+  if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_deck_mastery_summary')) {
+    console.error('[dashboard] get_deck_mastery_summary rpc failed, using fallback:', rpcResult.error.message);
+  }
+
+  const { data: masteryStateRows, error: masteryStateError } = await supabase
+    .from('card_mastery_state')
+    .select('deck_id, correct, last_quiz_at')
+    .eq('user_id', userId)
+    .limit(20000);
+
+  if (masteryStateError) {
+    if (isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
+      return { rows: [], tableMissing: true };
+    }
+    console.error('[dashboard] failed to read card mastery state:', masteryStateError.message);
+    return { rows: [], tableMissing: false };
+  }
+
+  const summaryByDeck = new Map<string, DeckMasterySummaryRow>();
+  for (const row of masteryStateRows ?? []) {
+    const existing = summaryByDeck.get(row.deck_id) ?? {
+      deck_id: row.deck_id,
+      assessed_cards: 0,
+      mastered_cards: 0,
+      last_quiz_at: row.last_quiz_at,
+    };
+    existing.assessed_cards += 1;
+    if (row.correct) {
+      existing.mastered_cards += 1;
+    }
+    if (row.last_quiz_at > existing.last_quiz_at) {
+      existing.last_quiz_at = row.last_quiz_at;
+    }
+    summaryByDeck.set(row.deck_id, existing);
+  }
+
+  return { rows: Array.from(summaryByDeck.values()), tableMissing: false };
+}
 
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: relationalDecks, error: relationalDecksError } = await supabase
@@ -113,10 +215,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
 
 async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot> {
   const supabase = await createClient();
-  const now = new Date();
-  const nowIso = now.toISOString();
-  const sixMonthsAgo = new Date(now);
-  sixMonthsAgo.setUTCMonth(sixMonthsAgo.getUTCMonth() - 6);
+  const nowIso = new Date().toISOString();
 
   const {
     deckRows,
@@ -124,36 +223,14 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     errorMessage: deckQueryErrorMessage,
   } = await loadDeckRowsWithFallback(supabase);
 
-  const dueByDeckRows = await loadDueByDeckRows(supabase, userId, nowIso);
-
-  const [
-    { data: studyDays },
-    { data: recentActivityLogs },
-    { count: totalStudiedCards },
-    { data: masteryStateRows, error: masteryStateError },
-  ] = await Promise.all([
-    supabase
-      .from('study_logs')
-      .select('created_at')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(5000),
-    supabase
-      .from('study_logs')
-      .select('created_at')
-      .eq('user_id', userId)
-      .gte('created_at', sixMonthsAgo.toISOString())
-      .order('created_at', { ascending: true })
-      .limit(10000),
+  const [dueByDeckRows, activityDays, { count: totalStudiedCards }, masterySummary] = await Promise.all([
+    loadDueByDeckRows(supabase, userId, nowIso),
+    loadActivityDays(supabase, userId),
     supabase
       .from('study_logs')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId),
-    supabase
-      .from('card_mastery_state')
-      .select('deck_id, correct, last_quiz_at')
-      .eq('user_id', userId)
-      .limit(20000),
+    loadMasterySummary(supabase, userId),
   ]);
 
   return {
@@ -161,11 +238,10 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     deckQueryUsedFallback,
     deckQueryErrorMessage,
     dueByDeckRows,
-    studyDays: (studyDays ?? []).map((row) => ({ created_at: row.created_at ?? new Date().toISOString() })),
-    recentActivityLogs: (recentActivityLogs ?? []).map((row) => ({ created_at: row.created_at ?? new Date().toISOString() })),
+    activityDays,
     totalStudiedCards: totalStudiedCards ?? 0,
-    masteryStateRows: masteryStateRows ?? [],
-    masteryStateErrorMessage: masteryStateError?.message ?? null,
+    masterySummaryRows: masterySummary.rows,
+    masteryTableMissing: masterySummary.tableMissing,
   };
 }
 
@@ -182,11 +258,10 @@ export default async function Dashboard() {
     deckQueryUsedFallback,
     deckQueryErrorMessage,
     dueByDeckRows,
-    studyDays,
-    recentActivityLogs,
+    activityDays,
     totalStudiedCards,
-    masteryStateRows,
-    masteryStateErrorMessage,
+    masterySummaryRows,
+    masteryTableMissing,
   } = await loadDashboardSnapshot(user.id);
 
   if (deckQueryUsedFallback && deckQueryErrorMessage) {
@@ -211,41 +286,23 @@ export default async function Dashboard() {
   const totalCardsByDeck = new Map(deckRows.map((deck) => [deck.id, deck.cards?.[0]?.count ?? 0]));
 
   const masteryByDeck = new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();
-  for (const row of masteryStateRows ?? []) {
-    const existing = masteryByDeck.get(row.deck_id) ?? {
-      assessedCards: 0,
-      masteredCards: 0,
-      lastQuizAt: null,
-    };
-
-    existing.assessedCards += 1;
-    if (row.correct) {
-      existing.masteredCards += 1;
-    }
-
-    if (!existing.lastQuizAt || existing.lastQuizAt < row.last_quiz_at) {
-      existing.lastQuizAt = row.last_quiz_at;
-    }
-
-    masteryByDeck.set(row.deck_id, existing);
+  for (const row of masterySummaryRows) {
+    masteryByDeck.set(row.deck_id, {
+      assessedCards: row.assessed_cards,
+      masteredCards: row.mastered_cards,
+      lastQuizAt: row.last_quiz_at,
+    });
   }
 
-  if (masteryStateErrorMessage) {
-    if (isMissingTableError(masteryStateErrorMessage, 'card_mastery_state')) {
-      const legacyMasteryByDeck = await loadLegacyDeckMasterySnapshots(supabase, user.id, totalCardsByDeck);
-      for (const [deckId, snapshot] of legacyMasteryByDeck.entries()) {
-        masteryByDeck.set(deckId, snapshot);
-      }
-    } else {
-      console.error('[dashboard] failed to read card mastery state:', masteryStateErrorMessage);
+  if (masteryTableMissing) {
+    const legacyMasteryByDeck = await loadLegacyDeckMasterySnapshots(supabase, user.id, totalCardsByDeck);
+    for (const [deckId, snapshot] of legacyMasteryByDeck.entries()) {
+      masteryByDeck.set(deckId, snapshot);
     }
   }
 
-  // Deduplicate by date (UTC)
-  const uniqueDays = new Set<string>();
-  for (const log of studyDays ?? []) {
-    uniqueDays.add(log.created_at.slice(0, 10)); // YYYY-MM-DD
-  }
+  // Already deduplicated by day (RPC GROUP BY, or the fallback's Map dedup)
+  const uniqueDays = new Set<string>(activityDays.map((row) => row.activity_date));
 
   const sortedDays = Array.from(uniqueDays).sort((a, b) => b.localeCompare(a)); // newest first
   const todayDate = new Date();
@@ -258,11 +315,9 @@ export default async function Dashboard() {
   let check = today;
   const studiedToday = sortedDays.includes(today);
 
-  const activityByDate = new Map<string, number>();
-  for (const log of recentActivityLogs ?? []) {
-    const day = log.created_at.slice(0, 10);
-    activityByDate.set(day, (activityByDate.get(day) ?? 0) + 1);
-  }
+  const activityByDate = new Map<string, number>(
+    activityDays.map((row) => [row.activity_date, row.review_count])
+  );
 
   const activity = Array.from(activityByDate.entries())
     .map(([date, count]) => ({ date, count }))
@@ -320,7 +375,10 @@ export default async function Dashboard() {
               <p className="text-sm text-muted-foreground">Welcome back, {user.email}</p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-3">
+            <SemanticSearchModal />
+            <ThemeToggle />
+          </div>
         </div>
       </FadeInUp>
 

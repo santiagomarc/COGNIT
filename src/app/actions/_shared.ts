@@ -9,7 +9,8 @@ export type AiActionName =
   | 'get_hint'
   | 'generate_mnemonic'
   | 'chat_with_deck'
-  | 'sync_embeddings';
+  | 'sync_embeddings'
+  | 'semantic_search';
 
 const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests: number }> = {
   generate_cards: { windowMinutes: 60, maxRequests: 20 },
@@ -21,6 +22,7 @@ const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests:
   // Each call now embeds at most 200 cards (see CARDS_PER_SYNC_BATCH in chat.ts),
   // so a large deck needs several calls per sync — this limit must accommodate that.
   sync_embeddings: { windowMinutes: 60, maxRequests: 40 },
+  semantic_search: { windowMinutes: 60, maxRequests: 60 },
 };
 
 function getGeminiClient() {

@@ -1,10 +1,12 @@
 'use server';
 
+import { createClient } from '@/lib/supabase/server';
 import {
   syncEmbeddingsSchema, SyncEmbeddingsInput,
   createDeckChatSessionSchema, CreateDeckChatSessionInput,
   getDeckChatMessagesSchema, GetDeckChatMessagesInput,
   chatWithDeckSchema, ChatWithDeckInput,
+  semanticSearchSchema, SemanticSearchInput,
 } from '@/lib/schemas';
 import { SchemaType, type Schema } from '@google/generative-ai';
 import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
@@ -490,4 +492,59 @@ export async function chatWithDeck(data: ChatWithDeckInput) {
     followupSuggestions,
     references: contextCards.map((card) => ({ id: card.id, front: card.front })),
   };
+}
+
+export type SemanticSearchResult = {
+  id: string;
+  deck_id: string;
+  deck_title: string;
+  front: string;
+  back: string;
+  similarity: number;
+};
+
+export async function semanticSearchCards(data: SemanticSearchInput) {
+  const parsed = semanticSearchSchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.flatten().fieldErrors };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: 'You must be logged in.' };
+  }
+
+  const limitError = await enforceAiRateLimit(supabase, user.id, 'semantic_search');
+  if (limitError) {
+    return { error: limitError };
+  }
+
+  const sanitizedQuery = sanitizeAiInputText(parsed.data.query, 300);
+  if (!sanitizedQuery) {
+    return { error: 'Search query is empty after sanitization.' };
+  }
+
+  const queryVector = await embedText(sanitizedQuery);
+  const queryVectorLiteral = toVectorLiteral(queryVector);
+
+  const { data: results, error } = await supabase.rpc('search_user_cards_by_embedding', {
+    p_user_id: user.id,
+    p_query_embedding: queryVectorLiteral,
+    p_limit: parsed.data.limit ?? 8,
+  });
+
+  if (error) {
+    if (isMissingDatabaseFunctionError(error.message, 'search_user_cards_by_embedding')) {
+      return { error: 'Semantic search is not available yet. Please apply the latest database migrations first.' };
+    }
+    return { error: sanitizeDatabaseError(error, 'Search failed. Please try again.') };
+  }
+
+  await recordAiUsage(supabase, user.id, 'semantic_search', {
+    query_chars: sanitizedQuery.length,
+    result_count: results?.length ?? 0,
+  });
+
+  return { success: true, results: (results ?? []) as SemanticSearchResult[] };
 }

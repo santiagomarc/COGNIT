@@ -172,6 +172,13 @@ export const chatWithDeckSchema = z.object({
 
 export type ChatWithDeckInput = z.infer<typeof chatWithDeckSchema>;
 
+export const semanticSearchSchema = z.object({
+  query: z.string().trim().min(3, { message: 'Search query is too short' }).max(300, { message: 'Search query is too long' }),
+  limit: z.number().int().min(1).max(20).default(8).optional(),
+});
+
+export type SemanticSearchInput = z.infer<typeof semanticSearchSchema>;
+
 /* ═══════════ Study / Grading Schema ═══════════ */
 
 export const quizModeSchema = z.enum(['mcq', 'identification']);

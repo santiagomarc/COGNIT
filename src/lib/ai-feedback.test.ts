@@ -17,6 +17,11 @@ describe('formatActionError', () => {
     expect(message).toContain('Mnemonic generation is temporarily limited');
   });
 
+  it('maps semantic search rate limit errors', () => {
+    const message = formatActionError('AI limit reached for semantic search. Try again in about 60 minutes.', 'fallback');
+    expect(message).toContain('Search is temporarily rate-limited');
+  });
+
   it('joins object field validation errors', () => {
     const message = formatActionError({ message: ['Oops'], deck_id: ['Invalid deck id'] }, 'fallback');
     expect(message).toContain('Oops');

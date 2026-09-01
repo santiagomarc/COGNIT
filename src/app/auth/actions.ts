@@ -91,6 +91,31 @@ export async function login(data: LoginInput & { redirectTo?: string | null }) {
   redirect(resolveRedirectPath(data.redirectTo));
 }
 
+// ─── OAUTH (Google / GitHub) ───
+// Requires the provider to be enabled in Supabase Auth settings (Dashboard →
+// Authentication → Providers) with its own Client ID/Secret configured there
+// — this action cannot do that part, it only starts the redirect flow.
+export async function loginWithOAuth(provider: 'google' | 'github', redirectTo?: string | null) {
+  const headerStore = await headers();
+  const origin = headerStore.get('origin') || headerStore.get('x-forwarded-host') || '';
+  const protocol = headerStore.get('x-forwarded-proto') || 'https';
+  const baseUrl = origin.startsWith('http') ? origin : `${protocol}://${origin}`;
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${baseUrl}/auth/callback?next=${encodeURIComponent(resolveRedirectPath(redirectTo))}`,
+    },
+  });
+
+  if (error || !data.url) {
+    return { error: sanitizeAuthError(error ?? { message: 'Failed to start OAuth sign-in.' }) };
+  }
+
+  redirect(data.url);
+}
+
 // ─── SIGNUP ───
 export async function signup(data: SignupInput) {
   const parsed = signupSchema.safeParse(data);
