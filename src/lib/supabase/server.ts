@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/lib/database.types';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -9,8 +9,8 @@ export async function createClient() {
   // This client is special: it automatically passes the user's cookies
   // to Supabase so RLS policies work.
   return createServerClient<Database>(
-    env.NEXT_PUBLIC_SUPABASE_URL,
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    publicEnv.NEXT_PUBLIC_SUPABASE_URL,
+    publicEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {
