@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { deleteDeck, updateDeck } from '@/app/actions';
+import { deleteDeck, updateDeck } from '@/app/actions/deck';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';

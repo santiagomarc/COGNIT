@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { createDeck } from '@/app/actions';
+import { createDeck } from '@/app/actions/deck';
 import { createDeckSchema } from '@/lib/schemas';
 import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
 import { Button } from '@/components/ui/button';
@@ -32,15 +32,21 @@ export function CreateDeckForm() {
     }
 
     setIsLoading(true);
-    const result = await createDeck(parsed.data);
-    if (result?.error) {
-      toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
-    } else {
-      toast.success('Deck created successfully');
-      formRef.current?.reset();
-      setFieldError(null);
+    try {
+      const result = await createDeck(parsed.data);
+      if (result?.error) {
+        toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
+      } else {
+        toast.success('Deck created successfully');
+        formRef.current?.reset();
+        setFieldError(null);
+      }
+    } catch (err) {
+      console.error('[CreateDeckForm] error creating deck:', err);
+      toast.error('Unable to create deck right now. Please refresh the page and try again.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }
 
   return (

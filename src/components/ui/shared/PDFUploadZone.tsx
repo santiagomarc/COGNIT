@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useCallback, useTransition, type DragEvent, type ChangeEvent } from 'react';
-import { generateCards, enrichCards } from '@/app/actions';
+import { generateCards } from '@/app/actions/ai-generate';
+import { enrichCards } from '@/app/actions/ai-enrich';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';

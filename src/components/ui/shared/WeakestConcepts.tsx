@@ -1,5 +1,5 @@
 import { AlertTriangle, Target } from 'lucide-react';
-import { getWeakestConcepts, type WeakestConcept } from '@/app/actions';
+import { getWeakestConcepts, type WeakestConcept } from '@/app/actions/quiz';
 import { Card, CardContent } from '@/components/ui/card';
 
 type WeakestConceptsProps = {

@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { enrichCards, logQuizResult } from '@/app/actions';
+import { enrichCards } from '@/app/actions/ai-enrich';
+import { logQuizResult } from '@/app/actions/quiz';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
 import { MCQMode } from '@/components/ui/shared/MCQMode';

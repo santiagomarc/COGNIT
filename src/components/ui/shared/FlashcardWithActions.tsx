@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Pencil, Trash2, X, Check, Square, CheckSquare } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
-import { updateCard, deleteCard } from '@/app/actions';
+import { updateCard, deleteCard } from '@/app/actions/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';

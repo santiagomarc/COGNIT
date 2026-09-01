@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, CheckSquare, Square, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { bulkDeleteCards } from '@/app/actions';
+import { bulkDeleteCards } from '@/app/actions/card';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';

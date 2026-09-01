@@ -16,7 +16,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { gradeCard } from '@/app/actions';
+import { gradeCard } from '@/app/actions/study';
 import type { StudyGrade } from '@/lib/sm2';
 import type { StudyScope, StudySessionCard } from '@/lib/study';
 import { toast } from 'sonner';

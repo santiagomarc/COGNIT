@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Plus, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createDeck } from '@/app/actions';
+import { createDeck } from '@/app/actions/deck';
 import { createDeckSchema } from '@/lib/schemas';
 import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
 import { Button } from '@/components/ui/button';
@@ -59,22 +59,30 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
     const submittedTitle = title;
     setOpen(false);
     setIsLoading(true);
-    const result = await createDeck(parsed.data);
-    if (result?.error) {
+    try {
+      const result = await createDeck(parsed.data);
+      if (result?.error) {
+        setDraftTitle(submittedTitle);
+        setOpen(true);
+        toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
+      } else {
+        toast.success('Deck created successfully');
+        formRef.current?.reset();
+        setDraftTitle('');
+        setAccentTag('');
+        setFieldError(null);
+        if (result?.deckId) {
+          router.push(`/dashboard/${result.deckId}`);
+        }
+      }
+    } catch (err) {
       setDraftTitle(submittedTitle);
       setOpen(true);
-      toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
-    } else {
-      toast.success('Deck created successfully');
-      formRef.current?.reset();
-      setDraftTitle('');
-      setAccentTag('');
-      setFieldError(null);
-      if (result?.deckId) {
-        router.push(`/dashboard/${result.deckId}`);
-      }
+      console.error('[CreateDeckModal] error creating deck:', err);
+      toast.error('Unable to create deck right now. Please refresh the page and try again.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }
 
   return (

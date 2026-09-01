@@ -8,7 +8,7 @@ import {
   getDeckChatMessages,
   getDeckChatSessions,
   syncEmbeddings,
-} from '@/app/actions';
+} from '@/app/actions/chat';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { formatActionError } from '@/lib/ai-feedback';

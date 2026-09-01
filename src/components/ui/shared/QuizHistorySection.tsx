@@ -1,5 +1,5 @@
 import { Target } from 'lucide-react';
-import { getQuizHistory } from '@/app/actions';
+import { getQuizHistory } from '@/app/actions/quiz';
 import { QuizHistoryList } from '@/components/ui/shared/QuizHistoryList';
 import { Card, CardContent } from '@/components/ui/card';
 

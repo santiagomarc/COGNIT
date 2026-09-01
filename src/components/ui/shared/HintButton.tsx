@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Lightbulb } from 'lucide-react';
-import { getHint } from '@/app/actions';
+import { getHint } from '@/app/actions/ai-assist';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';

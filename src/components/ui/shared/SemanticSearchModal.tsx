@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
-import { semanticSearchCards, type SemanticSearchResult } from '@/app/actions';
+import { semanticSearchCards, type SemanticSearchResult } from '@/app/actions/chat';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';

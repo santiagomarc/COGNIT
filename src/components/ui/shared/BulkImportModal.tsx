@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Upload, X, Wand2 } from 'lucide-react';
-import { bulkImportCards, sanitizeNotes, enrichCards } from '@/app/actions';
+import { bulkImportCards } from '@/app/actions/card';
+import { sanitizeNotes } from '@/app/actions/ai-assist';
+import { enrichCards } from '@/app/actions/ai-enrich';
 import { BulkImportPreview } from '@/components/ui/shared/BulkImportPreview';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
