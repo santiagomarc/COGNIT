@@ -1,72 +1,43 @@
-export type CardState = 'new' | 'learning' | 'review' | 'relearning';
-export type CardSource = 'manual' | 'ai_pdf' | 'bulk_import' | 'ai_cleaned';
+import type { Database } from '@/lib/database.types';
 
-export interface Deck {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
+type Tables = Database['public']['Tables'];
+
+export type CardState = Database['public']['Enums']['card_state'];
+export type CardSource = 'manual' | 'ai_pdf' | 'bulk_import' | 'ai_cleaned';
+export type QuizMode = 'mcq' | 'identification';
+
+export type DeckRow = Tables['decks']['Row'];
+export type CardRow = Tables['cards']['Row'];
+export type StudyLogRow = Tables['study_logs']['Row'];
+export type QuizResultRow = Tables['quiz_results']['Row'];
+export type QuizCardResultRow = Tables['quiz_card_results']['Row'];
+
+export interface Deck extends Omit<DeckRow, 'is_public' | 'created_at' | 'updated_at'> {
   is_public: boolean;
   created_at: string;
   updated_at: string;
 }
 
-export interface Card {
-  id: string;
-  deck_id: string;
-  front: string;
-  back: string;
-  explanation: string | null;
+export interface Card extends Omit<CardRow, 'source' | 'state' | 'next_review_at' | 'created_at'> {
   source: CardSource;
-  imported_by: string | null;
-  mcq_distractors: string[] | null;
-  id_question: string | null;
-  ai_hint: string | null;
-  topic_tags: string[] | null;
-  mnemonic: string | null;
-  embedding: number[] | null;
-  
-  // Spaced Repetition Data
+  // pgvector columns round-trip through PostgREST as a "[0.1,0.2,...]" string literal, not number[].
   state: CardState;
   next_review_at: string; // ISO Date string
-  last_review_at: string | null;
-  interval: number;
-  ease_factor: number;
-  repetition_count: number;
-  
   created_at: string;
 }
 
-export interface StudyLog {
-  id: string;
-  user_id: string;
-  card_id: string;
+export interface StudyLog extends Omit<StudyLogRow, 'created_at' | 'review_duration_ms'> {
   grade: number; // 0-5
   review_duration_ms: number;
   created_at: string;
 }
 
-export interface QuizResult {
-  id: string;
-  user_id: string;
-  deck_id: string;
-  mode: 'mcq' | 'identification';
-  total_cards: number;
-  correct_cards: number;
-  duration_ms: number;
+export interface QuizResult extends Omit<QuizResultRow, 'mode' | 'created_at'> {
+  mode: QuizMode;
   created_at: string;
 }
 
-export interface QuizCardResult {
-  id: string;
-  quiz_result_id: string;
-  card_id: string;
-  correct: boolean;
-  prompt_text: string | null;
-  correct_answer_text: string | null;
-  user_answer_text: string | null;
-  created_at: string;
-}
+export type QuizCardResult = QuizCardResultRow;
 
 export interface QuizHistoryMistake {
   card_id: string;
@@ -79,7 +50,7 @@ export interface QuizHistoryMistake {
 export interface QuizHistoryEntry {
   id: string;
   deck_id: string;
-  mode: 'mcq' | 'identification';
+  mode: QuizMode;
   total_cards: number;
   correct_cards: number;
   score_percentage: number;

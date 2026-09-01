@@ -77,9 +77,22 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
 
     async function syncDeckVectors() {
       setIsSyncing(true);
-      const result = await syncEmbeddings({ deck_id: deckId });
-      if (mounted && result?.error) {
-        toast.error(formatActionError(result.error, 'Embedding sync is temporarily unavailable.'));
+      // Each call embeds one bounded batch (see CARDS_PER_SYNC_BATCH in
+      // src/app/actions/chat.ts) so a large deck needs several round trips.
+      // Keep calling until nothing is left pending or a batch makes no
+      // progress (avoids looping forever on a persistent failure).
+      for (;;) {
+        const result = await syncEmbeddings({ deck_id: deckId });
+        if (!mounted) {
+          return;
+        }
+        if (result?.error) {
+          toast.error(formatActionError(result.error, 'Embedding sync is temporarily unavailable.'));
+          break;
+        }
+        if (!result?.success || result.pending <= 0 || result.synced === 0) {
+          break;
+        }
       }
       if (mounted) {
         setIsSyncing(false);

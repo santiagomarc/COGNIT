@@ -77,8 +77,8 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
         id: deck.id,
         title: deck.title,
         description: deck.description,
-        created_at: deck.created_at,
-        updated_at: deck.updated_at,
+        created_at: deck.created_at ?? new Date().toISOString(),
+        updated_at: deck.updated_at ?? new Date().toISOString(),
         cards: [{ count: 0 }],
       }));
 
@@ -99,8 +99,8 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
     id: deck.id,
     title: deck.title,
     description: deck.description,
-    created_at: deck.created_at,
-    updated_at: deck.updated_at,
+    created_at: deck.created_at ?? new Date().toISOString(),
+    updated_at: deck.updated_at ?? new Date().toISOString(),
     cards: [{ count: cardsByDeck.get(deck.id) ?? 0 }],
   }));
 
@@ -161,8 +161,8 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     deckQueryUsedFallback,
     deckQueryErrorMessage,
     dueByDeckRows,
-    studyDays: studyDays ?? [],
-    recentActivityLogs: recentActivityLogs ?? [],
+    studyDays: (studyDays ?? []).map((row) => ({ created_at: row.created_at ?? new Date().toISOString() })),
+    recentActivityLogs: (recentActivityLogs ?? []).map((row) => ({ created_at: row.created_at ?? new Date().toISOString() })),
     totalStudiedCards: totalStudiedCards ?? 0,
     masteryStateRows: masteryStateRows ?? [],
     masteryStateErrorMessage: masteryStateError?.message ?? null,

@@ -101,9 +101,16 @@ async function loadDeckDetailSnapshot(userId: string, deckId: string): Promise<D
   ]);
 
   return {
-    deck,
+    // created_at is nullable at the schema level but always set at insert time
+    // (DEFAULT now()); coalescing here keeps every downstream consumer's
+    // existing non-null assumption intact.
+    deck: deck ? { ...deck, created_at: deck.created_at ?? new Date().toISOString() } : null,
     deckErrorMessage: deckError?.message ?? null,
-    cards: cards ?? [],
+    cards: (cards ?? []).map((card) => ({
+      ...card,
+      created_at: card.created_at ?? new Date().toISOString(),
+      source: card.source as CardSource,
+    })),
     cardsErrorMessage: cardsError?.message ?? null,
     cardsErrorCode: cardsError?.code ?? null,
     masteryRows: masteryRows ?? [],
