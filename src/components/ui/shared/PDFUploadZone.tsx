@@ -17,6 +17,25 @@ type GeneratedCard = { front: string; back: string };
 
 const PDF_GENERATION_MAX_COUNT = 30;
 
+// Must stay in sync with MAX_PDF_BYTES in app/actions/ai-generate.ts. Rejecting
+// oversized files here matters: a body larger than the Next.js transport limits
+// is truncated before the server action runs, so the action's own size check
+// never gets a chance to return its message.
+const MAX_PDF_BYTES = 10 * 1024 * 1024;
+
+function getFileRejectionReason(file: File) {
+  if (file.type !== 'application/pdf') {
+    return 'Only PDF files are supported.';
+  }
+
+  if (file.size > MAX_PDF_BYTES) {
+    const sizeMb = (file.size / 1024 / 1024).toFixed(1);
+    return `That PDF is ${sizeMb} MB. Please upload a file under 10 MB.`;
+  }
+
+  return null;
+}
+
 export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -55,20 +74,34 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
     setIsDragging(false);
 
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      setSelectedFile(file);
-      setGeneratedCards([]);
-    } else {
+    if (!file) {
       toast.error('Please drop a PDF file.');
+      return;
     }
+
+    const rejection = getFileRejectionReason(file);
+    if (rejection) {
+      toast.error(rejection);
+      return;
+    }
+
+    setSelectedFile(file);
+    setGeneratedCards([]);
   }, []);
 
   const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setGeneratedCards([]);
+    if (!file) return;
+
+    const rejection = getFileRejectionReason(file);
+    if (rejection) {
+      toast.error(rejection);
+      e.target.value = '';
+      return;
     }
+
+    setSelectedFile(file);
+    setGeneratedCards([]);
   }, []);
 
   const clearFile = useCallback(() => {
@@ -113,7 +146,8 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           });
         }
       }
-    } catch {
+    } catch (err) {
+      console.error('[PDFUploadZone] generateCards failed:', err);
       toast.error('Something went wrong. Please try again.');
     } finally {
       setIsGenerating(false);

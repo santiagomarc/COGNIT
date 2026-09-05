@@ -8,9 +8,17 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
   experimental: {
     serverActions: {
-      // Default is 1MB — raise it so PDFs up to 10MB can be uploaded
-      bodySizeLimit: '10mb',
+      // Both limits must sit ABOVE the app's own 10MB PDF cap
+      // (MAX_PDF_BYTES in actions/ai-generate.ts). A multipart upload carries
+      // form overhead on top of the file, so a limit of exactly 10mb rejects a
+      // legitimate 10MB PDF at the transport layer — before the action can run
+      // and return its friendly "PDF must be under 10 MB." message.
+      bodySizeLimit: '12mb',
     },
+    // proxy.ts matches /dashboard/*, so it buffers every PDF upload body.
+    // Its default 10MB cap silently truncates the stream, which surfaces as an
+    // uncaught "Unexpected end of form" and a generic client-side failure.
+    proxyClientMaxBodySize: '12mb',
   },
 };
 
