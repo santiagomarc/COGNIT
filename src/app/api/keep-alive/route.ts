@@ -8,15 +8,22 @@ import { publicEnv } from '@/lib/env-public';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  // If CRON_SECRET is configured, require it — keeps this world-callable
-  // endpoint from being pinged by anyone who finds the URL. Optional so
-  // existing deployments that haven't set the secret yet keep working.
-  // Read directly (not validated at import time): this route has nothing to
-  // do with AI, so it must never be coupled to GEMINI_API_KEY being present.
   const cronSecret = process.env.CRON_SECRET;
+
+  // In production, CRON_SECRET must be configured to prevent unauthenticated ping abuse
+  if (!cronSecret && process.env.NODE_ENV === 'production') {
+    console.error('[keep-alive] Rejected request: CRON_SECRET is not configured in production.');
+    return NextResponse.json(
+      { error: 'Server configuration error: CRON_SECRET is not configured.' },
+      { status: 500 }
+    );
+  }
+
+  // If CRON_SECRET is set (or in production where it is required), require Bearer authorization
   if (cronSecret) {
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    const expectedAuth = `Bearer ${cronSecret}`;
+    if (!authHeader || authHeader !== expectedAuth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
