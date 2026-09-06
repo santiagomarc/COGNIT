@@ -10,6 +10,7 @@ import {
   enforceAiRateLimit, getGeminiJsonModel, normalizeForMatch,
   normalizeWhitespace, recordAiUsage, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
+import { logger } from '@/lib/logger';
 
 type CardDifficultyBand = 'foundational' | 'intermediate' | 'advanced';
 
@@ -319,7 +320,7 @@ export async function generateCards(formData: FormData) {
     const arrayBuf = await file.arrayBuffer();
     pdfBytes = new Uint8Array(arrayBuf);
   } catch (readErr) {
-    console.error('[generateCards] failed to read uploaded file:', readErr);
+    logger.error('generateCards', 'failed to read uploaded file', { error: readErr });
     return { error: 'Failed to read the uploaded file.' };
   }
 
@@ -335,7 +336,7 @@ export async function generateCards(formData: FormData) {
     extractedText = textResult.text;
   } catch (err) {
     // Log the real error server-side so it's visible in Next.js terminal
-    console.error('[generateCards] pdf-parse error:', err);
+    logger.error('generateCards', 'pdf-parse error', { error: err });
     return { error: 'Failed to read the PDF. It may be scanned-only, corrupted, or password-protected.' };
   } finally {
     // Must run even when getText() throws (scanned/corrupt/password-protected
@@ -472,7 +473,7 @@ export async function generateCards(formData: FormData) {
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[generateCards] Gemini error:', msg);
+    logger.error('generateCards', 'Gemini error', { message: msg });
     // Surface quota / rate-limit errors clearly instead of a generic message
     if (msg.includes('429') || msg.includes('quota') || msg.includes('Too Many Requests')) {
       return { error: 'AI is under heavy demand right now. Please try again in a little while.' };
@@ -493,7 +494,7 @@ export async function generateCards(formData: FormData) {
     .insert(rows)
     .select('id');
   if (insertErr) {
-    console.error('[generateCards] insert error:', insertErr.code, insertErr.message);
+    logger.error('generateCards', 'insert error', { code: insertErr.code, message: insertErr.message });
     return { error: sanitizeDatabaseError(insertErr, 'Cards were generated but failed to save.') };
   }
 

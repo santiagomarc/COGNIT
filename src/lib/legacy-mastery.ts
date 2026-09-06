@@ -1,6 +1,7 @@
 import { createClient } from './supabase/server';
 import { computeDeckMasterySnapshots } from './quiz-progress';
 import { isMissingDatabaseFunctionError } from './supabase-errors';
+import { logger } from './logger';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -17,6 +18,11 @@ type LegacyMasteryRpcRow = {
   last_quiz_at: string | null;
 };
 
+/**
+ * @deprecated Fallback for pre-202609011200 environments.
+ * Remove once `supabase migration list` confirms every environment is current.
+ * Tracking: Phase 5 exit criteria.
+ */
 async function loadLegacyMasteryFallback(
   supabase: SupabaseServerClient,
   userId: string,
@@ -51,7 +57,7 @@ async function loadLegacyMasteryFallback(
       .in('quiz_result_id', chunk);
 
     if (error) {
-      console.error('[legacy-mastery] fallback quiz card results failed:', error.message);
+      logger.error('legacy-mastery', 'fallback quiz card results failed', { message: error.message });
       return new Map<string, LegacyMasterySnapshot>();
     }
 
@@ -76,6 +82,11 @@ async function loadLegacyMasteryFallback(
   return masteryByDeck;
 }
 
+/**
+ * @deprecated Fallback for pre-202609011200 environments.
+ * Remove once `supabase migration list` confirms every environment is current.
+ * Tracking: Phase 5 exit criteria.
+ */
 export async function loadLegacyDeckMasterySnapshots(
   supabase: SupabaseServerClient,
   userId: string,
@@ -91,7 +102,7 @@ export async function loadLegacyDeckMasterySnapshots(
   });
 
   if (rpcError && !isMissingDatabaseFunctionError(rpcError.message, 'get_legacy_mastery_snapshots')) {
-    console.error('[legacy-mastery] rpc failed:', rpcError.code, rpcError.message);
+    logger.error('legacy-mastery', 'rpc failed', { code: rpcError.code, message: rpcError.message });
     return loadLegacyMasteryFallback(supabase, userId, totalCardsByDeck);
   }
 

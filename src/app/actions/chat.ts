@@ -16,6 +16,7 @@ import {
   chunkArray, enforceAiRateLimit, getGeminiEmbeddingModel, getGeminiJsonModel, normalizeWhitespace,
   recordAiUsage, requireOwnedDeck, sanitizeAiInputText,
 } from './_shared';
+import { logger } from '@/lib/logger';
 
 // Bounds each syncEmbeddings invocation so a large deck can't run past the
 // server action's execution limit; the client re-invokes until pending is 0.
@@ -151,13 +152,13 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
             .eq('deck_id', parsed.data.deck_id);
 
           if (updateError) {
-            console.warn('[syncEmbeddings] failed to update embedding:', updateError.message);
+            logger.warn('syncEmbeddings', 'failed to update embedding', { message: updateError.message });
             return;
           }
 
           synced += 1;
         } catch (embeddingError) {
-          console.warn('[syncEmbeddings] embed failure for card:', card.id, embeddingError);
+          logger.warn('syncEmbeddings', 'embed failure for card', { card_id: card.id, error: embeddingError });
         }
       })
     );
@@ -178,8 +179,13 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
     .from('deck_chat_embedding_metadata')
     .upsert(metadataPayload, { onConflict: 'deck_id,user_id' });
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (metadataError && !isMissingTableError(metadataError.message, 'deck_chat_embedding_metadata')) {
-    console.warn('[syncEmbeddings] metadata upsert failed:', metadataError.message);
+    logger.warn('syncEmbeddings', 'metadata upsert failed', { message: metadataError.message });
   }
 
   await recordAiUsage(supabase, user.id, 'sync_embeddings', {
@@ -358,8 +364,13 @@ export async function chatWithDeck(data: ChatWithDeckInput) {
   });
 
   if (rpcResult.error) {
+    /**
+     * @deprecated Fallback for pre-202609011200 environments.
+     * Remove once `supabase migration list` confirms every environment is current.
+     * Tracking: Phase 5 exit criteria.
+     */
     if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'search_deck_cards_by_embedding')) {
-      console.warn('[chatWithDeck] rpc vector search failed:', rpcResult.error.message);
+      logger.warn('chatWithDeck', 'rpc vector search failed', { message: rpcResult.error.message });
     }
 
     const fallbackCards = await supabase
@@ -465,8 +476,13 @@ export async function chatWithDeck(data: ChatWithDeckInput) {
       followup_suggestions: followupSuggestions,
     });
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (assistantInsert.error && !isMissingTableError(assistantInsert.error.message, 'deck_chat_messages')) {
-    console.warn('[chatWithDeck] failed to persist assistant message:', assistantInsert.error.message);
+    logger.warn('chatWithDeck', 'failed to persist assistant message', { message: assistantInsert.error.message });
   }
 
   await supabase
@@ -535,6 +551,11 @@ export async function semanticSearchCards(data: SemanticSearchInput) {
   });
 
   if (error) {
+    /**
+     * @deprecated Fallback for pre-202609011200 environments.
+     * Remove once `supabase migration list` confirms every environment is current.
+     * Tracking: Phase 5 exit criteria.
+     */
     if (isMissingDatabaseFunctionError(error.message, 'search_user_cards_by_embedding')) {
       return { error: 'Semantic search is not available yet. Please apply the latest database migrations first.' };
     }

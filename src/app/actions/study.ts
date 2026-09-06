@@ -8,6 +8,7 @@ import type { CardState } from '@/index';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { generateMnemonicForCard } from './ai-assist';
+import { logger } from '@/lib/logger';
 
 export async function gradeCard(data: GradeCardInput) {
   const result = gradeCardSchema.safeParse(data);
@@ -76,11 +77,16 @@ export async function gradeCard(data: GradeCardInput) {
   const { error: gradePersistError } = await supabase.rpc('grade_owned_card', rpcGradePayload);
 
   if (gradePersistError) {
+    /**
+     * @deprecated Fallback for pre-202609011200 environments.
+     * Remove once `supabase migration list` confirms every environment is current.
+     * Tracking: Phase 5 exit criteria.
+     */
     const missingRpcFunction = isMissingDatabaseFunctionError(gradePersistError.message, 'grade_owned_card');
     if (missingRpcFunction) {
-      console.warn('[gradeCard] rpc unavailable, using fallback persistence path:', gradePersistError.message);
+      logger.warn('gradeCard', 'rpc unavailable, using fallback persistence path', { message: gradePersistError.message });
     } else {
-      console.warn('[gradeCard] rpc failed, using fallback persistence path:', gradePersistError.code, gradePersistError.message);
+      logger.warn('gradeCard', 'rpc failed, using fallback persistence path', { code: gradePersistError.code, message: gradePersistError.message });
     }
 
     const { error: updateErr } = await supabase
@@ -97,7 +103,7 @@ export async function gradeCard(data: GradeCardInput) {
       .eq('deck_id', result.data.deck_id);
 
     if (updateErr) {
-      console.error('[gradeCard] fallback update error:', updateErr.code, updateErr.message);
+      logger.error('gradeCard', 'fallback update error', { code: updateErr.code, message: updateErr.message });
       return { error: sanitizeDatabaseError(updateErr, 'Failed to update card schedule.') };
     }
 
@@ -109,7 +115,7 @@ export async function gradeCard(data: GradeCardInput) {
     });
 
     if (logErr) {
-      console.error('[gradeCard] fallback log error:', logErr.code, logErr.message);
+      logger.error('gradeCard', 'fallback log error', { code: logErr.code, message: logErr.message });
       return { error: sanitizeDatabaseError(logErr, 'Card was graded, but history log failed to save.') };
     }
   }
@@ -124,7 +130,7 @@ export async function gradeCard(data: GradeCardInput) {
         mnemonic: card.mnemonic,
       });
     } catch (mnemonicError) {
-      console.warn('[gradeCard] mnemonic generation skipped:', mnemonicError);
+      logger.warn('gradeCard', 'mnemonic generation skipped', { error: mnemonicError });
     }
   }
 

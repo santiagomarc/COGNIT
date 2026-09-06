@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/lib/database.types';
 import { publicEnv } from '@/lib/env-public';
+import { logger } from '@/lib/logger';
 
 // Force this route to always fetch fresh data, skipping Next.js caching
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   // In production, CRON_SECRET must be configured to prevent unauthenticated ping abuse
   if (!cronSecret && process.env.NODE_ENV === 'production') {
-    console.error('[keep-alive] Rejected request: CRON_SECRET is not configured in production.');
+    logger.error('keep-alive', 'Rejected request: CRON_SECRET is not configured in production.');
     return NextResponse.json(
       { error: 'Server configuration error: CRON_SECRET is not configured.' },
       { status: 500 }
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     // Log server-side only — never echo raw database error text to the caller.
-    console.error('[keep-alive] Query failed:', error.message);
+    logger.error('keep-alive', 'Query failed', { message: error.message });
     return NextResponse.json(
       { success: false, error: 'Database ping failed.' },
       { status: 500 }

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Json } from '@/lib/database.types';
+import { logger } from '@/lib/logger';
 
 export type AiActionName =
   | 'generate_cards'
@@ -153,7 +154,7 @@ export async function recordAiUsage(
   });
 
   if (error && !isMissingAiUsageTableError(error.message)) {
-    console.error('[ai_usage_logs] failed to insert usage row:', error.message);
+    logger.error('ai_usage_logs', 'failed to insert usage row', { message: error.message });
   }
 }
 
@@ -169,7 +170,7 @@ export async function touchDeckUpdatedAt(
     .eq('user_id', userId);
 
   if (error) {
-    console.warn('[decks] failed to update updated_at:', error.message);
+    logger.warn('decks', 'failed to update updated_at', { message: error.message });
   }
 }
 

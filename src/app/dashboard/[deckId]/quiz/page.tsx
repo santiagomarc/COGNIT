@@ -121,6 +121,11 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
       .eq('correct', true);
 
     if (provenMasteryError) {
+      /**
+       * @deprecated Fallback for pre-202609011200 environments.
+       * Remove once `supabase migration list` confirms every environment is current.
+       * Tracking: Phase 5 exit criteria.
+       */
       if (!isMissingTableError(provenMasteryError.message, 'card_mastery_state')) {
         console.error('[quiz-page] failed to read mastery state for focus_unproven:', provenMasteryError.message);
       }

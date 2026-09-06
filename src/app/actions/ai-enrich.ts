@@ -9,6 +9,7 @@ import {
   chunkArray, enforceAiRateLimit, getGeminiJsonModel,
   recordAiUsage, requireOwnedDeck, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
+import { logger } from '@/lib/logger';
 
 type EnrichmentRow = {
   id: string;
@@ -102,7 +103,7 @@ export async function enrichCards(data: EnrichCardsInput) {
     .in('id', uniqueCardIds);
 
   if (error) {
-    console.error('[enrichCards] cards fetch error:', error.code, error.message);
+    logger.error('enrichCards', 'cards fetch error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to load cards for enrichment.') };
   }
 
@@ -174,7 +175,7 @@ export async function enrichCards(data: EnrichCardsInput) {
 
       return { rows: enrichedRows, failedIds: batchFailedIds };
     } catch (batchError) {
-      console.error('[enrichCards] batch failed:', batchError);
+      logger.error('enrichCards', 'batch failed', { error: batchError });
       return { rows: [], failedIds: batch.map((card) => card.id) };
     }
   }
@@ -213,7 +214,7 @@ export async function enrichCards(data: EnrichCardsInput) {
           .eq('deck_id', result.data.deck_id);
 
         if (updateError) {
-          console.warn('[enrichCards] db update failed for card', row.id, updateError.message);
+          logger.warn('enrichCards', 'db update failed for card', { card_id: row.id, message: updateError.message });
           failedCardIds.push(row.id);
           return;
         }

@@ -48,6 +48,11 @@ async function loadActivityDays(supabase: SupabaseServerClient, userId: string):
     return rpcResult.data ?? [];
   }
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_study_activity_days')) {
     console.warn('[dashboard] get_study_activity_days rpc failed, using fallback:', rpcResult.error.message);
   }
@@ -93,6 +98,11 @@ async function loadMasterySummary(
     return { rows: rpcResult.data ?? [], tableMissing: false };
   }
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (isMissingTableError(rpcResult.error.message, 'card_mastery_state')) {
     return { rows: [], tableMissing: true };
   }
@@ -108,6 +118,11 @@ async function loadMasterySummary(
     .limit(20000);
 
   if (masteryStateError) {
+    /**
+     * @deprecated Fallback for pre-202609011200 environments.
+     * Remove once `supabase migration list` confirms every environment is current.
+     * Tracking: Phase 5 exit criteria.
+     */
     if (isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
       return { rows: [], tableMissing: true };
     }

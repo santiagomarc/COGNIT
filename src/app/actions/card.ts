@@ -10,6 +10,7 @@ import { revalidatePath } from 'next/cache';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { requireOwnedDeck, touchDeckUpdatedAt } from './_shared';
+import { logger } from '@/lib/logger';
 
 const BULK_DELETE_MAX_COUNT = 200;
 
@@ -45,7 +46,7 @@ export async function createCard(data: CreateCardInput) {
     .single();
 
   if (error) {
-    console.error('[createCard] db error:', error.code, error.message);
+    logger.error('createCard', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to create card.') };
   }
 
@@ -100,7 +101,7 @@ export async function updateCard(data: UpdateCardInput) {
     .eq('deck_id', result.data.deck_id);
 
   if (error) {
-    console.error('[updateCard] db error:', error.code, error.message);
+    logger.error('updateCard', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to update card.') };
   }
 
@@ -137,7 +138,7 @@ export async function bulkImportCards(data: BulkImportInput) {
     .select('id');
 
   if (error) {
-    console.error('[bulkImportCards] db error:', error.code, error.message);
+    logger.error('bulkImportCards', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to import cards.') };
   }
 
@@ -180,7 +181,7 @@ export async function deleteCard(cardId: string, deckId: string) {
     .eq('deck_id', deckId);
 
   if (error) {
-    console.error('[deleteCard] db error:', error.code, error.message);
+    logger.error('deleteCard', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to delete card.') };
   }
 
@@ -233,8 +234,13 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
     p_card_ids: normalizedIds,
   });
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (rpcError && !isMissingDatabaseFunctionError(rpcError.message, 'delete_owned_cards_batch')) {
-    console.error('[bulkDeleteCards] rpc error:', rpcError.code, rpcError.message);
+    logger.error('bulkDeleteCards', 'rpc error', { code: rpcError.code, message: rpcError.message });
     return { error: sanitizeDatabaseError(rpcError, 'Failed to delete selected cards.') };
   }
 
@@ -253,7 +259,7 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
       .select('id');
 
     if (error) {
-      console.error('[bulkDeleteCards] fallback delete error:', error.code, error.message);
+      logger.error('bulkDeleteCards', 'fallback delete error', { code: error.code, message: error.message });
       return { error: sanitizeDatabaseError(error, 'Failed to delete selected cards.') };
     }
 
@@ -269,17 +275,3 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   revalidatePath('/dashboard');
   return { success: true, deletedCount, requestedCount: normalizedIds.length };
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// STUDY / SM-2 GRADING
-// ═══════════════════════════════════════════════════════════════════
-
-/**
- * Grade a card using the SM-2 spaced repetition algorithm.
- *
- * 1. Validates input with Zod
- * 2. Fetches current SM-2 state from the DB
- * 3. Runs SM-2 to calculate the next review schedule
- * 4. Updates the card row
- * 5. Inserts a study_log entry (immutable history)
- */

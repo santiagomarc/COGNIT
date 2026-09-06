@@ -7,6 +7,7 @@ import {
   enforceAiRateLimit, getGeminiTextModel, normalizeWhitespace, recordAiUsage,
   requireOwnedDeck, sanitizeAiInputText,
 } from './_shared';
+import { logger } from '@/lib/logger';
 
 function normalizeForHintGuard(value: string) {
   return value
@@ -211,7 +212,7 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
     return { success: true, text: sanitizedText };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('[sanitizeNotes] Gemini error:', message);
+    logger.error('sanitizeNotes', 'Gemini error', { message });
     return { error: sanitizeAiServiceError(message, 'AI cleaning failed. Please try again shortly.') };
   }
 }
@@ -293,7 +294,7 @@ export async function getHint(data: GetHintInput) {
       .eq('deck_id', result.data.deck_id);
 
     if (hintUpdateError) {
-      console.warn('[getHint] failed to cache ai_hint:', hintUpdateError.message);
+      logger.warn('getHint', 'failed to cache ai_hint', { message: hintUpdateError.message });
     }
 
     await recordAiUsage(supabase, user.id, 'get_hint', {
@@ -305,7 +306,7 @@ export async function getHint(data: GetHintInput) {
     return { success: true, hint };
   } catch (hintError) {
     const message = hintError instanceof Error ? hintError.message : String(hintError);
-    console.error('[getHint] Gemini error:', message);
+    logger.error('getHint', 'Gemini error', { message });
     return { error: sanitizeAiServiceError(message, 'Hint generation failed. Please try again shortly.') };
   }
 }

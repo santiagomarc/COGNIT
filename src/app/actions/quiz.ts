@@ -8,6 +8,7 @@ import type { CardState, QuizHistoryEntry, QuizMode } from '@/index';
 import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { normalizeForMatch, requireOwnedDeck } from './_shared';
+import { logger } from '@/lib/logger';
 
 type QuizCardHistoryRow = {
   quiz_result_id: string;
@@ -38,7 +39,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
     .in('id', uniqueCardIds);
 
   if (ownedCardsError) {
-    console.error('[logQuizResult] owned cards fetch error:', ownedCardsError.code, ownedCardsError.message);
+    logger.error('logQuizResult', 'owned cards fetch error', { code: ownedCardsError.code, message: ownedCardsError.message });
     return { error: sanitizeDatabaseError(ownedCardsError, 'Failed to validate quiz cards.') };
   }
 
@@ -115,11 +116,16 @@ export async function logQuizResult(data: LogQuizResultInput) {
   });
 
   if (batchRpcResult.error) {
+    /**
+     * @deprecated Fallback for pre-202609011200 environments.
+     * Remove once `supabase migration list` confirms every environment is current.
+     * Tracking: Phase 5 exit criteria.
+     */
     const missingRpcFunction = isMissingDatabaseFunctionError(batchRpcResult.error.message, 'apply_quiz_sm2_batch');
     if (missingRpcFunction) {
-      console.warn('[logQuizResult] rpc unavailable, using fallback persistence path:', batchRpcResult.error.message);
+      logger.warn('logQuizResult', 'rpc unavailable, using fallback persistence path', { message: batchRpcResult.error.message });
     } else {
-      console.warn('[logQuizResult] rpc failed, using fallback persistence path:', batchRpcResult.error.message);
+      logger.warn('logQuizResult', 'rpc failed, using fallback persistence path', { message: batchRpcResult.error.message });
     }
 
     for (const { card_id, sm2Result } of sm2Updates) {
@@ -138,7 +144,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
       if (cardUpdateErr) {
         // Non-fatal: log and continue — quiz result should still be saved
-        console.warn('[logQuizResult] SM-2 card update failed for card', card_id, cardUpdateErr.message);
+        logger.warn('logQuizResult', 'SM-2 card update failed for card', { card_id, message: cardUpdateErr.message });
       }
     }
 
@@ -151,7 +157,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
     const { error: studyLogErr } = await supabase.from('study_logs').insert(studyLogRows);
     if (studyLogErr) {
-      console.warn('[logQuizResult] study_logs batch insert failed:', studyLogErr.message);
+      logger.warn('logQuizResult', 'study_logs batch insert failed', { message: studyLogErr.message });
     }
   }
   // ────────────────────────────────────────────────────────────────────────
@@ -178,7 +184,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   if (quizResultError || !insertedQuizResult) {
     if (quizResultError) {
-      console.error('[logQuizResult] quiz result insert error:', quizResultError.code, quizResultError.message);
+      logger.error('logQuizResult', 'quiz result insert error', { code: quizResultError.code, message: quizResultError.message });
     }
     return { error: sanitizeDatabaseError(quizResultError, 'Failed to save quiz result.') };
   }
@@ -197,7 +203,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
     );
 
   if (quizCardResultsError) {
-    console.error('[logQuizResult] quiz card results insert error:', quizCardResultsError.code, quizCardResultsError.message);
+    logger.error('logQuizResult', 'quiz card results insert error', { code: quizCardResultsError.code, message: quizCardResultsError.message });
     return { error: sanitizeDatabaseError(quizCardResultsError, 'Failed to save quiz details.') };
   }
 
@@ -209,8 +215,13 @@ export async function logQuizResult(data: LogQuizResultInput) {
     .eq('deck_id', result.data.deck_id)
     .in('card_id', evaluatedResults.map((entry) => entry.card_id));
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (existingMasteryError && !isMissingTableError(existingMasteryError.message, 'card_mastery_state')) {
-    console.error('[card_mastery_state] failed to read existing rows:', existingMasteryError.message);
+    logger.error('card_mastery_state', 'failed to read existing rows', { message: existingMasteryError.message });
   }
 
   const existingMasteryByCardId = new Map(
@@ -232,8 +243,13 @@ export async function logQuizResult(data: LogQuizResultInput) {
       { onConflict: 'user_id,deck_id,card_id' }
     );
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   if (masteryStateError && !isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
-    console.error('[card_mastery_state] failed to upsert rows:', masteryStateError.message);
+    logger.error('card_mastery_state', 'failed to upsert rows', { message: masteryStateError.message });
   }
 
   revalidatePath('/dashboard');
@@ -246,21 +262,6 @@ export async function logQuizResult(data: LogQuizResultInput) {
     totalCards: evaluatedResults.length,
   };
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// AI CARD GENERATION
-// ═══════════════════════════════════════════════════════════════════
-
-/** Max PDF size we allow (10 MB). */
-/**
- * Accept a FormData containing a PDF file + metadata, extract text,
- * call OpenAI to generate flashcards, and batch-insert them.
- *
- * FormData shape:
- *   - file: File (application/pdf)
- *   - deck_id: string (uuid)
- *   - count: string (number or "max", optional — defaults to 10)
- */
 
 export async function getQuizHistory(deckId: string) {
   const deckAccess = await requireOwnedDeck(deckId);
@@ -280,7 +281,7 @@ export async function getQuizHistory(deckId: string) {
     .limit(200);
 
   if (quizResultsError) {
-    console.error('[getQuizHistory] quiz results error:', quizResultsError.code, quizResultsError.message);
+    logger.error('getQuizHistory', 'quiz results error', { code: quizResultsError.code, message: quizResultsError.message });
     return { error: 'Failed to fetch quiz history.' };
   }
 
@@ -295,7 +296,7 @@ export async function getQuizHistory(deckId: string) {
     .limit(20000);
 
   if (quizCardRowsError) {
-    console.error('[getQuizHistory] quiz card rows error:', quizCardRowsError.code, quizCardRowsError.message);
+    logger.error('getQuizHistory', 'quiz card rows error', { code: quizCardRowsError.code, message: quizCardRowsError.message });
     return { error: 'Failed to fetch quiz history details.' };
   }
 

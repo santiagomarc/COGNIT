@@ -5,6 +5,7 @@ import { createDeckSchema, CreateDeckInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { buildDeckTitleWithTag, normalizeDeckTag, removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { logger } from '@/lib/logger';
 
 export async function createDeck(data: CreateDeckInput) {
   // 1. "No-Vibe" Validation: Check the data again on the server
@@ -42,7 +43,7 @@ export async function createDeck(data: CreateDeckInput) {
 
   if (error || !deck) {
     if (error) {
-      console.error('[createDeck] db error:', error.code, error.message);
+      logger.error('createDeck', 'db error', { code: error.code, message: error.message });
     }
     return { error: sanitizeDatabaseError(error, 'Failed to create deck.') };
   }
@@ -67,7 +68,7 @@ export async function deleteDeck(deckId: string) {
     .eq('user_id', user.id); // Security: Ensure user owns the deck
 
   if (error) {
-    console.error('[deleteDeck] db error:', error.code, error.message);
+    logger.error('deleteDeck', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to delete deck.') };
   }
 
@@ -97,7 +98,7 @@ export async function updateDeck(deckId: string, title: string, accentTag?: stri
     .eq('user_id', user.id);
 
   if (error) {
-    console.error('[updateDeck] db error:', error.code, error.message);
+    logger.error('updateDeck', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to update deck.') };
   }
 

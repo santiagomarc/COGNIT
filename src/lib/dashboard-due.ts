@@ -1,4 +1,5 @@
 import { isMissingDatabaseFunctionError } from './supabase-errors';
+import { logger } from './logger';
 
 export type DueCardsByDeckRow = {
   deck_id: string;
@@ -36,11 +37,18 @@ type DueBreakdownSupabaseClient = {
   };
 };
 
+/**
+ * @deprecated Fallback for pre-202609011200 environments.
+ * Remove once `supabase migration list` confirms every environment is current.
+ * Tracking: Phase 5 exit criteria.
+ */
 export async function loadDueByDeckRows(
   supabase: DueBreakdownSupabaseClient,
   userId: string,
   nowIso: string,
-  logError: (message: string, ...args: unknown[]) => void = console.error,
+  logError: (message: string, ...args: unknown[]) => void = (message, ...args) => {
+    logger.error('dashboard', message.replace(/^\[dashboard\]\s*/, ''), args.length ? { args } : undefined);
+  },
 ): Promise<DueCardsByDeckRow[]> {
   const { data: dueBreakdownRows, error: dueBreakdownError } = await supabase.rpc('get_due_cards_by_deck', {
     p_user_id: userId,
@@ -59,6 +67,11 @@ export async function loadDueByDeckRows(
     }));
   }
 
+  /**
+   * @deprecated Fallback for pre-202609011200 environments.
+   * Remove once `supabase migration list` confirms every environment is current.
+   * Tracking: Phase 5 exit criteria.
+   */
   const { data: dueCards, error: dueCardsError } = await supabase
     .from('cards')
     .select('deck_id')

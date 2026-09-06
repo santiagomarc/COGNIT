@@ -76,9 +76,13 @@ function formatLastQuizLabel(lastQuizAt: string | null) {
   return `Last quizzed ${dayDiff} days ago`;
 }
 
-async function loadDeckDetailSnapshot(userId: string, deckId: string): Promise<DeckDetailSnapshot> {
-  const supabase = await createClient();
+type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
+async function loadDeckDetailSnapshot(
+  supabase: SupabaseServerClient,
+  userId: string,
+  deckId: string
+): Promise<DeckDetailSnapshot> {
   const [
     { data: deck, error: deckError },
     { data: cards, error: cardsError },
@@ -139,17 +143,15 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     redirect('/login');
   }
 
-  const [
-    {
-      deck,
-      deckErrorMessage,
-      cards,
-      cardsErrorMessage,
-      cardsErrorCode,
-      masteryRows,
-      masteryRowsErrorMessage,
-    },
-  ] = await Promise.all([loadDeckDetailSnapshot(user.id, deckId)]);
+  const {
+    deck,
+    deckErrorMessage,
+    cards,
+    cardsErrorMessage,
+    cardsErrorCode,
+    masteryRows,
+    masteryRowsErrorMessage,
+  } = await loadDeckDetailSnapshot(supabase, user.id, deckId);
 
   if (deckErrorMessage || !deck) {
     notFound();
@@ -180,6 +182,11 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   if (masteryRowsErrorMessage) {
+    /**
+     * @deprecated Fallback for pre-202609011200 environments.
+     * Remove once `supabase migration list` confirms every environment is current.
+     * Tracking: Phase 5 exit criteria.
+     */
     if (isMissingTableError(masteryRowsErrorMessage, 'card_mastery_state')) {
       const legacyMasteryByDeck = await loadLegacyDeckMasterySnapshots(
         supabase,
@@ -492,9 +499,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
         </div>
       </FadeInUp>
 
-      {!hasCards ? addContentSection : null}
-
-      {hasCards ? addContentSection : null}
+      {addContentSection}
 
       <DeckCardsManager deckId={deckId} cards={cards} />
 
