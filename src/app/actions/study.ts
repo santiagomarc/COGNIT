@@ -134,9 +134,6 @@ export async function gradeCard(data: GradeCardInput) {
     }
   }
 
-  revalidatePath('/dashboard');
-  revalidatePath(`/dashboard/${result.data.deck_id}`);
-
   return {
     success: true,
     nextReviewAt: sm2Result.nextReviewAt.toISOString(),
@@ -144,3 +141,10 @@ export async function gradeCard(data: GradeCardInput) {
     state: sm2Result.state,
   };
 }
+
+export async function finishStudySession(deckId: string) {
+  revalidatePath('/dashboard');
+  revalidatePath(`/dashboard/${deckId}`);
+  return { success: true };
+}
+

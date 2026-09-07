@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Json } from '@/lib/database.types';
 import { logger } from '@/lib/logger';
+import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 
 export type AiActionName =
   | 'generate_cards'
@@ -109,6 +110,25 @@ export function sanitizeAiInputText(rawText: string, maxChars = 50_000) {
   return sanitized.length > 0 ? sanitized : bounded.trim();
 }
 
+const DAILY_AI_CALL_CEILING = 300;
+
+export async function enforceDailyAiBudget(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+) {
+  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const { count, error } = await supabase
+    .from('ai_usage_logs')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .gte('created_at', since);
+
+  if (error) return null; // fail open on the ceiling; per-action limits still apply
+  return (count ?? 0) >= DAILY_AI_CALL_CEILING
+    ? 'You have reached your daily AI limit. It resets 24 hours after your first request today.'
+    : null;
+}
+
 export async function enforceAiRateLimit(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -141,16 +161,89 @@ export async function enforceAiRateLimit(
   return null;
 }
 
+export async function reserveAiCall(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  action: AiActionName,
+  metadata: Record<string, Json> = {},
+): Promise<{ ok: true; reservationId: string | null } | { ok: false; error: string }> {
+  const dailyError = await enforceDailyAiBudget(supabase, userId);
+  if (dailyError) return { ok: false, error: dailyError };
+
+  const policy = AI_RATE_LIMITS[action];
+
+  // Try the atomic RPC first (202609060915_atomic_ai_reservation.sql)
+  const rpcCaller = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: string | null; error: { message: string; code?: string } | null }>;
+
+  const { data: rpcId, error: rpcError } = await rpcCaller('reserve_ai_call', {
+    p_action: action,
+    p_window_minutes: policy.windowMinutes,
+    p_max_requests: policy.maxRequests,
+    p_metadata: { ...metadata, phase: 'reserved' },
+  });
+
+  if (!rpcError && rpcId) {
+    return { ok: true, reservationId: rpcId };
+  }
+
+  if (rpcError) {
+    if (rpcError.message?.includes('AI_RATE_LIMIT') || (rpcError as { code?: string }).code === 'P0001') {
+      return {
+        ok: false,
+        error: `AI limit reached for ${action.replace('_', ' ')}. Try again in about ${policy.windowMinutes} minutes.`,
+      };
+    }
+    if (!isMissingDatabaseFunctionError(rpcError.message, 'reserve_ai_call')) {
+      logger.warn('reserveAiCall', 'rpc call failed, using TypeScript fallback', { message: rpcError.message });
+    }
+  }
+
+  // TypeScript fallback path
+  const limitError = await enforceAiRateLimit(supabase, userId, action);
+  if (limitError) return { ok: false, error: limitError };
+
+  const { data, error } = await supabase
+    .from('ai_usage_logs')
+    .insert({ user_id: userId, action, metadata: { ...metadata, phase: 'reserved' } })
+    .select('id')
+    .single();
+
+  if (error && !isMissingAiUsageTableError(error.message)) {
+    logger.error('reserveAiCall', 'usage insert failed', { action, message: error.message });
+  }
+
+  return { ok: true, reservationId: data?.id ?? null };
+}
+
 export async function recordAiUsage(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   action: AiActionName,
   metadata: Record<string, Json> = {},
+  reservationId?: string | null,
 ) {
+  if (reservationId) {
+    const { error } = await supabase
+      .from('ai_usage_logs')
+      .update({
+        metadata: { ...metadata, phase: 'completed' },
+      })
+      .eq('id', reservationId)
+      .eq('user_id', userId);
+
+    if (error && !isMissingAiUsageTableError(error.message)) {
+      logger.error('ai_usage_logs', 'failed to update usage row', { message: error.message });
+    }
+    return;
+  }
+
   const { error } = await supabase.from('ai_usage_logs').insert({
     user_id: userId,
     action,
-    metadata,
+    metadata: { ...metadata, phase: 'completed' },
   });
 
   if (error && !isMissingAiUsageTableError(error.message)) {

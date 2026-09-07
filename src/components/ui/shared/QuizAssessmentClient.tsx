@@ -328,12 +328,12 @@ export function QuizAssessmentClient({
 
     startEnrichmentTransition(async () => {
       const result = await enrichCards({ deck_id: deckId, card_ids: missingIds });
-      if (result?.error) {
-        toast.error(formatActionError(result.error, 'Failed to prepare quiz data'));
+      if (result?.error || !result?.success) {
+        toast.error(formatActionError(result?.error ?? 'Failed to prepare quiz data', 'Failed to prepare quiz data'));
         return;
       }
 
-      applyEnrichment(result?.cards ?? []);
+      applyEnrichment(result.cards ?? []);
     });
   }, [applyEnrichment, deckId, quizMode, sessionCards]);
 

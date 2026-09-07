@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, CheckSquare, Square, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { bulkDeleteCards } from '@/app/actions/card';
+import { bulkDeleteCards, getDeckCardsPage } from '@/app/actions/card';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ type DeckCard = {
 type DeckCardsManagerProps = {
   deckId: string;
   cards: DeckCard[];
+  totalCards?: number;
 };
 
 function mapCardNumbersByCreation(items: DeckCard[]) {
@@ -52,17 +53,37 @@ function sortCardsByNumberDesc(items: DeckCard[]) {
   });
 }
 
-export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
+export function DeckCardsManager({ deckId, cards, totalCards }: DeckCardsManagerProps) {
   const router = useRouter();
   const [deckCards, setDeckCards] = useState(() => sortCardsByNumberDesc(cards));
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     setDeckCards(sortCardsByNumberDesc(cards));
   }, [cards]);
+
+  async function handleLoadMore() {
+    setIsLoadingMore(true);
+    const result = await getDeckCardsPage(deckId, deckCards.length, 60);
+    setIsLoadingMore(false);
+
+    if (result.error || !result.success) {
+      toast.error(result.error ?? 'Failed to load more cards.');
+      return;
+    }
+
+    if (result.cards && result.cards.length > 0) {
+      setDeckCards((prev) => {
+        const existingIds = new Set(prev.map((c) => c.id));
+        const newCards = result.cards.filter((c) => !existingIds.has(c.id));
+        return sortCardsByNumberDesc([...prev, ...newCards]);
+      });
+    }
+  }
 
   const selectedCount = selectedIds.size;
   const allSelected = deckCards.length > 0 && selectedCount === deckCards.length;
@@ -210,6 +231,18 @@ export function DeckCardsManager({ deckId, cards }: DeckCardsManagerProps) {
           </div>
         ))}
       </div>
+
+      {totalCards !== undefined && deckCards.length < totalCards ? (
+        <div className="mt-8 flex flex-col items-center justify-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleLoadMore}
+            disabled={isLoadingMore}
+          >
+            {isLoadingMore ? 'Loading cards...' : `Load more cards (${deckCards.length} of ${totalCards})`}
+          </Button>
+        </div>
+      ) : null}
 
       <ConfirmDialog
         open={showBulkDeleteConfirm}

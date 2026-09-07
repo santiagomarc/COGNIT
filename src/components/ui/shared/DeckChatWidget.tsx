@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BrainCircuit, Loader2, MessageSquarePlus, Send } from 'lucide-react';
 import {
   chatWithDeck,
   createDeckChatSession,
   getDeckChatMessages,
   getDeckChatSessions,
+  getDeckIndexStatus,
   syncEmbeddings,
 } from '@/app/actions/chat';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,8 @@ type ChatMessage = {
   created_at: string;
 };
 
+type IndexStatus = { total: number; pending: number } | null;
+
 export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -43,6 +46,8 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   const [isSending, setIsSending] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [indexStatus, setIndexStatus] = useState<IndexStatus>(null);
+  const hasAutoSyncedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -72,38 +77,36 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     };
   }, [deckId]);
 
+  // Cheap COUNT-only probe. Does NOT call the embedding API.
   useEffect(() => {
     let mounted = true;
-
-    async function syncDeckVectors() {
-      setIsSyncing(true);
-      // Each call embeds one bounded batch (see CARDS_PER_SYNC_BATCH in
-      // src/app/actions/chat.ts) so a large deck needs several round trips.
-      // Keep calling until nothing is left pending or a batch makes no
-      // progress (avoids looping forever on a persistent failure).
-      for (;;) {
-        const result = await syncEmbeddings({ deck_id: deckId });
-        if (!mounted) {
-          return;
-        }
-        if (result?.error) {
-          toast.error(formatActionError(result.error, 'Embedding sync is temporarily unavailable.'));
-          break;
-        }
-        if (!result?.success || result.pending <= 0 || result.synced === 0) {
-          break;
-        }
+    void getDeckIndexStatus(deckId).then((result) => {
+      if (mounted && result?.success) {
+        setIndexStatus({ total: result.total, pending: result.pending });
       }
-      if (mounted) {
-        setIsSyncing(false);
-      }
-    }
-
-    void syncDeckVectors();
-
+    });
     return () => {
       mounted = false;
     };
+  }, [deckId]);
+
+  const runSync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      // Bounded loop: CARDS_PER_SYNC_BATCH is 200, and we stop on no-progress.
+      for (let round = 0; round < 20; round += 1) {
+        const result = await syncEmbeddings({ deck_id: deckId });
+        if (result?.error) {
+          toast.error(formatActionError(result.error, 'Indexing is temporarily unavailable.'));
+          break;
+        }
+        if (!result?.success) break;
+        setIndexStatus({ total: result.total ?? 0, pending: result.pending });
+        if (result.pending <= 0 || result.synced === 0) break;
+      }
+    } finally {
+      setIsSyncing(false);
+    }
   }, [deckId]);
 
   useEffect(() => {
@@ -128,7 +131,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
       }
 
       if (result?.error) {
-        toast.error(formatActionError(result.error, 'Failed to load chat history.'));
+        toast.error(formatActionError(result.error, 'Failed to load messages.'));
         setIsLoadingMessages(false);
         return;
       }
@@ -155,26 +158,29 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     return [] as string[];
   }, [messages]);
 
-  async function handleCreateSession() {
-    setIsCreatingSession(true);
-    const result = await createDeckChatSession({
-      deck_id: deckId,
-      title: `Chat ${sessions.length + 1}`,
-    });
-    setIsCreatingSession(false);
-
-    if (result?.error) {
-      toast.error(formatActionError(result.error, 'Failed to create a chat session.'));
+  const handleCreateSession = useCallback(async () => {
+    if (isCreatingSession) {
       return;
     }
 
-    if (result?.success) {
-      const nextSession = result.session as ChatSession;
-      setSessions((prev) => [nextSession, ...prev]);
-      setActiveSessionId(nextSession.id);
-      setMessages([]);
+    setIsCreatingSession(true);
+    const result = await createDeckChatSession({
+      deck_id: deckId,
+      title: 'New chat',
+    });
+    setIsCreatingSession(false);
+
+    if (result?.error || !result?.success) {
+      toast.error(formatActionError(result?.error, 'Failed to create chat session.'));
+      return;
     }
-  }
+
+    const created = result.session as ChatSession;
+    setSessions((prev) => [created, ...prev]);
+    setActiveSessionId(created.id);
+    setMessages([]);
+    setInput('');
+  }, [deckId, isCreatingSession]);
 
   async function handleSendMessage(message: string) {
     const trimmed = message.trim();
@@ -201,46 +207,57 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     }
 
     setIsSending(true);
-    const result = await chatWithDeck({
-      deck_id: deckId,
-      session_id: sessionId,
-      message: trimmed,
-      top_k: 5,
-    });
-    setIsSending(false);
+    try {
+      if (indexStatus && indexStatus.pending > 0 && !hasAutoSyncedRef.current) {
+        hasAutoSyncedRef.current = true;
+        await runSync();
+      }
 
-    if (result?.error) {
-      toast.error(formatActionError(result.error, 'Deck chat failed.'));
-      return;
+      const result = await chatWithDeck({
+        deck_id: deckId,
+        session_id: sessionId,
+        message: trimmed,
+        top_k: 5,
+      });
+
+      if (result?.error || !result?.success) {
+        toast.error(formatActionError(result?.error, 'Deck chat failed.'));
+        return;
+      }
+
+      const assistantAnswer = typeof result.answer === 'string' ? result.answer : '';
+      if (!assistantAnswer) {
+        toast.error('Deck chat returned an empty response. Please try again.');
+        return;
+      }
+
+      const nowIso = new Date().toISOString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `tmp-user-${nowIso}`,
+          role: 'user',
+          content: trimmed,
+          followup_suggestions: [],
+          referenced_card_ids: [],
+          created_at: nowIso,
+        },
+        {
+          id: `tmp-assistant-${nowIso}`,
+          role: 'assistant',
+          content: assistantAnswer,
+          followup_suggestions: Array.isArray(result.followupSuggestions) ? result.followupSuggestions : [],
+          referenced_card_ids: Array.isArray(result.references) ? result.references.map((ref: { id: string }) => ref.id) : [],
+          created_at: new Date().toISOString(),
+        },
+      ]);
+      setInput('');
+    } catch (error) {
+      console.error('[DeckChatWidget] send failed:', error);
+      toast.error('Deck chat is unavailable right now. Please try again.');
+    } finally {
+      setIsSending(false);
     }
-
-    const assistantAnswer = typeof result.answer === 'string' ? result.answer : '';
-    if (!assistantAnswer) {
-      toast.error('Deck chat returned an empty response. Please try again.');
-      return;
-    }
-
-    const nowIso = new Date().toISOString();
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `tmp-user-${nowIso}`,
-        role: 'user',
-        content: trimmed,
-        followup_suggestions: [],
-        referenced_card_ids: [],
-        created_at: nowIso,
-      },
-      {
-        id: `tmp-assistant-${nowIso}`,
-        role: 'assistant',
-        content: assistantAnswer,
-        followup_suggestions: Array.isArray(result.followupSuggestions) ? result.followupSuggestions : [],
-        referenced_card_ids: Array.isArray(result.references) ? result.references.map((ref: { id: string }) => ref.id) : [],
-        created_at: new Date().toISOString(),
-      },
-    ]);
-    setInput('');
   }
 
   return (
@@ -263,6 +280,24 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
           </Button>
         </div>
       </div>
+
+      {indexStatus && indexStatus.pending > 0 ? (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs">
+          <span className="text-amber-200">
+            {indexStatus.pending} of {indexStatus.total} cards aren&apos;t indexed yet.
+            Chat can only answer from indexed cards.
+          </span>
+          <Button type="button" size="sm" variant="outline" onClick={runSync} disabled={isSyncing}>
+            {isSyncing ? (
+              <>
+                <Loader2 className="h-3 w-3 animate-spin mr-1" /> Indexing…
+              </>
+            ) : (
+              'Index now'
+            )}
+          </Button>
+        </div>
+      ) : null}
 
       <div className="mb-3 flex flex-wrap gap-2">
         {sessions.map((session) => (

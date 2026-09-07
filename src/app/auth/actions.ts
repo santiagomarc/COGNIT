@@ -65,6 +65,22 @@ function resolveRedirectPath(redirectTo?: string | null) {
   return redirectTo;
 }
 
+async function resolveBaseUrl(): Promise<string> {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('NEXT_PUBLIC_SITE_URL must be configured in production.');
+  }
+
+  const headerStore = await headers();
+  const host = headerStore.get('x-forwarded-host') ?? headerStore.get('host') ?? 'localhost:3000';
+  const proto = headerStore.get('x-forwarded-proto') ?? 'http';
+  return `${proto}://${host}`.replace(/\/+$/, '');
+}
+
 // ─── LOGIN ───
 export async function login(data: LoginInput & { redirectTo?: string | null }) {
   const parsed = loginSchema.safeParse(data);
@@ -96,10 +112,7 @@ export async function login(data: LoginInput & { redirectTo?: string | null }) {
 // Authentication → Providers) with its own Client ID/Secret configured there
 // — this action cannot do that part, it only starts the redirect flow.
 export async function loginWithOAuth(provider: 'google' | 'github', redirectTo?: string | null) {
-  const headerStore = await headers();
-  const origin = headerStore.get('origin') || headerStore.get('x-forwarded-host') || '';
-  const protocol = headerStore.get('x-forwarded-proto') || 'https';
-  const baseUrl = origin.startsWith('http') ? origin : `${protocol}://${origin}`;
+  const baseUrl = await resolveBaseUrl();
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -123,11 +136,8 @@ export async function signup(data: SignupInput) {
     return { error: parsed.error.flatten().fieldErrors };
   }
 
-  // Resolve the callback URL on the server (not from client's window.location)
-  const headerStore = await headers();
-  const origin = headerStore.get('origin') || headerStore.get('x-forwarded-host') || '';
-  const protocol = headerStore.get('x-forwarded-proto') || 'https';
-  const baseUrl = origin.startsWith('http') ? origin : `${protocol}://${origin}`;
+  // Resolve the callback URL on the server (pinned to NEXT_PUBLIC_SITE_URL in prod)
+  const baseUrl = await resolveBaseUrl();
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
@@ -155,10 +165,7 @@ export async function resetPassword(data: ResetPasswordInput) {
     return { error: parsed.error.flatten().fieldErrors };
   }
 
-  const headerStore = await headers();
-  const origin = headerStore.get('origin') || headerStore.get('x-forwarded-host') || '';
-  const protocol = headerStore.get('x-forwarded-proto') || 'https';
-  const baseUrl = origin.startsWith('http') ? origin : `${protocol}://${origin}`;
+  const baseUrl = await resolveBaseUrl();
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {

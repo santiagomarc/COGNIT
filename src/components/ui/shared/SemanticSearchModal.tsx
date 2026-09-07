@@ -59,16 +59,21 @@ export function SemanticSearchModal() {
     setStatus('loading');
     setErrorMessage(null);
 
-    const result = await semanticSearchCards({ query: trimmed });
+    try {
+      const result = await semanticSearchCards({ query: trimmed });
 
-    if (result?.error) {
+      if (result?.error || !result?.success) {
+        setStatus('error');
+        setErrorMessage(formatActionError(result?.error, 'Search failed. Please try again.'));
+        return;
+      }
+
+      setResults(result.results ?? []);
+      setStatus('done');
+    } catch {
       setStatus('error');
-      setErrorMessage(formatActionError(result.error, 'Search failed. Please try again.'));
-      return;
+      setErrorMessage('Search is unavailable right now. Please try again.');
     }
-
-    setResults(result?.results ?? []);
-    setStatus('done');
   }
 
   function resetAndClose() {

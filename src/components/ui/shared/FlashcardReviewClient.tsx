@@ -16,7 +16,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { gradeCard } from '@/app/actions/study';
+import { gradeCard, finishStudySession } from '@/app/actions/study';
 import type { StudyGrade } from '@/lib/sm2';
 import type { StudyScope, StudySessionCard } from '@/lib/study';
 import { toast } from 'sonner';
@@ -393,7 +393,7 @@ export function FlashcardReviewClient({
     startNewSession();
   }, [startNewSession]);
 
-  const saveAndExit = useCallback(() => {
+  const saveAndExit = useCallback(async () => {
     clearStoredProgress();
 
     if (effectiveAttemptCount > 0) {
@@ -402,8 +402,19 @@ export function FlashcardReviewClient({
       toast.success('Session closed. You can continue reviewing anytime.');
     }
 
+    try {
+      await finishStudySession(deckId);
+    } catch {
+      // Best-effort cache invalidation
+    }
     router.push(`/dashboard/${deckId}`);
   }, [clearStoredProgress, deckId, effectiveAttemptCount, router]);
+
+  useEffect(() => {
+    if (completed) {
+      finishStudySession(deckId).catch(() => {});
+    }
+  }, [completed, deckId]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || resumeState) {

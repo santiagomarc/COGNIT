@@ -12,6 +12,7 @@ import {
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { logger } from '@/lib/logger';
 
 type QuizPageProps = {
   params: Promise<{
@@ -100,14 +101,49 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   const availableCardCount = totalInDeck ?? 0;
   const { max: maxQuizCards } = getSessionCardBounds(availableCardCount);
   const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, availableCardCount);
+  const limitToFetch = maxQuizCards > 0 ? Math.min(Math.max(sessionCardCount * 2, 20), 100) : 0;
 
-  const { data: allCards } = await supabase
-    .from('cards')
-    .select('id, front, back, state, interval, ease_factor, repetition_count, mcq_distractors, id_question, topic_tags, mnemonic')
-    .eq('deck_id', deckId)
-    .order('created_at', { ascending: true });
+  type QuizCardRow = {
+    id: string;
+    front: string;
+    back: string;
+    state: string | null;
+    interval: number | null;
+    ease_factor: number | null;
+    repetition_count: number | null;
+    mcq_distractors: unknown;
+    id_question: string | null;
+    topic_tags: unknown;
+    mnemonic: string | null;
+  };
 
-  const studyCards = (allCards ?? []).map(toStudyCard);
+  const rpcCaller = supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: QuizCardRow[] | null; error: { message: string } | null }>;
+
+  const { data: rpcCards, error: rpcError } = await rpcCaller('select_quiz_cards', {
+    p_deck_id: deckId,
+    p_limit: limitToFetch > 0 ? limitToFetch : 20,
+  });
+
+  let rawCards: QuizCardRow[] = [];
+
+  if (!rpcError && rpcCards && rpcCards.length > 0) {
+    rawCards = rpcCards;
+  } else {
+    // Fallback: bounded card fetch (P-2)
+    const { data: fallbackCards } = await supabase
+      .from('cards')
+      .select('id, front, back, state, interval, ease_factor, repetition_count, mcq_distractors, id_question, topic_tags, mnemonic')
+      .eq('deck_id', deckId)
+      .order('created_at', { ascending: true })
+      .limit(limitToFetch > 0 ? limitToFetch : 20);
+
+    rawCards = (fallbackCards ?? []) as QuizCardRow[];
+  }
+
+  const studyCards = rawCards.map(toStudyCard);
   const shuffledCards = shuffleItems(studyCards);
 
   let cards = shuffledCards.slice(0, maxQuizCards > 0 ? sessionCardCount : 0);
@@ -127,7 +163,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
        * Tracking: Phase 5 exit criteria.
        */
       if (!isMissingTableError(provenMasteryError.message, 'card_mastery_state')) {
-        console.error('[quiz-page] failed to read mastery state for focus_unproven:', provenMasteryError.message);
+        logger.error('quiz-page', 'failed to read mastery state for focus_unproven', { message: provenMasteryError.message });
       }
     } else {
       const provenCardIds = new Set((provenMasteryRows ?? []).map((row) => row.card_id));

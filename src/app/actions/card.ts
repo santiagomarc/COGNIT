@@ -11,6 +11,7 @@ import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { requireOwnedDeck, touchDeckUpdatedAt } from './_shared';
 import { logger } from '@/lib/logger';
+import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 
 const BULK_DELETE_MAX_COUNT = 200;
 
@@ -106,6 +107,33 @@ export async function updateCard(data: UpdateCardInput) {
   }
 
   await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
+
+  try {
+    const textToEmbed = `${result.data.front} ${result.data.back}`.trim();
+    if (textToEmbed) {
+      const embeddings = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT' });
+      if (embeddings.length > 0 && embeddings[0]) {
+        const vectorLiteral = toVectorLiteral(embeddings[0]);
+        const { error: embedError } = await supabase
+          .from('cards')
+          .update({ embedding: vectorLiteral })
+          .eq('id', result.data.id)
+          .eq('deck_id', result.data.deck_id);
+
+        if (embedError) {
+          logger.warn('updateCard', 'Failed to update embedding for card', {
+            cardId: result.data.id,
+            message: embedError.message,
+          });
+        }
+      }
+    }
+  } catch (embedErr) {
+    logger.warn('updateCard', 'Failed to generate embedding for card', {
+      cardId: result.data.id,
+      message: embedErr instanceof Error ? embedErr.message : String(embedErr),
+    });
+  }
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
@@ -275,3 +303,42 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   revalidatePath('/dashboard');
   return { success: true, deletedCount, requestedCount: normalizedIds.length };
 }
+
+export async function getDeckCardsPage(deckId: string, offset: number, limit = 60) {
+  const deckAccess = await requireOwnedDeck(deckId);
+  if ('error' in deckAccess) {
+    return { error: deckAccess.error };
+  }
+
+  const { supabase } = deckAccess;
+  const safeLimit = Math.min(Math.max(1, limit), 100);
+  const safeOffset = Math.max(0, offset);
+
+  const { data: cards, error } = await supabase
+    .from('cards')
+    .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags')
+    .eq('deck_id', deckId)
+    .order('created_at', { ascending: false })
+    .range(safeOffset, safeOffset + safeLimit - 1);
+
+  if (error) {
+    logger.error('getDeckCardsPage', 'Failed to fetch cards page', { error: error.message, deckId });
+    return { error: sanitizeDatabaseError(error, 'Failed to fetch cards.') };
+  }
+
+  return {
+    success: true as const,
+    cards: (cards ?? []).map((card) => ({
+      ...card,
+      created_at: card.created_at ?? new Date().toISOString(),
+      source: card.source as import('@/index').CardSource,
+      mcq_distractors: Array.isArray(card.mcq_distractors)
+        ? (card.mcq_distractors.filter((x): x is string => typeof x === 'string'))
+        : null,
+      topic_tags: Array.isArray(card.topic_tags)
+        ? (card.topic_tags.filter((x): x is string => typeof x === 'string'))
+        : null,
+    })),
+  };
+}
+

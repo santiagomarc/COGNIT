@@ -18,6 +18,7 @@ import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { getSessionCardBounds } from '@/lib/study';
+import { logger } from '@/lib/logger';
 import type { CardSource } from '@/index';
 
 type DeckDetailSnapshot = {
@@ -40,6 +41,7 @@ type DeckDetailSnapshot = {
     id_question: string | null;
     topic_tags: string[] | null;
   }>;
+  totalCards: number;
   cardsErrorMessage: string | null;
   cardsErrorCode: string | null;
   masteryRows: Array<{
@@ -85,7 +87,7 @@ async function loadDeckDetailSnapshot(
 ): Promise<DeckDetailSnapshot> {
   const [
     { data: deck, error: deckError },
-    { data: cards, error: cardsError },
+    { data: cards, error: cardsError, count: cardsCount },
     { data: masteryRows, error: masteryRowsError },
   ] = await Promise.all([
     supabase
@@ -95,9 +97,10 @@ async function loadDeckDetailSnapshot(
       .single(),
     supabase
       .from('cards')
-      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags')
+      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags', { count: 'exact' })
       .eq('deck_id', deckId)
-      .order('created_at', { ascending: false }),
+      .order('created_at', { ascending: false })
+      .range(0, 59),
     supabase
       .from('card_mastery_state')
       .select('correct, last_quiz_at')
@@ -116,6 +119,7 @@ async function loadDeckDetailSnapshot(
       created_at: card.created_at ?? new Date().toISOString(),
       source: card.source as CardSource,
     })),
+    totalCards: cardsCount ?? (cards?.length ?? 0),
     cardsErrorMessage: cardsError?.message ?? null,
     cardsErrorCode: cardsError?.code ?? null,
     masteryRows: masteryRows ?? [],
@@ -147,6 +151,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     deck,
     deckErrorMessage,
     cards,
+    totalCards,
     cardsErrorMessage,
     cardsErrorCode,
     masteryRows,
@@ -158,11 +163,10 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   if (cardsErrorMessage) {
-    console.error('[deck-page] failed to read cards:', cardsErrorCode, cardsErrorMessage);
+    logger.error('deck-page', 'failed to read cards', { code: cardsErrorCode, message: cardsErrorMessage });
     throw new Error('Failed to load deck cards.');
   }
 
-  const totalCards = cards.length;
   const deckTitleMeta = parseDeckTitleMetadata(deck.title);
   const sessionBounds = getSessionCardBounds(totalCards);
   const quizReadyCards = cards.filter(
@@ -197,7 +201,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
       masteredCards = fallback?.masteredCards ?? 0;
       lastQuizAt = fallback?.lastQuizAt ?? null;
     } else {
-      console.error('[deck-page] failed to read card mastery state:', masteryRowsErrorMessage);
+      logger.error('deck-page', 'failed to read card mastery state', { message: masteryRowsErrorMessage });
     }
   }
 
@@ -501,7 +505,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       {addContentSection}
 
-      <DeckCardsManager deckId={deckId} cards={cards} />
+      <DeckCardsManager deckId={deckId} cards={cards} totalCards={totalCards} />
 
       <FadeInUp delay={0.2}>
         <Suspense fallback={<WeakestConceptsSkeleton />}>

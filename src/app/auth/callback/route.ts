@@ -9,20 +9,23 @@ import { NextResponse } from 'next/server';
 // Supabase sends users here with a "code" in the URL.
 // We exchange the code for a session, then redirect.
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const next = requestUrl.searchParams.get('next') ?? '/dashboard';
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '');
+  const baseOrigin = siteUrl || requestUrl.origin;
 
   // Handle error params from Supabase (e.g. expired link)
-  const errorDescription = searchParams.get('error_description');
+  const errorDescription = requestUrl.searchParams.get('error_description');
   if (errorDescription) {
     const message = encodeURIComponent(errorDescription);
-    return NextResponse.redirect(`${origin}/login?error=${message}`);
+    return NextResponse.redirect(`${baseOrigin}/login?error=${message}`);
   }
 
   if (!code) {
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent('Invalid or missing authentication code. Please try again.')}`
+      `${baseOrigin}/login?error=${encodeURIComponent('Invalid or missing authentication code. Please try again.')}`
     );
   }
 
@@ -39,12 +42,13 @@ export async function GET(request: Request) {
       message = 'This link has already been used. Please sign in.';
     }
     return NextResponse.redirect(
-      `${origin}/login?error=${encodeURIComponent(message)}`
+      `${baseOrigin}/login?error=${encodeURIComponent(message)}`
     );
   }
 
   // Redirect to the intended destination
-  // Ensure the `next` path is a relative path (prevent open redirect attacks)
-  const safePath = next.startsWith('/') ? next : '/dashboard';
-  return NextResponse.redirect(`${origin}${safePath}`);
+  // Ensure the `next` path is a relative path starting with single / (prevent open redirect attacks)
+  const isSafe = next.startsWith('/') && !next.startsWith('//') && !next.includes('\\');
+  const safePath = isSafe ? next : '/dashboard';
+  return NextResponse.redirect(new URL(safePath, baseOrigin));
 }

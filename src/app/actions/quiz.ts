@@ -95,16 +95,16 @@ export async function logQuizResult(data: LogQuizResultInput) {
       card_id: entry.card_id,
       sm2Result,
       grade,
+      correct: entry.correct,
     };
   });
 
-  // Apply every card's scheduling update and study_logs row atomically in one
-  // round trip via the RPC. Falls back to the sequential per-card path if the
-  // migration hasn't been applied yet, matching the pattern used elsewhere in
-  // this codebase (e.g. grade_owned_card, search_deck_cards_by_embedding).
+  // Apply every card's scheduling update, study_logs row, and mastery state
+  // atomically in one round trip via the RPC. Falls back to the sequential
+  // per-card path if the RPC is unavailable.
   const batchRpcResult = await supabase.rpc('apply_quiz_sm2_batch', {
     p_deck_id: result.data.deck_id,
-    p_updates: sm2Updates.map(({ card_id, sm2Result, grade }) => ({
+    p_updates: sm2Updates.map(({ card_id, sm2Result, grade, correct }) => ({
       card_id,
       state: sm2Result.state,
       interval: sm2Result.interval,
@@ -112,14 +112,14 @@ export async function logQuizResult(data: LogQuizResultInput) {
       repetition_count: sm2Result.repetitionCount,
       next_review_at: sm2Result.nextReviewAt.toISOString(),
       grade,
+      correct,
     })),
   });
 
   if (batchRpcResult.error) {
     /**
-     * @deprecated Fallback for pre-202609011200 environments.
+     * @deprecated Fallback for pre-202609060925 environments.
      * Remove once `supabase migration list` confirms every environment is current.
-     * Tracking: Phase 5 exit criteria.
      */
     const missingRpcFunction = isMissingDatabaseFunctionError(batchRpcResult.error.message, 'apply_quiz_sm2_batch');
     if (missingRpcFunction) {
@@ -159,9 +159,39 @@ export async function logQuizResult(data: LogQuizResultInput) {
     if (studyLogErr) {
       logger.warn('logQuizResult', 'study_logs batch insert failed', { message: studyLogErr.message });
     }
+
+    // Fallback mastery update
+    const { data: existingMasteryRows } = await supabase
+      .from('card_mastery_state')
+      .select('card_id, correct')
+      .eq('user_id', user.id)
+      .eq('deck_id', result.data.deck_id)
+      .in('card_id', evaluatedResults.map((entry) => entry.card_id));
+
+    const existingMasteryByCardId = new Map(
+      (existingMasteryRows ?? []).map((row) => [row.card_id, row.correct])
+    );
+
+    const { error: masteryStateError } = await supabase
+      .from('card_mastery_state')
+      .upsert(
+        evaluatedResults.map((entry) => ({
+          user_id: user.id,
+          deck_id: result.data.deck_id,
+          card_id: entry.card_id,
+          // Persist the highest-ever quiz mastery for this card.
+          correct: Boolean(existingMasteryByCardId.get(entry.card_id)) || entry.correct,
+          last_quiz_at: now.toISOString(),
+          updated_at: now.toISOString(),
+        })),
+        { onConflict: 'user_id,deck_id,card_id' }
+      );
+
+    if (masteryStateError && !isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
+      logger.error('card_mastery_state', 'failed to upsert rows in fallback', { message: masteryStateError.message });
+    }
   }
   // ────────────────────────────────────────────────────────────────────────
-
 
   const correctCards = evaluatedResults.filter((entry) => entry.correct).length;
   const insertQuizResultBase = {
@@ -205,51 +235,6 @@ export async function logQuizResult(data: LogQuizResultInput) {
   if (quizCardResultsError) {
     logger.error('logQuizResult', 'quiz card results insert error', { code: quizCardResultsError.code, message: quizCardResultsError.message });
     return { error: sanitizeDatabaseError(quizCardResultsError, 'Failed to save quiz details.') };
-  }
-
-  const attemptTimestamp = insertedQuizResult.created_at ?? new Date().toISOString();
-  const { data: existingMasteryRows, error: existingMasteryError } = await supabase
-    .from('card_mastery_state')
-    .select('card_id, correct')
-    .eq('user_id', user.id)
-    .eq('deck_id', result.data.deck_id)
-    .in('card_id', evaluatedResults.map((entry) => entry.card_id));
-
-  /**
-   * @deprecated Fallback for pre-202609011200 environments.
-   * Remove once `supabase migration list` confirms every environment is current.
-   * Tracking: Phase 5 exit criteria.
-   */
-  if (existingMasteryError && !isMissingTableError(existingMasteryError.message, 'card_mastery_state')) {
-    logger.error('card_mastery_state', 'failed to read existing rows', { message: existingMasteryError.message });
-  }
-
-  const existingMasteryByCardId = new Map(
-    (existingMasteryRows ?? []).map((row) => [row.card_id, row.correct])
-  );
-
-  const { error: masteryStateError } = await supabase
-    .from('card_mastery_state')
-    .upsert(
-      evaluatedResults.map((entry) => ({
-        user_id: user.id,
-        deck_id: result.data.deck_id,
-        card_id: entry.card_id,
-        // Persist the highest-ever quiz mastery for this card.
-        correct: Boolean(existingMasteryByCardId.get(entry.card_id)) || entry.correct,
-        last_quiz_at: attemptTimestamp,
-        updated_at: new Date().toISOString(),
-      })),
-      { onConflict: 'user_id,deck_id,card_id' }
-    );
-
-  /**
-   * @deprecated Fallback for pre-202609011200 environments.
-   * Remove once `supabase migration list` confirms every environment is current.
-   * Tracking: Phase 5 exit criteria.
-   */
-  if (masteryStateError && !isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
-    logger.error('card_mastery_state', 'failed to upsert rows', { message: masteryStateError.message });
   }
 
   revalidatePath('/dashboard');
