@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Pencil, Trash2, X, Check, Square, CheckSquare } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
@@ -90,7 +90,7 @@ export function FlashcardWithActions({
     <div className={`group relative ${selectionMode && selected ? 'rounded-2xl ring-2 ring-primary/40 ring-offset-2 ring-offset-background' : ''}`}>
       <AnimatePresence mode="wait">
         {isEditing ? (
-          <motion.div
+          <m.div
             key="edit"
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -135,9 +135,9 @@ export function FlashcardWithActions({
                 {isLoading ? 'Saving...' : 'Save'}
               </Button>
             </div>
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key="view"
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -154,7 +154,7 @@ export function FlashcardWithActions({
                 <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
                   {SOURCE_LABELS[source]}
                 </span>
-                <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+                <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
                   {quizReady ? 'Quiz Ready' : 'Quiz Pending'}
                 </span>
                 {importedBy ? (
@@ -211,14 +211,14 @@ export function FlashcardWithActions({
                 {topicTags.map((tag) => (
                   <span
                     key={`${cardId}-${tag}`}
-                    className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-300"
+                    className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-700 dark:text-sky-300"
                   >
                     {tag}
                   </span>
                 ))}
               </div>
             ) : null}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 

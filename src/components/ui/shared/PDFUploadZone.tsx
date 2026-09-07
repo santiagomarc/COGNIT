@@ -6,7 +6,7 @@ import { enrichCards } from '@/app/actions/ai-enrich';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Upload, FileText, Brain, Sparkles, X, CheckCircle2 } from 'lucide-react';
 
 type PDFUploadZoneProps = {
@@ -209,7 +209,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           />
 
           {selectedFile ? (
-            <motion.div
+            <m.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               className="flex flex-col items-center gap-3 p-6"
@@ -234,7 +234,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 <X className="h-3 w-3" />
                 Remove
               </button>
-            </motion.div>
+            </m.div>
           ) : (
             <div className="flex flex-col items-center gap-3 p-6">
               <div className={`
@@ -255,7 +255,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
 
         {/* Controls row */}
         {selectedFile && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             className="mt-4 flex flex-wrap items-center justify-between gap-3"
@@ -283,40 +283,40 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               <Sparkles className="h-4 w-4" />
               Generate Cards
             </Button>
-          </motion.div>
+          </m.div>
         )}
 
         {/* ─── Generation Overlay ─── */}
         <AnimatePresence>
           {isGenerating && (
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-background/80 backdrop-blur-md"
             >
-              <motion.div
+              <m.div
                 animate={{ scale: [1, 1.15, 1] }}
                 transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                 className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10"
               >
                 <Brain className="h-8 w-8 text-primary" />
-              </motion.div>
+              </m.div>
               <p className="text-sm font-medium">Generating cards...</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Reading your PDF and creating flashcards with AI
               </p>
-              <motion.div
+              <m.div
                 className="mt-4 h-1 w-48 overflow-hidden rounded-full bg-muted"
               >
-                <motion.div
+                <m.div
                   className="h-full rounded-full bg-primary"
                   animate={{ x: ['-100%', '100%'] }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                   style={{ width: '50%' }}
                 />
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
@@ -324,7 +324,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       {/* ─── Generated Cards Preview ─── */}
       <AnimatePresence>
         {generatedCards.length > 0 && (
-          <motion.div
+          <m.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -12 }}
@@ -336,7 +336,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
             </div>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {generatedCards.map((card, i) => (
-                <motion.div
+                <m.div
                   key={i}
                   initial={{ opacity: 0, y: 16, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -359,10 +359,10 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {card.back}
                   </p>
-                </motion.div>
+                </m.div>
               ))}
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

@@ -313,29 +313,42 @@ export type Database = {
         ]
       }
       decks: {
+        // share_token / shared_at / clone_count added by hand for
+        // 202609070910_deck_sharing.sql. Regenerate this file with
+        // `supabase gen types typescript --linked` once that migration is
+        // applied, and this comment can go.
         Row: {
+          clone_count: number
           created_at: string | null
           description: string | null
           id: string
           is_public: boolean | null
+          share_token: string | null
+          shared_at: string | null
           title: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          clone_count?: number
           created_at?: string | null
           description?: string | null
           id?: string
           is_public?: boolean | null
+          share_token?: string | null
+          shared_at?: string | null
           title: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          clone_count?: number
           created_at?: string | null
           description?: string | null
           id?: string
           is_public?: boolean | null
+          share_token?: string | null
+          shared_at?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string

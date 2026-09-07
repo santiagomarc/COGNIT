@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { motion, useScroll, useTransform, useReducedMotion } from 'framer-motion';
+import { m, useScroll, useTransform, useReducedMotion } from 'framer-motion';
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -48,7 +48,7 @@ export function HeroSection() {
       <div className="relative z-20 mx-auto max-w-6xl px-6 pt-16 pb-8 md:pt-24">
         <div className="mx-auto max-w-3xl text-center">
           {/* Badge */}
-          <motion.div
+          <m.div
             initial={reduced ? undefined : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
@@ -56,10 +56,10 @@ export function HeroSection() {
           >
             <Sparkles className="h-3.5 w-3.5" />
             AI-Powered Active Recall
-          </motion.div>
+          </m.div>
 
           {/* Headline */}
-          <motion.h1
+          <m.h1
             initial={reduced ? undefined : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
@@ -72,10 +72,10 @@ export function HeroSection() {
             <span className="bg-gradient-to-r from-primary via-neon to-primary/60 bg-clip-text text-transparent">
               remember forever
             </span>
-          </motion.h1>
+          </m.h1>
 
           {/* Subtitle */}
-          <motion.p
+          <m.p
             initial={reduced ? undefined : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
@@ -83,10 +83,10 @@ export function HeroSection() {
           >
             Transform any document into interactive flashcards. Let AI do the heavy
             lifting while spaced repetition ensures you never forget.
-          </motion.p>
+          </m.p>
 
           {/* CTAs */}
-          <motion.div
+          <m.div
             initial={reduced ? undefined : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.35 }}
@@ -103,11 +103,11 @@ export function HeroSection() {
                 Sign In
               </Button>
             </Link>
-          </motion.div>
+          </m.div>
         </div>
 
         {/* ── Glass browser mockup — hidden on mobile to save GPU ── */}
-        <motion.div
+        <m.div
           style={reduced ? undefined : { y: mockupY, rotateX: mockupRotate, scale: mockupScale }}
           initial={reduced ? undefined : { opacity: 0, y: 60 }}
           animate={{ opacity: 1, y: 0 }}
@@ -182,7 +182,7 @@ export function HeroSection() {
 
           {/* Glow underneath the mockup */}
           <div className="absolute -inset-x-10 -bottom-10 -z-10 h-40 rounded-full bg-primary/[8%] blur-3xl" />
-        </motion.div>
+        </m.div>
       </div>
 
       {/* ── Background decorations (above the global orbs) ── */}

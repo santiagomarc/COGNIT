@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { m, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import {
   RotateCcw,
   ArrowLeft,
@@ -12,13 +12,15 @@ import {
   TrendingUp,
   ChevronRight,
   Flame,
+  CalendarClock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { FlipCard } from '@/components/ui/shared/FlipCard';
 import { gradeCard, finishStudySession } from '@/app/actions/study';
 import type { StudyGrade } from '@/lib/sm2';
-import type { StudyScope, StudySessionCard } from '@/lib/study';
+import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { toast } from 'sonner';
 
 type FlashcardReviewClientProps = {
@@ -198,6 +200,9 @@ export function FlashcardReviewClient({
   });
   const [isPending, startTransition] = useTransition();
   const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
+  // gradeCard already returns nextReviewAt/interval; the client used to discard
+  // them, so the summary never said when the work actually pays off.
+  const [scheduledReviews, setScheduledReviews] = useState<string[]>([]);
 
   const cardStart = useRef(sessionStartMs);
   const active = sessionCards[index];
@@ -240,6 +245,11 @@ export function FlashcardReviewClient({
   const hardCount = attemptGrades.filter((grade) => grade === 'hard').length;
   const goodCount = attemptGrades.filter((grade) => grade === 'good').length;
   const easyCount = attemptGrades.filter((grade) => grade === 'easy').length;
+
+  const nextReviewSummary = useMemo(
+    () => summariseNextReviews(scheduledReviews),
+    [scheduledReviews],
+  );
 
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-220, 220], [-14, 14]);
@@ -298,6 +308,10 @@ export function FlashcardReviewClient({
             duration_ms: durationMs,
           });
 
+          if (result?.success && typeof result.nextReviewAt === 'string') {
+            setScheduledReviews((prev) => [...prev, result.nextReviewAt as string]);
+          }
+
           if (result?.error) {
             toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
 
@@ -354,6 +368,7 @@ export function FlashcardReviewClient({
     setIndex(0);
     setShowAnswer(false);
     setGradeLog([]);
+    setScheduledReviews([]);
     setResumeState(null);
     setSessionStartMs(nextNow);
     setNowMs(nextNow);
@@ -513,9 +528,26 @@ export function FlashcardReviewClient({
           <p className="mt-1 text-xs text-muted-foreground">
             {totalInDeck} card{totalInDeck !== 1 ? 's' : ''} total in this deck
           </p>
-          <Link href={`/dashboard/${deckId}`} className="mt-6 inline-block">
-            <Button>Back to Deck</Button>
-          </Link>
+
+          {totalInDeck > 0 ? (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Button asChild>
+                <Link href={`/dashboard/${deckId}/quiz?count=10&mode=mcq`}>Take a quiz instead</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href={`/dashboard/${deckId}/study?count=10&scope=include_reviewed`}>
+                  Study ahead anyway
+                </Link>
+              </Button>
+              <Button asChild variant="ghost">
+                <Link href={`/dashboard/${deckId}`}>Back to Deck</Link>
+              </Button>
+            </div>
+          ) : (
+            <Link href={`/dashboard/${deckId}`} className="mt-6 inline-block">
+              <Button>Back to Deck</Button>
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -581,7 +613,7 @@ export function FlashcardReviewClient({
           <span className="font-medium">{Math.min(progress, 100)}%</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
-          <motion.div
+          <m.div
             className="h-full rounded-full bg-primary"
             animate={{ width: `${Math.min(progress, 100)}%` }}
             transition={{ type: 'spring', stiffness: 180, damping: 24 }}
@@ -597,7 +629,7 @@ export function FlashcardReviewClient({
 
       <AnimatePresence mode="wait">
         {completed ? (
-          <motion.div
+          <m.div
             key="summary"
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -653,6 +685,16 @@ export function FlashcardReviewClient({
                   {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
                 </span>
               </div>
+
+              {nextReviewSummary ? (
+                <div className="flex items-center justify-between gap-3 px-5 py-3">
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CalendarClock className="h-4 w-4" />
+                    Next review
+                  </span>
+                  <span className="text-right text-sm font-medium">{nextReviewSummary}</span>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex justify-center gap-3">
@@ -667,9 +709,9 @@ export function FlashcardReviewClient({
                 </Button>
               </Link>
             </div>
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key={active.id}
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
@@ -677,16 +719,16 @@ export function FlashcardReviewClient({
             transition={{ type: 'spring', stiffness: 260, damping: 24 }}
             className="mx-auto w-full max-w-2xl space-y-4"
           >
-            <div className="relative h-[20rem]">
+            <div className="relative h-[22rem] sm:h-[20rem]">
               {next ? (
-                <motion.div
+                <m.div
                   className="glass-card absolute inset-0 rounded-3xl"
                   initial={false}
                   animate={{ scale: 0.96, y: 10, opacity: 0.55 }}
                 />
               ) : null}
 
-              <motion.div
+              <m.div
                 drag={showAnswer ? 'x' : false}
                 dragConstraints={{ left: 0, right: 0 }}
                 style={{ x: dragX, rotate }}
@@ -706,33 +748,39 @@ export function FlashcardReviewClient({
                   </span>
                 </div>
 
+                {/* A real 3D flip rather than a cross-fade. onFlip is omitted
+                    so this stays non-interactive: the drag-to-grade wrapper
+                    around it must keep receiving the pointer events, and the
+                    reveal is driven by the button below plus Space/Enter. */}
                 <button
                   type="button"
                   onClick={() => {
                     if (!showAnswer) setShowAnswer(true);
                   }}
-                  className="flex h-[13rem] w-full items-center justify-center overflow-y-auto rounded-2xl border border-primary/15 bg-background/25 px-6 text-center focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background/0"
+                  className="w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background/0"
                   aria-label={showAnswer ? 'Showing answer. Choose a grade below.' : 'Showing question. Press to reveal answer.'}
                 >
-                  <AnimatePresence mode="wait">
-                    <motion.p
-                      key={showAnswer ? 'answer' : 'question'}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      transition={{ duration: 0.15 }}
-                      className="text-lg leading-relaxed line-clamp-6"
-                    >
-                      {showAnswer ? active.front : active.back}
-                    </motion.p>
-                  </AnimatePresence>
+                  <FlipCard
+                    isFlipped={showAnswer}
+                    className="relative h-[13rem] w-full"
+                    front={
+                      <div className="flex h-full w-full items-center justify-center overflow-y-auto rounded-2xl border border-primary/15 bg-background/25 px-6 text-center">
+                        <p className="line-clamp-6 text-lg leading-relaxed">{active.back}</p>
+                      </div>
+                    }
+                    back={
+                      <div className="flex h-full w-full items-center justify-center overflow-y-auto rounded-2xl border border-neon/25 bg-background/25 px-6 text-center">
+                        <p className="line-clamp-6 text-lg leading-relaxed">{active.front}</p>
+                      </div>
+                    }
+                  />
                 </button>
-              </motion.div>
+              </m.div>
             </div>
 
             <AnimatePresence>
               {showAnswer ? (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 12 }}
@@ -760,13 +808,13 @@ export function FlashcardReviewClient({
                       </button>
                     ))}
                   </div>
-                </motion.div>
+                </m.div>
               ) : (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
+                <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
                   <Button onClick={() => setShowAnswer(true)} className="w-full max-w-xs">
                     Show Answer
                   </Button>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -781,7 +829,7 @@ export function FlashcardReviewClient({
                 grade
               </span>
             </div>
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
     </div>

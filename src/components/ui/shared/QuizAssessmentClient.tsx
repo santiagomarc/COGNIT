@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   ArrowLeft,
   Brain,
@@ -14,12 +14,18 @@ import {
   RotateCcw,
   Sparkles,
   Timer,
+  Volume2,
+  VolumeX,
+  Vibrate,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { enrichCards } from '@/app/actions/ai-enrich';
 import { logQuizResult } from '@/app/actions/quiz';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
+import { MasteryConfetti } from '@/components/ui/shared/MasteryConfetti';
+import { fireFeedback } from '@/lib/feedback-effects';
+import { useFeedbackPrefs } from '@/lib/use-feedback-prefs';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
 import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
@@ -153,6 +159,12 @@ export function QuizAssessmentClient({
   const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
   const [isEnriching, startEnrichmentTransition] = useTransition();
   const [isSavingResult, startSavingResultTransition] = useTransition();
+
+  const [feedbackPrefs, updateFeedbackPrefs] = useFeedbackPrefs();
+
+  const handleAnswered = useCallback((wasCorrect: boolean) => {
+    fireFeedback(wasCorrect ? 'correct' : 'incorrect', feedbackPrefs);
+  }, [feedbackPrefs]);
 
   const requestedEnrichmentIds = useRef<Set<string>>(new Set());
   const didPersistResult = useRef(false);
@@ -337,6 +349,13 @@ export function QuizAssessmentClient({
     });
   }, [applyEnrichment, deckId, quizMode, sessionCards]);
 
+  const didCelebrate = useRef(false);
+  useEffect(() => {
+    if (!completed || results.length === 0 || didCelebrate.current) return;
+    didCelebrate.current = true;
+    fireFeedback('complete', feedbackPrefs);
+  }, [completed, feedbackPrefs, results.length]);
+
   useEffect(() => {
     if (!completed || results.length === 0 || didPersistResult.current) {
       return;
@@ -459,6 +478,7 @@ export function QuizAssessmentClient({
     setShowShortcutHelp(false);
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
+    didCelebrate.current = false;
     lastTickMs.current = null;
   }, [cards, clearStoredSession, mode]);
 
@@ -516,6 +536,7 @@ export function QuizAssessmentClient({
     clearStoredSession();
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
+    didCelebrate.current = false;
     lastTickMs.current = null;
   };
 
@@ -533,9 +554,14 @@ export function QuizAssessmentClient({
           <p className="mt-1 text-xs text-muted-foreground">
             {totalInDeck} card{totalInDeck !== 1 ? 's' : ''} currently in this deck
           </p>
-          <Link href={`/dashboard/${deckId}`} className="mt-6 inline-block">
-            <Button>Back to Deck</Button>
-          </Link>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild>
+              <Link href={`/dashboard/${deckId}#add-content`}>Add cards now</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/${deckId}`}>Back to Deck</Link>
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -578,7 +604,7 @@ export function QuizAssessmentClient({
 
   return (
     <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <button
           type="button"
           onClick={() => requestQuit(`/dashboard/${deckId}`)}
@@ -587,8 +613,8 @@ export function QuizAssessmentClient({
           <ArrowLeft className="h-4 w-4" />
           Back to Deck
         </button>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span>{deckTitle}</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+          <span className="max-w-[12rem] truncate sm:max-w-none">{deckTitle}</span>
           <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 text-xs font-medium text-foreground">
             {getModeLabel(quizMode)} Quiz
           </span>
@@ -608,6 +634,30 @@ export function QuizAssessmentClient({
               {isPaused ? 'Resume' : 'Pause'}
             </Button>
           ) : null}
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5"
+            onClick={() => updateFeedbackPrefs({ ...feedbackPrefs, sound: !feedbackPrefs.sound })}
+            aria-pressed={feedbackPrefs.sound}
+            title={feedbackPrefs.sound ? 'Turn answer sounds off' : 'Turn answer sounds on'}
+          >
+            {feedbackPrefs.sound ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+            <span className="sr-only">{feedbackPrefs.sound ? 'Sound on' : 'Sound off'}</span>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5"
+            onClick={() => updateFeedbackPrefs({ ...feedbackPrefs, haptics: !feedbackPrefs.haptics })}
+            aria-pressed={feedbackPrefs.haptics}
+            title={feedbackPrefs.haptics ? 'Turn vibration off' : 'Turn vibration on'}
+          >
+            <Vibrate className={`h-3.5 w-3.5 ${feedbackPrefs.haptics ? '' : 'opacity-40'}`} />
+            <span className="sr-only">{feedbackPrefs.haptics ? 'Vibration on' : 'Vibration off'}</span>
+          </Button>
           <Button
             type="button"
             size="sm"
@@ -641,14 +691,14 @@ export function QuizAssessmentClient({
               {formatDuration(sessionDuration)}
             </span>
             {isPaused && !completed ? (
-              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-200">
+              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-200">
                 Paused
               </span>
             ) : null}
           </div>
         </div>
         <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
-          <motion.div
+          <m.div
             className="h-full rounded-full bg-primary"
             animate={{ width: `${Math.min(progress, 100)}%` }}
             transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
@@ -678,7 +728,10 @@ export function QuizAssessmentClient({
                   Check typed answer
                 </p>
                 <p>
-                  Use keyboard focus + Enter to trigger Continue
+                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>
+                  {' or '}
+                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
+                  Continue after feedback
                 </p>
               </>
             )}
@@ -698,7 +751,7 @@ export function QuizAssessmentClient({
 
       <AnimatePresence mode="wait">
         {completed ? (
-          <motion.div
+          <m.div
             key="summary"
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -706,7 +759,13 @@ export function QuizAssessmentClient({
             className="mx-auto max-w-4xl space-y-6"
           >
             <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-              <div className="glass-card glow-border rounded-3xl p-8">
+              <div className="glass-card glow-border relative overflow-hidden rounded-3xl p-8">
+                {/* Fires at a strong pass, harder at a perfect score. Suppressed
+                    entirely under prefers-reduced-motion. */}
+                <MasteryConfetti
+                  active={completed && scoreSummary.percentage >= 80}
+                  intensity={scoreSummary.percentage === 100 ? 1.6 : 1}
+                />
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Quiz Result</p>
@@ -723,11 +782,11 @@ export function QuizAssessmentClient({
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                    <p className="text-2xl font-bold text-emerald-300">{scoreSummary.correctCount}</p>
+                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{scoreSummary.correctCount}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Correct</p>
                   </div>
                   <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
-                    <p className="text-2xl font-bold text-red-300">{scoreSummary.incorrectCount}</p>
+                    <p className="text-2xl font-bold text-red-700 dark:text-red-300">{scoreSummary.incorrectCount}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Missed</p>
                   </div>
                   <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
@@ -741,9 +800,9 @@ export function QuizAssessmentClient({
                     {quizBadges.map((badge) => {
                       const toneClass =
                         badge.tone === 'emerald'
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-200'
+                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
                           : badge.tone === 'amber'
-                            ? 'border-amber-500/20 bg-amber-500/10 text-amber-200'
+                            ? 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200'
                             : 'border-primary/20 bg-primary/10 text-primary';
 
                       return (
@@ -791,9 +850,9 @@ export function QuizAssessmentClient({
                     </p>
                   </div>
                   {incorrectResults.length > 0 ? (
-                    <CircleAlert className="h-5 w-5 text-amber-300" />
+                    <CircleAlert className="h-5 w-5 text-amber-700 dark:text-amber-300" />
                   ) : (
-                    <CircleCheckBig className="h-5 w-5 text-emerald-300" />
+                    <CircleCheckBig className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
                   )}
                 </div>
 
@@ -803,12 +862,12 @@ export function QuizAssessmentClient({
                       <div key={entry.cardId} className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
                         <p className="text-sm font-medium text-foreground">{entry.prompt}</p>
                         <p className="mt-2 text-xs text-muted-foreground">Your answer: {entry.userAnswer || 'No answer recorded'}</p>
-                        <p className="mt-1 text-xs text-red-200">Correct answer: {entry.correctAnswer}</p>
+                        <p className="mt-1 text-xs text-red-700 dark:text-red-200">Correct answer: {entry.correctAnswer}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+                  <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-200">
                     Strong pass. You can re-run the quiz in the other mode or move back into review to keep your daily streak active.
                   </div>
                 )}
@@ -864,9 +923,9 @@ export function QuizAssessmentClient({
                         ) : null}
                       </div>
                       {entry.correct ? (
-                        <CircleCheckBig className="h-5 w-5 shrink-0 text-emerald-300" />
+                        <CircleCheckBig className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
                       ) : (
-                        <CircleAlert className="h-5 w-5 shrink-0 text-red-300" />
+                        <CircleAlert className="h-5 w-5 shrink-0 text-red-700 dark:text-red-300" />
                       )}
                     </div>
                   </div>
@@ -875,9 +934,9 @@ export function QuizAssessmentClient({
             </div>
 
             
-          </motion.div>
+          </m.div>
         ) : (
-          <motion.div
+          <m.div
             key={`${quizMode}-${active.id}`}
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
@@ -900,6 +959,7 @@ export function QuizAssessmentClient({
                     correct: wasCorrect,
                   })
                 }
+                onAnswered={handleAnswered}
                 onFallbackToIdentification={() => setQuizMode('identification')}
               />
             ) : (
@@ -909,6 +969,7 @@ export function QuizAssessmentClient({
                 card={active}
                 disabled={isPaused}
                 enrichmentPending={isEnriching && activeNeedsIdentificationPrompt}
+                onAnswered={handleAnswered}
                 onResolve={(_, score, answer) =>
                   resolveQuestion({
                     cardId: active.id,
@@ -921,13 +982,13 @@ export function QuizAssessmentClient({
                 }
               />
             )}
-          </motion.div>
+          </m.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence>
         {isPaused && !completed ? (
-          <motion.div
+          <m.div
             key="quiz-paused-overlay"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -935,7 +996,7 @@ export function QuizAssessmentClient({
             transition={reduced ? { duration: 0 } : motionSprings.overlay}
             className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-md"
           >
-            <motion.div
+            <m.div
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -955,8 +1016,8 @@ export function QuizAssessmentClient({
                 <Play className="h-4 w-4" />
                 Resume Quiz
               </Button>
-            </motion.div>
-          </motion.div>
+            </m.div>
+          </m.div>
         ) : null}
       </AnimatePresence>
 

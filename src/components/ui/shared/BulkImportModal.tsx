@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Sparkles, Upload, X, Wand2 } from 'lucide-react';
 import { bulkImportCards } from '@/app/actions/card';
 import { sanitizeNotes } from '@/app/actions/ai-assist';
@@ -133,7 +133,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
       <AnimatePresence>
         {open ? (
           <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 py-6">
-            <motion.div
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -141,7 +141,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
               onClick={() => !isImporting && !isCleaning && setOpen(false)}
             />
 
-            <motion.div
+            <m.div
               ref={dialogRef}
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -244,7 +244,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                   </Button>
                 </div>
               </div>
-            </motion.div>
+            </m.div>
           </div>
         ) : null}
       </AnimatePresence>

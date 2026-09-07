@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import { m, useReducedMotion, type Variants } from 'framer-motion';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { motionSprings } from '@/lib/motion-configs';
 
@@ -62,14 +62,14 @@ export function StaggerContainer({
   const resolvedVariants = !hasMounted || reduced ? noMotion : staggerContainer;
 
   return (
-    <motion.div
+    <m.div
       variants={resolvedVariants}
       initial="hidden"
       animate="show"
       className={className}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -84,9 +84,9 @@ export function StaggerItem({
   const reduced = useReducedMotion();
 
   return (
-    <motion.div variants={!hasMounted || reduced ? noMotion : staggerItem} className={className}>
+    <m.div variants={!hasMounted || reduced ? noMotion : staggerItem} className={className}>
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -104,7 +104,7 @@ export function FadeInUp({
   const shouldReduceMotion = !hasMounted || reduced;
 
   return (
-    <motion.div
+    <m.div
       variants={shouldReduceMotion ? noMotion : fadeInUp}
       initial="hidden"
       animate="show"
@@ -112,7 +112,7 @@ export function FadeInUp({
       className={className}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 
@@ -128,14 +128,14 @@ export function PageTransition({
   const shouldReduceMotion = !hasMounted || reduced;
 
   return (
-    <motion.div
+    <m.div
       initial={shouldReduceMotion ? undefined : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={shouldReduceMotion ? { duration: 0 } : motionSprings.entrance}
       className={className}
     >
       {children}
-    </motion.div>
+    </m.div>
   );
 }
 

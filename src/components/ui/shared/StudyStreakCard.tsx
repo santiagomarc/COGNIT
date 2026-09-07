@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { Flame, Target, Trophy } from 'lucide-react';
 import { type CSSProperties } from 'react';
 import { ActivityHeatmap } from './ActivityHeatmap';
@@ -72,7 +72,7 @@ export function StudyStreakCard({
           : 'rgba(129, 140, 248, 0.24)';
 
   return (
-    <motion.div
+    <m.div
       initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={reduced ? { duration: 0 } : { ...motionSprings.listItem, delay: 0.05 }}
@@ -93,7 +93,7 @@ export function StudyStreakCard({
                 active ? 'bg-orange-500/15 border-orange-500/30' : 'bg-muted/20 border-primary/15'
               }`}
             >
-              <motion.div
+              <m.div
                 animate={
                   active && !reduced
                     ? {
@@ -113,7 +113,7 @@ export function StudyStreakCard({
                     active ? 'text-orange-500' : 'text-muted-foreground/60'
                   }`}
                 />
-              </motion.div>
+              </m.div>
             </div>
 
             <div>
@@ -161,7 +161,7 @@ export function StudyStreakCard({
               <span>{dailyGoalProgress}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted/50">
-              <motion.div
+              <m.div
                 initial={reduced ? undefined : { width: 0 }}
                 animate={{ width: `${dailyGoalProgress}%` }}
                 transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
@@ -176,7 +176,7 @@ export function StudyStreakCard({
               <span>{nextLevelTarget === null ? 'MAX' : `${totalStudiedCards}/${nextLevelTarget}`}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted/50">
-              <motion.div
+              <m.div
                 initial={reduced ? undefined : { width: 0 }}
                 animate={{ width: `${levelProgress}%` }}
                 transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
@@ -198,6 +198,6 @@ export function StudyStreakCard({
         </div>
         <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={todayIso} />
       </div>
-    </motion.div>
+    </m.div>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 
 type PasswordStrengthProps = {
@@ -65,7 +65,7 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
           </span>
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
-          <motion.div
+          <m.div
             className={`h-full rounded-full ${barColor}`}
             initial={{ width: 0 }}
             animate={{ width: `${strength * 100}%` }}

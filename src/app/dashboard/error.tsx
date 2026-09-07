@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { AlertTriangle, RotateCcw, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ export default function DashboardError({
 
   return (
     <div className="container mx-auto flex min-h-[60vh] items-center justify-center p-6">
-      <motion.div
+      <m.div
         initial={{ opacity: 0, y: 20, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
@@ -52,7 +52,7 @@ export default function DashboardError({
             </Button>
           </Link>
         </div>
-      </motion.div>
+      </m.div>
     </div>
   );
 }

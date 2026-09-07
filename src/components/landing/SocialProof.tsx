@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useInView, useReducedMotion } from 'framer-motion';
+import { m, useInView, useReducedMotion } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
 import { Users, BookOpen, Star } from 'lucide-react';
 
@@ -52,7 +52,7 @@ export function SocialProof() {
   return (
     <section className="relative border-y border-primary/10 bg-card/30 backdrop-blur-sm py-16">
       <div className="mx-auto max-w-6xl px-6">
-        <motion.div
+        <m.div
           initial={reduced ? undefined : { opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-40px' }}
@@ -62,7 +62,7 @@ export function SocialProof() {
           {stats.map((stat, i) => {
             const Icon = stat.icon;
             return (
-              <motion.div
+              <m.div
                 key={stat.label}
                 initial={reduced ? undefined : { opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -81,10 +81,10 @@ export function SocialProof() {
                   )}
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
-              </motion.div>
+              </m.div>
             );
           })}
-        </motion.div>
+        </m.div>
       </div>
     </section>
   );

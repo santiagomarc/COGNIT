@@ -4,6 +4,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
 import { SemanticSearchModal } from '@/components/ui/shared/SemanticSearchModal';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
+import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
 import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
 import { FadeInUp } from '@/components/motion';
@@ -418,6 +419,11 @@ export default async function Dashboard() {
       </div>
 
       {/* ── Deck Grid with Search ── */}
+      {deckRows.length === 0 ? (
+        <FadeInUp delay={0.15}>
+          <DashboardOnboarding />
+        </FadeInUp>
+      ) : (
       <FadeInUp delay={0.15}>
         <div id="deck-collection" className="scroll-mt-24">
         <DeckGrid
@@ -439,6 +445,7 @@ export default async function Dashboard() {
         />
         </div>
       </FadeInUp>
+      )}
     </div>
   );
 }

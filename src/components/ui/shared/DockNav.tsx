@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Layers, Brain, UserRound, LogOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { logout } from '@/app/auth/actions';
@@ -50,7 +50,7 @@ export function DockNav() {
   return (
     <AnimatePresence>
       {visible && (
-        <motion.nav
+        <m.nav
           initial={{ opacity: 0, y: 30, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 24, scale: 0.95 }}
@@ -89,7 +89,7 @@ export function DockNav() {
                   aria-current={isActive ? 'page' : undefined}
                 >
                   {isActive && (
-                    <motion.span
+                    <m.span
                       layoutId="dock-active"
                       className="absolute inset-0 rounded-xl border border-primary/30 bg-primary/10 shadow-[0_0_14px_-6px_var(--glow)]"
                       transition={prefersReducedMotion ? { duration: 0 } : motionSprings.activePill}
@@ -115,7 +115,7 @@ export function DockNav() {
               <LogOut className="relative z-10 h-5 w-5" />
             </button>
           </div>
-        </motion.nav>
+        </m.nav>
       )}
     </AnimatePresence>
   );

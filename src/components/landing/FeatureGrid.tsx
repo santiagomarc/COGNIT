@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import {
   FileText,
   Wand2,
@@ -56,7 +56,7 @@ export function FeatureGrid() {
     <section className="relative py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
         {/* Header */}
-        <motion.div
+        <m.div
           initial={reduced ? undefined : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-80px' }}
@@ -72,14 +72,14 @@ export function FeatureGrid() {
           <p className="mt-3 text-muted-foreground">
             Built for serious students who want real results.
           </p>
-        </motion.div>
+        </m.div>
 
         {/* Grid */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, i) => {
             const Icon = feature.icon;
             return (
-              <motion.div
+              <m.div
                 key={feature.title}
                 initial={reduced ? undefined : { opacity: 0, y: 24, scale: 0.96 }}
                 whileInView={{ opacity: 1, y: 0, scale: 1 }}
@@ -100,7 +100,7 @@ export function FeatureGrid() {
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>
-              </motion.div>
+              </m.div>
             );
           })}
         </div>

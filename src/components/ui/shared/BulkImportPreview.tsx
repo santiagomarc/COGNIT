@@ -16,10 +16,10 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-300">
+        <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
           {result.cards.length} ready
         </span>
-        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-300">
+        <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300">
           {result.flagged.length} flagged
         </span>
         <span className="rounded-full border border-primary/15 bg-card/50 px-2.5 py-1">
@@ -65,7 +65,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                     <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                       Line {line.lineNumber}
                     </span>
-                    <span className="text-[11px] font-medium text-amber-300">
+                    <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
                       {FLAG_LABELS[line.reason]}
                     </span>
                   </div>

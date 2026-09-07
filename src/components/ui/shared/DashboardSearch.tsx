@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 
 type DashboardSearchProps = {
   value: string;
@@ -36,7 +36,7 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
         />
         <AnimatePresence>
           {value && (
-            <motion.button
+            <m.button
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
@@ -47,7 +47,7 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
               aria-label="Clear search"
             >
               <X className="h-3 w-3" />
-            </motion.button>
+            </m.button>
           )}
         </AnimatePresence>
       </div>
@@ -55,7 +55,7 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
       {/* Result count indicator */}
       <AnimatePresence>
         {value && (
-          <motion.p
+          <m.p
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -64,7 +64,7 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
             {resultCount === 0
               ? 'No decks found'
               : `Showing ${resultCount} of ${totalCount} deck${totalCount !== 1 ? 's' : ''}`}
-          </motion.p>
+          </m.p>
         )}
       </AnimatePresence>
     </div>

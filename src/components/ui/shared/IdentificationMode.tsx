@@ -1,6 +1,6 @@
 'use client';
 
-import { type FormEvent, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, CircleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,8 @@ type IdentificationModeProps = {
   disabled: boolean;
   enrichmentPending: boolean;
   onResolve: (grade: StudyGrade, score: number, answer: string) => void;
+  /** Fires the moment the answer is checked, so audio/haptics feel immediate. */
+  onAnswered?: (wasCorrect: boolean) => void;
 };
 
 type IdentificationResult = {
@@ -45,6 +47,7 @@ export function IdentificationMode({
   disabled,
   enrichmentPending,
   onResolve,
+  onAnswered,
 }: IdentificationModeProps) {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<IdentificationResult | null>(null);
@@ -54,6 +57,29 @@ export function IdentificationMode({
   const promptStatusText = card.id_question
     ? 'This clue was rewritten from the card description to make the identification prompt cleaner.'
     : 'This clue is using the saved card description directly until a rewritten prompt is available.';
+
+  // MCQ advances on Space after feedback; Identification had no equivalent, and
+  // the shortcut panel admitted as much ("use keyboard focus + Enter").
+  useEffect(() => {
+    if (!result || disabled) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (
+        event.target instanceof HTMLInputElement
+        || event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if ((event.key !== 'Enter' && event.key !== ' ') || event.repeat) return;
+
+      event.preventDefault();
+      onResolve(result.grade, result.score, result.answer);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [disabled, onResolve, result]);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -67,13 +93,15 @@ export function IdentificationMode({
       score,
       grade: getGrade(score),
     });
+    // 0.7 is the same threshold the server uses when it re-grades the attempt.
+    onAnswered?.(score >= 0.7);
   }
 
   return (
     <div className="glass-card glow-border rounded-3xl p-7">
       <div className="mb-4 flex items-center justify-between gap-3 text-xs uppercase tracking-wider text-muted-foreground">
         <span>Identification Prompt</span>
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${card.id_question ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${card.id_question ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
           {promptStatusLabel}
         </span>
       </div>

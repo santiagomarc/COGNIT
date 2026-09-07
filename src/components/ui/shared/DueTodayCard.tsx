@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { Clock, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -13,7 +13,7 @@ type DueTodayCardProps = {
 
 export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCardProps) {
   return (
-    <motion.div
+    <m.div
       initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
@@ -61,6 +61,6 @@ export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCar
           You&apos;re all caught up! No cards due for review right now.
         </p>
       )}
-    </motion.div>
+    </m.div>
   );
 }

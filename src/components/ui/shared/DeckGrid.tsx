@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/ca
 import { DeckActions } from '@/components/ui/shared/DeckActions';
 import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
 import { FadeInUp } from '@/components/motion';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { getDeckTagGlowColor, parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { getCappedStaggerDelay, motionSprings } from '@/lib/motion-configs';
 
@@ -169,7 +169,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
           </div>
         </FadeInUp>
       ) : (
-        <motion.div className="grid gap-4 sm:grid-cols-2" layout>
+        <m.div className="grid gap-4 sm:grid-cols-2" layout>
           <AnimatePresence mode="popLayout">
             {filtered.map((deck, i) => {
               const cardCount = deck.cards?.[0]?.count ?? 0;
@@ -181,7 +181,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                 '--deck-glow': deckGlow,
               } as CSSProperties;
               return (
-                <motion.div
+                <m.div
                   key={deck.id}
                   layout
                   initial={{ opacity: 0, scale: 0.96, y: 24 }}
@@ -242,11 +242,11 @@ export function DeckGrid({ decks }: DeckGridProps) {
                     </div>
                   </CardHeader>
                 </Card>
-              </motion.div>
+              </m.div>
             );
           })}
           </AnimatePresence>
-        </motion.div>
+        </m.div>
       )}
     </div>
   );

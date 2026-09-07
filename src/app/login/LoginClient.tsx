@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion, useReducedMotion, AnimatePresence } from 'framer-motion';
+import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -254,7 +254,7 @@ export default function LoginClient() {
             {floatingCards.map((card) => {
               const Icon = card.icon;
               return (
-                <motion.div
+                <m.div
                   key={card.label}
                   className="absolute glass-card rounded-xl border border-primary/15 px-5 py-4 shadow-lg"
                   style={{
@@ -284,7 +284,7 @@ export default function LoginClient() {
                       {card.label}
                     </span>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>
@@ -310,7 +310,7 @@ export default function LoginClient() {
         </Link>
 
         <AnimatePresence mode="wait">
-          <motion.div
+          <m.div
             key={emailSent ? 'sent' : mode}
             initial={reduced ? undefined : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -471,14 +471,14 @@ export default function LoginClient() {
 
                   {/* General error */}
                   {generalError && (
-                    <motion.div
+                    <m.div
                       initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
                       role="alert"
                     >
                       {generalError}
-                    </motion.div>
+                    </m.div>
                   )}
 
                   {/* Submit button */}
@@ -552,7 +552,7 @@ export default function LoginClient() {
                 )}
               </>
             )}
-          </motion.div>
+          </m.div>
         </AnimatePresence>
       </div>
     </div>

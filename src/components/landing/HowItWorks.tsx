@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { Upload, Wand2, GraduationCap } from 'lucide-react';
 
 const steps = [
@@ -34,7 +34,7 @@ export function HowItWorks() {
     <section id="how-it-works" className="relative py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
         {/* Section header */}
-        <motion.div
+        <m.div
           initial={reduced ? undefined : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: '-80px' }}
@@ -50,7 +50,7 @@ export function HowItWorks() {
           <p className="mt-3 text-muted-foreground">
             From raw material to lasting knowledge in minutes, not hours.
           </p>
-        </motion.div>
+        </m.div>
 
         {/* Timeline */}
         <div className="relative mx-auto max-w-2xl">
@@ -61,7 +61,7 @@ export function HowItWorks() {
             {steps.map((step, i) => {
               const Icon = step.icon;
               return (
-                <motion.div
+                <m.div
                   key={step.number}
                   initial={reduced ? undefined : { opacity: 0, x: -24 }}
                   whileInView={{ opacity: 1, x: 0 }}
@@ -88,7 +88,7 @@ export function HowItWorks() {
                       {step.description}
                     </p>
                   </div>
-                </motion.div>
+                </m.div>
               );
             })}
           </div>

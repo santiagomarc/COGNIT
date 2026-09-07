@@ -75,8 +75,13 @@ export function isEnumerationLike(text: string) {
     return true;
   }
 
-  const ordinalHits = text.match(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b/gi)?.length ?? 0;
-  if (ordinalHits >= 2) {
+  // DISTINCT ordinals, not just two hits. "first-in-first-out" repeats one
+  // ordinal and is a compound term, not a list — counting raw hits rejected
+  // every queue/FIFO card in a computer-science deck. "first … second" is a
+  // genuine enumeration and is still caught.
+  const ordinalMatches = text.match(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b/gi) ?? [];
+  const distinctOrdinals = new Set(ordinalMatches.map((match) => match.toLowerCase()));
+  if (distinctOrdinals.size >= 2) {
     return true;
   }
 

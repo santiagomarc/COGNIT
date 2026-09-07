@@ -10,6 +10,7 @@ import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
 import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
+import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ type DeckDetailSnapshot = {
     title: string;
     description: string | null;
     created_at: string;
+    share_token: string | null;
   } | null;
   deckErrorMessage: string | null;
   cards: Array<{
@@ -185,7 +187,7 @@ async function loadDeckDetailSnapshot(
   ] = await Promise.all([
     supabase
       .from('decks')
-      .select('id, title, description, created_at')
+      .select('id, title, description, created_at, share_token')
       .eq('id', deckId)
       .single(),
     supabase
@@ -210,7 +212,13 @@ async function loadDeckDetailSnapshot(
     // created_at is nullable at the schema level but always set at insert time
     // (DEFAULT now()); coalescing here keeps every downstream consumer's
     // existing non-null assumption intact.
-    deck: deck ? { ...deck, created_at: deck.created_at ?? new Date().toISOString() } : null,
+    deck: deck
+      ? {
+        ...deck,
+        created_at: deck.created_at ?? new Date().toISOString(),
+        share_token: deck.share_token ?? null,
+      }
+      : null,
     deckErrorMessage: deckError?.message ?? null,
     cards: (cards ?? []).map((card) => ({
       ...card,
@@ -380,6 +388,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                 <div className="inline-flex items-center rounded-full border border-primary/20 bg-card/50 px-3 py-1 text-sm text-muted-foreground">
                   {quizReadyCards}/{totalCards} quiz-ready
                 </div>
+                <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
               </div>
             </div>
 
@@ -420,10 +429,10 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                   {topTopics.map(([topic, count]) => (
                     <span
                       key={topic}
-                      className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs text-sky-200"
+                      className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs text-sky-700 dark:text-sky-200"
                     >
                       <span>{topic}</span>
-                      <span className="text-sky-300/80">{count}</span>
+                      <span className="text-sky-700/80 dark:text-sky-300/80">{count}</span>
                     </span>
                   ))}
                 </div>
@@ -431,7 +440,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
             ) : null}
 
             {hasCards ? (
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>

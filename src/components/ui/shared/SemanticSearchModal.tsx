@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence } from 'framer-motion';
 import { Search, Sparkles, X, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { semanticSearchCards, type SemanticSearchResult } from '@/app/actions/chat';
@@ -98,8 +98,8 @@ export function SemanticSearchModal() {
 
       <AnimatePresence>
         {open ? (
-          <div className="fixed inset-0 z-[110] flex items-start justify-center px-4 py-6 sm:items-center">
-            <motion.div
+          <div className="fixed inset-0 z-[110] flex items-start justify-center px-4 py-6 pb-[max(1.5rem,env(keyboard-inset-height,0px))] sm:items-center">
+            <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -107,7 +107,7 @@ export function SemanticSearchModal() {
               onClick={resetAndClose}
             />
 
-            <motion.div
+            <m.div
               ref={dialogRef}
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -193,7 +193,7 @@ export function SemanticSearchModal() {
                   </ul>
                 ) : null}
               </div>
-            </motion.div>
+            </m.div>
           </div>
         ) : null}
       </AnimatePresence>

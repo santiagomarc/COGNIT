@@ -163,8 +163,19 @@ export function DeckCardsManager({ deckId, cards, totalCards }: DeckCardsManager
         <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
         <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          Add your first flashcard above to start studying, or generate cards from your notes in the next step.
+          Add cards by hand, paste your notes, or let the AI read a PDF for you.
         </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <Button asChild size="sm">
+            <a href="#add-content">Add a card</a>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href="#add-content">Bulk import notes</a>
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <a href="#add-content">Generate from PDF</a>
+          </Button>
+        </div>
       </div>
     );
   }

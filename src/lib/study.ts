@@ -78,3 +78,34 @@ export function shuffleItems<T>(items: T[]): T[] {
   }
   return next;
 }
+
+/**
+ * Buckets the per-card next-review timestamps into a human sentence, e.g.
+ * "8 cards due tomorrow · 3 in 6 days". Only the two nearest buckets are shown;
+ * beyond that the detail stops being useful.
+ */
+export function summariseNextReviews(timestamps: string[], now = Date.now()): string | null {
+  if (timestamps.length === 0) return null;
+
+  const buckets = new Map<number, number>();
+  for (const iso of timestamps) {
+    const at = new Date(iso).getTime();
+    if (!Number.isFinite(at)) continue;
+    const days = Math.max(0, Math.round((at - now) / 86_400_000));
+    buckets.set(days, (buckets.get(days) ?? 0) + 1);
+  }
+
+  if (buckets.size === 0) return null;
+
+  const label = (days: number) => {
+    if (days === 0) return 'later today';
+    if (days === 1) return 'tomorrow';
+    return `in ${days} days`;
+  };
+
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .slice(0, 2)
+    .map(([days, count]) => `${count} card${count === 1 ? '' : 's'} ${label(days)}`)
+    .join(' · ');
+}

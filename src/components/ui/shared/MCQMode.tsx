@@ -19,6 +19,8 @@ type MCQModeProps = {
   enrichmentPending: boolean;
   onResolve: (grade: StudyGrade, wasCorrect: boolean, answer: string) => void;
   onFallbackToIdentification: () => void;
+  /** Fires the moment an option is chosen, so audio/haptics feel immediate. */
+  onAnswered?: (wasCorrect: boolean) => void;
 };
 
 function shuffle<T>(items: T[]) {
@@ -36,6 +38,7 @@ export function MCQMode({
   enrichmentPending,
   onResolve,
   onFallbackToIdentification,
+  onAnswered,
 }: MCQModeProps) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
@@ -91,11 +94,12 @@ export function MCQMode({
       const option = options[optionIndex];
       setSelectedOption(option);
       setResolved(true);
+      onAnswered?.(option === card.front);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [disabled, options, resolved]);
+  }, [card.front, disabled, onAnswered, options, resolved]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -162,9 +166,9 @@ export function MCQMode({
             const isSelected = option === selectedOption;
             const feedbackClass = resolved
               ? isCorrect
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
                 : isSelected
-                  ? 'border-red-500/30 bg-red-500/10 text-red-200'
+                  ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200'
                   : 'border-primary/10 bg-card/20 text-muted-foreground'
               : 'border-primary/10 bg-card/20 text-foreground hover:border-primary/25 hover:bg-card/40';
 
@@ -178,6 +182,7 @@ export function MCQMode({
                   }
                   setSelectedOption(option);
                   setResolved(true);
+                  onAnswered?.(option === card.front);
                 }}
                 disabled={disabled || resolved}
                 className={`rounded-2xl border px-4 py-4 text-left transition-colors ${feedbackClass}`}

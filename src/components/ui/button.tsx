@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
-import { motion } from "framer-motion"
+import { m } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 
@@ -64,14 +64,14 @@ function Button({
   }
 
   return (
-    <motion.button
+    <m.button
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 400, damping: 17 }}
       data-slot="button"
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
-      {...(props as React.ComponentProps<typeof motion.button>)}
+      {...(props as React.ComponentProps<typeof m.button>)}
     />
   )
 }

@@ -3,7 +3,7 @@
 import { Rocket, ArrowLeft, Home, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
+import { m } from 'framer-motion';
 import { StaggerContainer, StaggerItem } from '@/components/motion';
 
 const FLOATING_SPARKS = [
@@ -19,7 +19,7 @@ export default function NotFound() {
     <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden bg-background">
       {/* Background Animated Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
+        <m.div
           animate={{
             y: [0, -20, 0],
             rotate: [0, 5, 0],
@@ -31,7 +31,7 @@ export default function NotFound() {
           }}
           className="absolute -top-10 -left-10 h-64 w-64 rounded-full bg-primary/10 blur-[100px]"
         />
-        <motion.div
+        <m.div
           animate={{
             y: [0, 20, 0],
             rotate: [0, -5, 0],
@@ -46,7 +46,7 @@ export default function NotFound() {
         
         {/* Floating Sparks */}
         {FLOATING_SPARKS.map((spark, i) => (
-          <motion.div
+          <m.div
             key={i}
             className="absolute h-2 w-2 rounded-full bg-primary/40 shadow-[0_0_10px_var(--neon)]"
             style={{
@@ -74,7 +74,7 @@ export default function NotFound() {
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
 
           <StaggerItem>
-            <motion.div 
+            <m.div 
               className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 relative"
               animate={{ 
                 y: [0, -10, 0],
@@ -86,7 +86,7 @@ export default function NotFound() {
               }}
             >
               <Rocket className="h-10 w-10 text-primary" strokeWidth={1.5} />
-              <motion.div
+              <m.div
                 animate={{
                   opacity: [0.5, 1, 0.5],
                   scale: [0.8, 1.2, 0.8],
@@ -99,8 +99,8 @@ export default function NotFound() {
                 className="absolute -bottom-2 -right-2"
               >
                 <Sparkles className="h-5 w-5 text-neon" />
-              </motion.div>
-            </motion.div>
+              </m.div>
+            </m.div>
           </StaggerItem>
 
           <StaggerItem>

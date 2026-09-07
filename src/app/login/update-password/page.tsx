@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'framer-motion';
+import { m, useReducedMotion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,7 +71,7 @@ export default function UpdatePasswordPage() {
         <ThemeToggle />
       </div>
 
-      <motion.div
+      <m.div
         initial={reduced ? undefined : { opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 26 }}
@@ -198,14 +198,14 @@ export default function UpdatePasswordPage() {
 
               {/* General error */}
               {generalError && (
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
                   role="alert"
                 >
                   {generalError}
-                </motion.div>
+                </m.div>
               )}
 
               <Button type="submit" className="w-full" disabled={isPending}>
@@ -221,7 +221,7 @@ export default function UpdatePasswordPage() {
             </form>
           </>
         )}
-      </motion.div>
+      </m.div>
     </div>
   );
 }

@@ -38,6 +38,17 @@ describe('isEnumerationLike', () => {
   it('accepts prose definitions', () => {
     expect(isEnumerationLike('A process that converts light into chemical energy.')).toBe(false);
   });
+
+  it('accepts a repeated ordinal inside a compound term', () => {
+    // "first-in-first-out" repeats one ordinal; it is a term, not a list.
+    // Counting raw hits rejected every queue/FIFO card in a CS deck.
+    expect(isEnumerationLike('A first-in-first-out collection of elements.')).toBe(false);
+    expect(isEnumerationLike('A last-in-first-out collection of elements.')).toBe(false);
+  });
+
+  it('still rejects two DISTINCT ordinals', () => {
+    expect(isEnumerationLike('First you initialise it, second you traverse it.')).toBe(true);
+  });
 });
 
 describe('scoreCandidateCard', () => {

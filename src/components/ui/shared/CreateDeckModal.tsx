@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, m, useReducedMotion } from 'framer-motion';
 import { Plus, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { createDeck } from '@/app/actions/deck';
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motionSprings } from '@/lib/motion-configs';
+import { OPEN_CREATE_DECK_EVENT } from '@/lib/dashboard-events';
 import { toast } from 'sonner';
 
 type CreateDeckModalProps = {
@@ -29,6 +30,14 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const reduced = useReducedMotion();
+
+  // The onboarding panel lives in a different grid area and cannot pass props
+  // here, so it asks via a named event instead.
+  useEffect(() => {
+    const handleOpenRequest = () => setOpen(true);
+    window.addEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
+    return () => window.removeEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -92,7 +101,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
 
         <AnimatePresence mode="wait" initial={false}>
           {!open ? (
-            <motion.div
+            <m.div
               key="quick-actions-face"
               initial={{ opacity: 0, rotateX: -6, y: 6 }}
               animate={{ opacity: 1, rotateX: 0, y: 0 }}
@@ -130,9 +139,9 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                   <span>Create New Deck</span>
                 </button>
               </div>
-            </motion.div>
+            </m.div>
           ) : (
-            <motion.div
+            <m.div
               key="create-deck-face"
               initial={{ opacity: 0, rotateX: 6, y: 6 }}
               animate={{ opacity: 1, rotateX: 0, y: 0 }}
@@ -224,7 +233,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                   </Button>
                 </div>
               </form>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>
