@@ -29,9 +29,17 @@ const nextConfig: NextConfig = {
       supabaseHost = 'https://*.supabase.co';
     }
 
+    // 'unsafe-eval' is required by the Turbopack dev runtime and React Refresh.
+    // A production build needs neither, so it is scoped to development rather
+    // than shipped to users.
+    const isDev = process.env.NODE_ENV !== 'production';
+    const scriptSrc = isDev
+      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+      : "script-src 'self' 'unsafe-inline'";
+
     const cspHeader = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
@@ -39,6 +47,7 @@ const nextConfig: NextConfig = {
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "object-src 'none'",
     ].join('; ');
 
     return [

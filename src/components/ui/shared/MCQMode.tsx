@@ -41,8 +41,21 @@ export function MCQMode({
   const [resolved, setResolved] = useState(false);
 
   const options = useMemo(() => {
-    const distractors = Array.isArray(card.mcq_distractors) ? card.mcq_distractors.filter(Boolean) : [];
-    return shuffle([card.front, ...distractors]).slice(0, Math.max(2, distractors.length + 1));
+    // Defence in depth: the server already rejects duplicate distractors
+    // (selectUsableDistractors), but a duplicate reaching the client renders
+    // two options as "correct" and triggers a duplicate React key.
+    const seen = new Set<string>([card.front.trim().toLowerCase()]);
+    const distractors = (Array.isArray(card.mcq_distractors) ? card.mcq_distractors : [])
+      .filter((value) => {
+        const key = value?.trim().toLowerCase();
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+    // The old trailing .slice(0, Math.max(2, distractors.length + 1)) was a
+    // no-op by construction; dropped.
+    return shuffle([card.front, ...distractors]);
   }, [card.front, card.mcq_distractors]);
 
   const prompt = card.id_question ?? card.back;
@@ -109,7 +122,7 @@ export function MCQMode({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [disabled, handleContinue, resolved, selectedOption]);
 
-  if (!Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2) {
+  if (options.length < 4) {
     return (
       <div className="glass-card glow-border rounded-3xl p-7">
         <div className="rounded-2xl border border-primary/10 bg-card/20 p-5 text-center">
@@ -157,7 +170,7 @@ export function MCQMode({
 
             return (
               <button
-                key={`${card.id}-${option}`}
+                key={`${card.id}-${index}`}
                 type="button"
                 onClick={() => {
                   if (resolved || disabled) {

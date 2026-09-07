@@ -101,7 +101,42 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   const availableCardCount = totalInDeck ?? 0;
   const { max: maxQuizCards } = getSessionCardBounds(availableCardCount);
   const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, availableCardCount);
-  const limitToFetch = maxQuizCards > 0 ? Math.min(Math.max(sessionCardCount * 2, 20), 100) : 0;
+
+  // The deck page advertises "Force include all unproven cards (N)" with N =
+  // every unproven card in the deck. Fetching a fixed small pool and filtering
+  // inside it silently capped that promise, so in focus mode the limit is
+  // derived from the real unproven count instead.
+  let unprovenCardCount = 0;
+  if (focusUnproven) {
+    const [{ count: provenCount, error: provenCountError }] = await Promise.all([
+      supabase
+        .from('card_mastery_state')
+        .select('card_id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('deck_id', deckId)
+        .eq('correct', true),
+    ]);
+
+    if (provenCountError) {
+      /**
+       * @deprecated Fallback for pre-202609011200 environments.
+       * Remove once `supabase migration list` confirms every environment is current.
+       */
+      if (!isMissingTableError(provenCountError.message, 'card_mastery_state')) {
+        logger.error('quiz-page', 'failed to count proven cards', { message: provenCountError.message });
+      }
+      unprovenCardCount = availableCardCount;
+    } else {
+      unprovenCardCount = Math.max(0, availableCardCount - (provenCount ?? 0));
+    }
+  }
+
+  const limitToFetch = maxQuizCards === 0
+    ? 0
+    : focusUnproven
+      // Cover every unproven card, plus room to top up to the session size.
+      ? Math.min(Math.max(sessionCardCount, unprovenCardCount), availableCardCount, 500)
+      : Math.min(Math.max(sessionCardCount * 2, 20), 100);
 
   type QuizCardRow = {
     id: string;
@@ -125,12 +160,17 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   const { data: rpcCards, error: rpcError } = await rpcCaller('select_quiz_cards', {
     p_deck_id: deckId,
     p_limit: limitToFetch > 0 ? limitToFetch : 20,
+    // Pushes the unproven-first ordering into Postgres, and randomises within
+    // each priority tier so a repeat quiz is not the same cards in a new order.
+    p_focus_unproven: focusUnproven,
   });
 
   let rawCards: QuizCardRow[] = [];
+  let usedRpc = false;
 
   if (!rpcError && rpcCards && rpcCards.length > 0) {
     rawCards = rpcCards;
+    usedRpc = true;
   } else {
     // Fallback: bounded card fetch (P-2)
     const { data: fallbackCards } = await supabase
@@ -144,35 +184,53 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   }
 
   const studyCards = rawCards.map(toStudyCard);
-  const shuffledCards = shuffleItems(studyCards);
+  const takeCount = maxQuizCards === 0
+    ? 0
+    : focusUnproven
+      // Focus mode expands past the session size to cover the unproven set.
+      ? Math.min(Math.max(sessionCardCount, unprovenCardCount), studyCards.length)
+      : Math.min(sessionCardCount, studyCards.length);
 
-  let cards = shuffledCards.slice(0, maxQuizCards > 0 ? sessionCardCount : 0);
+  let cards: StudySessionCard[];
 
-  if (focusUnproven && shuffledCards.length > 0) {
-    const { data: provenMasteryRows, error: provenMasteryError } = await supabase
-      .from('card_mastery_state')
-      .select('card_id')
-      .eq('user_id', user.id)
-      .eq('deck_id', deckId)
-      .eq('correct', true);
+  if (usedRpc) {
+    // The RPC already ordered by priority and randomised within each tier, so
+    // slice FIRST (keeping the priority) and shuffle only the chosen cards for
+    // presentation order. Shuffling before slicing would throw the priority away.
+    cards = shuffleItems(studyCards.slice(0, takeCount));
+  } else {
+    // Fallback rows come back in deterministic created_at order, so shuffle the
+    // pool to get variety, then apply the focus filter in TypeScript.
+    const shuffledCards = shuffleItems(studyCards);
+    cards = shuffledCards.slice(0, takeCount);
 
-    if (provenMasteryError) {
-      /**
-       * @deprecated Fallback for pre-202609011200 environments.
-       * Remove once `supabase migration list` confirms every environment is current.
-       * Tracking: Phase 5 exit criteria.
-       */
-      if (!isMissingTableError(provenMasteryError.message, 'card_mastery_state')) {
-        logger.error('quiz-page', 'failed to read mastery state for focus_unproven', { message: provenMasteryError.message });
+    if (focusUnproven && shuffledCards.length > 0) {
+      const { data: provenMasteryRows, error: provenMasteryError } = await supabase
+        .from('card_mastery_state')
+        .select('card_id')
+        .eq('user_id', user.id)
+        .eq('deck_id', deckId)
+        .eq('correct', true);
+
+      if (provenMasteryError) {
+        /**
+         * @deprecated Fallback for pre-202609011200 environments.
+         * Remove once `supabase migration list` confirms every environment is current.
+         * Tracking: Phase 5 exit criteria.
+         */
+        if (!isMissingTableError(provenMasteryError.message, 'card_mastery_state')) {
+          logger.error('quiz-page', 'failed to read mastery state for focus_unproven', { message: provenMasteryError.message });
+        }
+      } else {
+        const provenCardIds = new Set((provenMasteryRows ?? []).map((row) => row.card_id));
+        const unproven = shuffledCards.filter((card) => !provenCardIds.has(card.id));
+        const proven = shuffledCards.filter((card) => provenCardIds.has(card.id));
+
+        cards = [...unproven, ...proven].slice(
+          0,
+          Math.min(Math.max(sessionCardCount, unproven.length), shuffledCards.length),
+        );
       }
-    } else {
-      const provenCardIds = new Set((provenMasteryRows ?? []).map((row) => row.card_id));
-      const unprovenCards = shuffledCards.filter((card) => !provenCardIds.has(card.id));
-      const provenCards = shuffledCards.filter((card) => provenCardIds.has(card.id));
-      const desiredCount = Math.max(sessionCardCount, unprovenCards.length);
-      const takeCount = Math.min(desiredCount, shuffledCards.length);
-
-      cards = [...unprovenCards, ...provenCards].slice(0, takeCount);
     }
   }
 

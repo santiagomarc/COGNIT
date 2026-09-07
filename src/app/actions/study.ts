@@ -134,6 +134,13 @@ export async function gradeCard(data: GradeCardInput) {
     }
   }
 
+  // Deck path only. Revalidating /dashboard here fired once per graded card —
+  // 40 times in a 40-card session, while the user is not even looking at it.
+  // finishStudySession() handles the dashboard once, at the end.
+  // Keeping the deck path means a mid-session back-navigation still shows
+  // current data rather than a stale card list.
+  revalidatePath(`/dashboard/${result.data.deck_id}`);
+
   return {
     success: true,
     nextReviewAt: sm2Result.nextReviewAt.toISOString(),

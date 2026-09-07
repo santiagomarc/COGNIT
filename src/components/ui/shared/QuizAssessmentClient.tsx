@@ -315,7 +315,7 @@ export function QuizAssessmentClient({
           return !card.id_question;
         }
 
-        return !Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 2 || !card.id_question;
+        return !Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 3 || !card.id_question;
       })
       .slice(0, 50)
       .map((card) => card.id);
@@ -571,7 +571,7 @@ export function QuizAssessmentClient({
 
   const activeNeedsIdentificationPrompt = Boolean(active && !active.id_question);
   const activeNeedsMcq = Boolean(
-    active && (!Array.isArray(active.mcq_distractors) || active.mcq_distractors.length < 2)
+    active && (!Array.isArray(active.mcq_distractors) || active.mcq_distractors.length < 3)
   );
   const incorrectResults = results.filter((entry) => !entry.correct);
   const resultActionButtonClass = 'gap-2 min-w-[11.5rem] justify-center';

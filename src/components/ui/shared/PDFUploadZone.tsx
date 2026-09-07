@@ -128,7 +128,15 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       if (result.error) {
         toast.error(formatActionError(result.error, 'Failed to generate cards.'));
       } else if (result.success && result.cards) {
-        if (result.count < resolvedMaxCardCount) {
+        if (result.partial) {
+          // A long PDF is split into sections; one failing section no longer
+          // loses the document, but the user should know it happened.
+          const failed = result.failedChunks ?? 0;
+          toast.warning(
+            `${result.count} cards generated. ${failed} section${failed === 1 ? '' : 's'} of the PDF couldn't be processed — you can re-upload just those pages.`,
+            { duration: 8000 },
+          );
+        } else if (result.count < resolvedMaxCardCount) {
           toast.success(`${result.count} cards generated (AI stopped early after covering the material).`);
         } else {
           toast.success(`${result.count} cards generated and saved!`);

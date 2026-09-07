@@ -173,7 +173,7 @@ function isValidTermDescriptionLine(line: string) {
 }
 
 export async function sanitizeNotes(data: SanitizeNotesInput) {
-  return guardAction('sanitizeNotes', async () => {
+  return guardAction('Note cleanup', async () => {
     const result = sanitizeNotesSchema.safeParse(data);
     if (!result.success) {
       return { error: 'Invalid input notes.' };
@@ -243,7 +243,7 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
 }
 
 export async function getHint(data: GetHintInput) {
-  return guardAction('getHint', async () => {
+  return guardAction('Hint generation', async () => {
     const result = getHintSchema.safeParse(data);
     if (!result.success) {
       return { error: 'Invalid hint parameters.' };

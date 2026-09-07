@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Json } from '@/lib/database.types';
 import { logger } from '@/lib/logger';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
+import { getServerEnv } from '@/lib/env-server';
 
 export type AiActionName =
   | 'generate_cards'
@@ -28,33 +29,39 @@ const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests:
 };
 
 function getGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not configured on the server.');
-  }
-
-  return new GoogleGenerativeAI(apiKey);
+  // getServerEnv throws with a precise message when GEMINI_API_KEY is absent or
+  // malformed, so every AI entry point fails the same way instead of each
+  // inventing its own check.
+  return new GoogleGenerativeAI(getServerEnv().GEMINI_API_KEY);
 }
 
-export function getGeminiJsonModel() {
+/**
+ * @param options.temperature Defaults to 0.1. Extraction and enrichment want
+ * near-determinism — the same PDF should yield the same cards. Callers that
+ * want warmth (deck chat) pass their own value.
+ */
+export function getGeminiJsonModel(options?: { temperature?: number }) {
+  const env = getServerEnv();
   const genai = getGeminiClient();
   return genai.getGenerativeModel({
-    model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+    model: env.GEMINI_MODEL,
     generationConfig: {
-      temperature: 0.4,
+      temperature: options?.temperature ?? 0.1,
+      topP: 0.95,
       responseMimeType: 'application/json',
-      maxOutputTokens: Number(process.env.GEMINI_MODEL_MAX_TOKENS) || 4096,
+      maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
     },
   });
 }
 
-export function getGeminiTextModel() {
+export function getGeminiTextModel(options?: { temperature?: number }) {
+  const env = getServerEnv();
   const genai = getGeminiClient();
   return genai.getGenerativeModel({
-    model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+    model: env.GEMINI_MODEL,
     generationConfig: {
-      temperature: 0.5,
-      maxOutputTokens: Number(process.env.GEMINI_MODEL_MAX_TOKENS) || 4096,
+      temperature: options?.temperature ?? 0.5,
+      maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
     },
   });
 }
@@ -62,7 +69,7 @@ export function getGeminiTextModel() {
 export function getGeminiEmbeddingModel() {
   const genai = getGeminiClient();
   return genai.getGenerativeModel({
-    model: process.env.GEMINI_EMBEDDING_MODEL ?? 'text-embedding-004',
+    model: getServerEnv().GEMINI_EMBEDDING_MODEL,
   });
 }
 
@@ -74,18 +81,7 @@ export function chunkArray<T>(items: T[], size: number) {
   return chunks;
 }
 
-export function normalizeWhitespace(value: string) {
-  return value
-    .replace(/\r/g, '\n')
-    .replace(/\t/g, ' ')
-    .replace(/[ \u00A0]{2,}/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-export function normalizeForMatch(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, ' ');
-}
+export { normalizeForMatch, normalizeWhitespace } from '@/lib/text-normalize';
 
 function isMissingAiUsageTableError(message: string) {
   const normalized = message.toLowerCase();
@@ -218,6 +214,22 @@ export async function reserveAiCall(
   return { ok: true, reservationId: data?.id ?? null };
 }
 
+/**
+ * Records the OUTCOME of an AI call.
+ *
+ * When `reservationId` is set, `reserveAiCall` already inserted the row that
+ * the rate limiter counts, and there is nothing further to write: 202609050900
+ * puts `FOR UPDATE USING (false)` on ai_usage_logs, so an UPDATE here matches
+ * zero rows and PostgREST reports that as success — the write looked like it
+ * worked and silently did nothing. Rather than punch a hole in the append-only
+ * guarantee (or add the codebase's only SECURITY DEFINER function, which the
+ * Phase 5 assertions explicitly forbid), the reservation row stays the single
+ * record and the post-hoc detail goes to the structured log, which is where
+ * you would look when debugging a specific call anyway.
+ *
+ * Without a reservation — the legacy path, and any caller that did not reserve —
+ * this still inserts, so usage is never uncounted.
+ */
 export async function recordAiUsage(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
@@ -226,17 +238,11 @@ export async function recordAiUsage(
   reservationId?: string | null,
 ) {
   if (reservationId) {
-    const { error } = await supabase
-      .from('ai_usage_logs')
-      .update({
-        metadata: { ...metadata, phase: 'completed' },
-      })
-      .eq('id', reservationId)
-      .eq('user_id', userId);
-
-    if (error && !isMissingAiUsageTableError(error.message)) {
-      logger.error('ai_usage_logs', 'failed to update usage row', { message: error.message });
-    }
+    logger.info('ai_usage', 'call completed', {
+      action,
+      reservation_id: reservationId,
+      ...metadata,
+    });
     return;
   }
 

@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrainCircuit, Loader2, MessageSquarePlus, Send } from 'lucide-react';
+import { BrainCircuit, Loader2, MessageSquarePlus, RotateCcw, Send, TriangleAlert } from 'lucide-react';
 import {
-  chatWithDeck,
   createDeckChatSession,
   getDeckChatMessages,
   getDeckChatSessions,
@@ -13,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { formatActionError } from '@/lib/ai-feedback';
+import { useDeckChatStream, type ChatReference } from '@/lib/use-deck-chat-stream';
 import { toast } from 'sonner';
 
 type DeckChatWidgetProps = {
@@ -33,6 +33,10 @@ type ChatMessage = {
   followup_suggestions: string[];
   referenced_card_ids: string[];
   created_at: string;
+  /** Assistant only: the deck did not cover the question. */
+  ungrounded?: boolean;
+  /** Assistant only: chips resolved from the live stream's meta frame. */
+  references?: ChatReference[];
 };
 
 type IndexStatus = { total: number; pending: number } | null;
@@ -43,20 +47,26 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  const [isSending, setIsSending] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [indexStatus, setIndexStatus] = useState<IndexStatus>(null);
+  const [lastQuestion, setLastQuestion] = useState('');
   const hasAutoSyncedRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const { state, send, cancel, reset } = useDeckChatStream();
+
+  // Derived from stream state rather than a manually managed boolean. This is
+  // what makes the permanently-stuck Send button (finding R-2) structurally
+  // impossible: there is no setIsSending(false) that an early return can skip.
+  const isStreaming = state.status === 'retrieving' || state.status === 'streaming';
 
   useEffect(() => {
     let mounted = true;
 
     async function loadSessions() {
       const result = await getDeckChatSessions(deckId);
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       if (result?.error) {
         toast.error(formatActionError(result.error, 'Failed to load deck chat sessions.'));
@@ -71,10 +81,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     }
 
     void loadSessions();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [deckId]);
 
   // Cheap COUNT-only probe. Does NOT call the embedding API.
@@ -85,10 +92,11 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         setIndexStatus({ total: result.total, pending: result.pending });
       }
     });
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [deckId]);
+
+  // Abort any in-flight stream when the deck changes or the widget unmounts.
+  useEffect(() => cancel, [cancel, deckId]);
 
   const runSync = useCallback(async () => {
     setIsSyncing(true);
@@ -110,12 +118,9 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   }, [deckId]);
 
   useEffect(() => {
-    if (!activeSessionId) {
-      return;
-    }
+    if (!activeSessionId) return;
 
     const sessionId = activeSessionId;
-
     let mounted = true;
 
     async function loadMessages() {
@@ -126,9 +131,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         limit: 80,
       });
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       if (result?.error) {
         toast.error(formatActionError(result.error, 'Failed to load messages.'));
@@ -141,33 +144,59 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     }
 
     void loadMessages();
-
-    return () => {
-      mounted = false;
-    };
+    return () => { mounted = false; };
   }, [activeSessionId, deckId]);
+
+  // Keep the newest content in view while tokens arrive.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages.length, state.answer]);
+
+  // Commit the streamed answer to the message list once the stream closes.
+  useEffect(() => {
+    if (state.status !== 'done' || !state.answer) return;
+
+    setMessages((prev) => [...prev, {
+      id: `assistant-${Date.now()}`,
+      role: 'assistant',
+      content: state.answer,
+      followup_suggestions: state.followupSuggestions,
+      referenced_card_ids: state.references.map((ref) => ref.id),
+      references: state.references,
+      ungrounded: !state.grounded,
+      created_at: new Date().toISOString(),
+    }]);
+
+    if (state.sessionId) {
+      setActiveSessionId((current) => current ?? state.sessionId);
+    }
+
+    reset();
+  }, [
+    state.status,
+    state.answer,
+    state.followupSuggestions,
+    state.references,
+    state.grounded,
+    state.sessionId,
+    reset,
+  ]);
 
   const latestAssistantSuggestions = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
-      if (message.role === 'assistant' && Array.isArray(message.followup_suggestions) && message.followup_suggestions.length > 0) {
+      if (message.role === 'assistant' && message.followup_suggestions?.length > 0) {
         return message.followup_suggestions;
       }
     }
-
     return [] as string[];
   }, [messages]);
 
   const handleCreateSession = useCallback(async () => {
-    if (isCreatingSession) {
-      return;
-    }
+    if (isCreatingSession) return;
 
     setIsCreatingSession(true);
-    const result = await createDeckChatSession({
-      deck_id: deckId,
-      title: 'New chat',
-    });
+    const result = await createDeckChatSession({ deck_id: deckId, title: 'New chat' });
     setIsCreatingSession(false);
 
     if (result?.error || !result?.success) {
@@ -180,85 +209,42 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     setActiveSessionId(created.id);
     setMessages([]);
     setInput('');
-  }, [deckId, isCreatingSession]);
+    reset();
+  }, [deckId, isCreatingSession, reset]);
 
-  async function handleSendMessage(message: string) {
+  const handleSendMessage = useCallback(async (message: string) => {
     const trimmed = message.trim();
-    if (!trimmed || isSending) {
-      return;
+    // The server schema requires >= 3 chars; checking here keeps the user out
+    // of a validation round trip for an obvious typo.
+    if (trimmed.length < 3 || isStreaming) return;
+
+    setLastQuestion(trimmed);
+    setInput('');
+
+    // Optimistic: the user's own words appear instantly. Previously they did
+    // not render until the assistant's full reply came back.
+    setMessages((prev) => [...prev, {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: trimmed,
+      followup_suggestions: [],
+      referenced_card_ids: [],
+      created_at: new Date().toISOString(),
+    }]);
+
+    if (indexStatus && indexStatus.pending > 0 && !hasAutoSyncedRef.current) {
+      hasAutoSyncedRef.current = true;
+      await runSync();
     }
 
-    let sessionId = activeSessionId;
-    if (!sessionId) {
-      const sessionResult = await createDeckChatSession({
-        deck_id: deckId,
-        title: trimmed.slice(0, 80),
-      });
+    await send({ deckId, message: trimmed, sessionId: activeSessionId });
+  }, [activeSessionId, deckId, indexStatus, isStreaming, runSync, send]);
 
-      if (sessionResult?.error || !sessionResult?.success) {
-        toast.error(formatActionError(sessionResult?.error, 'Failed to initialize chat session.'));
-        return;
-      }
+  const retry = useCallback(() => {
+    if (lastQuestion) void send({ deckId, message: lastQuestion, sessionId: activeSessionId });
+  }, [activeSessionId, deckId, lastQuestion, send]);
 
-      const createdSession = sessionResult.session as ChatSession;
-      setSessions((prev) => [createdSession, ...prev]);
-      setActiveSessionId(createdSession.id);
-      sessionId = createdSession.id;
-    }
-
-    setIsSending(true);
-    try {
-      if (indexStatus && indexStatus.pending > 0 && !hasAutoSyncedRef.current) {
-        hasAutoSyncedRef.current = true;
-        await runSync();
-      }
-
-      const result = await chatWithDeck({
-        deck_id: deckId,
-        session_id: sessionId,
-        message: trimmed,
-        top_k: 5,
-      });
-
-      if (result?.error || !result?.success) {
-        toast.error(formatActionError(result?.error, 'Deck chat failed.'));
-        return;
-      }
-
-      const assistantAnswer = typeof result.answer === 'string' ? result.answer : '';
-      if (!assistantAnswer) {
-        toast.error('Deck chat returned an empty response. Please try again.');
-        return;
-      }
-
-      const nowIso = new Date().toISOString();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `tmp-user-${nowIso}`,
-          role: 'user',
-          content: trimmed,
-          followup_suggestions: [],
-          referenced_card_ids: [],
-          created_at: nowIso,
-        },
-        {
-          id: `tmp-assistant-${nowIso}`,
-          role: 'assistant',
-          content: assistantAnswer,
-          followup_suggestions: Array.isArray(result.followupSuggestions) ? result.followupSuggestions : [],
-          referenced_card_ids: Array.isArray(result.references) ? result.references.map((ref: { id: string }) => ref.id) : [],
-          created_at: new Date().toISOString(),
-        },
-      ]);
-      setInput('');
-    } catch (error) {
-      console.error('[DeckChatWidget] send failed:', error);
-      toast.error('Deck chat is unavailable right now. Please try again.');
-    } finally {
-      setIsSending(false);
-    }
-  }
+  const showEmptyState = messages.length === 0 && !isStreaming && state.status !== 'error';
 
   return (
     <section className="glass-card glow-border rounded-2xl p-5">
@@ -267,34 +253,22 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
           <h2 className="text-lg font-semibold tracking-tight">Chat with Your Deck</h2>
           <p className="text-sm text-muted-foreground">Ask concept questions grounded in your own flashcards.</p>
         </div>
-        <div className="flex items-center gap-2">
-          {isSyncing ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-xs text-primary">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Syncing embeddings
-            </span>
-          ) : null}
-          <Button type="button" variant="outline" size="sm" onClick={handleCreateSession} disabled={isCreatingSession} className="gap-2">
-            <MessageSquarePlus className="h-4 w-4" />
-            {isCreatingSession ? 'Creating...' : 'New Chat'}
-          </Button>
-        </div>
+        <Button type="button" variant="outline" size="sm" onClick={handleCreateSession} disabled={isCreatingSession} className="gap-2">
+          <MessageSquarePlus className="h-4 w-4" />
+          {isCreatingSession ? 'Creating...' : 'New Chat'}
+        </Button>
       </div>
 
       {indexStatus && indexStatus.pending > 0 ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs">
-          <span className="text-amber-200">
+          <span className="text-amber-700 dark:text-amber-200">
             {indexStatus.pending} of {indexStatus.total} cards aren&apos;t indexed yet.
             Chat can only answer from indexed cards.
           </span>
           <Button type="button" size="sm" variant="outline" onClick={runSync} disabled={isSyncing}>
             {isSyncing ? (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin mr-1" /> Indexing…
-              </>
-            ) : (
-              'Index now'
-            )}
+              <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Indexing…</>
+            ) : 'Index now'}
           </Button>
         </div>
       ) : null}
@@ -316,13 +290,13 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         ))}
       </div>
 
-      <div className="h-[22rem] overflow-y-auto rounded-xl border border-primary/10 bg-card/20 p-3">
+      <div ref={scrollRef} className="h-[22rem] overflow-y-auto rounded-xl border border-primary/10 bg-card/20 p-3">
         {isLoadingMessages ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Loading chat history...
           </div>
-        ) : messages.length === 0 ? (
+        ) : showEmptyState ? (
           <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
             <BrainCircuit className="mb-2 h-6 w-6 text-primary" />
             Ask your first question to start this study conversation.
@@ -330,35 +304,61 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         ) : (
           <div className="space-y-3">
             {messages.map((message) => (
-              <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
-                  message.role === 'user'
-                    ? 'border border-primary/30 bg-primary/15 text-foreground'
-                    : 'border border-primary/15 bg-card/60 text-muted-foreground'
-                }`}>
-                  <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                  {message.role === 'assistant' && Array.isArray(message.referenced_card_ids) && message.referenced_card_ids.length > 0 ? (
-                    <p className="mt-2 text-[11px] uppercase tracking-[0.14em] text-primary/70">
-                      References: {message.referenced_card_ids.slice(0, 3).map((id) => `#${id.slice(0, 8)}`).join(', ')}
-                      {message.referenced_card_ids.length > 3 ? ` +${message.referenced_card_ids.length - 3}` : ''}
+              <ChatBubble key={message.id} message={message} />
+            ))}
+
+            {/* Live streaming bubble */}
+            {isStreaming ? (
+              <div className="flex justify-start">
+                <div className="max-w-[90%] space-y-2 rounded-xl border border-primary/15 bg-card/60 px-3 py-2 text-sm">
+                  {state.references.length > 0 ? (
+                    <SourceChips references={state.references} />
+                  ) : null}
+
+                  {state.answer ? (
+                    <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                      {state.answer}
+                      <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-primary align-text-bottom" />
                     </p>
+                  ) : (
+                    <p className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      {state.status === 'retrieving' ? 'Searching your cards…' : 'Thinking…'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
+            {state.status === 'error' ? (
+              <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <div className="space-y-2">
+                  {state.answer ? (
+                    <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{state.answer}</p>
+                  ) : null}
+                  <p className="text-destructive">{state.errorMessage}</p>
+                  {state.retryable ? (
+                    <Button type="button" size="sm" variant="outline" onClick={retry} className="gap-1.5">
+                      <RotateCcw className="h-3 w-3" /> Retry
+                    </Button>
                   ) : null}
                 </div>
               </div>
-            ))}
+            ) : null}
           </div>
         )}
       </div>
 
-      {latestAssistantSuggestions.length > 0 ? (
+      {latestAssistantSuggestions.length > 0 && !isStreaming ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {latestAssistantSuggestions.map((suggestion) => (
             <button
               key={suggestion}
               type="button"
               onClick={() => void handleSendMessage(suggestion)}
-              disabled={isSending}
-              className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300 transition-colors hover:bg-emerald-500/15"
+              disabled={isStreaming}
+              className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-300"
             >
               {suggestion}
             </button>
@@ -371,8 +371,8 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
           value={input}
           onChange={(event) => setInput(event.target.value)}
           placeholder="Ask a question about this deck..."
-          className="min-h-[3rem] max-h-36"
-          disabled={isSending}
+          className="max-h-36 min-h-[3rem]"
+          disabled={isStreaming}
           onKeyDown={(event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault();
@@ -380,11 +380,69 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             }
           }}
         />
-        <Button type="button" onClick={() => void handleSendMessage(input)} disabled={isSending || !input.trim()} className="gap-2">
-          {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        <Button
+          type="button"
+          onClick={() => void handleSendMessage(input)}
+          disabled={isStreaming || input.trim().length < 3}
+          className="gap-2"
+        >
+          {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Send
         </Button>
       </div>
     </section>
+  );
+}
+
+function SourceChips({ references }: { references: ChatReference[] }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {references.map((ref) => (
+        <span
+          key={ref.id}
+          title={ref.similarity !== null ? `${Math.round(ref.similarity * 100)}% match` : undefined}
+          className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] text-primary"
+        >
+          {ref.front}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ChatBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user';
+
+  // An un-grounded answer says "your deck doesn't cover this". Rendering it in
+  // the normal assistant style would make a refusal look like an answer.
+  const bubbleClass = isUser
+    ? 'border border-primary/30 bg-primary/15 text-foreground'
+    : message.ungrounded
+      ? 'border border-amber-500/25 bg-amber-500/10 text-amber-900 dark:text-amber-100'
+      : 'border border-primary/15 bg-card/60 text-muted-foreground';
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`max-w-[90%] space-y-2 rounded-xl px-3 py-2 text-sm ${bubbleClass}`}>
+        {message.references && message.references.length > 0 ? (
+          <SourceChips references={message.references} />
+        ) : null}
+
+        {message.ungrounded ? (
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
+            Not covered by this deck
+          </p>
+        ) : null}
+
+        <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+
+        {!message.references && !isUser && message.referenced_card_ids?.length > 0 ? (
+          <p className="text-[11px] uppercase tracking-[0.14em] text-primary/70">
+            {message.referenced_card_ids.length} source
+            {message.referenced_card_ids.length === 1 ? '' : 's'} from your deck
+          </p>
+        ) : null}
+      </div>
+    </div>
   );
 }

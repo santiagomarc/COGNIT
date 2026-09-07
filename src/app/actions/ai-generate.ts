@@ -7,39 +7,35 @@ import { SchemaType, type Schema } from '@google/generative-ai';
 import { PDFParse } from 'pdf-parse';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import {
-  getGeminiJsonModel, normalizeForMatch,
-  normalizeWhitespace, recordAiUsage, reserveAiCall, touchDeckUpdatedAt,
+  getGeminiJsonModel, normalizeWhitespace,
+  recordAiUsage, reserveAiCall, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
 import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
 import { withGeminiRetry } from '@/lib/ai-retry';
+import { assessPdfQuality, chunkDocumentText, describePdfQuality } from '@/lib/pdf-chunking';
+import {
+  normalizeFrontKey, parseAndRankGeneratedCards, pickBalancedCards,
+  TERM_HARD_MAX_WORDS, TERM_MAX_WORDS, type CandidateCard,
+} from '@/lib/card-generation';
 
-type CardDifficultyBand = 'foundational' | 'intermediate' | 'advanced';
 
-type CandidateCard = {
-  front: string;
-  back: string;
-  score: number;
-  difficulty: CardDifficultyBand;
-};
 
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 const MIN_PDF_HEADER_BYTES = 5;
 
-const MAX_TEXT_CHARS = 120_000;
+// Outer bound before chunking. Was 120,000 — which silently discarded
+// everything past roughly page 40. MAX_CHUNKS is what actually bounds AI
+// spend now, so this only needs to be large enough not to clip a real book.
+const MAX_TEXT_CHARS = 600_000;
 
 const PDF_CARD_GENERATION_MAX_COUNT = 30;
 
-const TERM_MAX_WORDS = 4;
 
-const TERM_HARD_MAX_WORDS = 6;
 
-const TERM_MAX_CHARS = 60;
 
-const MIN_BACK_CHARS = 16;
 
-const MAX_PDF_GENERATION_PASSES = 2;
 
 function hasPdfMagicBytes(data: Uint8Array) {
   if (data.length < MIN_PDF_HEADER_BYTES) {
@@ -73,203 +69,13 @@ function sanitizePdfText(rawText: string) {
   return normalizeWhitespace(cleanedLines.join('\n'));
 }
 
-function isValidTermFront(front: string) {
-  if (!front) {
-    return false;
-  }
 
-  if (front.length > TERM_MAX_CHARS) {
-    return false;
-  }
 
-  if (/\?|\n/.test(front)) {
-    return false;
-  }
 
-  if (/^[\d\s.)-]+$/.test(front)) {
-    return false;
-  }
 
-  if (/^(what|which|how|why|when|where|who|define|explain|describe)\b/i.test(front)) {
-    return false;
-  }
 
-  if (/[;:,.!?]$/.test(front)) {
-    return false;
-  }
 
-  const words = front.split(/\s+/).filter(Boolean);
-  if (words.length < 1 || words.length > TERM_HARD_MAX_WORDS) {
-    return false;
-  }
 
-  return true;
-}
-
-function normalizeGeneratedCard(card: { front: string; back: string }) {
-  const front = normalizeWhitespace(card.front).replace(/^['"`]+|['"`]+$/g, '');
-  const back = normalizeWhitespace(card.back);
-  return { front, back };
-}
-
-function normalizeFrontKey(front: string) {
-  return normalizeForMatch(front).replace(/[^a-z0-9\s-]/gi, '');
-}
-
-function isEnumerationLike(text: string) {
-  if (/^\s*(?:[-*•]|\d+[.)]|[a-z][.)])\s+/i.test(text)) {
-    return true;
-  }
-
-  const numberedPoints = text.match(/\b\d+[.)]\s+/g)?.length ?? 0;
-  if (numberedPoints >= 2) {
-    return true;
-  }
-
-  const ordinalHits = text.match(/\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b/gi)?.length ?? 0;
-  if (ordinalHits >= 2) {
-    return true;
-  }
-
-  return false;
-}
-
-function classifyCardDifficulty(card: { front: string; back: string }): CardDifficultyBand {
-  const frontWords = card.front.split(/\s+/).filter(Boolean).length;
-  const backLen = card.back.length;
-
-  if (frontWords <= 2 && backLen <= 120) {
-    return 'foundational';
-  }
-
-  if (frontWords >= 3 || backLen >= 210) {
-    return 'advanced';
-  }
-
-  return 'intermediate';
-}
-
-function scoreCandidateCard(card: { front: string; back: string }, sourceTextLower: string) {
-  const words = card.front.split(/\s+/).filter(Boolean);
-  let score = 0;
-
-  if (words.length <= 2) {
-    score += 6;
-  } else if (words.length <= TERM_MAX_WORDS) {
-    score += 3;
-  } else {
-    score -= 4;
-  }
-
-  const frontLower = card.front.toLowerCase();
-  if (sourceTextLower.includes(frontLower)) {
-    score += 5;
-  } else {
-    const tokenMatches = words.filter((word) => word.length > 2 && sourceTextLower.includes(word.toLowerCase())).length;
-    score += tokenMatches;
-  }
-
-  if (card.back.length >= 40 && card.back.length <= 260) {
-    score += 4;
-  } else if (card.back.length > 420) {
-    score -= 5;
-  }
-
-  if (/\b(is|are|refers to|defined as|describes|means)\b/i.test(card.back)) {
-    score += 2;
-  }
-
-  if (/\?/.test(card.back)) {
-    score -= 3;
-  }
-
-  if (isEnumerationLike(card.back)) {
-    score -= 7;
-  }
-
-  return score;
-}
-
-function pickBalancedCards(candidates: CandidateCard[], maxCount: number) {
-  if (candidates.length <= maxCount) {
-    return candidates;
-  }
-
-  const groups: Record<CardDifficultyBand, CandidateCard[]> = {
-    foundational: [],
-    intermediate: [],
-    advanced: [],
-  };
-
-  for (const candidate of candidates) {
-    groups[candidate.difficulty].push(candidate);
-  }
-
-  const targets: Record<CardDifficultyBand, number> = {
-    foundational: Math.max(1, Math.round(maxCount * 0.35)),
-    intermediate: Math.max(1, Math.round(maxCount * 0.45)),
-    advanced: Math.max(1, maxCount - Math.round(maxCount * 0.35) - Math.round(maxCount * 0.45)),
-  };
-
-  const selected: CandidateCard[] = [];
-  for (const band of ['foundational', 'intermediate', 'advanced'] as const) {
-    selected.push(...groups[band].slice(0, targets[band]));
-  }
-
-  if (selected.length < maxCount) {
-    const seen = new Set(selected.map((card) => normalizeFrontKey(card.front)));
-    const remaining = candidates.filter((card) => !seen.has(normalizeFrontKey(card.front)));
-    selected.push(...remaining.slice(0, maxCount - selected.length));
-  }
-
-  return selected.slice(0, maxCount);
-}
-
-function parseAndRankGeneratedCards(
-  rawCards: unknown[],
-  sourceTextLower: string,
-  usedFrontKeys: Set<string>,
-) {
-  const uniqueCandidates = new Map<string, CandidateCard>();
-
-  for (const item of rawCards) {
-    if (!item || typeof item !== 'object') {
-      continue;
-    }
-
-    const maybeCard = item as Record<string, unknown>;
-    if (typeof maybeCard.front !== 'string' || typeof maybeCard.back !== 'string') {
-      continue;
-    }
-
-    const normalized = normalizeGeneratedCard({ front: maybeCard.front, back: maybeCard.back });
-    if (!isValidTermFront(normalized.front)) {
-      continue;
-    }
-
-    if (normalized.back.length < MIN_BACK_CHARS || isEnumerationLike(normalized.back)) {
-      continue;
-    }
-
-    const frontKey = normalizeFrontKey(normalized.front);
-    if (!frontKey || usedFrontKeys.has(frontKey)) {
-      continue;
-    }
-
-    const candidate: CandidateCard = {
-      ...normalized,
-      score: scoreCandidateCard(normalized, sourceTextLower),
-      difficulty: classifyCardDifficulty(normalized),
-    };
-
-    const existing = uniqueCandidates.get(frontKey);
-    if (!existing || candidate.score > existing.score) {
-      uniqueCandidates.set(frontKey, candidate);
-    }
-  }
-
-  return [...uniqueCandidates.values()].sort((a, b) => b.score - a.score);
-}
 
 export async function generateCards(formData: FormData) {
   return guardAction('Card generation', async () => {
@@ -332,11 +138,13 @@ export async function generateCards(formData: FormData) {
 
     // ── 5. Extract and sanitize text from PDF ──
     let extractedText = '';
+    let pageCount = 0;
     let pdf: InstanceType<typeof PDFParse> | null = null;
     try {
       pdf = new PDFParse({ data: pdfBytes });
       const textResult = await pdf.getText();
       extractedText = textResult.text;
+      pageCount = Array.isArray(textResult.pages) ? textResult.pages.length : 0;
     } catch {
       return { error: 'Failed to extract text from the PDF. It may be password-protected or image-only.' };
     } finally {
@@ -350,8 +158,21 @@ export async function generateCards(formData: FormData) {
     }
 
     const sanitizedText = sanitizePdfText(extractedText);
-    const trimmedText = sanitizedText.slice(0, MAX_TEXT_CHARS).trim();
-    if (!trimmedText) {
+
+    // Distinguish "scanned", "too short" and "mostly page furniture" so the UI
+    // can give an actionable message rather than one generic failure.
+    const qualityMessage = describePdfQuality(
+      assessPdfQuality(extractedText, sanitizedText, pageCount),
+    );
+    if (qualityMessage) {
+      return { error: qualityMessage };
+    }
+
+    // Chunk rather than truncate. The previous 120,000-char slice silently
+    // discarded everything past roughly page 40 of a long document.
+    const boundedText = sanitizeAiInputText(sanitizedText, MAX_TEXT_CHARS);
+    const chunks = chunkDocumentText(boundedText);
+    if (chunks.length === 0) {
       return { error: 'The PDF appears to be empty or contains no readable text.' };
     }
 
@@ -380,93 +201,120 @@ export async function generateCards(formData: FormData) {
       properties: {
         cards: {
           type: SchemaType.ARRAY,
+          minItems: 1,
+          maxItems: PDF_CARD_GENERATION_MAX_COUNT,
           items: {
             type: SchemaType.OBJECT,
             required: ['front', 'back'],
+            // See the note in ai-enrich.ts: propertyOrdering is a real Gemini
+            // field that @google/generative-ai 0.24 has not typed yet.
+            ...({ propertyOrdering: ['front', 'back'] } as object),
             properties: {
-              front: { type: SchemaType.STRING },
-              back: { type: SchemaType.STRING },
+              front: {
+                type: SchemaType.STRING,
+                description: `The term. 1-${TERM_MAX_WORDS} words. Never a question or a full sentence.`,
+              },
+              back: {
+                type: SchemaType.STRING,
+                description: 'A factual 1-3 sentence definition drawn only from the provided text.',
+              },
             },
           },
         },
       },
     };
 
-    const sourceTextLower = trimmedText.toLowerCase();
+    const sourceTextLower = boundedText.toLowerCase();
     const usedFrontKeys = new Set<string>();
-    const cards: { front: string; back: string }[] = [];
+    const allCandidates: CandidateCard[] = [];
+    let failedChunks = 0;
 
     const model = getGeminiJsonModel();
 
-    for (let pass = 0; pass < MAX_PDF_GENERATION_PASSES; pass += 1) {
-      if (cards.length >= parsed.data.count) {
+    // Ask each chunk for a little more than its even share so the global
+    // ranking below has a real pool to choose from.
+    const perChunkTarget = Math.max(
+      3,
+      Math.min(
+        PDF_CARD_GENERATION_MAX_COUNT,
+        Math.ceil((parsed.data.count * 1.4) / chunks.length),
+      ),
+    );
+
+    for (const chunk of chunks) {
+      // Ample pool already gathered — stop early rather than spend more.
+      if (allCandidates.length >= parsed.data.count * 2) {
         break;
       }
 
-      if (pass > 0 && cards.length >= Math.ceil(parsed.data.count * 0.6)) {
-        break;
-      }
-
-      const remaining = parsed.data.count - cards.length;
-      const passBuffer = Math.max(2, Math.ceil(remaining * 0.4));
-      const targetForPass = Math.min(PDF_CARD_GENERATION_MAX_COUNT, remaining + passBuffer);
-      const excludedTerms = cards.map((card) => card.front);
-
-      const result = await withGeminiRetry(
-        () =>
-          model.generateContent({
-            systemInstruction: systemPrompt,
-            generationConfig: {
-              responseMimeType: 'application/json',
-              responseSchema,
-            },
-            contents: [
-              {
-                role: 'user',
-                parts: [
-                  {
-                    text: [
-                      `Generate up to ${targetForPass} term-description flashcards from the following text.`,
-                      'If the core concepts are fully covered before reaching the maximum, stop early and return fewer cards.',
-                      pass > 0 && excludedTerms.length > 0
-                        ? `Do not repeat these already accepted terms: ${excludedTerms.join(', ')}.`
-                        : '',
-                      '',
-                      trimmedText,
-                    ].filter(Boolean).join('\n'),
-                  },
-                ],
+      try {
+        const result = await withGeminiRetry(
+          () =>
+            model.generateContent({
+              systemInstruction: systemPrompt,
+              generationConfig: {
+                responseMimeType: 'application/json',
+                responseSchema,
               },
-            ],
-          }),
-        { label: 'generate_cards' },
-      );
+              contents: [
+                {
+                  role: 'user',
+                  parts: [
+                    {
+                      text: [
+                        `Generate up to ${perChunkTarget} term-description flashcards from this excerpt`,
+                        `(section ${chunk.index + 1} of ${chunks.length}).`,
+                        'If the core concepts are fully covered before reaching the maximum, stop early and return fewer cards.',
+                        usedFrontKeys.size > 0
+                          ? `Do not repeat these already-covered terms: ${[...usedFrontKeys].slice(-40).join(', ')}.`
+                          : '',
+                        '',
+                        chunk.text,
+                      ].filter(Boolean).join('\n'),
+                    },
+                  ],
+                },
+              ],
+            }),
+          { label: `generate_cards_chunk_${chunk.index}`, maxAttempts: 2 },
+        );
 
-      const raw = result.response.text();
-      const json = JSON.parse(raw);
-      if (!json || typeof json !== 'object' || !Array.isArray((json as { cards?: unknown }).cards)) {
-        continue;
-      }
-
-      const generatedCards = (json as { cards: unknown[] }).cards;
-      const rankedCandidates = parseAndRankGeneratedCards(generatedCards, sourceTextLower, usedFrontKeys);
-      const balancedCandidates = pickBalancedCards(rankedCandidates, remaining);
-
-      for (const candidate of balancedCandidates) {
-        if (cards.length >= parsed.data.count) {
-          break;
-        }
-        const key = normalizeFrontKey(candidate.front);
-        if (!key || usedFrontKeys.has(key)) {
+        const json = JSON.parse(result.response.text()) as { cards?: unknown };
+        if (!Array.isArray(json.cards)) {
+          failedChunks += 1;
           continue;
         }
-        usedFrontKeys.add(key);
-        cards.push({ front: candidate.front, back: candidate.back });
+
+        // Reuses the existing validation/ranking pipeline unchanged.
+        const ranked = parseAndRankGeneratedCards(json.cards, sourceTextLower, usedFrontKeys);
+        for (const candidate of ranked) {
+          const key = normalizeFrontKey(candidate.front);
+          if (!key || usedFrontKeys.has(key)) continue;
+          usedFrontKeys.add(key);
+          allCandidates.push(candidate);
+        }
+      } catch (chunkError) {
+        // One bad section must not lose the whole document.
+        failedChunks += 1;
+        logger.warn('generateCards', 'chunk failed', {
+          chunkIndex: chunk.index,
+          error: chunkError instanceof Error ? chunkError.message : String(chunkError),
+        });
       }
     }
 
+    // Balance across the WHOLE document rather than per pass.
+    const cards = pickBalancedCards(
+      [...allCandidates].sort((a, b) => b.score - a.score),
+      parsed.data.count,
+    ).map((candidate) => ({ front: candidate.front, back: candidate.back }));
+
     if (cards.length === 0) {
-      return { error: 'AI could not generate valid cards from this PDF.' };
+      return {
+        error: failedChunks > 0
+          ? 'AI could not generate cards from this PDF — every section failed to process. Please try again, or use Bulk Import.'
+          : 'AI could not generate valid cards from this PDF. Try a different section, or use Bulk Import.',
+      };
     }
 
     // ── 7. Batch insert into the cards table ──
@@ -499,6 +347,8 @@ export async function generateCards(formData: FormData) {
         requested_count: parsed.data.count,
         generated_count: cards.length,
         file_size_bytes: file.size,
+        chunk_count: chunks.length,
+        failed_chunks: failedChunks,
       },
       reservation.reservationId,
     );
@@ -506,6 +356,11 @@ export async function generateCards(formData: FormData) {
     return {
       success: true as const,
       count: cards.length,
+      // Lets the UI say "18 cards generated — 2 sections couldn't be processed"
+      // instead of silently under-delivering.
+      partial: failedChunks > 0,
+      failedChunks,
+      chunkCount: chunks.length,
       cardIds: (insertedCards ?? []).map((card) => card.id),
       cards: cards.map((c) => ({ front: c.front, back: c.back })),
     };
