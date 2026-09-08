@@ -31,6 +31,7 @@ export async function embedTexts(
         requests: slice.map((text) => ({
           content: { role: 'user', parts: [{ text }] },
           taskType: options.taskType as GeminiTaskType,
+          outputDimensionality: EMBEDDING_DIMENSIONS,
         })),
       }),
       { label: 'batch_embed' },

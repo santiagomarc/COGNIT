@@ -71,8 +71,9 @@ async function main() {
   );
 
   const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const embeddingModel = process.env.GEMINI_EMBEDDING_MODEL ?? 'gemini-embedding-001';
   const model = genai.getGenerativeModel({
-    model: process.env.GEMINI_EMBEDDING_MODEL ?? 'text-embedding-004',
+    model: embeddingModel,
   });
 
   async function topSimilarity(question) {
@@ -82,6 +83,7 @@ async function main() {
     const embedding = await model.embedContent({
       content: { role: 'user', parts: [{ text: question }] },
       taskType: 'RETRIEVAL_QUERY',
+      outputDimensionality: 768,
     });
 
     const vector = embedding.embedding.values;

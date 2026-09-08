@@ -12,7 +12,7 @@ import { z } from 'zod';
 const serverEnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required for AI features'),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
-  GEMINI_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
+  GEMINI_EMBEDDING_MODEL: z.string().default('gemini-embedding-001'),
   GEMINI_MODEL_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
   CRON_SECRET: z.string().min(16).optional(),
 });
