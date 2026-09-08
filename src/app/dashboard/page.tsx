@@ -155,7 +155,7 @@ async function loadMasterySummary(
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: relationalDecks, error: relationalDecksError } = await supabase
     .from('decks')
-    .select('id, title, description, created_at, updated_at, cards(count)')
+    .select('id, title, description, created_at, updated_at, cards!cards_deck_id_fkey(count)')
     .order('created_at', { ascending: false });
 
   if (!relationalDecksError) {
