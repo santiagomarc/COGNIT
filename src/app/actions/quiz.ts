@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { sm2, DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { similarity } from '@/lib/fuzzy';
 import type { CardState, QuizHistoryEntry, QuizMode } from '@/index';
-import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { normalizeForMatch, requireOwnedDeck } from './_shared';
 import { logger } from '@/lib/logger';
@@ -81,7 +81,6 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   // ── SM-2: Update card scheduling from quiz outcomes ─────────────────────
   // Map quiz correctness to SM-2 grades: correct → 4 (Good), incorrect → 0 (Again)
-  const now = new Date();
   const sm2Updates = evaluatedResults.map((entry) => {
     const card = cardsById.get(entry.card_id);
     const grade = entry.correct ? 4 : 0;
@@ -100,8 +99,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
   });
 
   // Apply every card's scheduling update, study_logs row, and mastery state
-  // atomically in one round trip via the RPC. Falls back to the sequential
-  // per-card path if the RPC is unavailable.
+  // atomically in one round trip.
   const batchRpcResult = await supabase.rpc('apply_quiz_sm2_batch', {
     p_deck_id: result.data.deck_id,
     p_updates: sm2Updates.map(({ card_id, sm2Result, grade, correct }) => ({
@@ -117,79 +115,14 @@ export async function logQuizResult(data: LogQuizResultInput) {
   });
 
   if (batchRpcResult.error) {
-    /**
-     * @deprecated Fallback for pre-202609060925 environments.
-     * Remove once `supabase migration list` confirms every environment is current.
-     */
-    const missingRpcFunction = isMissingDatabaseFunctionError(batchRpcResult.error.message, 'apply_quiz_sm2_batch');
-    if (missingRpcFunction) {
-      logger.warn('logQuizResult', 'rpc unavailable, using fallback persistence path', { message: batchRpcResult.error.message });
-    } else {
-      logger.warn('logQuizResult', 'rpc failed, using fallback persistence path', { message: batchRpcResult.error.message });
-    }
-
-    for (const { card_id, sm2Result } of sm2Updates) {
-      const { error: cardUpdateErr } = await supabase
-        .from('cards')
-        .update({
-          state: sm2Result.state,
-          interval: sm2Result.interval,
-          ease_factor: sm2Result.easeFactor,
-          repetition_count: sm2Result.repetitionCount,
-          next_review_at: sm2Result.nextReviewAt.toISOString(),
-          last_review_at: now.toISOString(),
-        })
-        .eq('id', card_id)
-        .eq('deck_id', result.data.deck_id);
-
-      if (cardUpdateErr) {
-        // Non-fatal: log and continue — quiz result should still be saved
-        logger.warn('logQuizResult', 'SM-2 card update failed for card', { card_id, message: cardUpdateErr.message });
-      }
-    }
-
-    const studyLogRows = sm2Updates.map(({ card_id, grade }) => ({
-      user_id: user.id,
-      card_id,
-      grade,
-      review_duration_ms: 0,
-    }));
-
-    const { error: studyLogErr } = await supabase.from('study_logs').insert(studyLogRows);
-    if (studyLogErr) {
-      logger.warn('logQuizResult', 'study_logs batch insert failed', { message: studyLogErr.message });
-    }
-
-    // Fallback mastery update
-    const { data: existingMasteryRows } = await supabase
-      .from('card_mastery_state')
-      .select('card_id, correct')
-      .eq('user_id', user.id)
-      .eq('deck_id', result.data.deck_id)
-      .in('card_id', evaluatedResults.map((entry) => entry.card_id));
-
-    const existingMasteryByCardId = new Map(
-      (existingMasteryRows ?? []).map((row) => [row.card_id, row.correct])
-    );
-
-    const { error: masteryStateError } = await supabase
-      .from('card_mastery_state')
-      .upsert(
-        evaluatedResults.map((entry) => ({
-          user_id: user.id,
-          deck_id: result.data.deck_id,
-          card_id: entry.card_id,
-          // Persist the highest-ever quiz mastery for this card.
-          correct: Boolean(existingMasteryByCardId.get(entry.card_id)) || entry.correct,
-          last_quiz_at: now.toISOString(),
-          updated_at: now.toISOString(),
-        })),
-        { onConflict: 'user_id,deck_id,card_id' }
-      );
-
-    if (masteryStateError && !isMissingTableError(masteryStateError.message, 'card_mastery_state')) {
-      logger.error('card_mastery_state', 'failed to upsert rows in fallback', { message: masteryStateError.message });
-    }
+    // No fallback path — see gradeCard. The per-card loop this replaced
+    // swallowed individual update failures as warnings, so a quiz could report
+    // success while some cards never advanced their schedule.
+    logger.error('logQuizResult', 'apply_quiz_sm2_batch failed', {
+      code: batchRpcResult.error.code,
+      message: batchRpcResult.error.message,
+    });
+    return { error: sanitizeDatabaseError(batchRpcResult.error, 'Failed to save quiz results.') };
   }
   // ────────────────────────────────────────────────────────────────────────
 

@@ -7,7 +7,6 @@ import {
   bulkImportSchema, BulkImportInput,
 } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
-import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { requireOwnedDeck, touchDeckUpdatedAt } from './_shared';
 import { logger } from '@/lib/logger';
@@ -262,40 +261,16 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
     p_card_ids: normalizedIds,
   });
 
-  /**
-   * @deprecated Fallback for pre-202609011200 environments.
-   * Remove once `supabase migration list` confirms every environment is current.
-   * Tracking: Phase 5 exit criteria.
-   */
-  if (rpcError && !isMissingDatabaseFunctionError(rpcError.message, 'delete_owned_cards_batch')) {
+  if (rpcError) {
     logger.error('bulkDeleteCards', 'rpc error', { code: rpcError.code, message: rpcError.message });
     return { error: sanitizeDatabaseError(rpcError, 'Failed to delete selected cards.') };
   }
 
-  if (!rpcError) {
-    const parsedDeletedCount = typeof rpcDeletedCount === 'number'
-      ? rpcDeletedCount
-      : Number(rpcDeletedCount ?? 0);
+  const parsedDeletedCount = typeof rpcDeletedCount === 'number'
+    ? rpcDeletedCount
+    : Number(rpcDeletedCount ?? 0);
 
-    deletedCount = Number.isFinite(parsedDeletedCount) ? parsedDeletedCount : 0;
-  } else {
-    const { data: deletedRows, error } = await supabase
-      .from('cards')
-      .delete()
-      .in('id', normalizedIds)
-      .eq('deck_id', deckId)
-      .select('id');
-
-    if (error) {
-      logger.error('bulkDeleteCards', 'fallback delete error', { code: error.code, message: error.message });
-      return { error: sanitizeDatabaseError(error, 'Failed to delete selected cards.') };
-    }
-
-    deletedCount = deletedRows?.length ?? 0;
-    if (deletedCount > 0) {
-      await touchDeckUpdatedAt(supabase, deckId, user.id);
-    }
-  }
+  deletedCount = Number.isFinite(parsedDeletedCount) ? parsedDeletedCount : 0;
 
   revalidatePath(`/dashboard/${deckId}`);
   revalidatePath(`/dashboard/${deckId}/study`);

@@ -6,22 +6,13 @@ type DueRpcResult = {
   error: { message: string; code?: string } | null;
 };
 
-type DueFallbackResult = {
-  data: Array<{ deck_id: string }> | null;
-  error: { message: string } | null;
-};
-
-function createSupabaseMock(config: { rpcResult: DueRpcResult; fallbackResult?: DueFallbackResult }) {
-  const lte = vi.fn(async () => config.fallbackResult ?? { data: [], error: null });
-  const select = vi.fn(() => ({ lte }));
-  const from = vi.fn(() => ({ select }));
+function createSupabaseMock(config: { rpcResult: DueRpcResult }) {
+  // `from` is still asserted on: it must never be called now that the
+  // per-card fallback query is gone.
+  const from = vi.fn();
   const rpc = vi.fn(async () => config.rpcResult);
 
-  return {
-    rpc,
-    from,
-    lte,
-  };
+  return { rpc, from };
 }
 
 describe('loadDueByDeckRows', () => {
@@ -46,32 +37,7 @@ describe('loadDueByDeckRows', () => {
     ]);
   });
 
-  it('falls back to card query when RPC function is missing', async () => {
-    const supabase = createSupabaseMock({
-      rpcResult: {
-        data: null,
-        error: { message: 'function get_due_cards_by_deck(uuid, timestamptz) does not exist' },
-      },
-      fallbackResult: {
-        data: [
-          { deck_id: 'deck-1' },
-          { deck_id: 'deck-1' },
-          { deck_id: 'deck-2' },
-        ],
-        error: null,
-      },
-    });
-
-    const rows = await loadDueByDeckRows(supabase as never, 'user-1', '2026-04-08T00:00:00.000Z', vi.fn());
-
-    expect(supabase.from).toHaveBeenCalledWith('cards');
-    expect(rows).toEqual([
-      { deck_id: 'deck-1', due_count: 2 },
-      { deck_id: 'deck-2', due_count: 1 },
-    ]);
-  });
-
-  it('returns empty when RPC fails for reasons other than missing function', async () => {
+  it('returns empty and logs when the RPC fails', async () => {
     const supabase = createSupabaseMock({
       rpcResult: {
         data: null,
@@ -85,21 +51,5 @@ describe('loadDueByDeckRows', () => {
     expect(rows).toEqual([]);
     expect(supabase.from).not.toHaveBeenCalled();
     expect(logError).toHaveBeenCalled();
-  });
-
-  it('returns empty when fallback query fails', async () => {
-    const supabase = createSupabaseMock({
-      rpcResult: {
-        data: null,
-        error: { message: 'function get_due_cards_by_deck(uuid, timestamptz) does not exist' },
-      },
-      fallbackResult: {
-        data: null,
-        error: { message: 'network issue' },
-      },
-    });
-
-    const rows = await loadDueByDeckRows(supabase as never, 'user-1', '2026-04-08T00:00:00.000Z', vi.fn());
-    expect(rows).toEqual([]);
   });
 });

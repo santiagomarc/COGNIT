@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 /**
  * Helper to log in to Supabase and retrieve a user JWT access token.
- * Writes it directly to SUPABASE_ACCESS_TOKEN in .env.local.
+ * Writes it to SUPABASE_USER_ACCESS_TOKEN in .env.local.
+ *
+ * NOT named SUPABASE_ACCESS_TOKEN: the Supabase CLI reads .env.local from the
+ * working directory and expects that name to hold its own personal access
+ * token (`sbp_...`). A user JWT there makes every `supabase --linked` command
+ * fail with "Invalid access token format".
  *
  * Usage:
  *   node --env-file=.env.local scripts/get-user-token.mjs <email> <password>
@@ -49,12 +54,12 @@ async function main() {
 
   try {
     const envContent = readFileSync('.env.local', 'utf8');
-    if (/^SUPABASE_ACCESS_TOKEN=/m.test(envContent)) {
-      const updated = envContent.replace(/^SUPABASE_ACCESS_TOKEN=.*$/m, `SUPABASE_ACCESS_TOKEN=${token}`);
-      writeFileSync('.env.local', updated, 'utf8');
-      console.log('✅ Updated SUPABASE_ACCESS_TOKEN in .env.local automatically.');
-    }
-  } catch (e) {
+    const updated = /^SUPABASE_USER_ACCESS_TOKEN=/m.test(envContent)
+      ? envContent.replace(/^SUPABASE_USER_ACCESS_TOKEN=.*$/m, `SUPABASE_USER_ACCESS_TOKEN=${token}`)
+      : `${envContent.replace(/\n*$/, '')}\nSUPABASE_USER_ACCESS_TOKEN=${token}\n`;
+    writeFileSync('.env.local', updated, 'utf8');
+    console.log('✅ Updated SUPABASE_USER_ACCESS_TOKEN in .env.local automatically.');
+  } catch {
     console.log('Could not update .env.local directly, please paste the token above into .env.local.');
   }
 }

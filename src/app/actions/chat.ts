@@ -9,7 +9,7 @@ import {
   semanticSearchSchema, SemanticSearchInput,
 } from '@/lib/schemas';
 import { SchemaType, type Schema } from '@google/generative-ai';
-import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import {
@@ -150,34 +150,17 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
         p_updates: updates,
       });
 
-      if (!applyError) {
-        synced = Number(appliedCount ?? 0);
-      } else {
-        /**
-         * @deprecated Fallback for pre-202609060905 environments.
-         * Remove once `supabase migration list` confirms every environment is current.
-         */
-        if (!isMissingDatabaseFunctionError(applyError.message, 'apply_card_embeddings_batch')) {
-          logger.warn('syncEmbeddings', 'batch embedding apply failed, using per-card path', {
-            message: applyError.message,
-          });
-        }
-
-        for (const update of updates) {
-          const { error: updateError } = await supabase
-            .from('cards')
-            .update({ embedding: update.embedding })
-            .eq('id', update.card_id)
-            .eq('deck_id', parsed.data.deck_id);
-
-          if (updateError) {
-            logger.warn('syncEmbeddings', 'failed to update embedding', { message: updateError.message });
-            continue;
-          }
-
-          synced += 1;
-        }
+      if (applyError) {
+        // No per-card fallback. That loop skipped failed rows and still
+        // reported success, leaving the deck silently under-retrievable.
+        logger.error('syncEmbeddings', 'apply_card_embeddings_batch failed', {
+          code: applyError.code,
+          message: applyError.message,
+        });
+        return { error: sanitizeDatabaseError(applyError, 'Failed to save card embeddings.') };
       }
+
+      synced = Number(appliedCount ?? 0);
     }
 
     const remainingPending = Math.max(0, totalPendingCount - synced);
@@ -195,12 +178,7 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
       .from('deck_chat_embedding_metadata')
       .upsert(metadataPayload, { onConflict: 'deck_id,user_id' });
 
-    /**
-     * @deprecated Fallback for pre-202609011200 environments.
-     * Remove once `supabase migration list` confirms every environment is current.
-     * Tracking: Phase 5 exit criteria.
-     */
-    if (metadataError && !isMissingTableError(metadataError.message, 'deck_chat_embedding_metadata')) {
+    if (metadataError) {
       logger.warn('syncEmbeddings', 'metadata upsert failed', { message: metadataError.message });
     }
 
@@ -471,12 +449,7 @@ export async function chatWithDeck(data: ChatWithDeckInput) {
 
     const assistantInsert = await supabase.from('deck_chat_messages').insert(assistantMsg);
 
-    /**
-     * @deprecated Fallback for pre-202609011200 environments.
-     * Remove once `supabase migration list` confirms every environment is current.
-     * Tracking: Phase 5 exit criteria.
-     */
-    if (assistantInsert.error && !isMissingTableError(assistantInsert.error.message, 'deck_chat_messages')) {
+    if (assistantInsert.error) {
       logger.warn('chatWithDeck', 'failed to persist assistant message', { message: assistantInsert.error.message });
     }
 
@@ -557,14 +530,6 @@ export async function semanticSearchCards(data: SemanticSearchInput) {
     });
 
     if (error) {
-      /**
-       * @deprecated Fallback for pre-202609011200 environments.
-       * Remove once `supabase migration list` confirms every environment is current.
-       * Tracking: Phase 5 exit criteria.
-       */
-      if (isMissingDatabaseFunctionError(error.message, 'search_user_cards_by_embedding')) {
-        return { error: 'Semantic search is not available yet. Please apply the latest database migrations first.' };
-      }
       return { error: sanitizeDatabaseError(error, 'Search failed. Please try again.') };
     }
 

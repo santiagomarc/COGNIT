@@ -11,7 +11,7 @@
  *     --irrelevant "who won the 1998 world cup" --irrelevant "best pasta recipe"
  *
  * Requires NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
- * GEMINI_API_KEY and SUPABASE_ACCESS_TOKEN (a logged-in user's access token) in
+ * GEMINI_API_KEY and SUPABASE_USER_ACCESS_TOKEN (a logged-in user's access token) in
  * the environment or .env.local.
  */
 import { readFileSync } from 'node:fs';
@@ -58,9 +58,9 @@ async function main() {
     process.exit(1);
   }
 
-  const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+  const accessToken = process.env.SUPABASE_USER_ACCESS_TOKEN;
   if (!accessToken) {
-    console.error('SUPABASE_ACCESS_TOKEN is required (the RPC is SECURITY INVOKER and needs a real user).');
+    console.error('SUPABASE_USER_ACCESS_TOKEN is required (the RPC is SECURITY INVOKER and needs a real user).');
     process.exit(1);
   }
 

@@ -10,7 +10,6 @@ import {
   type StudySessionCard,
 } from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
-import { isMissingTableError } from '@/lib/supabase-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { logger } from '@/lib/logger';
 
@@ -118,13 +117,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
     ]);
 
     if (provenCountError) {
-      /**
-       * @deprecated Fallback for pre-202609011200 environments.
-       * Remove once `supabase migration list` confirms every environment is current.
-       */
-      if (!isMissingTableError(provenCountError.message, 'card_mastery_state')) {
-        logger.error('quiz-page', 'failed to count proven cards', { message: provenCountError.message });
-      }
+      logger.error('quiz-page', 'failed to count proven cards', { message: provenCountError.message });
       unprovenCardCount = availableCardCount;
     } else {
       unprovenCardCount = Math.max(0, availableCardCount - (provenCount ?? 0));
@@ -208,14 +201,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
         .eq('correct', true);
 
       if (provenMasteryError) {
-        /**
-         * @deprecated Fallback for pre-202609011200 environments.
-         * Remove once `supabase migration list` confirms every environment is current.
-         * Tracking: Phase 5 exit criteria.
-         */
-        if (!isMissingTableError(provenMasteryError.message, 'card_mastery_state')) {
-          logger.error('quiz-page', 'failed to read mastery state for focus_unproven', { message: provenMasteryError.message });
-        }
+        logger.error('quiz-page', 'failed to read mastery state for focus_unproven', { message: provenMasteryError.message });
       } else {
         const provenCardIds = new Set((provenMasteryRows ?? []).map((row) => row.card_id));
         const unproven = shuffledCards.filter((card) => !provenCardIds.has(card.id));

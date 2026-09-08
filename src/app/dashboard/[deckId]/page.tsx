@@ -15,8 +15,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { loadLegacyDeckMasterySnapshots } from '@/lib/legacy-mastery';
-import { isMissingDatabaseFunctionError, isMissingTableError } from '@/lib/supabase-errors';
+import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { getSessionCardBounds } from '@/lib/study';
 import { logger } from '@/lib/logger';
@@ -313,23 +312,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   }
 
   if (masteryRowsErrorMessage) {
-    /**
-     * @deprecated Fallback for pre-202609011200 environments.
-     * Remove once `supabase migration list` confirms every environment is current.
-     * Tracking: Phase 5 exit criteria.
-     */
-    if (isMissingTableError(masteryRowsErrorMessage, 'card_mastery_state')) {
-      const legacyMasteryByDeck = await loadLegacyDeckMasterySnapshots(
-        supabase,
-        user.id,
-        new Map([[deckId, totalCards]])
-      );
-      const fallback = legacyMasteryByDeck.get(deckId);
-      masteredCards = fallback?.masteredCards ?? 0;
-      lastQuizAt = fallback?.lastQuizAt ?? null;
-    } else {
-      logger.error('deck-page', 'failed to read card mastery state', { message: masteryRowsErrorMessage });
-    }
+    logger.error('deck-page', 'failed to read card mastery state', { message: masteryRowsErrorMessage });
   }
 
   const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;

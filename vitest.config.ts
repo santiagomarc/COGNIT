@@ -12,7 +12,11 @@ export default defineConfig({
       exclude: ['**/*.test.ts', 'src/lib/database.types.ts', 'src/test/**'],
       // Ratchet thresholds: set to current measured baseline so CI passes
       // and blocks regressions. Crank them up as test coverage expands.
-      thresholds: { lines: 33, functions: 30, branches: 32 },
+      // functions dropped 30.3 -> 29.2 when the migration-fallback paths were
+      // deleted: legacy-mastery.ts was 83% covered, so removing it took more
+      // covered functions out than uncovered ones. A ratchet down for dead-code
+      // removal, not for test rot.
+      thresholds: { lines: 33, functions: 29, branches: 32 },
     },
   },
   resolve: {

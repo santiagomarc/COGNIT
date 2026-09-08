@@ -1,4 +1,3 @@
-import { isMissingDatabaseFunctionError } from './supabase-errors';
 import { logger } from './logger';
 
 export type DueCardsByDeckRow = {
@@ -16,10 +15,6 @@ type RpcErrorLike = {
   code?: string;
 };
 
-type DueCardsFallbackRow = {
-  deck_id: string;
-};
-
 type AwaitableResult<T> = PromiseLike<T> | Promise<T>;
 
 type DueBreakdownSupabaseClient = {
@@ -27,21 +22,8 @@ type DueBreakdownSupabaseClient = {
     fn: 'get_due_cards_by_deck',
     args: { p_user_id: string; p_now: string }
   ) => AwaitableResult<{ data: RpcDueRow[] | null; error: RpcErrorLike | null }>;
-  from: (table: 'cards') => {
-    select: (columns: 'deck_id') => {
-      lte: (
-        column: 'next_review_at',
-        value: string
-      ) => AwaitableResult<{ data: DueCardsFallbackRow[] | null; error: { message: string } | null }>;
-    };
-  };
 };
 
-/**
- * @deprecated Fallback for pre-202609011200 environments.
- * Remove once `supabase migration list` confirms every environment is current.
- * Tracking: Phase 5 exit criteria.
- */
 export async function loadDueByDeckRows(
   supabase: DueBreakdownSupabaseClient,
   userId: string,
@@ -55,37 +37,13 @@ export async function loadDueByDeckRows(
     p_now: nowIso,
   });
 
-  if (dueBreakdownError && !isMissingDatabaseFunctionError(dueBreakdownError.message, 'get_due_cards_by_deck')) {
+  if (dueBreakdownError) {
     logError('[dashboard] failed to read due cards breakdown:', dueBreakdownError.code, dueBreakdownError.message);
     return [];
   }
 
-  if (!dueBreakdownError) {
-    return (dueBreakdownRows ?? []).map((row) => ({
-      deck_id: row.deck_id,
-      due_count: Number(row.due_count ?? 0),
-    }));
-  }
-
-  /**
-   * @deprecated Fallback for pre-202609011200 environments.
-   * Remove once `supabase migration list` confirms every environment is current.
-   * Tracking: Phase 5 exit criteria.
-   */
-  const { data: dueCards, error: dueCardsError } = await supabase
-    .from('cards')
-    .select('deck_id')
-    .lte('next_review_at', nowIso);
-
-  if (dueCardsError) {
-    logError('[dashboard] fallback due cards query failed:', dueCardsError.message);
-    return [];
-  }
-
-  const dueByDeck = new Map<string, number>();
-  for (const row of dueCards ?? []) {
-    dueByDeck.set(row.deck_id, (dueByDeck.get(row.deck_id) ?? 0) + 1);
-  }
-
-  return Array.from(dueByDeck.entries()).map(([deck_id, due_count]) => ({ deck_id, due_count }));
+  return (dueBreakdownRows ?? []).map((row) => ({
+    deck_id: row.deck_id,
+    due_count: Number(row.due_count ?? 0),
+  }));
 }

@@ -5,7 +5,6 @@ import { gradeCardSchema, GradeCardInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import type { CardState } from '@/index';
-import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { generateMnemonicForCard } from './ai-assist';
 import { logger } from '@/lib/logger';
@@ -77,47 +76,14 @@ export async function gradeCard(data: GradeCardInput) {
   const { error: gradePersistError } = await supabase.rpc('grade_owned_card', rpcGradePayload);
 
   if (gradePersistError) {
-    /**
-     * @deprecated Fallback for pre-202609011200 environments.
-     * Remove once `supabase migration list` confirms every environment is current.
-     * Tracking: Phase 5 exit criteria.
-     */
-    const missingRpcFunction = isMissingDatabaseFunctionError(gradePersistError.message, 'grade_owned_card');
-    if (missingRpcFunction) {
-      logger.warn('gradeCard', 'rpc unavailable, using fallback persistence path', { message: gradePersistError.message });
-    } else {
-      logger.warn('gradeCard', 'rpc failed, using fallback persistence path', { code: gradePersistError.code, message: gradePersistError.message });
-    }
-
-    const { error: updateErr } = await supabase
-      .from('cards')
-      .update({
-        state: sm2Result.state,
-        interval: sm2Result.interval,
-        ease_factor: sm2Result.easeFactor,
-        repetition_count: sm2Result.repetitionCount,
-        next_review_at: sm2Result.nextReviewAt.toISOString(),
-        last_review_at: nowIso,
-      })
-      .eq('id', card.id)
-      .eq('deck_id', result.data.deck_id);
-
-    if (updateErr) {
-      logger.error('gradeCard', 'fallback update error', { code: updateErr.code, message: updateErr.message });
-      return { error: sanitizeDatabaseError(updateErr, 'Failed to update card schedule.') };
-    }
-
-    const { error: logErr } = await supabase.from('study_logs').insert({
-      user_id: user.id,
-      card_id: card.id,
-      grade: numericGrade,
-      review_duration_ms: result.data.duration_ms ?? 0,
+    // No fallback path. The RPC does the card update and the study_logs insert
+    // in one transaction; splitting them client-side is what let a broken RPC
+    // look like success for months while every grade silently lost atomicity.
+    logger.error('gradeCard', 'grade_owned_card failed', {
+      code: gradePersistError.code,
+      message: gradePersistError.message,
     });
-
-    if (logErr) {
-      logger.error('gradeCard', 'fallback log error', { code: logErr.code, message: logErr.message });
-      return { error: sanitizeDatabaseError(logErr, 'Card was graded, but history log failed to save.') };
-    }
+    return { error: sanitizeDatabaseError(gradePersistError, 'Failed to update card schedule.') };
   }
 
 
