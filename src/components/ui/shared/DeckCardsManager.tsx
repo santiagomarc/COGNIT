@@ -27,6 +27,7 @@ type DeckCardsManagerProps = {
   deckId: string;
   cards: DeckCard[];
   totalCards?: number;
+  errorMessage?: string | null;
 };
 
 function mapCardNumbersByCreation(items: DeckCard[]) {
@@ -53,7 +54,7 @@ function sortCardsByNumberDesc(items: DeckCard[]) {
   });
 }
 
-export function DeckCardsManager({ deckId, cards, totalCards }: DeckCardsManagerProps) {
+export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: DeckCardsManagerProps) {
   const router = useRouter();
   const [deckCards, setDeckCards] = useState(() => sortCardsByNumberDesc(cards));
   const [selectionMode, setSelectionMode] = useState(false);
@@ -158,6 +159,26 @@ export function DeckCardsManager({ deckId, cards, totalCards }: DeckCardsManager
   }
 
   if (deckCards.length === 0) {
+    if (errorMessage) {
+      return (
+        <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/5 backdrop-blur-md p-8 text-center">
+          <BookOpen className="mb-4 h-10 w-10 text-destructive/60" />
+          <h2 className="text-xl font-semibold tracking-tight text-destructive">Unable to load cards right now</h2>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            There was a temporary network issue loading this deck&apos;s cards. Your data is safe.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => router.refresh()}>
+              Try Again
+            </Button>
+            <Button asChild size="sm">
+              <a href="#add-content">Add a card</a>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
         <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />

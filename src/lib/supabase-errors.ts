@@ -1,4 +1,5 @@
-export function isMissingTableError(message: string, tableName: string) {
+export function isMissingTableError(message: string | null | undefined, tableName: string) {
+  if (!message || typeof message !== 'string') return false;
   const normalized = message.toLowerCase();
   const normalizedTable = tableName.toLowerCase();
   const referencesTable =
@@ -11,7 +12,8 @@ export function isMissingTableError(message: string, tableName: string) {
   return referencesTable && indicatesMissingTable;
 }
 
-export function isMissingColumnError(message: string, columnName: string) {
+export function isMissingColumnError(message: string | null | undefined, columnName: string) {
+  if (!message || typeof message !== 'string') return false;
   const normalized = message.toLowerCase();
   const normalizedColumn = columnName.toLowerCase();
   const referencesColumn =
@@ -24,7 +26,8 @@ export function isMissingColumnError(message: string, columnName: string) {
   return referencesColumn && indicatesMissingColumn;
 }
 
-export function isMissingDatabaseFunctionError(message: string, functionName: string) {
+export function isMissingDatabaseFunctionError(message: string | null | undefined, functionName: string) {
+  if (!message || typeof message !== 'string') return false;
   const normalized = message.toLowerCase();
   const referencesFunction = normalized.includes(functionName.toLowerCase());
   const indicatesMissingFunction =

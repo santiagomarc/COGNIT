@@ -94,33 +94,34 @@ async function loadQuizReadyCount(
   supabase: SupabaseServerClient,
   deckId: string,
 ): Promise<number> {
-  const rpcCaller = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: number | null; error: { message: string } | null }>;
+  try {
+    const rpcCaller = supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: number | null; error: { message: string } | null }>;
 
-  const { data, error } = await rpcCaller('count_quiz_ready_cards', { p_deck_id: deckId });
+    const { data, error } = await rpcCaller('count_quiz_ready_cards', { p_deck_id: deckId });
 
-  if (!error) {
-    return Number(data ?? 0);
+    if (!error) {
+      return Number(data ?? 0);
+    }
+
+    if (error?.message && !isMissingDatabaseFunctionError(error.message, 'count_quiz_ready_cards')) {
+      logger.warn('deck-page', 'count_quiz_ready_cards rpc failed', { message: error.message });
+    }
+
+    const { count } = await supabase
+      .from('cards')
+      .select('id', { count: 'exact', head: true })
+      .eq('deck_id', deckId)
+      .not('id_question', 'is', null)
+      .not('mcq_distractors', 'is', null);
+
+    return count ?? 0;
+  } catch (err) {
+    logger.warn('deck-page', 'loadQuizReadyCount failed', { err });
+    return 0;
   }
-
-  /**
-   * @deprecated Fallback for pre-202609070900 environments.
-   * Remove once `supabase migration list` confirms every environment is current.
-   */
-  if (!isMissingDatabaseFunctionError(error.message, 'count_quiz_ready_cards')) {
-    logger.warn('deck-page', 'count_quiz_ready_cards rpc failed', { message: error.message });
-  }
-
-  const { count } = await supabase
-    .from('cards')
-    .select('id', { count: 'exact', head: true })
-    .eq('deck_id', deckId)
-    .not('id_question', 'is', null)
-    .not('mcq_distractors', 'is', null);
-
-  return count ?? 0;
 }
 
 /** Deck-wide topic-tag histogram, for the same pagination reason. */
@@ -128,49 +129,50 @@ async function loadTopTopics(
   supabase: SupabaseServerClient,
   deckId: string,
 ): Promise<Array<[string, number]>> {
-  const rpcCaller = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{
-    data: Array<{ topic_tag: string; tag_count: number }> | null;
-    error: { message: string } | null;
-  }>;
+  try {
+    const rpcCaller = supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<{
+      data: Array<{ topic_tag: string; tag_count: number }> | null;
+      error: { message: string } | null;
+    }>;
 
-  const { data, error } = await rpcCaller('get_deck_topic_tag_counts', {
-    p_deck_id: deckId,
-    p_limit: 10,
-  });
+    const { data, error } = await rpcCaller('get_deck_topic_tag_counts', {
+      p_deck_id: deckId,
+      p_limit: 10,
+    });
 
-  if (!error) {
-    return (data ?? []).map((row) => [row.topic_tag, Number(row.tag_count)] as [string, number]);
-  }
-
-  /**
-   * @deprecated Fallback for pre-202609070900 environments.
-   * Remove once `supabase migration list` confirms every environment is current.
-   */
-  if (!isMissingDatabaseFunctionError(error.message, 'get_deck_topic_tag_counts')) {
-    logger.warn('deck-page', 'get_deck_topic_tag_counts rpc failed', { message: error.message });
-  }
-
-  const { data: taggedCards } = await supabase
-    .from('cards')
-    .select('topic_tags')
-    .eq('deck_id', deckId)
-    .not('topic_tags', 'is', null)
-    .limit(2000);
-
-  const counts = new Map<string, number>();
-  for (const card of taggedCards ?? []) {
-    if (!Array.isArray(card.topic_tags)) continue;
-    for (const rawTag of card.topic_tags) {
-      const tag = rawTag.trim();
-      if (!tag) continue;
-      counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    if (!error) {
+      return (data ?? []).map((row) => [row.topic_tag, Number(row.tag_count)] as [string, number]);
     }
-  }
 
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (error?.message && !isMissingDatabaseFunctionError(error.message, 'get_deck_topic_tag_counts')) {
+      logger.warn('deck-page', 'get_deck_topic_tag_counts rpc failed', { message: error.message });
+    }
+
+    const { data: taggedCards } = await supabase
+      .from('cards')
+      .select('topic_tags')
+      .eq('deck_id', deckId)
+      .not('topic_tags', 'is', null)
+      .limit(2000);
+
+    const counts = new Map<string, number>();
+    for (const card of taggedCards ?? []) {
+      if (!Array.isArray(card.topic_tags)) continue;
+      for (const rawTag of card.topic_tags) {
+        const tag = (rawTag ?? '').trim();
+        if (!tag) continue;
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  } catch (err) {
+    logger.warn('deck-page', 'loadTopTopics failed', { err });
+    return [];
+  }
 }
 
 async function loadDeckDetailSnapshot(
@@ -178,40 +180,76 @@ async function loadDeckDetailSnapshot(
   userId: string,
   deckId: string
 ): Promise<DeckDetailSnapshot> {
-  const [
-    { data: deck, error: deckError },
-    { data: cards, error: cardsError, count: cardsCount },
-    { data: masteryRows, error: masteryRowsError },
-    quizReadyResult,
-    topTopicsResult,
-  ] = await Promise.all([
-    supabase
-      .from('decks')
-      .select('id, title, description, created_at, share_token')
-      .eq('id', deckId)
-      .single(),
-    supabase
-      .from('cards')
-      .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags', { count: 'exact' })
-      .eq('deck_id', deckId)
-      .order('created_at', { ascending: false })
-      .range(0, 59),
-    supabase
-      .from('card_mastery_state')
-      .select('correct, last_quiz_at')
-      .eq('user_id', userId)
-      .eq('deck_id', deckId),
-    // Deck-wide aggregates. The card list above is paginated at 60 (P-3), so
-    // counting these client-side reported "60/200 quiz-ready" on a fully
-    // enriched 200-card deck and showed Top Concepts for the newest 60 only.
-    loadQuizReadyCount(supabase, deckId),
-    loadTopTopics(supabase, deckId),
-  ]);
+  const fetchSnapshot = async () => {
+    return Promise.all([
+      supabase
+        .from('decks')
+        .select('id, title, description, created_at, share_token')
+        .eq('id', deckId)
+        .single(),
+      supabase
+        .from('cards')
+        .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags', { count: 'exact' })
+        .eq('deck_id', deckId)
+        .order('created_at', { ascending: false })
+        .range(0, 59),
+      supabase
+        .from('card_mastery_state')
+        .select('correct, last_quiz_at')
+        .eq('user_id', userId)
+        .eq('deck_id', deckId),
+    ]);
+  };
+
+  let [deckRes, cardsRes, masteryRes] = await fetchSnapshot();
+
+  // Retry once if there was a transient network/fetch failure
+  if ((deckRes.error?.message?.includes('fetch failed') || cardsRes.error?.message?.includes('fetch failed')) && !deckRes.data) {
+    await new Promise((r) => setTimeout(r, 250));
+    [deckRes, cardsRes, masteryRes] = await fetchSnapshot();
+  }
+
+  const { data: deck, error: deckError } = deckRes;
+  const { data: rawCards, error: cardsError, count: cardsCount } = cardsRes;
+  const { data: masteryRows, error: masteryRowsError } = masteryRes;
+
+  const cards = (rawCards ?? []).map((card) => ({
+    ...card,
+    created_at: card.created_at ?? new Date().toISOString(),
+    source: card.source as CardSource,
+  }));
+  const totalCards = cardsCount ?? cards.length;
+
+  let quizReadyCards = 0;
+  let topTopics: Array<[string, number]> = [];
+
+  // If the deck has more than 60 cards, use the database RPCs for deck-wide stats.
+  // For 0-60 cards, compute in-memory instantly to avoid redundant round-trips.
+  if (totalCards > 60) {
+    const [rpcQuizReady, rpcTopTopics] = await Promise.all([
+      loadQuizReadyCount(supabase, deckId),
+      loadTopTopics(supabase, deckId),
+    ]);
+    quizReadyCards = rpcQuizReady;
+    topTopics = rpcTopTopics;
+  } else if (cards.length > 0) {
+    quizReadyCards = cards.filter(
+      (c) => Boolean(c.id_question) && Array.isArray(c.mcq_distractors) && c.mcq_distractors.length >= 3
+    ).length;
+
+    const counts = new Map<string, number>();
+    for (const card of cards) {
+      if (!Array.isArray(card.topic_tags)) continue;
+      for (const rawTag of card.topic_tags) {
+        const tag = (rawTag ?? '').trim();
+        if (!tag) continue;
+        counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      }
+    }
+    topTopics = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }
 
   return {
-    // created_at is nullable at the schema level but always set at insert time
-    // (DEFAULT now()); coalescing here keeps every downstream consumer's
-    // existing non-null assumption intact.
     deck: deck
       ? {
         ...deck,
@@ -220,14 +258,10 @@ async function loadDeckDetailSnapshot(
       }
       : null,
     deckErrorMessage: deckError?.message ?? null,
-    cards: (cards ?? []).map((card) => ({
-      ...card,
-      created_at: card.created_at ?? new Date().toISOString(),
-      source: card.source as CardSource,
-    })),
-    totalCards: cardsCount ?? (cards?.length ?? 0),
-    quizReadyCards: quizReadyResult,
-    topTopics: topTopicsResult,
+    cards,
+    totalCards,
+    quizReadyCards,
+    topTopics,
     cardsErrorMessage: cardsError?.message ?? null,
     cardsErrorCode: cardsError?.code ?? null,
     masteryRows: masteryRows ?? [],
@@ -274,7 +308,6 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
   if (cardsErrorMessage) {
     logger.error('deck-page', 'failed to read cards', { code: cardsErrorCode, message: cardsErrorMessage });
-    throw new Error('Failed to load deck cards.');
   }
 
   const deckTitleMeta = parseDeckTitleMetadata(deck.title);
@@ -593,19 +626,28 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       {addContentSection}
 
-      <DeckCardsManager deckId={deckId} cards={cards} totalCards={totalCards} />
+      <DeckCardsManager
+        deckId={deckId}
+        cards={cards}
+        totalCards={totalCards}
+        errorMessage={cardsErrorMessage}
+      />
 
-      <FadeInUp delay={0.2}>
-        <Suspense fallback={<WeakestConceptsSkeleton />}>
-          <WeakestConcepts deckId={deckId} />
-        </Suspense>
-      </FadeInUp>
+      {hasCards ? (
+        <>
+          <FadeInUp delay={0.2}>
+            <Suspense fallback={<WeakestConceptsSkeleton />}>
+              <WeakestConcepts deckId={deckId} />
+            </Suspense>
+          </FadeInUp>
 
-      <FadeInUp delay={0.2}>
-        <Suspense fallback={<QuizHistorySkeleton />}>
-          <QuizHistorySection deckId={deckId} />
-        </Suspense>
-      </FadeInUp>
+          <FadeInUp delay={0.2}>
+            <Suspense fallback={<QuizHistorySkeleton />}>
+              <QuizHistorySection deckId={deckId} />
+            </Suspense>
+          </FadeInUp>
+        </>
+      ) : null}
     </div>
   );
 }

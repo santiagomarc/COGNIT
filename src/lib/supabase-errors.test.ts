@@ -47,4 +47,13 @@ describe('isMissingDatabaseFunctionError', () => {
       isMissingDatabaseFunctionError('function get_other_thing() does not exist', 'get_due_cards_by_deck')
     ).toBe(false);
   });
+
+  it('handles null, undefined, and non-string inputs gracefully', () => {
+    expect(isMissingDatabaseFunctionError(null, 'get_due_cards_by_deck')).toBe(false);
+    expect(isMissingDatabaseFunctionError(undefined, 'get_due_cards_by_deck')).toBe(false);
+    expect(isMissingTableError(null, 'cards')).toBe(false);
+    expect(isMissingTableError(undefined, 'cards')).toBe(false);
+    expect(isMissingColumnError(null, 'id')).toBe(false);
+    expect(isMissingColumnError(undefined, 'id')).toBe(false);
+  });
 });
