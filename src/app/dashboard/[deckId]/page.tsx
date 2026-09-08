@@ -95,12 +95,7 @@ async function loadQuizReadyCount(
   deckId: string,
 ): Promise<number> {
   try {
-    const rpcCaller = supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: number | null; error: { message: string } | null }>;
-
-    const { data, error } = await rpcCaller('count_quiz_ready_cards', { p_deck_id: deckId });
+    const { data, error } = await supabase.rpc('count_quiz_ready_cards', { p_deck_id: deckId });
 
     if (!error) {
       return Number(data ?? 0);
@@ -130,15 +125,7 @@ async function loadTopTopics(
   deckId: string,
 ): Promise<Array<[string, number]>> {
   try {
-    const rpcCaller = supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{
-      data: Array<{ topic_tag: string; tag_count: number }> | null;
-      error: { message: string } | null;
-    }>;
-
-    const { data, error } = await rpcCaller('get_deck_topic_tag_counts', {
+    const { data, error } = await supabase.rpc('get_deck_topic_tag_counts', {
       p_deck_id: deckId,
       p_limit: 10,
     });

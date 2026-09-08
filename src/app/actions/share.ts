@@ -28,12 +28,7 @@ export async function setDeckSharing(data: SetDeckSharingInput) {
       return { error: deckAccess.error };
     }
 
-    const rpcCaller = deckAccess.supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: string | null; error: { message: string; code?: string } | null }>;
-
-    const { data: token, error } = await rpcCaller('set_deck_sharing', {
+    const { data: token, error } = await deckAccess.supabase.rpc('set_deck_sharing', {
       p_deck_id: parsed.data.deck_id,
       p_enabled: parsed.data.enabled,
       p_rotate: parsed.data.rotate,
@@ -65,12 +60,7 @@ export async function cloneSharedDeck(shareToken: string) {
       return { error: 'Sign in to save this deck to your library.' };
     }
 
-    const rpcCaller = supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>,
-    ) => Promise<{ data: string | null; error: { message: string; code?: string } | null }>;
-
-    const { data: deckId, error } = await rpcCaller('clone_shared_deck', {
+    const { data: deckId, error } = await supabase.rpc('clone_shared_deck', {
       p_share_token: shareToken,
     });
 

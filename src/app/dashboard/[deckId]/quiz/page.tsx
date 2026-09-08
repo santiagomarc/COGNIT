@@ -152,12 +152,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
     mnemonic: string | null;
   };
 
-  const rpcCaller = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: QuizCardRow[] | null; error: { message: string } | null }>;
-
-  const { data: rpcCards, error: rpcError } = await rpcCaller('select_quiz_cards', {
+  const { data: rpcCards, error: rpcError } = await supabase.rpc('select_quiz_cards', {
     p_deck_id: deckId,
     p_limit: limitToFetch > 0 ? limitToFetch : 20,
     // Pushes the unproven-first ordering into Postgres, and randomises within

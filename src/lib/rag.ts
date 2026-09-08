@@ -42,12 +42,7 @@ export async function retrieveDeckContext(
     return { cards: [], grounded: false, degraded: true, topSimilarity: null };
   }
 
-  const rpcCaller = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: RetrievedCard[] | null; error: { message: string } | null }>;
-
-  const { data, error } = await rpcCaller('search_deck_cards_by_embedding', {
+  const { data, error } = await supabase.rpc('search_deck_cards_by_embedding', {
     p_deck_id: input.deckId,
     p_query_embedding: toVectorLiteral(queryVector),
     p_limit: input.topK,

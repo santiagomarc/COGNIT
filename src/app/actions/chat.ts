@@ -145,12 +145,7 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
         .map((entry) => ({ card_id: entry.card_id, embedding: toVectorLiteral(entry.vector) }));
 
       // One statement instead of up to 200 UPDATEs (P-4).
-      const batchRpc = supabase.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: number | null; error: { message: string } | null }>;
-
-      const { data: appliedCount, error: applyError } = await batchRpc('apply_card_embeddings_batch', {
+      const { data: appliedCount, error: applyError } = await supabase.rpc('apply_card_embeddings_batch', {
         p_deck_id: parsed.data.deck_id,
         p_updates: updates,
       });

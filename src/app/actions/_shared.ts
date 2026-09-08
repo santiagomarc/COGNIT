@@ -168,13 +168,7 @@ export async function reserveAiCall(
 
   const policy = AI_RATE_LIMITS[action];
 
-  // Try the atomic RPC first (202609060915_atomic_ai_reservation.sql)
-  const rpcCaller = supabase.rpc as unknown as (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: string | null; error: { message: string; code?: string } | null }>;
-
-  const { data: rpcId, error: rpcError } = await rpcCaller('reserve_ai_call', {
+  const { data: rpcId, error: rpcError } = await supabase.rpc('reserve_ai_call', {
     p_action: action,
     p_window_minutes: policy.windowMinutes,
     p_max_requests: policy.maxRequests,
