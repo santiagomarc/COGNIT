@@ -4,10 +4,8 @@ import path from 'node:path';
 export default defineConfig({
   test: {
     environment: 'node',
-    // Requires a one-time `npm install -D @vitest/coverage-v8`. Left configured
-    // but uninstalled: adding it to package.json without a matching
-    // package-lock.json entry would break `npm ci`, and the local node_modules
-    // tree currently rejects `npm install` (see README → Troubleshooting).
+    // @vitest/coverage-v8 is pinned to the exact vitest version: it declares an
+    // exact peer, and installing it by range re-resolves vitest itself.
     coverage: {
       provider: 'v8',
       include: ['src/lib/**/*.ts', 'src/app/actions/**/*.ts'],

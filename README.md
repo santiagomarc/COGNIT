@@ -34,7 +34,7 @@ without the migrations every RPC quietly falls into a slower fallback path.
 | `npm run lint` | ESLint |
 | `npm test` | Vitest, single run |
 | `npm run test:watch` | Vitest watch mode |
-| `npm run test:coverage` | Coverage report (see Troubleshooting) |
+| `npm run test:coverage` | Coverage report |
 | `npm run verify:deployment` | Checks every RPC exists in the target database |
 
 ## Architecture
@@ -91,21 +91,12 @@ calls new RPCs; the reverse order sends every request down a fallback path.
 
 ## Troubleshooting
 
-**`npm install` fails with `Cannot read properties of null (reading 'edgesOut')`.**
-The local `node_modules` tree has extraneous packages that desync it from the lockfile.
-`npm ci` is unaffected (CI is fine). To repair locally:
-
-```bash
-rm -rf node_modules && npm ci
-```
-
-**`npm run test:coverage` reports a missing dependency.** The coverage provider is
-configured but not installed, because adding it to `package.json` without a matching
-`package-lock.json` entry would break `npm ci`. After repairing the tree above:
-
-```bash
-npm install --save-dev @vitest/coverage-v8
-```
+**`npm ls` reports `@emnapi/*`, `@napi-rs/wasm-runtime` and `@tybys/wasm-util` as
+extraneous.** Harmless, and not a desynced tree. They are dependencies of
+`@tailwindcss/oxide-wasm32-wasi` and `@unrs/resolver-binding-wasm32-wasi` — WASM
+fallbacks whose parents do not install on this platform, so npm hoists the children and
+then has no installed parent to attribute them to. Both `npm install` and `npm ci`
+succeed; a `rm -rf node_modules && npm ci` does not clear them.
 
 **Auth links point at the wrong host.** `NEXT_PUBLIC_SITE_URL` is unset or missing from
 Supabase's Redirect URLs list. See Setup steps 2 and 4.

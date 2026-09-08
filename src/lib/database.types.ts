@@ -313,10 +313,6 @@ export type Database = {
         ]
       }
       decks: {
-        // share_token / shared_at / clone_count added by hand for
-        // 202609070910_deck_sharing.sql. Regenerate this file with
-        // `supabase gen types typescript --linked` once that migration is
-        // applied, and this comment can go.
         Row: {
           clone_count: number
           created_at: string | null
@@ -490,34 +486,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      // Hand-added: matches supabase/migrations/202609010900_quiz_sm2_batch_rpc.sql,
-      // not yet applied to the live database. Re-running
-      // `supabase gen types typescript --linked` after applying it will replace
-      // this entry with the real generated one (which should match) — safe to
-      // remove this comment once that's confirmed.
-      apply_quiz_sm2_batch: {
+      apply_card_embeddings_batch: {
         Args: { p_deck_id: string; p_updates: Json }
         Returns: number
       }
-      // Hand-added: matches supabase/migrations/202609011200_dashboard_aggregation_rpcs.sql,
-      // not yet applied. See comment above.
-      get_study_activity_days: {
-        Args: { p_user_id: string }
-        Returns: { activity_date: string; review_count: number }[]
-      }
-      get_deck_mastery_summary: {
-        Args: { p_user_id: string }
-        Returns: { deck_id: string; assessed_cards: number; mastered_cards: number; last_quiz_at: string }[]
-      }
-      // Hand-added: matches supabase/migrations/202609011300_weakest_concepts_rpc.sql.
-      get_weakest_concepts: {
-        Args: { p_deck_id?: string | null; p_limit?: number; p_min_attempts?: number; p_user_id: string }
-        Returns: { topic_tag: string; attempts: number; misses: number; error_rate: number }[]
-      }
-      // Hand-added: matches supabase/migrations/202609011400_cross_deck_semantic_search_rpc.sql.
-      search_user_cards_by_embedding: {
-        Args: { p_limit?: number; p_query_embedding: string; p_user_id: string }
-        Returns: { id: string; deck_id: string; deck_title: string; front: string; back: string; similarity: number }[]
+      apply_quiz_sm2_batch: {
+        Args: { p_deck_id: string; p_updates: Json }
+        Returns: number
       }
       batch_grade_owned_cards:
         | { Args: { p_deck_id: string; p_updates: Json[] }; Returns: undefined }
@@ -525,9 +500,27 @@ export type Database = {
             Args: { p_deck_id: string; p_updates: Json[]; p_user_id: string }
             Returns: undefined
           }
+      clone_shared_deck: { Args: { p_share_token: string }; Returns: string }
+      count_quiz_ready_cards: { Args: { p_deck_id: string }; Returns: number }
       delete_owned_cards_batch: {
         Args: { p_card_ids: string[]; p_deck_id: string }
         Returns: number
+      }
+      get_deck_mastery_summary: {
+        Args: { p_user_id: string }
+        Returns: {
+          assessed_cards: number
+          deck_id: string
+          last_quiz_at: string
+          mastered_cards: number
+        }[]
+      }
+      get_deck_topic_tag_counts: {
+        Args: { p_deck_id: string; p_limit?: number }
+        Returns: {
+          tag_count: number
+          topic_tag: string
+        }[]
       }
       get_due_cards_by_deck: {
         Args: { p_now?: string; p_user_id: string }
@@ -545,6 +538,27 @@ export type Database = {
           mastered_cards: number
         }[]
       }
+      get_study_activity_days: {
+        Args: { p_user_id: string }
+        Returns: {
+          activity_date: string
+          review_count: number
+        }[]
+      }
+      get_weakest_concepts: {
+        Args: {
+          p_deck_id?: string
+          p_limit?: number
+          p_min_attempts?: number
+          p_user_id: string
+        }
+        Returns: {
+          attempts: number
+          error_rate: number
+          misses: number
+          topic_tag: string
+        }[]
+      }
       grade_owned_card: {
         Args: {
           p_card_id: string
@@ -560,6 +574,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      reserve_ai_call: {
+        Args: {
+          p_action: string
+          p_max_requests: number
+          p_metadata?: Json
+          p_window_minutes: number
+        }
+        Returns: string
+      }
       search_deck_cards_by_embedding: {
         Args: { p_deck_id: string; p_limit?: number; p_query_embedding: string }
         Returns: {
@@ -568,6 +591,43 @@ export type Database = {
           id: string
           similarity: number
         }[]
+      }
+      search_user_cards_by_embedding: {
+        Args: { p_limit?: number; p_query_embedding: string; p_user_id: string }
+        Returns: {
+          back: string
+          deck_id: string
+          deck_title: string
+          front: string
+          id: string
+          similarity: number
+        }[]
+      }
+      select_quiz_cards: {
+        Args: {
+          p_deck_id: string
+          p_focus_unproven?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          back: string
+          deck_id: string
+          ease_factor: number
+          front: string
+          id: string
+          id_question: string
+          interval: number
+          mcq_distractors: Json
+          mnemonic: string
+          next_review_at: string
+          repetition_count: number
+          state: string
+          topic_tags: Json
+        }[]
+      }
+      set_deck_sharing: {
+        Args: { p_deck_id: string; p_enabled: boolean; p_rotate?: boolean }
+        Returns: string
       }
     }
     Enums: {
@@ -587,12 +647,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -616,11 +676,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -641,11 +701,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -666,11 +726,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -683,11 +743,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
