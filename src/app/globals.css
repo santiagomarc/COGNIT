@@ -104,6 +104,16 @@
   --z-toast: 120;    /* sonner                          */
   --z-skip: 200;     /* skip-to-content                 */
 
+  /* Navigation geometry (§8). The floating dock is gone; a 48px left rail
+     replaces it. `--dock-clearance` is deliberately kept at 0 rather than
+     deleted: bottom clearance is owned by exactly one element (the dashboard
+     route layout), so a future bottom-anchored element re-uses this token
+     instead of re-scattering a bottom pad across every page — which is what
+     produced 224px of dead space in the first place (F-03). */
+  --rail-w: 48px;
+  --rail-w-expanded: 184px;
+  --dock-clearance: 0px;
+
   /* Motion (§5) — instruments do not bounce. One spring survives, in JS. */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-focus: 90ms;
@@ -717,7 +727,13 @@ button.flip {
     position: sticky;
     bottom: 0;
     z-index: var(--z-sticky);
+    /* Cancels the page container's 1.5rem gutter on three sides so the deck
+       is flush to the viewport edge at maximum scroll. Without the bottom
+       cancel the keys float above the home indicator with a dead strip under
+       them — which is exactly the shape of the clearance defect this phase
+       closes (F-03), just at 24px instead of 112px. */
     margin-inline: -1.5rem;
+    margin-bottom: -1.5rem;
     padding: 10px 1.5rem calc(10px + env(safe-area-inset-bottom));
     background: var(--bg);
     border-top: 1px solid var(--border);
@@ -898,6 +914,110 @@ button.flip {
 
   .glass-skeleton::after {
     animation: none;
+  }
+}
+
+/*
+ * ─── Navigation rail (§8) ───
+ *
+ * Replaces the floating dock (F-04), which occluded content on every screen in
+ * order to offer two live destinations and two permanently `disabled` slots.
+ *
+ * The rail does not float and does not overlay: it is a column in the shell's
+ * flex row, so expanding it reflows the content beside it rather than covering
+ * it. No fill and no shadow — a 1px right rule is the whole boundary (§4.3).
+ */
+.rail {
+  width: var(--rail-w);
+  border-right: 1px solid var(--border);
+  transition: width var(--dur-panel) var(--ease-out);
+}
+
+.rail[data-expanded='true'] {
+  width: var(--rail-w-expanded);
+}
+
+/* A rail control. 30px tall, per §8; the 48px column is the touch target's
+   own width, and the rail is desktop-only so ≥44px does not apply here. */
+.rail__btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  width: 100%;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--ink-faint);
+  background: transparent;
+  transition: color var(--dur-hover) ease, background-color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease;
+}
+
+.rail__btn:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.rail__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Active is a surface with the system's one elevation, not a coloured pill:
+   position in the rail already says which destination this is. */
+.rail__btn[aria-current='page'] {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--elevate);
+  border-color: var(--border);
+}
+
+/* The label is revealed by width, so it must not wrap or force the column
+   open while the rail is collapsed. */
+.rail__label {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-hover) ease;
+}
+
+.rail[data-expanded='true'] .rail__label {
+  opacity: 1;
+}
+
+/*
+ * The deck-index mark. §6's icon allowlist has no glyph for "index", and a
+ * metaphor would be worse than none — so the affordance is a 3-rule miniature
+ * of the deck index itself (§7.5), drawn in CSS rather than imported.
+ */
+.rail__rows {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.rail__rows span {
+  display: block;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.rail__rows span:nth-child(1) { width: 100%; }
+.rail__rows span:nth-child(2) { width: 72%; }
+.rail__rows span:nth-child(3) { width: 86%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rail,
+  .rail__label {
+    transition: none;
   }
 }
 

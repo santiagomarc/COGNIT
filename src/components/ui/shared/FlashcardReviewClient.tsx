@@ -692,7 +692,7 @@ export function FlashcardReviewClient({
   }
 
   return (
-    <div className="container mx-auto p-6 pb-28 md:p-8">
+    <div className="container mx-auto p-6 md:p-8">
       {/* Paused means paused: the page behind the scrim is inert, so keyboard
           focus cannot walk past it into the controls it is covering. */}
       <div className="space-y-6" inert={isPaused && !completed}>

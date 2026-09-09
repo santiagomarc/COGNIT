@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
+import { requestOpenCreateDeck } from '@/lib/dashboard-events';
 
 type DueNowBandProps = {
   totalDue: number;
@@ -18,8 +19,6 @@ type DueNowBandProps = {
   sessionHref: string | null;
   /** Most recently updated deck, for the PDF import shortcut. */
   importHref: string | null;
-  /** Rendered inline as a secondary action — the create-deck trigger. */
-  children?: React.ReactNode;
 };
 
 /**
@@ -38,7 +37,6 @@ export function DueNowBand({
   estimatedMinutes,
   sessionHref,
   importHref,
-  children,
 }: DueNowBandProps) {
   const router = useRouter();
   const hasWork = totalDue > 0;
@@ -121,7 +119,14 @@ export function DueNowBand({
             </Button>
           ) : null}
 
-          {children}
+          {/*
+            * The create-deck dialog is mounted by the shell layout now, so this
+            * is a trigger rather than the dialog itself — which is also why the
+            * onboarding panel can open it when this band is not rendered.
+            */}
+          <Button type="button" onClick={requestOpenCreateDeck} aria-haspopup="dialog">
+            New deck
+          </Button>
 
           {importHref ? (
             <Button asChild>

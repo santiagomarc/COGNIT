@@ -1,6 +1,6 @@
 export default function QuizLoading() {
   return (
-    <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
+    <div className="container mx-auto space-y-6 p-6 md:p-8">
       <div className="flex items-center justify-between gap-4">
         <div className="glass-skeleton h-4 w-28 rounded" />
         <div className="glass-skeleton h-4 w-40 rounded" />

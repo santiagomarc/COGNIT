@@ -596,7 +596,7 @@ export function QuizAssessmentClient({
   const resultActionButtonClass = 'gap-2 min-w-[11.5rem] justify-center';
 
   return (
-    <div className="container mx-auto p-6 pb-28 md:p-8">
+    <div className="container mx-auto p-6 md:p-8">
       {/*
         While the quiz is paused the page behind the scrim is inert. A scrim
         that only stops the mouse is not a guard: keyboard focus walked straight

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motionTransitions } from '@/lib/motion-configs';
 import { OPEN_CREATE_DECK_EVENT } from '@/lib/dashboard-events';
+import { useModalDialog } from '@/lib/use-modal-dialog';
 import { toast } from 'sonner';
 
 /**
@@ -35,61 +36,29 @@ export function CreateDeckModal() {
   const [accentTag, setAccentTag] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
+
+  const handleClose = useCallback(() => {
+    if (!isLoading) setOpen(false);
+  }, [isLoading]);
+
+  /*
+   * Escape, the Tab trap and focus restore come from the shared hook (§9).
+   * Restore has to read `document.activeElement` rather than a trigger ref,
+   * because this dialog now has three triggers in different parts of the tree:
+   * the due-now band's button, the onboarding panel and the command palette.
+   */
+  const dialogRef = useModalDialog({
+    open,
+    onClose: handleClose,
+    initialFocus: () => inputRef.current,
+  });
 
   useEffect(() => {
     const handleOpenRequest = () => setOpen(true);
     window.addEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
     return () => window.removeEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
   }, []);
-
-  useEffect(() => {
-    if (open) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-      return;
-    }
-
-    triggerRef.current?.focus();
-  }, [open]);
-
-  // Escape closes; Tab is trapped inside the dialog (§9 — a modal that leaks
-  // focus to the page behind it is not modal).
-  const handleKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (!open) return;
-
-      if (event.key === 'Escape') {
-        if (!isLoading) setOpen(false);
-        return;
-      }
-
-      if (event.key !== 'Tab' || !dialogRef.current) return;
-
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-      );
-      if (focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    },
-    [isLoading, open]
-  );
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
 
   async function handleSubmit() {
     setFieldError(null);
@@ -135,12 +104,16 @@ export function CreateDeckModal() {
     }
   }
 
+  /*
+   * No trigger of its own. The shell layout mounts this once for the whole
+   * chromed subtree and the buttons that open it live where the user is —
+   * which is also what repairs the case this component could not serve before:
+   * it used to be rendered inside the due-now band, and the due-now band is not
+   * rendered when the account has no decks, so the onboarding panel's "write
+   * your own" dispatched its open event at nothing.
+   */
   return (
     <>
-      <Button ref={triggerRef} type="button" onClick={() => setOpen(true)} disabled={isLoading}>
-        {isLoading ? 'Creating…' : 'New deck'}
-      </Button>
-
       <AnimatePresence>
         {open ? (
           <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center">

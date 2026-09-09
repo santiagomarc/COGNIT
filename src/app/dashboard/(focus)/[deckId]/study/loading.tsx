@@ -1,6 +1,6 @@
 export default function StudyLoading() {
   return (
-    <div className="container mx-auto space-y-6 p-6 md:p-8 pb-28">
+    <div className="container mx-auto space-y-6 p-6 md:p-8">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-4">
         <div className="glass-skeleton h-4 w-28 rounded" />

@@ -1,8 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
-import { SemanticSearchModal } from '@/components/ui/shared/SemanticSearchModal';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
 import { DashboardTelemetry } from '@/components/ui/shared/DashboardTelemetry';
@@ -354,11 +351,9 @@ export default async function Dashboard() {
 
   return (
     /*
-     * `pb-28` is gone from here (defect F-03). It was applied on this page *and*
-     * again on `dashboard/layout.tsx`, so the two nested to 224px of dead space
-     * for a dock about 74px tall. The layout keeps its copy: the dock still
-     * exists on this route until the navigation phase, and stripping the
-     * clearance now would push this content underneath it.
+     * No bottom padding here, and none in any other page under /dashboard:
+     * `dashboard/layout.tsx` is the single owner of bottom clearance, via
+     * `var(--dock-clearance)` (F-03 closed).
      */
     <div className="container mx-auto space-y-8 p-6 md:p-8">
       <DashboardTelemetry
@@ -366,12 +361,6 @@ export default async function Dashboard() {
         retentionPercentage={retentionPercentage}
         streakDays={streak}
         reviewedToday={todayStudiedCount}
-        actions={
-          <>
-            <SemanticSearchModal />
-            <ThemeToggle />
-          </>
-        }
       />
 
       {deckRows.length === 0 ? (
@@ -385,9 +374,7 @@ export default async function Dashboard() {
             estimatedMinutes={estimatedMinutes}
             sessionHref={sessionHref}
             importHref={mostRecentDeck ? `/dashboard/${mostRecentDeck.id}#add-content` : null}
-          >
-            <CreateDeckModal />
-          </DueNowBand>
+          />
 
           <div id="deck-collection" className="scroll-mt-24">
             <DeckGrid

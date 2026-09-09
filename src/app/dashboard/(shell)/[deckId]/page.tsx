@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
@@ -11,7 +10,6 @@ import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
-import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { Input } from '@/components/ui/input';
@@ -355,17 +353,12 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
       <header className="space-y-4">
-        <div className="flex items-center justify-between gap-4">
-          <Button asChild variant="ghost" size="sm" className="gap-2 px-2">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-4 w-4" />
-              Dashboard
-            </Link>
-          </Button>
-          <div className="flex items-center gap-2">
-            <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
-            <ThemeToggle />
-          </div>
+        {/* No back link and no theme toggle here: the shell's breadcrumb and
+            account sheet own both, on every chromed route rather than on the
+            two pages that happened to draw them (§8). Share stays — it is a
+            property of this deck, not of the chrome. */}
+        <div className="flex items-center justify-end gap-2">
+          <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
         </div>
 
         <div className="space-y-3">
