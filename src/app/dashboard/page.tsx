@@ -287,11 +287,11 @@ export default async function Dashboard() {
       <FadeInUp>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-border-strong">
               <Layers className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="glow-title text-2xl md:text-3xl font-bold tracking-tight">Dashboard</h1>
+              <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">Dashboard</h1>
               <p className="text-sm text-muted-foreground">Welcome back, {user.email}</p>
             </div>
           </div>

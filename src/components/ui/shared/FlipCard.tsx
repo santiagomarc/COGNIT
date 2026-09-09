@@ -1,8 +1,23 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { m, useMotionValue, useReducedMotion, useSpring, useTransform } from 'framer-motion';
-import { motionSprings, tiltSpring } from '@/lib/motion-configs';
+import { m, useMotionValue, useReducedMotion, useSpring, useTransform, type SpringOptions } from 'framer-motion';
+import { motionTransitions } from '@/lib/motion-configs';
+
+/*
+ * Local to this file on purpose. `motion-configs.ts` now holds exactly one
+ * spring — the card leaving the stack — and the cursor tilt is not it.
+ *
+ * The tilt is defect F-08: on a card the user is actively reading, the text
+ * plane is never square to the eye and never still. It is removed from the
+ * study canvas in Phase 4 and survives only on the marketing showpiece, so
+ * this constant is deleted along with it rather than promoted to a token.
+ */
+const tiltSpring: SpringOptions = {
+  stiffness: 300,
+  damping: 30,
+  mass: 0.85,
+};
 
 type FlipCardProps = {
   front: ReactNode;
@@ -88,7 +103,7 @@ export function FlipCard({
       <m.div
         className="relative h-full w-full"
         animate={{ rotateY: isFlipped ? 180 : 0 }}
-        transition={prefersReducedMotion ? { duration: 0 } : motionSprings.flip}
+        transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.flip}
         style={{ transformStyle: 'preserve-3d' }}
       >
         <div className={`backface-hidden absolute inset-0 ${faceClassName}`}>{front}</div>

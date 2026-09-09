@@ -518,7 +518,7 @@ export function FlashcardReviewClient({
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
             <Brain className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-semibold">You&apos;re all caught up!</h1>
@@ -557,7 +557,7 @@ export function FlashcardReviewClient({
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
             <Brain className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-semibold">Resume your previous session?</h1>
@@ -608,13 +608,13 @@ export function FlashcardReviewClient({
       <div className="glass-card rounded-2xl p-4">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span className="text-muted-foreground">
-            {completed ? 'Review complete' : `Card ${index + 1} of ${sessionCards.length}`}
+            {completed ? 'Review complete' : <span className="font-mono tnum">{`Card ${index + 1} of ${sessionCards.length}`}</span>}
           </span>
-          <span className="font-medium">{Math.min(progress, 100)}%</span>
+          <span className="font-mono font-medium tnum">{Math.min(progress, 100)}%</span>
         </div>
         <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
           <m.div
-            className="h-full rounded-full bg-primary"
+            className="h-full rounded-full bg-ink-dim"
             animate={{ width: `${Math.min(progress, 100)}%` }}
             transition={{ type: 'spring', stiffness: 180, damping: 24 }}
           />
@@ -635,8 +635,8 @@ export function FlashcardReviewClient({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             className="mx-auto max-w-2xl space-y-6"
           >
-            <div className="glass-card glow-border rounded-3xl p-8 text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+            <div className="glass-card rounded-3xl p-8 text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
                 <Flame className="h-7 w-7 text-primary" />
               </div>
               <h2 className="text-2xl font-bold tracking-tight">Review Complete</h2>
@@ -647,13 +647,13 @@ export function FlashcardReviewClient({
 
             <div className="grid grid-cols-4 gap-3">
               {[
-                { label: 'Again', count: againCount, color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/20' },
-                { label: 'Hard', count: hardCount, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
-                { label: 'Good', count: goodCount, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-                { label: 'Easy', count: easyCount, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
+                { label: 'Again', count: againCount, color: 'text-[var(--state-lapsed)]' },
+                { label: 'Hard', count: hardCount, color: 'text-[var(--state-due)]' },
+                { label: 'Good', count: goodCount, color: 'text-[var(--state-mastered)]' },
+                { label: 'Easy', count: easyCount, color: 'text-[var(--state-neutral)]' },
               ].map((stat) => (
-                <div key={stat.label} className={`rounded-2xl border ${stat.border} ${stat.bg} p-4 text-center`}>
-                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.count}</p>
+                <div key={stat.label} className="surface p-4 text-center">
+                  <p className={`font-mono text-2xl font-semibold tnum ${stat.color}`}>{stat.count}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
                 </div>
               ))}
@@ -665,14 +665,14 @@ export function FlashcardReviewClient({
                   <Timer className="h-4 w-4" />
                   Session Duration
                 </span>
-                <span className="text-sm font-medium">{formatDuration(sessionDuration)}</span>
+                <span className="font-mono text-sm font-medium tnum">{formatDuration(sessionDuration)}</span>
               </div>
               <div className="flex items-center justify-between px-5 py-3">
                 <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Zap className="h-4 w-4" />
                   Avg. per Review
                 </span>
-                <span className="text-sm font-medium">
+                <span className="font-mono text-sm font-medium tnum">
                   {effectiveAttemptCount > 0 ? formatDuration(Math.round(sessionDuration / effectiveAttemptCount)) : '—'}
                 </span>
               </div>
@@ -681,7 +681,7 @@ export function FlashcardReviewClient({
                   <TrendingUp className="h-4 w-4" />
                   Retention Rate
                 </span>
-                <span className="text-sm font-medium">
+                <span className="font-mono text-sm font-medium tnum">
                   {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
                 </span>
               </div>
@@ -692,7 +692,7 @@ export function FlashcardReviewClient({
                     <CalendarClock className="h-4 w-4" />
                     Next review
                   </span>
-                  <span className="text-right text-sm font-medium">{nextReviewSummary}</span>
+                  <span className="text-right font-mono text-sm font-medium tnum">{nextReviewSummary}</span>
                 </div>
               ) : null}
             </div>
@@ -739,11 +739,11 @@ export function FlashcardReviewClient({
                   }
                 }}
                 whileTap={{ scale: 0.995 }}
-                className="glass-card glow-border absolute inset-0 cursor-grab rounded-3xl p-7 active:cursor-grabbing"
+                className="glass-card absolute inset-0 flex cursor-grab flex-col rounded-3xl p-7 active:cursor-grabbing"
               >
-                <div className="mb-4 flex items-center justify-between text-xs uppercase tracking-wider text-muted-foreground">
-                  <span>Card {index + 1} of {sessionCards.length}</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${showAnswer ? 'border-neon/20 bg-neon/10 text-neon' : 'border-primary/20 bg-primary/10 text-primary'}`}>
+                <div className="mb-4 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
+                  <span className="font-mono tnum">Card {index + 1} of {sessionCards.length}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${showAnswer ? 'border-border-strong bg-surface-raised text-ink' : 'border-border-strong bg-primary/10 text-primary'}`}>
                     {showAnswer ? 'Answer' : 'Question'}
                   </span>
                 </div>
@@ -757,20 +757,33 @@ export function FlashcardReviewClient({
                   onClick={() => {
                     if (!showAnswer) setShowAnswer(true);
                   }}
-                  className="w-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background/0"
+                  className="flex min-h-0 w-full flex-1 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background/0"
                   aria-label={showAnswer ? 'Showing answer. Choose a grade below.' : 'Showing question. Press to reveal answer.'}
                 >
+                  {/*
+                    Neither face clamps its text (defect F-02). A clamp puts
+                    overflow:hidden on the paragraph, so it never overflows the
+                    face and the face's overflow-y-auto has nothing to scroll —
+                    the text was truncated *and* unreachable. Cognit generates
+                    cards from PDFs, so long answers are the norm.
+
+                    The paragraph centres with `my-auto` rather than the face
+                    using `items-center`: auto margins collapse to zero once the
+                    content overflows, so the first line stays reachable at the
+                    scroll origin. Centring via align-items would push the top of
+                    a long answer above the scrollport with no way back to it.
+                  */}
                   <FlipCard
                     isFlipped={showAnswer}
-                    className="relative h-[13rem] w-full"
+                    className="relative min-h-[13rem] w-full flex-1"
                     front={
-                      <div className="flex h-full w-full items-center justify-center overflow-y-auto rounded-2xl border border-primary/15 bg-background/25 px-6 text-center">
-                        <p className="line-clamp-6 text-lg leading-relaxed">{active.back}</p>
+                      <div className="flex h-full w-full flex-col overflow-y-auto overscroll-contain rounded-2xl border border-border bg-background/25 px-6 py-5 text-center [scrollbar-width:thin]">
+                        <p className="my-auto font-serif text-[clamp(1.0625rem,2.2vw,1.5rem)] leading-[1.32]">{active.back}</p>
                       </div>
                     }
                     back={
-                      <div className="flex h-full w-full items-center justify-center overflow-y-auto rounded-2xl border border-neon/25 bg-background/25 px-6 text-center">
-                        <p className="line-clamp-6 text-lg leading-relaxed">{active.front}</p>
+                      <div className="flex h-full w-full flex-col overflow-y-auto overscroll-contain rounded-2xl border border-border-strong bg-background/25 px-6 py-5 text-center [scrollbar-width:thin]">
+                        <p className="my-auto font-serif text-[clamp(1.0625rem,2.2vw,1.5rem)] leading-[1.32]">{active.front}</p>
                       </div>
                     }
                   />
@@ -788,7 +801,7 @@ export function FlashcardReviewClient({
                   className="space-y-3"
                 >
                   {active.mnemonic ? (
-                    <div className="rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-muted-foreground">
+                    <div className="rounded-xl border border-border-strong bg-primary/10 px-4 py-3 text-sm text-muted-foreground">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Memory Aid</p>
                       <p className="mt-1 leading-relaxed">{active.mnemonic}</p>
                     </div>
@@ -821,11 +834,11 @@ export function FlashcardReviewClient({
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-muted-foreground/70">
               <span className="hidden sm:inline-flex items-center gap-1.5">
                 <Keyboard className="h-3.5 w-3.5" />
-                <kbd className="rounded border border-primary/15 bg-card/60 px-1.5 py-0.5 font-mono text-[10px]">Space</kbd>
+                <kbd className="rounded border border-border bg-card/60 px-1.5 py-0.5 font-mono text-[10px]">Space</kbd>
                 reveal
               </span>
               <span className="hidden sm:inline-flex items-center gap-1.5">
-                <kbd className="rounded border border-primary/15 bg-card/60 px-1.5 py-0.5 font-mono text-[10px]">1-4</kbd>
+                <kbd className="rounded border border-border bg-card/60 px-1.5 py-0.5 font-mono text-[10px]">1-4</kbd>
                 grade
               </span>
             </div>

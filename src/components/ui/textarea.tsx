@@ -2,14 +2,21 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/*
+ * Design system §7.2 / §9 — see the note in `input.tsx`. Same control edge,
+ * same 2px --accent focus outline at 2px offset, no glow.
+ */
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
       data-slot="textarea"
       className={cn(
-        "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input/50 dark:border-primary/15 w-full min-w-0 rounded-lg border bg-card/40 backdrop-blur-sm px-3 py-2 text-base shadow-xs transition-all duration-200 outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-glow focus-visible:shadow-[0_0_16px_-2px_var(--glow)]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+        "placeholder:text-ink-dimmer selection:bg-primary selection:text-primary-foreground",
+        "w-full min-w-0 rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-3 py-2 text-sm",
+        "transition-[border-color,background-color] duration-[120ms] ease-out outline-none",
+        "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
+        "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+        "aria-invalid:border-destructive",
         "min-h-[5rem] resize-y field-sizing-content",
         className
       )}

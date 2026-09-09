@@ -23,7 +23,7 @@ export default function DashboardError({
         initial={{ opacity: 0, y: 20, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-        className="glass-card glow-border mx-auto max-w-lg rounded-3xl p-10 text-center"
+        className="glass-card mx-auto max-w-lg rounded-3xl p-10 text-center"
       >
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 border border-destructive/20">
           <AlertTriangle className="h-7 w-7 text-destructive" />

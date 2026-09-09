@@ -67,7 +67,7 @@ export default function UpdatePasswordPage() {
   return (
     <div className="flex min-h-screen items-center justify-center px-6 py-12">
       {/* Theme toggle */}
-      <div className="fixed right-4 top-4 z-50">
+      <div className="fixed right-4 top-4 z-[var(--z-sticky)]">
         <ThemeToggle />
       </div>
 
@@ -82,7 +82,7 @@ export default function UpdatePasswordPage() {
           href="/"
           className="mx-auto mb-8 flex w-fit items-center gap-2.5"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/25 bg-primary/15">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border-strong bg-primary/15">
             <Sparkles className="h-4.5 w-4.5 text-primary" />
           </div>
           <span className="text-xl font-bold tracking-tight">Cognit</span>

@@ -2,7 +2,7 @@
 
 import { m, useReducedMotion, type Variants } from 'framer-motion';
 import { useSyncExternalStore, type ReactNode } from 'react';
-import { motionSprings } from '@/lib/motion-configs';
+import { motionTransitions } from '@/lib/motion-configs';
 
 function useHasMounted() {
   return useSyncExternalStore(
@@ -36,7 +36,7 @@ const staggerItem: Variants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: motionSprings.listItem,
+    transition: motionTransitions.panel,
   },
 };
 
@@ -46,7 +46,7 @@ const fadeInUp: Variants = {
   show: {
     opacity: 1,
     y: 0,
-    transition: motionSprings.entrance,
+    transition: motionTransitions.panel,
   },
 };
 
@@ -131,7 +131,7 @@ export function PageTransition({
     <m.div
       initial={shouldReduceMotion ? undefined : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={shouldReduceMotion ? { duration: 0 } : motionSprings.entrance}
+      transition={shouldReduceMotion ? { duration: 0 } : motionTransitions.panel}
       className={className}
     >
       {children}

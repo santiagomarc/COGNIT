@@ -17,10 +17,10 @@ export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCar
       initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-      className={cn('glass-card glow-border flex h-full flex-col rounded-2xl p-4', className)}
+      className={cn('glass-card flex h-full flex-col rounded-2xl p-4', className)}
     >
       <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 border border-border-strong">
           <Clock className="h-5 w-5 text-primary" />
         </div>
         <div className="flex-1 min-w-0">
@@ -28,7 +28,7 @@ export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCar
             Due Today
           </h3>
           <div className="mt-1 flex items-baseline gap-2">
-            <span className="glow-title text-3xl font-extrabold tracking-tight">
+            <span className="font-mono text-3xl font-semibold tracking-[-.03em] tnum">
               {totalDue}
             </span>
             <span className="text-sm text-muted-foreground">
@@ -44,11 +44,11 @@ export function DueTodayCard({ totalDue, deckBreakdown, className }: DueTodayCar
             <Link
               key={deck.deckId}
               href={`/dashboard/${deck.deckId}/study`}
-              className="group flex items-center justify-between rounded-lg border border-primary/10 bg-card/30 px-3 py-1.5 transition-all hover:border-primary/25 hover:bg-primary/5"
+              className="group flex items-center justify-between rounded-lg border border-border bg-card/30 px-3 py-1.5 transition-all hover:border-border-strong hover:bg-primary/5"
             >
               <span className="text-sm font-medium truncate">{deck.deckTitle}</span>
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground group-hover:text-primary transition-colors">
-                {deck.dueCount} due
+                <span className="font-mono tnum">{deck.dueCount}</span>&nbsp;due
                 <ArrowRight className="h-3 w-3" />
               </span>
             </Link>

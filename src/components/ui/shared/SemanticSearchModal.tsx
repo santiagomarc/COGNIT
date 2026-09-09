@@ -89,7 +89,7 @@ export function SemanticSearchModal() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 rounded-xl border border-input/50 bg-card/40 px-3 py-2 text-sm text-muted-foreground backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-foreground dark:border-primary/15"
+        className="flex items-center gap-2 rounded-xl border border-input/50 bg-card/40 px-3 py-2 text-sm text-muted-foreground backdrop-blur-sm transition-colors hover:border-border-strong hover:text-foreground "
         aria-label="Search across all your decks"
       >
         <Sparkles className="h-4 w-4 text-primary" />
@@ -98,7 +98,7 @@ export function SemanticSearchModal() {
 
       <AnimatePresence>
         {open ? (
-          <div className="fixed inset-0 z-[110] flex items-start justify-center px-4 py-6 pb-[max(1.5rem,env(keyboard-inset-height,0px))] sm:items-center">
+          <div className="fixed inset-0 z-[var(--z-modal)] flex items-start justify-center px-4 py-6 pb-[max(1.5rem,env(keyboard-inset-height,0px))] sm:items-center">
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -113,12 +113,12 @@ export function SemanticSearchModal() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="glass-card relative z-10 flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-primary/15"
+              className="glass-card relative z-10 flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border"
               role="dialog"
               aria-modal="true"
               aria-labelledby="semantic-search-title"
             >
-              <div className="flex items-start justify-between gap-4 border-b border-primary/10 px-6 py-5">
+              <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
                 <div className="space-y-1">
                   <h2 id="semantic-search-title" className="text-xl font-semibold tracking-tight">
                     Search all decks
@@ -156,7 +156,7 @@ export function SemanticSearchModal() {
                 ) : null}
 
                 {status === 'done' && results.length === 0 ? (
-                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-primary/10 bg-primary/5 p-8 text-center text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-primary/5 p-8 text-center text-sm text-muted-foreground">
                     <Search className="h-8 w-8 opacity-40" />
                     <p>No matching cards found.</p>
                     <p className="text-xs">
@@ -172,15 +172,15 @@ export function SemanticSearchModal() {
                         <Link
                           href={`/dashboard/${card.deck_id}`}
                           onClick={resetAndClose}
-                          className="group flex items-start justify-between gap-3 rounded-2xl border border-primary/10 bg-card/40 p-4 transition-colors hover:border-primary/30 hover:bg-primary/5"
+                          className="group flex items-start justify-between gap-3 rounded-2xl border border-border bg-card/40 p-4 transition-colors hover:border-border-strong hover:bg-primary/5"
                         >
                           <div className="min-w-0 space-y-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              <span className="rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
                                 {removeDeckTagFromTitle(card.deck_title)}
                               </span>
                               <span className="text-[11px] text-muted-foreground">
-                                {Math.round(card.similarity * 100)}% match
+                                <span className="font-mono tnum">{Math.round(card.similarity * 100)}%</span>&nbsp;match
                               </span>
                             </div>
                             <p className="truncate text-sm font-medium text-foreground">{card.front}</p>

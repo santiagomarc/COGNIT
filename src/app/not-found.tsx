@@ -41,14 +41,14 @@ export default function NotFound() {
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-neon/10 blur-[100px]"
+          className="absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-primary/10 blur-[100px]"
         />
         
         {/* Floating Sparks */}
         {FLOATING_SPARKS.map((spark, i) => (
           <m.div
             key={i}
-            className="absolute h-2 w-2 rounded-full bg-primary/40 shadow-[0_0_10px_var(--neon)]"
+            className="absolute h-2 w-2 rounded-full bg-primary/40"
             style={{
               top: spark.top,
               left: spark.left,
@@ -69,13 +69,13 @@ export default function NotFound() {
       </div>
 
       <StaggerContainer className="z-10 w-full max-w-lg">
-        <div className="glass-card glow-border mx-auto rounded-3xl p-10 text-center relative overflow-hidden backdrop-blur-xl">
+        <div className="glass-card mx-auto rounded-3xl p-10 text-center relative overflow-hidden backdrop-blur-xl">
           {/* Subtle gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
 
           <StaggerItem>
             <m.div 
-              className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20 relative"
+              className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 border border-border-strong relative"
               animate={{ 
                 y: [0, -10, 0],
               }}
@@ -98,13 +98,13 @@ export default function NotFound() {
                 }}
                 className="absolute -bottom-2 -right-2"
               >
-                <Sparkles className="h-5 w-5 text-neon" />
+                <Sparkles className="h-5 w-5 text-ink-dim" />
               </m.div>
             </m.div>
           </StaggerItem>
 
           <StaggerItem>
-            <h1 className="glow-title text-8xl font-black tracking-tighter bg-gradient-to-br from-primary via-neon to-primary/60 bg-clip-text text-transparent mb-2">
+            <h1 className="mb-2 font-mono text-7xl font-semibold tracking-[-.03em] tnum text-ink">
               404
             </h1>
           </StaggerItem>

@@ -180,7 +180,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
     }
 
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/30 backdrop-blur-md p-8 text-center">
+      <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-border-strong bg-card/30 backdrop-blur-md p-8 text-center">
         <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
         <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
@@ -203,7 +203,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/15 bg-card/25 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/25 p-3">
         <div className="text-sm text-muted-foreground">
           {selectionMode
             ? `${selectedCount} of ${deckCards.length} selected`

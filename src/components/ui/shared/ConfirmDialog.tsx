@@ -4,7 +4,7 @@ import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useEffect, useRef, useCallback } from 'react';
-import { motionSprings } from '@/lib/motion-configs';
+import { motionTransitions } from '@/lib/motion-configs';
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -91,13 +91,13 @@ export function ConfirmDialog({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center">
           {/* Backdrop */}
           <m.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={reduced ? { duration: 0 } : motionSprings.overlay}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
             onClick={() => !loading && onOpenChange(false)}
           />
@@ -107,9 +107,9 @@ export function ConfirmDialog({
             initial={{ opacity: 0, scale: 0.92, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 10 }}
-            transition={reduced ? { duration: 0 } : motionSprings.modal}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
             ref={dialogRef}
-            className="glass-card relative z-10 mx-4 w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-primary/15 p-6 shadow-2xl"
+            className="glass-card relative z-10 mx-4 w-full max-w-sm max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-border p-6 shadow-2xl"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="confirm-title"
@@ -120,7 +120,7 @@ export function ConfirmDialog({
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
                   variant === 'destructive'
                     ? 'border-destructive/20 bg-destructive/10'
-                    : 'border-primary/20 bg-primary/10'
+                    : 'border-border-strong bg-primary/10'
                 }`}
               >
                 <AlertTriangle

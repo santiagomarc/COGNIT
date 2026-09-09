@@ -10,7 +10,7 @@ import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { motionSprings } from '@/lib/motion-configs';
+import { motionTransitions } from '@/lib/motion-configs';
 import { OPEN_CREATE_DECK_EVENT } from '@/lib/dashboard-events';
 import { toast } from 'sonner';
 
@@ -95,8 +95,8 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   }
 
   return (
-    <div className="glass-card glow-border h-full rounded-2xl p-3">
-      <div className="relative h-full overflow-hidden rounded-xl border border-primary/15 bg-card/35 p-3">
+    <div className="glass-card h-full rounded-2xl p-3">
+      <div className="relative h-full overflow-hidden rounded-xl border border-border bg-card/35 p-3">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_48%)]" />
 
         <AnimatePresence mode="wait" initial={false}>
@@ -106,7 +106,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
               initial={{ opacity: 0, rotateX: -6, y: 6 }}
               animate={{ opacity: 1, rotateX: 0, y: 0 }}
               exit={{ opacity: 0, rotateX: 6, y: -6 }}
-              transition={reduced ? { duration: 0 } : motionSprings.modal}
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
               className="relative flex h-full flex-col justify-between gap-3"
             >
               <div className="flex items-start justify-between gap-3">
@@ -114,16 +114,16 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                   <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick Actions</p>
                   <p className="mt-1 text-sm font-medium text-foreground">Keep momentum today</p>
                 </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-strong bg-primary/10 text-primary">
                   <Sparkles className="h-4 w-4" />
                 </span>
               </div>
 
               <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-foreground/85">
+                <span className="rounded-full border border-border-strong bg-card/80 px-2 py-1 text-foreground/85">
                   {totalDecks} deck{totalDecks !== 1 ? 's' : ''}
                 </span>
-                <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-foreground/85">
+                <span className="rounded-full border border-border-strong bg-card/80 px-2 py-1 text-foreground/85">
                   {totalCards} total card{totalCards !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -133,7 +133,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                   ref={triggerRef}
                   type="button"
                   onClick={() => setOpen(true)}
-                  className="inline-flex h-15 w-full items-center justify-center gap-2 rounded-xl border border-primary/45 bg-card/120 px-4 text-sm font-semibold text-foreground shadow-none transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
+                  className="inline-flex h-15 w-full items-center justify-center gap-2 rounded-xl border border-border-strong bg-card/120 px-4 text-sm font-semibold text-foreground shadow-none transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
                 >
                   <Plus className="h-4 w-4" />
                   <span>Create New Deck</span>
@@ -146,7 +146,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
               initial={{ opacity: 0, rotateX: 6, y: 6 }}
               animate={{ opacity: 1, rotateX: 0, y: 0 }}
               exit={{ opacity: 0, rotateX: -6, y: -6 }}
-              transition={reduced ? { duration: 0 } : motionSprings.modal}
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
               className="relative flex h-full flex-col justify-between gap-3"
               role="dialog"
               aria-modal="false"
@@ -207,7 +207,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                     id="inline-deck-tag"
                     value={accentTag}
                     onChange={(event) => setAccentTag(event.target.value)}
-                    className="neon-focus h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                    className="h-[34px] w-full rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-3 text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   >
                     <option value="">None</option>
                     {DECK_TAG_OPTIONS.map((option) => (

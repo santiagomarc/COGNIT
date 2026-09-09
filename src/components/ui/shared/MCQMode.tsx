@@ -128,8 +128,8 @@ export function MCQMode({
 
   if (options.length < 4) {
     return (
-      <div className="glass-card glow-border rounded-3xl p-7">
-        <div className="rounded-2xl border border-primary/10 bg-card/20 p-5 text-center">
+      <div className="glass-card rounded-3xl p-7">
+        <div className="rounded-2xl border border-border bg-card/20 p-5 text-center">
           <p className="text-lg font-semibold">Preparing quiz data</p>
           <p className="mt-2 text-sm text-muted-foreground">
             {enrichmentPending
@@ -147,16 +147,16 @@ export function MCQMode({
   }
 
   return (
-    <div className="glass-card glow-border rounded-3xl p-7">
-      <div className="mb-4 flex items-center justify-between gap-3 text-xs uppercase tracking-wider text-muted-foreground">
+    <div className="glass-card rounded-3xl p-7">
+      <div className="mb-4 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
         <span>Multiple Choice</span>
-        <span className="rounded-full border border-primary/15 bg-card/40 px-2 py-0.5 text-[10px] font-semibold">
+        <span className="rounded-full border border-border bg-card/40 px-2 py-0.5 text-[10px] font-semibold">
           {options.length} options
         </span>
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-2xl border border-primary/15 bg-background/25 px-6 py-6 text-center text-lg leading-relaxed">
+        <div className="rounded-2xl border border-border bg-background/25 px-6 py-6 text-center text-lg leading-relaxed">
           {prompt}
         </div>
 
@@ -169,8 +169,8 @@ export function MCQMode({
                 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
                 : isSelected
                   ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-200'
-                  : 'border-primary/10 bg-card/20 text-muted-foreground'
-              : 'border-primary/10 bg-card/20 text-foreground hover:border-primary/25 hover:bg-card/40';
+                  : 'border-border bg-card/20 text-muted-foreground'
+              : 'border-border bg-card/20 text-foreground hover:border-border-strong hover:bg-card/40';
 
             return (
               <button
@@ -197,7 +197,7 @@ export function MCQMode({
         </div>
 
         {resolved ? (
-          <div className="space-y-4 rounded-2xl border border-primary/10 bg-card/20 p-4">
+          <div className="space-y-4 rounded-2xl border border-border bg-card/20 p-4">
             <div className="flex items-start gap-3 text-sm">
               {wasCorrect ? (
                 <CircleCheckBig className="mt-0.5 h-5 w-5 text-emerald-400" />

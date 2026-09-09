@@ -19,8 +19,8 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
       <div
         className={`flex items-center gap-2 rounded-xl border bg-card/40 backdrop-blur-sm px-3 py-2 transition-all duration-200 ${
           focused
-            ? 'border-primary ring-[3px] ring-glow shadow-[0_0_16px_-2px_var(--glow)]'
-            : 'border-input/50 dark:border-primary/15'
+            ? 'border-border-strong ring-[2px] ring-ring'
+            : 'border-input/50 '
         }`}
       >
         <Search className="h-4 w-4 shrink-0 text-muted-foreground" />

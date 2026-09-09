@@ -3,96 +3,232 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ *  Obsidian Telemetry — token layer
+ *  Spec: COGNIT_DESIGN_SYSTEM.md §2 (colour), §3 (type), §4 (space/radius/z)
+ *
+ *  Two layers live here:
+ *
+ *  1. The design-system tokens (--bg, --surface, --ink*, --border*, --state-*).
+ *     These are the source of truth. New code reads these.
+ *
+ *  2. A compatibility layer that aliases the inherited shadcn names
+ *     (--background, --card, --primary, --muted-foreground …) onto layer 1.
+ *     ~9,800 LOC of existing utility classes resolve through these aliases, so
+ *     redefining them re-skins the whole app without touching a call site.
+ *     The aliases are retired component-by-component in later phases.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-poppins);
-  --font-display: var(--font-orbitron);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
+  /* Type (§3.1) — role assignments are hard; see the note in layout.tsx */
+  --font-sans: var(--font-geist-sans), 'Inter', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --font-mono: var(--font-geist-mono), 'SF Mono', ui-monospace, Menlo, monospace;
+  --font-serif: var(--font-instrument-serif), 'Iowan Old Style', Georgia, serif;
+
+  /* Design-system colour names */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
   --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --color-neon: var(--neon);
-  --color-neon-foreground: var(--neon-foreground);
-  --color-glow: var(--glow);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
+  --color-border-strong: var(--border-strong);
+  --color-border-control: var(--border-control);
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-ink-dimmer: var(--ink-dimmer);
+  --color-ink-faint: var(--ink-faint);
+
+  /* The state channel — the only source of hue in the product (§2.2) */
+  --color-state-due: var(--state-due);
+  --color-state-learning: var(--state-learning);
+  --color-state-mastered: var(--state-mastered);
+  --color-state-lapsed: var(--state-lapsed);
+  --color-state-streak: var(--state-streak);
+  --color-state-neutral: var(--state-neutral);
+
+  /* Inherited shadcn names, re-pointed at the ramps above */
+  --color-background: var(--bg);
+  --color-foreground: var(--ink);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--ink);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--ink);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-ink);
+  --color-secondary: var(--surface-raised);
+  --color-secondary-foreground: var(--ink);
+  --color-muted: var(--surface-raised);
+  --color-muted-foreground: var(--ink-dim);
+  --color-destructive: var(--state-lapsed);
+  --color-ring: var(--accent);
+  --color-input: var(--border-control);
+  /*
+   * shadcn's "accent" is a subtle hover *fill*, not this system's ink accent —
+   * a name collision. It maps to --surface-raised so `hover:bg-accent` keeps
+   * working (design spec §7.2 `.btn:hover`). The ink accent stays on --accent.
+   */
+  --color-accent: var(--surface-raised);
+  --color-accent-foreground: var(--ink);
+
+  /*
+   * Radius (§4.2): three steps by role, no fourth. The inherited scale is
+   * collapsed onto them so the 208 existing `rounded-*` call sites land on a
+   * legal value instead of inventing a fifth.
+   */
+  --radius-sm: var(--radius-control);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-container);
+  --radius-xl: var(--radius-container);
+  --radius-2xl: var(--radius-container);
+  --radius-3xl: var(--radius-container);
+  --radius-4xl: var(--radius-container);
 }
 
-/* ─── Light Mode: "Clean Paper" ─── */
+/*
+ * ─── Structural tokens — theme-independent (§4.2, §4.4) ───
+ */
 :root {
-  --radius: 0.625rem;
-  color-scheme: light;
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: rgba(255, 255, 255, 0.7);
-  --card-foreground: #0f172a;
-  --popover: rgba(255, 255, 255, 0.85);
-  --popover-foreground: #0f172a;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #e2e8f0;
-  --secondary-foreground: #1e293b;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #ede9fe;
-  --accent-foreground: #1e293b;
-  --destructive: #ef4444;
-  --border: rgba(15, 23, 42, 0.12);
-  --input: rgba(15, 23, 42, 0.12);
-  --ring: #3b82f6;
-  --neon: #6366f1;
-  --neon-foreground: #ffffff;
-  --glow: rgba(99, 102, 241, 0.25);
-  --shadow-base: rgba(15, 23, 42, 0.14); /* Lighter shadow for light mode */
-  --skeleton-base: rgba(148, 163, 184, 0.2);
-  --skeleton-shine: rgba(99, 102, 241, 0.24);
+  /* Radius — three steps, assigned by role */
+  --radius-control: 2px;    /* buttons, inputs, keys, keycaps, ticks */
+  --radius-container: 6px;  /* panels, bands, cards, modals          */
+  --radius-pill: 999px;     /* avatars only                          */
+  --radius: var(--radius-container);
+
+  /* Z-scale — the single source of stacking order. This is the fix for F-01.
+     Never write a raw z-50 again; if a new layer is needed, add a token here. */
+  --z-rail: 20;      /* left navigation rail            */
+  --z-sticky: 40;    /* sticky headers, progress bars   */
+  --z-overlay: 100;  /* scrims, pause overlay           */
+  --z-modal: 110;    /* dialogs above their scrim       */
+  --z-toast: 120;    /* sonner                          */
+  --z-skip: 200;     /* skip-to-content                 */
+
+  /* Motion (§5) — instruments do not bounce. One spring survives, in JS. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-focus: 90ms;
+  --dur-hover: 120ms;
+  --dur-key: 70ms;
+  --dur-panel: 160ms;
+  --dur-flip: 340ms;
 }
 
-/* ─── Dark Mode: "Deep Navy" (#020617) ─── */
+/*
+ * ─── Light — its own composition, not an inversion (§2.1).
+ *     Surfaces go *lighter* than the ground; elevation is a hairline drop
+ *     shadow because a chamfer is invisible on white. ───
+ */
+:root {
+  color-scheme: light;
+
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-raised: #f4f4f5;
+
+  --border: #e4e4e7;          /* decorative divider          · 1.23:1 */
+  --border-strong: #d4d4d8;   /* enclosure, hover edge       · 1.43:1 */
+  --border-control: #8a8a93;  /* interactive edge · 3.31:1 — WCAG 1.4.11 */
+
+  --ink: #18181b;             /* 17.13:1 · AAA */
+  --ink-dim: #52525b;         /*  7.47:1 · AAA */
+  --ink-dimmer: #71717a;      /*  4.67:1 · AA  */
+  --ink-faint: #a1a1aa;       /*  2.48:1 · NON-TEXT ONLY */
+
+  --accent: #18181b;
+  --accent-ink: #ffffff;
+
+  --elevate: 0 1px 2px rgb(24 24 27 / 0.06);
+  --key-face: linear-gradient(180deg, #ffffff, #f4f4f5);
+  --key-edge: 0 1px 0 #d4d4d8;
+
+  /* State channel (§2.2) — the only hue in the product */
+  --state-due: #c2410c;
+  --state-learning: #a16207;
+  --state-mastered: #15803d;
+  --state-lapsed: #b91c1c;
+  --state-streak: #b45309;
+  --state-neutral: var(--ink);
+
+  /* Compatibility aliases */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-raised);
+  --muted-foreground: var(--ink-dim);
+  --accent-foreground: var(--ink);
+  --destructive: var(--state-lapsed);
+  --input: var(--border-control);
+  --ring: var(--accent);
+
+  --shadow-base: rgb(24 24 27 / 0.06);
+  --skeleton-base: #f4f4f5;
+  --skeleton-shine: rgb(24 24 27 / 0.05);
+}
+
+/*
+ * ─── Dark — the default and the design's home (§2.1).
+ *     Elevation is an inner 1px top highlight: a physical chamfer catching
+ *     light from above. ───
+ */
 .dark {
   color-scheme: dark;
-  --background: #020617;
-  --foreground: #e2e8f0;
-  --card: rgba(15, 23, 42, 0.6);
-  --card-foreground: #e2e8f0;
-  --popover: rgba(15, 23, 42, 0.85);
-  --popover-foreground: #e2e8f0;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: rgba(30, 41, 59, 0.6);
-  --secondary-foreground: #e2e8f0;
-  --muted: rgba(30, 41, 59, 0.5);
-  --muted-foreground: #94a3b8;
-  --accent: rgba(99, 102, 241, 0.15);
-  --accent-foreground: #e2e8f0;
-  --destructive: #f87171;
-  --border: rgba(99, 102, 241, 0.12);
-  --input: rgba(99, 102, 241, 0.12);
-  --ring: #6366f1;
-  --neon: #818cf8;
-  --neon-foreground: #020617;
-  --glow: rgba(129, 140, 248, 0.35);
-  --shadow-base: rgba(0, 0, 0, 0.35); /* Darker shadow for dark mode */
-  --skeleton-base: rgba(148, 163, 184, 0.18);
-  --skeleton-shine: rgba(129, 140, 248, 0.22);
+
+  --bg: #09090b;
+  --surface: #131316;
+  --surface-raised: #1f1f23;
+
+  --border: #27272a;          /* decorative divider          · 1.34:1 */
+  --border-strong: #3f3f46;   /* enclosure, hover edge       · 1.91:1 */
+  --border-control: #63636d;  /* interactive edge · 3.35:1 — WCAG 1.4.11 */
+
+  --ink: #fafafa;             /* 19.06:1 · AAA */
+  --ink-dim: #a1a1aa;         /*  7.76:1 · AAA */
+  --ink-dimmer: #82828b;      /*  5.22:1 · AA  */
+  --ink-faint: #52525b;       /*  2.57:1 · NON-TEXT ONLY */
+
+  --accent: #fafafa;
+  --accent-ink: #09090b;
+
+  --elevate: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --key-face: linear-gradient(180deg, #1f1f23, #131316);
+  --key-edge: 0 1px 0 #000;
+
+  /* State channel (§2.2) */
+  --state-due: #fb923c;
+  --state-learning: #facc15;
+  --state-mastered: #4ade80;
+  --state-lapsed: #f87171;
+  --state-streak: #ffb020;
+  --state-neutral: var(--ink);
+
+  /* Compatibility aliases */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
+  --secondary: var(--surface-raised);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface-raised);
+  --muted-foreground: var(--ink-dim);
+  --accent-foreground: var(--ink);
+  --destructive: var(--state-lapsed);
+  --input: var(--border-control);
+  --ring: var(--accent);
+
+  --shadow-base: rgb(0 0 0 / 0.4);
+  --skeleton-base: #1f1f23;
+  --skeleton-shine: rgb(255 255 255 / 0.045);
 }
 
 @layer base {
@@ -101,6 +237,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* 14px base — application chrome is dense by design (§3.3) */
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  h1, h2, h3, h4 {
+    text-wrap: balance;
   }
 }
 
@@ -109,9 +251,9 @@
 .theme-transitioning *,
 .theme-transitioning *::before,
 .theme-transitioning *::after {
-  transition-property: background-color, color, border-color, box-shadow, fill, stroke, text-shadow, opacity, backdrop-filter;
+  transition-property: background-color, color, border-color, box-shadow, fill, stroke, opacity, backdrop-filter;
   transition-duration: 280ms;
-  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-timing-function: var(--ease-out);
   transition-delay: 0ms;
   /*
    * Scoped to direct children only — applying will-change to every * node
@@ -128,28 +270,22 @@
   will-change: background-color, color;
 }
 
+/* A neutral cross-fade between the two grounds — no tint, no glow. */
 .theme-fade-overlay {
   position: fixed;
   inset: 0;
-  z-index: 140;
+  z-index: var(--z-overlay);
   pointer-events: none;
   opacity: 0;
-  will-change: opacity, backdrop-filter, background;
-  background:
-    radial-gradient(circle at top center, color-mix(in srgb, var(--glow) 45%, transparent) 0%, transparent 48%),
-    linear-gradient(to bottom, color-mix(in srgb, var(--background) 52%, transparent), color-mix(in srgb, var(--background) 76%, transparent));
-  backdrop-filter: blur(0px) saturate(1);
-  -webkit-backdrop-filter: blur(0px) saturate(1);
+  will-change: opacity, background;
+  background: var(--bg);
   transition:
-    opacity 180ms cubic-bezier(0.22, 1, 0.36, 1),
-    backdrop-filter 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    background 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 180ms var(--ease-out),
+    background 320ms var(--ease-out);
 }
 
 .theme-fade-overlay.is-visible {
-  opacity: 0.58;
-  backdrop-filter: blur(10px) saturate(1.03);
-  -webkit-backdrop-filter: blur(10px) saturate(1.03);
+  opacity: 0.5;
 }
 
 /* Stop the overlay entirely for reduced-motion users */
@@ -159,73 +295,200 @@
   }
 }
 
-/* ─── Glow title: gamified display font with neon text-shadow ─── */
-.glow-title {
-  font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  text-shadow: 0 0 12px var(--glow), 0 0 40px rgba(99, 102, 241, 0.12);
-}
-
-.dark .glow-title {
-  text-shadow: 0 0 14px var(--glow), 0 0 60px rgba(129, 140, 248, 0.18),
-    0 0 100px rgba(129, 140, 248, 0.06);
-}
-
-/* ─── Grain Texture Overlay ─── */
-.grain-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.035;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 200px 200px;
-}
-
-/* ─── Glassmorphism Card ─── */
-.glass-card {
-  background: var(--card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+/*
+ * ─── Surface (§7.1) — the replacement for .glass-card.
+ *     Opaque ground, one 1px rule, one chamfer. No blur: it degrades text
+ *     contrast and costs compositing on the study canvas.
+ */
+.surface {
+  background: var(--surface);
   border: 1px solid var(--border);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.05),
-              0 4px 16px -4px var(--shadow-base);
-  transition: border-color 180ms ease, box-shadow 180ms ease;
+  border-radius: var(--radius-container);
+  box-shadow: var(--elevate);
 }
 
-.glass-card:hover {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 1px var(--glow),
-              0 8px 24px -6px var(--shadow-base),
-              0 0 16px -4px var(--glow);
+/* Only interactive surfaces get a hover. A static panel that lights up is noise. */
+.surface--interactive {
+  transition: border-color var(--dur-hover) ease;
+}
+.surface--interactive:hover {
+  border-color: var(--border-strong);
 }
 
-/* ─── Neon glow focus for inputs ─── */
-.neon-focus:focus,
-.neon-focus:focus-visible {
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 3px var(--glow),
-              0 0 20px -4px var(--glow) !important;
-  outline: none !important;
+/*
+ * .glass-card is redefined in place rather than renamed, so all 57 call sites
+ * change appearance without being edited (execution plan, Phase 1 risk note).
+ * Radius is deliberately NOT set here: these rules are unlayered and would
+ * override the `rounded-*` utility each call site already carries — and that
+ * utility now resolves to a legal step of the three-radius scale anyway.
+ */
+.glass-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--elevate);
 }
 
-/* ─── Neon glow on focus-within for containers ─── */
-.glow-border {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+/*
+ * ─── Kbd (§7.3) ───
+ * Cognit is a keyboard instrument with eight bindings and used to render two
+ * keycaps, both hidden below `sm`. A keycap is bound to the control it
+ * triggers and is never hidden responsively — a mobile user with a hardware
+ * keyboard benefits from knowing the binding exists.
+ */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 1px 4px;
+  min-width: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.glow-border:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 0 16px -4px var(--glow),
-              0 4px 12px -4px var(--shadow-base);
+/*
+ * ─── Corner brackets (§7.7) ───
+ * The system's focus idiom: four 14px corners drawn on the element's bounds.
+ * Never a glowing ring. The 90ms linear travel is deliberate — a spring here
+ * would read as decoration rather than as a reticle acquiring a target.
+ */
+.brk {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-strong);
+  transition: border-color var(--dur-focus) linear;
+  pointer-events: none;
+}
+.brk--tl { top: 0; left: 0;     border-right: 0; border-bottom: 0; }
+.brk--tr { top: 0; right: 0;    border-left: 0;  border-bottom: 0; }
+.brk--bl { bottom: 0; left: 0;  border-right: 0; border-top: 0; }
+.brk--br { bottom: 0; right: 0; border-left: 0;  border-top: 0; }
+
+/*
+ * ─── Grade key (§7.4) — the tactile exception ───
+ * The one place the flat system yields. Grading happens ~50 times a session,
+ * by hand, under time pressure; a flat 1px cell gives no confirmation that the
+ * press registered.
+ */
+.key {
+  position: relative;
+  background: var(--key-face);
+  border: 1px solid var(--border-control);
+  border-top-color: var(--border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: var(--elevate), var(--key-edge);
+  padding: 11px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform var(--dur-key) ease, box-shadow var(--dur-key) ease;
+}
+
+/* 2px state edge along the top — the key's only hue */
+.key::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--key-state);
+}
+
+/* "Detent": 1px travel, and the chamfer inverts to an inner shadow. */
+.key:active,
+.key[data-down='true'] {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 5px rgb(0 0 0 / 0.5);
+}
+
+.key:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.key:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.key .kn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.key .ki {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The keycap digit: --ink-dimmer, never --ink-faint, which fails as text. */
+.key .kk {
+  position: absolute;
+  top: 8px;
+  left: 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-dimmer);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Touch targets are 64px tall on mobile (§9). */
+@media (max-width: 640px) {
+  .key {
+    min-height: 64px;
+    justify-content: center;
+  }
+}
+
+/*
+ * The interval readout rolls like an odometer when it changes: each digit
+ * translates up through a masked track over 180ms, staggered 20ms.
+ */
+.odo {
+  display: inline-flex;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.odo__d {
+  display: inline-block;
+  animation: odo-roll 180ms var(--ease-out) both;
+  animation-delay: calc(var(--odo-i, 0) * 20ms);
+}
+
+@keyframes odo-roll {
+  from { transform: translateY(105%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .key {
+    transition: none;
+  }
+  .odo__d {
+    animation: none;
+  }
 }
 
 .glass-skeleton {
   position: relative;
   overflow: hidden;
   background: var(--skeleton-base);
-  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border: 1px solid var(--border);
 }
 
 .glass-skeleton::after {
@@ -234,7 +497,7 @@
   inset: 0;
   background: linear-gradient(110deg, transparent 18%, var(--skeleton-shine) 50%, transparent 82%);
   transform: translateX(-120%);
-  animation: glass-shimmer 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  animation: glass-shimmer 1.8s var(--ease-out) infinite;
 }
 
 @keyframes glass-shimmer {
@@ -243,29 +506,12 @@
   }
 }
 
-/*
- * Named orb pulse animation — used on background gradient blobs in layout.tsx.
- * Using a named class (instead of Tailwind animate-pulse) lets the CSS
- * prefers-reduced-motion guard target it before JS hydration.
- */
-@keyframes orb-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
-}
-
-.bg-orb-pulse {
-  animation: orb-pulse 6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
 .sonner-toast {
-  background: var(--card) !important;
-  color: var(--card-foreground) !important;
-  border: 1px solid rgba(99, 102, 241, 0.25) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.1),
-              0 8px 32px -8px var(--shadow-base),
-              0 0 24px -10px var(--glow) !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  border: 1px solid var(--border-strong) !important;
+  border-radius: var(--radius-container) !important;
+  box-shadow: var(--elevate), 0 8px 24px -12px var(--shadow-base) !important;
 }
 
 .sonner-toast [data-title] {
@@ -273,7 +519,7 @@
 }
 
 .sonner-toast [data-description] {
-  color: var(--muted-foreground) !important;
+  color: var(--ink-dim) !important;
 }
 
 @utility perspective-1000 {
@@ -313,6 +559,12 @@
   contain-intrinsic-size: auto 600px;
 }
 
+/* Every column of digits gets tabular figures — no exceptions (§3.3). */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
 /* ─── Reduced motion ─── */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -337,33 +589,27 @@
     will-change: auto;
   }
 
-  /* Kill the background orbs entirely at the CSS level — JS may not be
-     hydrated yet when the page first paints, so we need a CSS guard too. */
-  .bg-orb-pulse {
-    animation: none !important;
-  }
-
   .glass-skeleton::after {
     animation: none;
   }
 }
 
-/* ─── Dark scrollbar ─── */
-.dark ::-webkit-scrollbar {
+/* ─── Scrollbars — zinc, in both themes ─── */
+::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-.dark ::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.25);
-  border-radius: 999px;
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
 }
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.4);
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-control);
 }
-.dark {
-  scrollbar-color: rgba(99, 102, 241, 0.25) transparent;
+html {
+  scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;
 }

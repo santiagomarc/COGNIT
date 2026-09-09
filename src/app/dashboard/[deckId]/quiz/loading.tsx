@@ -26,7 +26,7 @@ export default function QuizLoading() {
       </div>
 
       <div className="relative mx-auto h-[24rem] w-full max-w-2xl">
-        <div className="glass-card glow-border absolute inset-0 rounded-3xl p-7">
+        <div className="glass-card absolute inset-0 rounded-3xl p-7">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <div className="glass-skeleton h-1.5 w-1.5 rounded-full" />

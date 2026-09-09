@@ -98,8 +98,8 @@ export function IdentificationMode({
   }
 
   return (
-    <div className="glass-card glow-border rounded-3xl p-7">
-      <div className="mb-4 flex items-center justify-between gap-3 text-xs uppercase tracking-wider text-muted-foreground">
+    <div className="glass-card rounded-3xl p-7">
+      <div className="mb-4 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
         <span>Identification Prompt</span>
         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${card.id_question ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
           {promptStatusLabel}
@@ -111,18 +111,18 @@ export function IdentificationMode({
       </p>
 
       <div className="space-y-4">
-        <div className="rounded-2xl border border-primary/15 bg-background/25 px-6 py-6 text-center text-lg leading-relaxed">
+        <div className="rounded-2xl border border-border bg-background/25 px-6 py-6 text-center text-lg leading-relaxed">
           {prompt}
         </div>
 
         {enrichmentPending && !card.id_question ? (
-          <div className="rounded-xl border border-primary/10 bg-card/20 px-4 py-3 text-sm text-muted-foreground">
+          <div className="rounded-xl border border-border bg-card/20 px-4 py-3 text-sm text-muted-foreground">
             AI is preparing a cleaner question-style clue for this card. You can still answer using the saved description right now.
           </div>
         ) : null}
 
         {result ? (
-          <div className="space-y-4 rounded-2xl border border-primary/10 bg-card/20 p-4">
+          <div className="space-y-4 rounded-2xl border border-border bg-card/20 p-4">
             <div className="flex items-start gap-3">
               {result.grade === 'again' ? (
                 <CircleAlert className="mt-0.5 h-5 w-5 text-red-400" />
@@ -137,7 +137,7 @@ export function IdentificationMode({
                   <span className="font-semibold text-foreground">Correct term:</span> {card.front}
                 </p>
                 <p className="text-muted-foreground">
-                  Similarity score: {Math.round(result.score * 100)}%
+                  Similarity score: <span className="font-mono tnum">{Math.round(result.score * 100)}%</span>
                 </p>
               </div>
             </div>

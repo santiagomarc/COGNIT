@@ -45,13 +45,13 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                     <Input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="h-8 w-full neon-focus"
+                        className="h-8 w-full"
                         autoFocus
                     />
                     <select
                         value={accentTag}
                         onChange={(event) => setAccentTag(event.target.value)}
-                        className="neon-focus h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs"
+                        className="h-8 w-full rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                         aria-label="Deck accent tag"
                     >
                         <option value="">No tag</option>

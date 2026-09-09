@@ -165,7 +165,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   return (
     <div className="space-y-4">
       {/* ─── Drop Zone ─── */}
-      <div className="glass-card glow-border relative rounded-2xl p-5 text-card-foreground">
+      <div className="glass-card relative rounded-2xl p-5 text-card-foreground">
         <div className="mb-4 space-y-1">
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -192,10 +192,10 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
             group relative flex min-h-40 cursor-pointer flex-col items-center justify-center
             rounded-xl border-2 border-dashed transition-all duration-300
             ${isDragging
-              ? 'border-primary bg-primary/10 shadow-[0_0_24px_-4px_var(--glow)]'
+              ? 'border-border-strong bg-primary/10'
               : selectedFile
-                ? 'border-primary/40 bg-primary/5'
-                : 'border-primary/20 bg-card/30 hover:border-primary/40 hover:bg-card/50'
+                ? 'border-border-strong bg-primary/5'
+                : 'border-border-strong bg-card/30 hover:border-border-strong hover:bg-card/50'
             }
           `}
         >
@@ -220,7 +220,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               <div className="text-center">
                 <p className="text-sm font-medium">{selectedFile.name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  <span className="font-mono tnum">{(selectedFile.size / 1024 / 1024).toFixed(2)}</span>&nbsp;MB
                 </p>
               </div>
               <button
@@ -268,7 +268,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 id="card-count"
                 value={maxCardChoice}
                 onChange={(e) => setMaxCardChoice(e.target.value)}
-                className="h-8 rounded-lg border border-primary/20 bg-card/60 px-2 text-sm backdrop-blur-sm outline-none focus:border-primary focus:ring-2 focus:ring-glow"
+                className="h-8 rounded-lg border border-border-strong bg-card/60 px-2 text-sm backdrop-blur-sm outline-none focus:border-[var(--border-control)] focus:ring-2 focus:ring-ring"
               >
                 {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>
@@ -346,14 +346,14 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                     stiffness: 260,
                     damping: 20,
                   }}
-                  className="glass-card glow-border rounded-xl p-4"
+                  className="glass-card rounded-xl p-4"
                 >
                   <p className="text-xs font-semibold uppercase tracking-wider text-primary/70 mb-1">
                     Q
                   </p>
                   <p className="text-sm leading-relaxed">{card.front}</p>
-                  <hr className="my-2 border-primary/10" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-neon/70 mb-1">
+                  <hr className="my-2 border-border" />
+                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-dim mb-1">
                     A
                   </p>
                   <p className="text-sm leading-relaxed text-muted-foreground">

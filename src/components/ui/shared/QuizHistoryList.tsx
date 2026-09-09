@@ -23,13 +23,13 @@ function getScoreClass(percentage: number) {
 export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry[]; deckId: string }) {
   if (!history || history.length === 0) {
     return (
-      <Card className="glass-card border-primary/20 mt-8">
+      <Card className="glass-card border-border-strong mt-8">
         <CardContent className="flex flex-col items-center justify-center p-8 text-muted-foreground">
           <Target className="w-12 h-12 mb-4 opacity-50" />
           <p className="text-center">No quiz history yet. Take your first quiz to start your mastery timeline.</p>
           <Link
             href={`/dashboard/${deckId}/quiz?mode=mcq`}
-            className="mt-4 inline-flex items-center rounded-md border border-primary/30 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
+            className="mt-4 inline-flex items-center rounded-md border border-border-strong bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
           >
             Take your first quiz
           </Link>
@@ -50,17 +50,17 @@ export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry
           const date = quizHistoryDateFormatter.format(new Date(result.created_at));
 
           return (
-            <AccordionItem value={result.id} key={result.id} className="glass-card border-primary/20 px-4 rounded-xl">
+            <AccordionItem value={result.id} key={result.id} className="glass-card border-border-strong px-4 rounded-xl">
               <AccordionTrigger className="hover:no-underline">
                 <div className="flex items-center justify-between w-full pr-4">
                   <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${getScoreClass(percentage)}`}>
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-full font-mono text-lg font-semibold tnum ${getScoreClass(percentage)}`}>
                       {percentage}%
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="font-semibold">{result.mode.toUpperCase()} Mode</span>
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> {date}
+                        <Calendar className="w-3 h-3" /> <span className="font-mono tnum">{date}</span>
                       </span>
                     </div>
                   </div>
@@ -70,14 +70,14 @@ export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry
                 </div>
               </AccordionTrigger>
               
-              <AccordionContent className="pt-4 pb-6 border-t border-primary/10">
+              <AccordionContent className="pt-4 pb-6 border-t border-border">
                 {result.incorrect_answers && result.incorrect_answers.length > 0 ? (
                   <div className="space-y-3">
                     <p className="text-sm text-red-400 font-medium mb-2">Needs Review ({result.wrong_count} Missed):</p>
                     {result.incorrect_answers.map((mistake, i) => (
                       <div key={i} className="bg-background/50 p-3 rounded-lg border border-red-500/20 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                          <span className="inline-flex items-center rounded-full border border-border-strong bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
                             {mistake.card_number ? `Card #${mistake.card_number}` : 'Card #?'}
                           </span>
                           <p className="text-sm font-medium">{mistake.prompt}</p>

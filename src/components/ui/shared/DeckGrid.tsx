@@ -9,17 +9,17 @@ import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
 import { FadeInUp } from '@/components/motion';
 import { m, AnimatePresence } from 'framer-motion';
 import { getDeckTagGlowColor, parseDeckTitleMetadata } from '@/lib/deck-tags';
-import { getCappedStaggerDelay, motionSprings } from '@/lib/motion-configs';
+import { getCappedStaggerDelay, motionTransitions } from '@/lib/motion-configs';
 
 function getMasteryBadgeClass(masteryPercentage: number) {
   if (masteryPercentage >= 85) return 'border-sky-500/30 bg-sky-500/15 text-sky-700 dark:text-sky-300';
   if (masteryPercentage >= 60) return 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
   if (masteryPercentage >= 30) return 'border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300';
-  return 'border-primary/20 bg-primary/5 text-primary';
+  return 'border-border-strong bg-primary/5 text-primary';
 }
 
 function getMasteryGlowColor(masteryPercentage: number, assessedCards: number) {
-  if (assessedCards === 0) return 'var(--glow)';
+  if (assessedCards === 0) return 'var(--ink-faint)';
   if (masteryPercentage >= 85) return 'rgba(56, 189, 248, 0.38)';
   if (masteryPercentage >= 60) return 'rgba(16, 185, 129, 0.35)';
   if (masteryPercentage >= 30) return 'rgba(245, 158, 11, 0.34)';
@@ -124,7 +124,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
           </div>
 
           <div
-            className="inline-flex self-start rounded-xl border border-primary/20 bg-card/60 p-1 backdrop-blur-sm"
+            className="inline-flex self-start rounded-xl border border-border-strong bg-card/60 p-1 backdrop-blur-sm"
             role="group"
             aria-label="Deck sort mode"
           >
@@ -132,7 +132,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
               type="button"
               onClick={() => setSortMode('newest')}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${sortMode === 'newest'
-                ? 'bg-primary/15 text-primary shadow-[0_0_10px_-3px_var(--glow)]'
+                ? 'bg-primary/15 text-primary'
                 : 'text-muted-foreground hover:text-foreground'}`}
               aria-pressed={sortMode === 'newest'}
             >
@@ -142,7 +142,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
               type="button"
               onClick={() => setSortMode('most-studied')}
               className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${sortMode === 'most-studied'
-                ? 'bg-primary/15 text-primary shadow-[0_0_10px_-3px_var(--glow)]'
+                ? 'bg-primary/15 text-primary'
                 : 'text-muted-foreground hover:text-foreground'}`}
               aria-pressed={sortMode === 'most-studied'}
             >
@@ -155,14 +155,14 @@ export function DeckGrid({ decks }: DeckGridProps) {
       {/* Deck list */}
       {localDecks.length === 0 ? (
         <FadeInUp delay={0.2}>
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/20 bg-card/40 backdrop-blur-md p-8 text-center">
+          <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border-strong bg-card/40 backdrop-blur-md p-8 text-center">
             <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground">No decks yet. Create one to get started!</p>
           </div>
         </FadeInUp>
       ) : filtered.length === 0 ? (
         <FadeInUp>
-          <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-primary/15 bg-card/30 backdrop-blur-md p-6 text-center">
+          <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/30 backdrop-blur-md p-6 text-center">
             <p className="text-sm text-muted-foreground">
               No decks match &ldquo;{search}&rdquo;
             </p>
@@ -188,12 +188,12 @@ export function DeckGrid({ decks }: DeckGridProps) {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.96, y: -24 }}
                   transition={{
-                    ...motionSprings.listItem,
+                    ...motionTransitions.panel,
                     delay: getCappedStaggerDelay(i),
                   }}
                 >
                   <Card
-                    className="glass-card glow-border group relative rounded-2xl transition-all duration-300 hover:shadow-[0_0_30px_-10px_var(--deck-glow)]"
+                    className="glass-card group relative rounded-2xl transition-all duration-300 hover:shadow-[0_0_30px_-10px_var(--deck-glow)]"
                     style={deckStyle}
                   >
                     <CardHeader>
@@ -206,12 +206,12 @@ export function DeckGrid({ decks }: DeckGridProps) {
                           {cleanTitle}
                         </CardTitle>
                         <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
-                          <span>{deckDateFormatter.format(new Date(modifiedAt))}</span>
-                          <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
-                            {cardCount} card{cardCount !== 1 ? 's' : ''}
+                          <span className="font-mono tnum">{deckDateFormatter.format(new Date(modifiedAt))}</span>
+                          <span className="inline-flex items-center rounded-full border border-border-strong bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
+                            <span className="font-mono tnum">{cardCount}</span>&nbsp;card{cardCount !== 1 ? 's' : ''}
                           </span>
                           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getMasteryBadgeClass(deck.masteryPercentage)}`}>
-                            {deck.assessedCards > 0 ? `${deck.masteryPercentage}% mastery` : 'No quiz data'}
+                            {deck.assessedCards > 0 ? <><span className="font-mono tnum">{deck.masteryPercentage}%</span>&nbsp;mastery</> : 'No quiz data'}
                           </span>
                           {tag ? (
                             <span

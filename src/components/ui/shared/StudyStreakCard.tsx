@@ -2,9 +2,8 @@
 
 import { m, useReducedMotion } from 'framer-motion';
 import { Flame, Target, Trophy } from 'lucide-react';
-import { type CSSProperties } from 'react';
 import { ActivityHeatmap } from './ActivityHeatmap';
-import { motionSprings } from '@/lib/motion-configs';
+import { motionTransitions } from '@/lib/motion-configs';
 
 type StudyStreakCardProps = {
   streak: number;
@@ -62,35 +61,21 @@ export function StudyStreakCard({
           100,
           Math.round(((totalStudiedCards - level.min) / (nextLevelTarget - level.min)) * 100),
         );
-  const streakGlow =
-    streak >= 45
-      ? 'rgba(244, 63, 94, 0.32)'
-      : streak >= 21
-        ? 'rgba(251, 146, 60, 0.33)'
-        : streak >= 7
-          ? 'rgba(245, 158, 11, 0.3)'
-          : 'rgba(129, 140, 248, 0.24)';
-
   return (
     <m.div
       initial={false}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={reduced ? { duration: 0 } : { ...motionSprings.listItem, delay: 0.05 }}
-      className="glass-card glow-border rounded-2xl p-5 md:p-6"
+      transition={reduced ? { duration: 0 } : { ...motionTransitions.panel, delay: 0.05 }}
+      className="glass-card rounded-2xl p-5 md:p-6"
     >
-      <div
-        className="relative overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-br from-primary/10 via-background to-background p-4 md:p-5"
-        style={{ '--streak-glow': streakGlow } as CSSProperties}
-      >
-        <div className="pointer-events-none absolute inset-0 opacity-80 [background:radial-gradient(90%_70%_at_8%_8%,var(--streak-glow),transparent_64%)]" />
-        <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/15 blur-xl" />
-        <div className="pointer-events-none absolute -left-12 bottom-0 h-28 w-28 rounded-full bg-[var(--streak-glow)] blur-2xl" />
-
+      {/* Flat ground: the two blur orbs and the radial gradient wash that used
+          to sit here were the loudest AI-template tell in the dashboard. */}
+      <div className="relative overflow-hidden rounded-xl border border-border bg-surface-raised p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
-                active ? 'bg-orange-500/15 border-orange-500/30' : 'bg-muted/20 border-primary/15'
+                active ? 'bg-orange-500/15 border-orange-500/30' : 'bg-muted/20 border-border'
               }`}
             >
               <m.div
@@ -121,33 +106,33 @@ export function StudyStreakCard({
                 Study Activity
               </h3>
               <div className="mt-1 flex items-baseline gap-2">
-                <span className="glow-title text-3xl md:text-4xl font-extrabold tracking-tight">{streak}</span>
+                <span className="font-mono text-3xl font-semibold tracking-[-.03em] tnum text-[var(--state-streak)]">{streak}</span>
                 <span className="text-sm text-muted-foreground">day streak</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-primary/10 px-3 py-2">
             <Trophy className="h-4 w-4 text-primary" />
             <div>
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Level</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Level</p>
               <p className="text-sm font-semibold">{level.name}</p>
             </div>
           </div>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-primary/10 bg-background/60 px-3 py-2">
+          <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
             <p className="text-xs text-muted-foreground">Longest Streak</p>
-            <p className="text-lg font-bold tracking-tight">{longestStreak} days</p>
+            <p className="text-lg font-semibold tracking-[-.03em]"><span className="font-mono tnum">{longestStreak}</span> days</p>
           </div>
-          <div className="rounded-lg border border-primary/10 bg-background/60 px-3 py-2">
+          <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
             <p className="text-xs text-muted-foreground">Cards Studied</p>
-            <p className="text-lg font-bold tracking-tight">{totalStudiedCards}</p>
+            <p className="font-mono text-lg font-semibold tracking-[-.03em] tnum">{totalStudiedCards}</p>
           </div>
-          <div className="rounded-lg border border-primary/10 bg-background/60 px-3 py-2">
+          <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
             <p className="text-xs text-muted-foreground">Today</p>
-            <p className="text-lg font-bold tracking-tight">{todayStudiedCount}</p>
+            <p className="font-mono text-lg font-semibold tracking-[-.03em] tnum">{todayStudiedCount}</p>
           </div>
         </div>
 
@@ -156,16 +141,16 @@ export function StudyStreakCard({
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
                 <Target className="h-3.5 w-3.5" />
-                Daily goal: {dailyGoal} cards
+                Daily goal: <span className="font-mono tnum">{dailyGoal}</span>&nbsp;cards
               </span>
-              <span>{dailyGoalProgress}%</span>
+              <span className="font-mono tnum">{dailyGoalProgress}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted/50">
               <m.div
                 initial={reduced ? undefined : { width: 0 }}
                 animate={{ width: `${dailyGoalProgress}%` }}
-                transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
-                className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-primary"
+                transition={reduced ? { duration: 0 } : motionTransitions.panel}
+                className="h-full rounded-full bg-ink-dim"
               />
             </div>
           </div>
@@ -173,21 +158,21 @@ export function StudyStreakCard({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Progress to next level</span>
-              <span>{nextLevelTarget === null ? 'MAX' : `${totalStudiedCards}/${nextLevelTarget}`}</span>
+              <span className="font-mono tnum">{nextLevelTarget === null ? 'MAX' : `${totalStudiedCards}/${nextLevelTarget}`}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-muted/50">
               <m.div
                 initial={reduced ? undefined : { width: 0 }}
                 animate={{ width: `${levelProgress}%` }}
-                transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
-                className="h-full rounded-full bg-gradient-to-r from-primary to-sky-400"
+                transition={reduced ? { duration: 0 } : motionTransitions.panel}
+                className="h-full rounded-full bg-ink-dim"
               />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-primary/15 bg-card/40 p-4">
+      <div className="mt-5 rounded-xl border border-border bg-card/40 p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <h4 className="text-sm font-semibold tracking-tight">Daily Activity Tracker</h4>
           {!studiedToday ? (

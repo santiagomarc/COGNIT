@@ -47,7 +47,7 @@ export function HintButton({ cardId, deckId, disabled = false }: HintButtonProps
         The hint is AI-generated from the card&apos;s answer and description, and it tries not to reveal the term directly.
       </p>
       {hint ? (
-        <div className="rounded-xl border border-primary/15 bg-card/30 px-3 py-2 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-border bg-card/30 px-3 py-2 text-sm text-muted-foreground">
           {hint}
         </div>
       ) : null}

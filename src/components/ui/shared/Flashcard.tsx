@@ -21,21 +21,21 @@ export function Flashcard({ question, answer }: FlashcardProps) {
       isFlipped={isFlipped}
       onFlip={() => setIsFlipped((prev) => !prev)}
       front={
-        <div className="h-full rounded-2xl border border-primary/20 bg-card/60 p-6 text-card-foreground shadow-lg backdrop-blur-xl transition-shadow duration-300 group-hover:shadow-[0_0_24px_-4px_var(--glow)]">
+        <div className="h-full rounded-2xl border border-border-strong bg-card/60 p-6 text-card-foreground shadow-lg backdrop-blur-xl">
           <div className="mb-3 flex items-center gap-2">
             <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
             <p className="text-xs font-semibold uppercase tracking-widest text-primary/80">Question</p>
           </div>
-          <p className="line-clamp-6 text-base leading-relaxed">{question}</p>
+          <p className="line-clamp-6 font-serif text-lg leading-[1.32]">{question}</p>
         </div>
       }
       back={
-        <div className="h-full rounded-2xl border border-neon/30 bg-card/60 p-6 text-card-foreground shadow-lg backdrop-blur-md transition-shadow duration-300 group-hover:shadow-[0_0_24px_-4px_var(--glow)]">
+        <div className="h-full rounded-2xl border border-border-strong bg-card/60 p-6 text-card-foreground shadow-lg backdrop-blur-md">
           <div className="mb-3 flex items-center gap-2">
-            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-neon" />
-            <p className="text-xs font-semibold uppercase tracking-widest text-neon/80">Answer</p>
+            <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+            <p className="text-xs font-semibold uppercase tracking-widest text-ink-dim">Answer</p>
           </div>
-          <p className="line-clamp-6 text-base leading-relaxed text-foreground/90">{answer}</p>
+          <p className="line-clamp-6 font-serif text-lg leading-[1.32] text-foreground/90">{answer}</p>
         </div>
       }
     />

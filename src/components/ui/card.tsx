@@ -7,7 +7,11 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card/60 backdrop-blur-md text-card-foreground flex flex-col gap-6 rounded-xl border border-primary/10 py-6 shadow-sm",
+        // The opaque surface recipe (design system §7.1). Deliberately not
+        // translucent: backdrop-blur degrades text contrast and costs
+        // compositing on the study canvas, and when every container is
+        // translucent none of them reads as elevated.
+        "surface text-card-foreground flex flex-col gap-6 py-6",
         className
       )}
       {...props}

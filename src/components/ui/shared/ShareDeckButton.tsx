@@ -72,8 +72,8 @@ export function ShareDeckButton({ deckId, initialToken }: ShareDeckButtonProps) 
   }
 
   return (
-    <div className="w-full space-y-2 rounded-xl border border-primary/15 bg-card/30 p-3">
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+    <div className="w-full space-y-2 rounded-xl border border-border bg-card/30 p-3">
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
         Anyone with this link can view and copy this deck
       </p>
 

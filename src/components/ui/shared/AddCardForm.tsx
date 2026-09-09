@@ -62,7 +62,7 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className="glass-card glow-border rounded-2xl p-5 text-card-foreground">
+    <form ref={formRef} action={handleSubmit} className="glass-card rounded-2xl p-5 text-card-foreground">
       <div className="mb-4 space-y-1">
         <h2 className="text-lg font-semibold tracking-tight">Add Card</h2>
         <p className="text-sm text-muted-foreground">Create a new flashcard for this deck.</p>

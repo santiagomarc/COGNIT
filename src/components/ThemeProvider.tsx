@@ -18,14 +18,33 @@ export function useTheme() {
   return useContext(ThemeContext);
 }
 
+/**
+ * Resolves the theme for a first paint (F-10).
+ *
+ * An explicit stored choice always wins and always persists. With nothing
+ * stored we follow `prefers-color-scheme` rather than falling through to dark:
+ * light is a first-class theme, so a light-OS visitor was being shown the wrong
+ * one on their first impression. Dark remains the default when the OS expresses
+ * no preference. Must stay in step with the pre-paint script in `layout.tsx`.
+ */
+function readInitialTheme(): Theme {
+  try {
+    const stored = localStorage.getItem('cognit-theme');
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // Storage can throw in private browsing — fall through to the OS.
+  }
+
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window === 'undefined') {
       return 'dark';
     }
 
-    const stored = localStorage.getItem('cognit-theme');
-    return stored === 'light' || stored === 'dark' ? stored : 'dark';
+    return readInitialTheme();
   });
   const mounted = useSyncExternalStore(
     () => () => {},

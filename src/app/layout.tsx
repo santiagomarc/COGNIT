@@ -1,21 +1,38 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
-import { Orbitron } from "next/font/google";
+import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/MotionProvider";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+/*
+ * Design system §3.1. Three faces with hard role assignments (§3.2):
+ *
+ *   Geist Sans       — all UI chrome, headings, body, buttons, labels
+ *   Geist Mono       — every number the user reads as data, and micro-labels
+ *   Instrument Serif — the card prompt and answer, and nothing else, ever
+ *
+ * The serif is the single editorial gesture in an otherwise technical system;
+ * its whole job is to make the thing being studied feel unlike the chrome
+ * around it. Using it for a page heading destroys that.
+ *
+ * Orbitron and Poppins are gone: a sci-fi display face was doing the work that
+ * weight and tracking should do.
+ */
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
-const orbitron = Orbitron({
-  variable: "--font-orbitron",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  weight: ["400"],
 });
 
 export const metadata: Metadata = {
@@ -64,11 +81,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${poppins.variable} ${orbitron.variable}`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('cognit-theme');if(t==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}}catch(e){}})()`,
+            /*
+             * Runs before first paint to prevent a theme flash (F-10).
+             * An explicit stored choice always wins; with no stored value we
+             * follow the OS, because light is a first-class theme now and a
+             * light-OS visitor was previously shown the wrong one.
+             */
+            __html: `(function(){try{var t=localStorage.getItem('cognit-theme');var d=t==='dark'||(t!=='light'&&!window.matchMedia('(prefers-color-scheme: light)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){document.documentElement.classList.add('dark')}})()`,
           }}
         />
       </head>
@@ -80,23 +107,10 @@ export default function RootLayout({
             {/* Skip to content link for keyboard users */}
             <a
               href="#main-content"
-              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg"
+              className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[var(--z-skip)] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:shadow-lg"
             >
               Skip to content
             </a>
-
-            {/* Grain texture overlay for premium feel */}
-            <div className="grain-overlay" aria-hidden="true" />
-
-            {/* Subtle animated gradient background orbs.
-               Uses .bg-orb-pulse instead of Tailwind animate-pulse so the
-               CSS prefers-reduced-motion guard in globals.css can disable
-               them before JS hydration. */}
-            <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-              <div className="bg-orb-pulse absolute -left-40 -top-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl [animation-delay:0s]" />
-              <div className="bg-orb-pulse absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-neon/5 blur-3xl [animation-delay:2s]" />
-              <div className="bg-orb-pulse absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[3%] blur-3xl [animation-delay:4s]" />
-            </div>
 
             {children}
             <Toaster

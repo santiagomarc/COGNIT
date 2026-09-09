@@ -31,7 +31,7 @@ import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
 import type { QuizMode, StudySessionCard } from '@/lib/study';
 import { formatActionError } from '@/lib/ai-feedback';
-import { motionSprings } from '@/lib/motion-configs';
+import { motionTransitions } from '@/lib/motion-configs';
 import { toast } from 'sonner';
 
 type QuizAssessmentClientProps = {
@@ -544,7 +544,7 @@ export function QuizAssessmentClient({
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
             <Brain className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-semibold">No cards available for a quiz yet</h1>
@@ -571,7 +571,7 @@ export function QuizAssessmentClient({
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
             <Brain className="h-7 w-7 text-primary" />
           </div>
           <h1 className="text-2xl font-semibold">Resume your previous quiz?</h1>
@@ -579,7 +579,7 @@ export function QuizAssessmentClient({
             Pick up from question {Math.min(resumeState.index + 1, resumeState.sessionCards.length)} of {resumeState.sessionCards.length}.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Last recorded progress: {formatDuration(resumeState.sessionDurationMs)} of quiz time.
+            Last recorded progress: <span className="font-mono tnum">{formatDuration(resumeState.sessionDurationMs)}</span> of quiz time.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
@@ -615,12 +615,12 @@ export function QuizAssessmentClient({
         </button>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
           <span className="max-w-[12rem] truncate sm:max-w-none">{deckTitle}</span>
-          <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 text-xs font-medium text-foreground">
+          <span className="rounded-full border border-border bg-card/30 px-2.5 py-1 text-xs font-medium text-foreground">
             {getModeLabel(quizMode)} Quiz
           </span>
           <span className="flex items-center gap-1 text-xs">
             <Timer className="h-3 w-3" />
-            {formatDuration(sessionDuration)}
+            <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>
           </span>
           {!completed ? (
             <Button
@@ -674,21 +674,21 @@ export function QuizAssessmentClient({
       <div className="glass-card rounded-2xl p-4 md:p-5">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Progress</p>
-            <p className="mt-2 text-lg font-semibold tracking-tight text-foreground">
-              {completed ? 'Quiz complete' : `Question ${index + 1} of ${sessionCards.length}`}
+            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Progress</p>
+            <p className="mt-2 text-lg font-semibold tracking-[-.03em] text-foreground">
+              {completed ? 'Quiz complete' : <span className="font-mono tnum">{`Question ${index + 1} of ${sessionCards.length}`}</span>}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 font-medium text-foreground">
+            <span className="rounded-full border border-border bg-card/30 px-2.5 py-1 font-medium text-foreground">
               {getModeLabel(quizMode)}
             </span>
-            <span className="rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 font-medium text-foreground">
-              {Math.min(progress, 100)}% complete
+            <span className="rounded-full border border-border bg-card/30 px-2.5 py-1 font-medium text-foreground">
+              <span className="font-mono tnum">{Math.min(progress, 100)}%</span>&nbsp;complete
             </span>
-            <span className="flex items-center gap-1 rounded-full border border-primary/15 bg-card/30 px-2.5 py-1 font-medium text-foreground">
+            <span className="flex items-center gap-1 rounded-full border border-border bg-card/30 px-2.5 py-1 font-medium text-foreground">
               <Timer className="h-3 w-3" />
-              {formatDuration(sessionDuration)}
+              <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>
             </span>
             {isPaused && !completed ? (
               <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-200">
@@ -701,42 +701,42 @@ export function QuizAssessmentClient({
           <m.div
             className="h-full rounded-full bg-primary"
             animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={reduced ? { duration: 0 } : motionSprings.quizProgress}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
           />
         </div>
       </div>
 
       {showShortcutHelp ? (
-        <div className="glass-card rounded-2xl border border-primary/15 p-4 text-sm">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Keyboard Shortcuts</p>
+        <div className="glass-card rounded-2xl border border-border p-4 text-sm">
+          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Keyboard Shortcuts</p>
           <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
             {quizMode === 'mcq' ? (
               <>
                 <p>
-                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">1-4</span>{' '}
+                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">1-4</span>{' '}
                   Select an MCQ option
                 </p>
                 <p>
-                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
+                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
                   Continue after feedback
                 </p>
               </>
             ) : (
               <>
                 <p>
-                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>{' '}
+                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>{' '}
                   Check typed answer
                 </p>
                 <p>
-                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>
+                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>
                   {' or '}
-                  <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
+                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
                   Continue after feedback
                 </p>
               </>
             )}
             <p>
-              <span className="rounded border border-primary/20 bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">P</span>{' '}
+              <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">P</span>{' '}
               Pause or resume the quiz
             </p>
           </div>
@@ -755,11 +755,11 @@ export function QuizAssessmentClient({
             key="summary"
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={reduced ? { duration: 0 } : motionSprings.quizPanel}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
             className="mx-auto max-w-4xl space-y-6"
           >
             <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-              <div className="glass-card glow-border relative overflow-hidden rounded-3xl p-8">
+              <div className="glass-card relative overflow-hidden rounded-3xl p-8">
                 {/* Fires at a strong pass, harder at a perfect score. Suppressed
                     entirely under prefers-reduced-motion. */}
                 <MasteryConfetti
@@ -768,29 +768,29 @@ export function QuizAssessmentClient({
                 />
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Quiz Result</p>
-                    <h2 className="mt-3 text-3xl font-bold tracking-tight">{scoreSummary.percentage}%</h2>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz Result</p>
+                    <h2 className="mt-3 font-mono text-[28px] font-semibold leading-[1.15] tracking-[-.03em] tnum">{scoreSummary.percentage}%</h2>
                     <p className="mt-2 text-sm text-muted-foreground">
-                      {scoreSummary.correctCount} of {results.length} answered correctly in {formatDuration(sessionDuration)}.
+                      <span className="font-mono tnum">{scoreSummary.correctCount}</span> of <span className="font-mono tnum">{results.length}</span> answered correctly in <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>.
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-center">
-                    <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Grade</p>
-                    <p className="mt-1 text-3xl font-bold text-primary">{scoreSummary.letterGrade}</p>
+                  <div className="rounded-2xl border border-border-strong bg-primary/10 px-4 py-3 text-center">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Grade</p>
+                    <p className="mt-1 font-mono text-3xl font-semibold tnum text-primary">{scoreSummary.letterGrade}</p>
                   </div>
                 </div>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-                    <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{scoreSummary.correctCount}</p>
+                  <div className="surface p-4">
+                    <p className="font-mono text-2xl font-semibold tnum text-[var(--state-mastered)]">{scoreSummary.correctCount}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Correct</p>
                   </div>
-                  <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
-                    <p className="text-2xl font-bold text-red-700 dark:text-red-300">{scoreSummary.incorrectCount}</p>
+                  <div className="surface p-4">
+                    <p className="font-mono text-2xl font-semibold tnum text-[var(--state-lapsed)]">{scoreSummary.incorrectCount}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Missed</p>
                   </div>
-                  <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
-                    <p className="text-2xl font-bold text-primary">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</p>
+                  <div className="surface p-4">
+                    <p className="font-mono text-2xl font-semibold tnum">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</p>
                     <p className="mt-1 text-xs text-muted-foreground">Avg. per Question</p>
                   </div>
                 </div>
@@ -803,7 +803,7 @@ export function QuizAssessmentClient({
                           ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
                           : badge.tone === 'amber'
                             ? 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200'
-                            : 'border-primary/20 bg-primary/10 text-primary';
+                            : 'border-border-strong bg-primary/10 text-primary';
 
                       return (
                         <span
@@ -818,7 +818,7 @@ export function QuizAssessmentClient({
                   </div>
                 ) : null}
 
-                <div className="mt-6 rounded-2xl border border-primary/10 bg-card/20 p-4 text-sm text-muted-foreground">
+                <div className="mt-6 rounded-2xl border border-border bg-card/20 p-4 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2 text-foreground">
                     <Sparkles className="h-4 w-4 text-primary" />
                     Mastery is updated from quiz performance. Daily streaks still come from flashcard review.
@@ -919,7 +919,7 @@ export function QuizAssessmentClient({
                         <p className="mt-2 text-xs text-muted-foreground">Your answer: {entry.userAnswer || 'No answer recorded'}</p>
                         <p className="mt-1 text-xs text-foreground/90">Correct answer: {entry.correctAnswer}</p>
                         {typeof entry.score === 'number' ? (
-                          <p className="mt-1 text-xs text-muted-foreground">Similarity score: {Math.round(entry.score * 100)}%</p>
+                          <p className="mt-1 font-mono text-xs tnum text-muted-foreground">Similarity score: {Math.round(entry.score * 100)}%</p>
                         ) : null}
                       </div>
                       {entry.correct ? (
@@ -941,7 +941,7 @@ export function QuizAssessmentClient({
             initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -18 }}
-            transition={reduced ? { duration: 0 } : motionSprings.quizPanel}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
             className="mx-auto w-full max-w-2xl space-y-4"
           >
             {quizMode === 'mcq' ? (
@@ -993,17 +993,17 @@ export function QuizAssessmentClient({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={reduced ? { duration: 0 } : motionSprings.overlay}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-background/75 backdrop-blur-md"
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
+            className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-background/75 backdrop-blur-md"
           >
             <m.div
               initial={{ opacity: 0, y: 16, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.98 }}
-              transition={reduced ? { duration: 0 } : motionSprings.modal}
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
               className="glass-card mx-4 w-full max-w-md rounded-3xl p-8 text-center"
             >
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Quiz Paused</p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz Paused</p>
               <h3 className="mt-3 text-2xl font-semibold tracking-tight">Timer is on hold</h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Resume when you are ready to continue. Your progress is preserved.

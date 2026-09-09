@@ -71,13 +71,13 @@ function getIntensity(count: number): 0 | 1 | 2 | 3 | 4 {
 function getCellClass(intensity: 0 | 1 | 2 | 3 | 4): string {
   switch (intensity) {
     case 1:
-      return 'bg-primary/25 border-primary/30';
+      return 'bg-primary/25 border-border-strong';
     case 2:
-      return 'bg-primary/45 border-primary/50';
+      return 'bg-primary/45 border-border-strong';
     case 3:
-      return 'bg-primary/65 border-primary/70';
+      return 'bg-primary/65 border-border-strong';
     case 4:
-      return 'bg-primary border-primary';
+      return 'bg-primary border-border-strong';
     default:
       return 'bg-muted/40 border-border/60';
   }
@@ -121,10 +121,10 @@ export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: Acti
         <div className="flex items-center gap-1.5">
           <span>Less</span>
           <span className="h-2.5 w-2.5 rounded-[3px] border border-border/60 bg-muted/40" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-primary/30 bg-primary/25" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-primary/50 bg-primary/45" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-primary/70 bg-primary/65" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-primary bg-primary" />
+          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary/25" />
+          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary/45" />
+          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary/65" />
+          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary" />
           <span>More</span>
         </div>
       </div>

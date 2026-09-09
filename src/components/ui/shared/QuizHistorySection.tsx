@@ -12,7 +12,7 @@ export async function QuizHistorySection({ deckId }: QuizHistorySectionProps) {
 
   if (historyResult && 'error' in historyResult) {
     return (
-      <Card className="glass-card border-primary/20 mt-8">
+      <Card className="glass-card border-border-strong mt-8">
         <CardContent className="flex flex-col items-center justify-center p-8 text-muted-foreground">
           <Target className="w-12 h-12 mb-4 opacity-50" />
           <p>Quiz history is taking longer than expected. Please refresh in a moment.</p>
@@ -27,7 +27,7 @@ export async function QuizHistorySection({ deckId }: QuizHistorySectionProps) {
 
 export function QuizHistorySkeleton() {
   return (
-    <Card className="glass-card border-primary/20 mt-8 animate-pulse">
+    <Card className="glass-card border-border-strong mt-8 animate-pulse">
       <CardContent className="space-y-4 p-6">
         <div className="h-5 w-48 rounded bg-primary/10" />
         <div className="h-16 rounded-xl bg-primary/5" />

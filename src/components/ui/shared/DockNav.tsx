@@ -6,13 +6,21 @@ import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Layers, Brain, UserRound, LogOut } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { logout } from '@/app/auth/actions';
-import { motionSprings } from '@/lib/motion-configs';
+import { motionTransitions } from '@/lib/motion-configs';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Layers },
   { href: '/dashboard/stats', label: 'Stats', icon: Brain, disabled: true },
   { href: '/dashboard/profile', label: 'Profile', icon: UserRound, disabled: true },
 ];
+
+/*
+ * Study and quiz are focus routes: the design system (§8) gives them no
+ * navigation chrome at all. Beyond the visual argument, the dock's Dashboard
+ * link is a plain <Link> that bypasses the quiz's requestQuit() guard, so
+ * leaving it mounted here is what let a paused quiz be abandoned silently.
+ */
+const CHROMELESS_ROUTE = /\/dashboard\/[^/]+\/(study|quiz)\/?$/;
 
 export function DockNav() {
   const pathname = usePathname();
@@ -47,6 +55,9 @@ export function DockNav() {
     await logout();
   }
 
+  // Placed after every hook so the hook order stays stable across routes.
+  if (CHROMELESS_ROUTE.test(pathname)) return null;
+
   return (
     <AnimatePresence>
       {visible && (
@@ -54,11 +65,11 @@ export function DockNav() {
           initial={{ opacity: 0, y: 30, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 24, scale: 0.95 }}
-          transition={prefersReducedMotion ? { duration: 0 } : motionSprings.dock}
-          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-50 w-[calc(100%-1.25rem)] max-w-fit -translate-x-1/2"
+          transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
+          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-[var(--z-rail)] w-[calc(100%-1.25rem)] max-w-fit -translate-x-1/2"
           aria-label="Primary navigation"
         >
-          <div className="glass-card mx-auto flex items-center gap-1 rounded-2xl border border-primary/20 px-2 py-2 shadow-2xl">
+          <div className="glass-card mx-auto flex items-center gap-1 rounded-2xl border border-border-strong px-2 py-2 shadow-2xl">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = item.href === '/dashboard'
@@ -91,8 +102,8 @@ export function DockNav() {
                   {isActive && (
                     <m.span
                       layoutId="dock-active"
-                      className="absolute inset-0 rounded-xl border border-primary/30 bg-primary/10 shadow-[0_0_14px_-6px_var(--glow)]"
-                      transition={prefersReducedMotion ? { duration: 0 } : motionSprings.activePill}
+                      className="absolute inset-0 rounded-xl border border-border-strong bg-primary/10"
+                      transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.focusTravel}
                     />
                   )}
                   <Icon className="relative z-10 h-5 w-5" />

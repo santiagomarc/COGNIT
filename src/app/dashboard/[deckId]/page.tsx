@@ -366,13 +366,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
             <ThemeToggle />
           </div>
 
-          <div className="glass-card glow-border space-y-6 rounded-2xl p-6">
+          <div className="glass-card space-y-6 rounded-2xl p-6">
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="glow-title text-3xl font-bold tracking-tight">{deckTitleMeta.cleanTitle}</h1>
+                  <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">{deckTitleMeta.cleanTitle}</h1>
                   {deckTitleMeta.tag ? (
-                    <span className="inline-flex items-center rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                    <span className="inline-flex items-center rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
                       {deckTitleMeta.tag}
                     </span>
                   ) : null}
@@ -385,17 +385,17 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <div className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
-                  {totalCards} cards
+                <div className="inline-flex items-center rounded-full border border-border-strong bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
+                  <span className="font-mono tnum">{totalCards}</span>&nbsp;cards
                 </div>
-                <div className="inline-flex items-center rounded-full border border-primary/20 bg-card/50 px-3 py-1 text-sm text-muted-foreground">
-                  {quizReadyCards}/{totalCards} quiz-ready
+                <div className="inline-flex items-center rounded-full border border-border-strong bg-card/50 px-3 py-1 text-sm text-muted-foreground">
+                  <span className="font-mono tnum">{quizReadyCards}/{totalCards}</span>&nbsp;quiz-ready
                 </div>
                 <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
               </div>
             </div>
 
-            <div className="rounded-2xl border border-primary/15 bg-card/30 p-5">
+            <div className="rounded-2xl border border-border bg-card/30 p-5">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -407,9 +407,9 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </p>
                 </div>
                 <div className="text-left md:text-right">
-                  <p className="text-3xl font-bold tracking-tight text-foreground">{masteryPercentage}%</p>
+                  <p className="font-mono tnum text-3xl font-semibold tracking-[-.03em] text-foreground">{masteryPercentage}%</p>
                   <p className="text-xs text-muted-foreground">
-                    {masteredCards}/{totalCards} cards currently proven in quizzes
+                    <span className="font-mono tnum">{masteredCards}/{totalCards}</span> cards currently proven in quizzes
                   </p>
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
             </div>
 
             {topTopics.length > 0 ? (
-              <div className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+              <div className="rounded-2xl border border-border bg-card/25 p-5">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-foreground">Top Concepts</p>
                   <p className="text-xs text-muted-foreground">From AI topic tags</p>
@@ -444,7 +444,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
             {hasCards ? (
               <div className="grid gap-4 md:grid-cols-2">
-                <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-border bg-card/25 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -459,7 +459,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                   <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
                     <label className="space-y-1 text-left">
-                      <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
                         Session cards
                       </span>
                       <Input
@@ -475,17 +475,17 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </label>
 
                     <fieldset className="space-y-2">
-                      <legend className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Card scope</legend>
+                      <legend className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Card scope</legend>
                       <div className="flex flex-wrap gap-2">
-                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
                           <input type="radio" name="scope" value="due" defaultChecked className="accent-primary" />
                           Due only (SM-2)
                         </label>
-                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
                           <input type="radio" name="scope" value="include_reviewed" className="accent-primary" />
                           Force include reviewed
                         </label>
-                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
                           <input type="radio" name="scope" value="unmastered_only" className="accent-primary" />
                           Only not reviewed/mastered
                         </label>
@@ -493,7 +493,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </fieldset>
                   </div>
 
-                  <div className="mt-4 rounded-xl border border-primary/10 bg-background/30 p-3">
+                  <div className="mt-4 rounded-xl border border-border bg-background/30 p-3">
                     <p className="text-xs text-muted-foreground">
                       Due mode keeps normal SM-2 scheduling. Force include reviewed fills the session with scheduled cards even if they are not due yet.
                       Unmastered mode includes cards still in new, learning, or relearning states.
@@ -505,7 +505,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                   </div>
                 </form>
 
-                <form action={`/dashboard/${deckId}/quiz`} method="get" className="rounded-2xl border border-primary/15 bg-card/25 p-5">
+                <form action={`/dashboard/${deckId}/quiz`} method="get" className="rounded-2xl border border-border bg-card/25 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -520,7 +520,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
                   <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
                     <label className="space-y-1 text-left">
-                      <span className="block text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
                         Quiz cards
                       </span>
                       <Input
@@ -536,13 +536,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </label>
 
                     <fieldset className="space-y-2">
-                      <legend className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Mode</legend>
+                      <legend className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Mode</legend>
                       <div className="flex flex-wrap gap-2">
-                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
                           <input type="radio" name="mode" value="mcq" defaultChecked className="accent-primary" />
                           MCQ
                         </label>
-                        <label className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-background/40 px-3 py-2 text-sm text-foreground">
+                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
                           <input type="radio" name="mode" value="identification" className="accent-primary" />
                           Identification
                         </label>
@@ -550,7 +550,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                     </fieldset>
                   </div>
 
-                  <div className="mt-4 space-y-2 rounded-xl border border-primary/10 bg-background/30 p-3">
+                  <div className="mt-4 space-y-2 rounded-xl border border-border bg-background/30 p-3">
                     <label className="inline-flex items-center gap-2 text-sm text-foreground">
                       <input
                         type="checkbox"
@@ -576,7 +576,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
                 </form>
               </div>
             ) : (
-              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+              <div className="rounded-2xl border border-border-strong bg-primary/5 p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">This deck is empty. Add your first cards to unlock Study and Quiz.</p>

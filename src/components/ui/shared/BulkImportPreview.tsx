@@ -22,13 +22,13 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
         <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-700 dark:text-amber-300">
           {result.flagged.length} flagged
         </span>
-        <span className="rounded-full border border-primary/15 bg-card/50 px-2.5 py-1">
+        <span className="rounded-full border border-border bg-card/50 px-2.5 py-1">
           {result.totalLines} total lines
         </span>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-        <div className="rounded-2xl border border-primary/10 bg-card/30 p-4">
+        <div className="rounded-2xl border border-border bg-card/30 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Valid Cards</h3>
             <span className="text-xs text-muted-foreground">Exact text preview</span>
@@ -37,7 +37,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
             {result.cards.length > 0 ? (
               result.cards.map((card) => (
                 <div key={`${card.lineNumber}-${card.front}`} className="rounded-xl border border-emerald-500/15 bg-emerald-500/5 p-3">
-                  <div className="mb-1 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                  <div className="mb-1 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
                     Line {card.lineNumber}
                   </div>
                   <p className="text-sm font-medium">{card.front}</p>
@@ -45,14 +45,14 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-dashed border-primary/15 p-4 text-sm text-muted-foreground">
+              <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
                 Valid parsed cards will appear here as you type.
               </div>
             )}
           </div>
         </div>
 
-        <div className="rounded-2xl border border-primary/10 bg-card/30 p-4">
+        <div className="rounded-2xl border border-border bg-card/30 p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold">Needs Attention</h3>
             <span className="text-xs text-muted-foreground">These lines will not be imported</span>
@@ -62,7 +62,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
               result.flagged.map((line) => (
                 <div key={`${line.lineNumber}-${line.text}`} className="rounded-xl border border-amber-500/15 bg-amber-500/5 p-3">
                   <div className="mb-1 flex items-center justify-between gap-2">
-                    <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
                       Line {line.lineNumber}
                     </span>
                     <span className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
@@ -73,7 +73,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                 </div>
               ))
             ) : (
-              <div className="rounded-xl border border-dashed border-primary/15 p-4 text-sm text-muted-foreground">
+              <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
                 No parsing issues detected.
               </div>
             )}

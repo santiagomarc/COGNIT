@@ -96,20 +96,20 @@ export function FlashcardWithActions({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-            className="glass-card glow-border flex h-56 flex-col gap-3 rounded-2xl p-5"
+            className="glass-card flex h-56 flex-col gap-3 rounded-2xl p-5"
           >
             <Input
               value={editableTerm}
               onChange={(e) => setEditableTerm(e.target.value)}
               placeholder="Term (answer)"
-              className="neon-focus text-sm"
+              className="text-sm"
               autoFocus
             />
             <Textarea
               value={editableDescription}
               onChange={(e) => setEditableDescription(e.target.value)}
               placeholder="Description (question)"
-              className="neon-focus min-h-0 flex-1 resize-none text-sm leading-relaxed"
+              className="min-h-0 flex-1 resize-none text-sm leading-relaxed"
             />
 
             <div className="mt-auto flex items-center justify-end gap-2">
@@ -147,18 +147,18 @@ export function FlashcardWithActions({
             <div className="flex items-start justify-between gap-2">
               <div className="flex max-w-[75%] flex-wrap gap-1">
                 {typeof cardNumber === 'number' ? (
-                  <span className="rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
+                  <span className="rounded-full border border-border-strong bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
                     Card #{cardNumber}
                   </span>
                 ) : null}
-                <span className="rounded-full border border-primary/20 bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
+                <span className="rounded-full border border-border-strong bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
                   {SOURCE_LABELS[source]}
                 </span>
                 <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
                   {quizReady ? 'Quiz Ready' : 'Quiz Pending'}
                 </span>
                 {importedBy ? (
-                  <span className="rounded-full border border-primary/15 bg-card/80 px-2 py-1 text-[10px] text-muted-foreground backdrop-blur-sm">
+                  <span className="rounded-full border border-border bg-card/80 px-2 py-1 text-[10px] text-muted-foreground backdrop-blur-sm">
                     {importedBy}
                   </span>
                 ) : null}
@@ -171,7 +171,7 @@ export function FlashcardWithActions({
                     e.stopPropagation();
                     onToggleSelected?.();
                   }}
-                  className="z-20 flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  className="z-20 flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-border-strong text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   title={selected ? 'Unselect card' : 'Select card'}
                   aria-pressed={selected}
                 >
@@ -185,7 +185,7 @@ export function FlashcardWithActions({
                       e.stopPropagation();
                       setIsEditing(true);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-primary/20 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-border-strong text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                     title="Edit card"
                   >
                     <Pencil className="h-3.5 w-3.5" />

@@ -132,7 +132,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
 
       <AnimatePresence>
         {open ? (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center px-4 py-6">
+          <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center px-4 py-6">
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -147,12 +147,12 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
               transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="glass-card relative z-10 flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-primary/15"
+              className="glass-card relative z-10 flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-border"
               role="dialog"
               aria-modal="true"
               aria-labelledby="bulk-import-title"
             >
-              <div className="flex items-start justify-between gap-4 border-b border-primary/10 px-6 py-5">
+              <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
                 <div className="space-y-1">
                   <h2 id="bulk-import-title" className="text-xl font-semibold tracking-tight">
                     Bulk Import Notes
@@ -225,7 +225,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                 <BulkImportPreview result={preview} />
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-primary/10 px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
                 <div className="text-sm text-muted-foreground">
                   Only valid preview rows will be imported.
                 </div>

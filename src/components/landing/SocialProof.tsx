@@ -50,7 +50,7 @@ export function SocialProof() {
   const reduced = useReducedMotion();
 
   return (
-    <section className="relative border-y border-primary/10 bg-card/30 backdrop-blur-sm py-16">
+    <section className="relative border-y border-border bg-card/30 backdrop-blur-sm py-16">
       <div className="mx-auto max-w-6xl px-6">
         <m.div
           initial={reduced ? undefined : { opacity: 0, y: 16 }}
@@ -70,10 +70,10 @@ export function SocialProof() {
                 transition={{ delay: i * 0.12, duration: 0.5 }}
                 className="flex flex-col items-center text-center"
               >
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-border-strong">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
-                <div className="glow-title text-3xl font-extrabold tracking-tight sm:text-4xl">
+                <div className="font-mono text-3xl font-semibold tracking-[-.03em] tnum sm:text-4xl">
                   {stat.display ? (
                     stat.display
                   ) : (

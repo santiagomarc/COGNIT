@@ -25,13 +25,13 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="border-t border-primary/10 bg-card/20 backdrop-blur-sm">
+    <footer className="border-t border-border bg-card/20 backdrop-blur-sm">
       <div className="mx-auto max-w-6xl px-6 py-14">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand column */}
           <div className="lg:col-span-2">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-primary/25">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-border-strong">
                 <Sparkles className="h-4.5 w-4.5 text-primary" />
               </div>
               <span className="text-lg font-bold tracking-tight">Cognit</span>
@@ -47,7 +47,7 @@ export function Footer() {
                 <a
                   key={platform}
                   href="#"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-primary/15 bg-card/40 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card/40 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
                   aria-label={platform}
                 >
                   <SocialIcon name={platform} />
@@ -79,7 +79,7 @@ export function Footer() {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-primary/10 pt-6 sm:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground/60">
             &copy; {new Date().getFullYear()} Cognit. All rights reserved.
           </p>

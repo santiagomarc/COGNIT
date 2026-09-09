@@ -97,18 +97,18 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
         <ThemeToggle />
       </div>
 
-      <header className="glass-card glow-border space-y-4 rounded-3xl p-8 text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+      <header className="glass-card space-y-4 rounded-3xl p-8 text-center">
+        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
           Shared deck
         </p>
-        <h1 className="glow-title text-3xl font-bold tracking-tight md:text-4xl">{title}</h1>
+        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">{title}</h1>
 
         {deck.description ? (
           <p className="mx-auto max-w-xl text-muted-foreground">{deck.description}</p>
         ) : null}
 
         <p className="text-sm text-muted-foreground">
-          {cardCount} card{cardCount === 1 ? '' : 's'}
+          <span className="font-mono tnum">{cardCount}</span>&nbsp;card{cardCount === 1 ? '' : 's'}
           {cloneCount > 0
             ? ` · saved by ${cloneCount} ${cloneCount === 1 ? 'person' : 'people'}`
             : ''}

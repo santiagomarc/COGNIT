@@ -11,7 +11,7 @@ export function ThemeToggle() {
   return (
     <m.button
       onClick={toggleTheme}
-      className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-primary/20 bg-card/60 text-foreground shadow-[0_8px_24px_-18px_var(--shadow-base)] backdrop-blur-md transition-[background-color,border-color,box-shadow,transform] duration-300 hover:bg-card/80 hover:shadow-[0_10px_28px_-18px_var(--glow)]"
+      className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border-strong bg-card/60 text-foreground shadow-[0_8px_24px_-18px_var(--shadow-base)] backdrop-blur-md transition-[background-color,border-color,box-shadow,transform] duration-300 hover:bg-card/80"
       whileTap={{ scale: 0.9 }}
       whileHover={{ scale: 1.05 }}
       transition={{ type: 'spring', stiffness: 320, damping: 24 }}

@@ -24,7 +24,7 @@ export function HeroSection() {
       {/* ── Navbar ── */}
       <nav className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-primary/25">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-border-strong">
             <Sparkles className="h-4.5 w-4.5 text-primary" />
           </div>
           <span className="text-lg font-bold tracking-tight">Cognit</span>
@@ -52,7 +52,7 @@ export function HeroSection() {
             initial={reduced ? undefined : { opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary backdrop-blur-sm"
+            className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border-strong bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary backdrop-blur-sm"
           >
             <Sparkles className="h-3.5 w-3.5" />
             AI-Powered Active Recall
@@ -63,13 +63,13 @@ export function HeroSection() {
             initial={reduced ? undefined : { opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.1 }}
-            className="glow-title text-5xl font-extrabold leading-[1.1] tracking-tighter sm:text-6xl lg:text-7xl"
+            className="text-5xl font-semibold leading-[1.1] tracking-[-.03em] sm:text-6xl lg:text-7xl"
           >
             <span className="bg-gradient-to-br from-foreground via-foreground/90 to-foreground/60 bg-clip-text text-transparent">
               Study smarter,
             </span>
             <br />
-            <span className="bg-gradient-to-r from-primary via-neon to-primary/60 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary via-primary to-primary/60 bg-clip-text text-transparent">
               remember forever
             </span>
           </m.h1>
@@ -114,9 +114,9 @@ export function HeroSection() {
           transition={{ duration: 0.8, delay: 0.45, type: 'spring', stiffness: 100, damping: 20 }}
           className="perspective-1000 relative z-10 mx-auto mt-16 max-w-4xl"
         >
-          <div className="glass-card overflow-hidden rounded-2xl border border-primary/15 shadow-2xl shadow-primary/5">
+          <div className="glass-card overflow-hidden rounded-2xl border border-border shadow-2xl shadow-primary/5">
             {/* Browser chrome */}
-            <div className="flex items-center gap-2 border-b border-primary/10 bg-card/60 px-4 py-3">
+            <div className="flex items-center gap-2 border-b border-border bg-card/60 px-4 py-3">
               <span className="h-3 w-3 rounded-full bg-destructive/60" />
               <span className="h-3 w-3 rounded-full bg-yellow-500/60" />
               <span className="h-3 w-3 rounded-full bg-green-500/60" />
@@ -144,13 +144,13 @@ export function HeroSection() {
                 const colorMap: Record<string, { iconBg: string; iconBorder: string; iconText: string }> = {
                   primary: {
                     iconBg: 'bg-primary/10',
-                    iconBorder: 'border-primary/20',
+                    iconBorder: 'border-border-strong',
                     iconText: 'text-primary',
                   },
                   neon: {
-                    iconBg: 'bg-[hsl(var(--neon)/0.10)]',
-                    iconBorder: 'border-[hsl(var(--neon)/0.20)]',
-                    iconText: 'text-[hsl(var(--neon))]',
+                    iconBg: 'bg-primary/10',
+                    iconBorder: 'border-border-strong',
+                    iconText: 'text-primary',
                   },
                 };
                 return (
@@ -164,7 +164,7 @@ export function HeroSection() {
                       return (
                         <div
                           key={deck.label}
-                          className="rounded-xl border border-primary/10 bg-card/40 p-4 backdrop-blur-sm"
+                          className="rounded-xl border border-border bg-card/40 p-4 backdrop-blur-sm"
                         >
                           <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${colors.iconBg} border ${colors.iconBorder}`}>
                             <deck.icon className={`h-[1.125rem] w-[1.125rem] ${colors.iconText}`} />
@@ -187,8 +187,8 @@ export function HeroSection() {
 
       {/* ── Background decorations (above the global orbs) ── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -left-32 top-0 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-primary/10 via-neon/5 to-transparent blur-3xl" />
-        <div className="absolute -right-32 top-32 h-[400px] w-[400px] rounded-full bg-gradient-to-bl from-neon/10 via-primary/5 to-transparent blur-3xl" />
+        <div className="absolute -left-32 top-0 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-primary/10 via-primary/5 to-transparent blur-3xl" />
+        <div className="absolute -right-32 top-32 h-[400px] w-[400px] rounded-full bg-gradient-to-bl from-primary/10 via-primary/5 to-transparent blur-3xl" />
       </div>
     </section>
   );

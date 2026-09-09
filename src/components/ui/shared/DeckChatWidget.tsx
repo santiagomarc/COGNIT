@@ -247,7 +247,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   const showEmptyState = messages.length === 0 && !isStreaming && state.status !== 'error';
 
   return (
-    <section className="glass-card glow-border rounded-2xl p-5">
+    <section className="glass-card rounded-2xl p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Chat with Your Deck</h2>
@@ -281,8 +281,8 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             onClick={() => setActiveSessionId(session.id)}
             className={`rounded-full border px-3 py-1 text-xs transition-colors ${
               activeSessionId === session.id
-                ? 'border-primary/35 bg-primary/15 text-primary'
-                : 'border-primary/15 bg-card/50 text-muted-foreground hover:border-primary/25 hover:text-foreground'
+                ? 'border-border-strong bg-primary/15 text-primary'
+                : 'border-border bg-card/50 text-muted-foreground hover:border-border-strong hover:text-foreground'
             }`}
           >
             {session.title?.trim() || 'Untitled chat'}
@@ -290,7 +290,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         ))}
       </div>
 
-      <div ref={scrollRef} className="h-[22rem] overflow-y-auto rounded-xl border border-primary/10 bg-card/20 p-3">
+      <div ref={scrollRef} className="h-[22rem] overflow-y-auto rounded-xl border border-border bg-card/20 p-3">
         {isLoadingMessages ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -310,7 +310,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             {/* Live streaming bubble */}
             {isStreaming ? (
               <div className="flex justify-start">
-                <div className="max-w-[90%] space-y-2 rounded-xl border border-primary/15 bg-card/60 px-3 py-2 text-sm">
+                <div className="max-w-[90%] space-y-2 rounded-xl border border-border bg-card/60 px-3 py-2 text-sm">
                   {state.references.length > 0 ? (
                     <SourceChips references={state.references} />
                   ) : null}
@@ -401,7 +401,7 @@ function SourceChips({ references }: { references: ChatReference[] }) {
         <span
           key={ref.id}
           title={ref.similarity !== null ? `${Math.round(ref.similarity * 100)}% match` : undefined}
-          className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] text-primary"
+          className="rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[10px] text-primary"
         >
           {ref.front}
         </span>
@@ -416,10 +416,10 @@ function ChatBubble({ message }: { message: ChatMessage }) {
   // An un-grounded answer says "your deck doesn't cover this". Rendering it in
   // the normal assistant style would make a refusal look like an answer.
   const bubbleClass = isUser
-    ? 'border border-primary/30 bg-primary/15 text-foreground'
+    ? 'border border-border-strong bg-primary/15 text-foreground'
     : message.ungrounded
       ? 'border border-amber-500/25 bg-amber-500/10 text-amber-900 dark:text-amber-100'
-      : 'border border-primary/15 bg-card/60 text-muted-foreground';
+      : 'border border-border bg-card/60 text-muted-foreground';
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>

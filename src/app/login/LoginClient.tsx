@@ -226,17 +226,17 @@ export default function LoginClient() {
         {/* Gradient orbs */}
         <div className="pointer-events-none absolute inset-0" aria-hidden="true">
           <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-primary/8 blur-3xl" />
-          <div className="absolute -bottom-32 -right-32 h-[360px] w-[360px] rounded-full bg-neon/8 blur-3xl" />
+          <div className="absolute -bottom-32 -right-32 h-[360px] w-[360px] rounded-full bg-primary/8 blur-3xl" />
         </div>
 
         {/* Center content */}
         <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-12">
           {/* Logo */}
           <Link href="/" className="mb-6 inline-flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/25 bg-primary/15">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-primary/15">
               <Sparkles className="h-6 w-6 text-primary" />
             </div>
-            <span className="glow-title text-3xl font-extrabold tracking-tighter bg-gradient-to-br from-primary via-neon to-primary/60 bg-clip-text text-transparent">
+            <span className="text-[28px] font-semibold tracking-[-.03em] text-ink">
               Cognit
             </span>
           </Link>
@@ -256,7 +256,7 @@ export default function LoginClient() {
               return (
                 <m.div
                   key={card.label}
-                  className="absolute glass-card rounded-xl border border-primary/15 px-5 py-4 shadow-lg"
+                  className="absolute glass-card rounded-xl border border-border px-5 py-4 shadow-lg"
                   style={{
                     left: card.x,
                     top: card.y,
@@ -277,7 +277,7 @@ export default function LoginClient() {
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border-strong bg-primary/10">
                       <Icon className="h-4 w-4 text-primary" />
                     </div>
                     <span className="text-sm font-medium whitespace-nowrap">
@@ -303,7 +303,7 @@ export default function LoginClient() {
 
         {/* Mobile-only logo */}
         <Link href="/" className="mb-8 inline-flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/25 bg-primary/15">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border-strong bg-primary/15">
             <Sparkles className="h-4.5 w-4.5 text-primary" />
           </div>
           <span className="text-xl font-bold tracking-tight">Cognit</span>
@@ -321,7 +321,7 @@ export default function LoginClient() {
             {/* ── Email sent confirmation ── */}
             {emailSent ? (
               <div className="text-center space-y-4">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-primary/20">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-border-strong">
                   <Mail className="h-7 w-7 text-primary" />
                 </div>
                 <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>

@@ -76,10 +76,10 @@ export function DashboardOnboarding({
     <m.div
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card glow-border space-y-6 rounded-3xl p-6 md:p-8"
+      className="glass-card space-y-6 rounded-3xl p-6 md:p-8"
     >
       <div className="space-y-2 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
           <Sparkles className="h-6 w-6 text-primary" />
         </div>
         <h2 className="text-2xl font-bold tracking-tight">Welcome to Cognit</h2>
@@ -154,13 +154,13 @@ function OnboardingCard({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-primary/15 bg-card/30 p-5">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/30 p-5">
       <div className="flex items-start justify-between gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border-strong bg-primary/10">
           {icon}
         </div>
         {badge ? (
-          <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+          <span className="rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
             {badge}
           </span>
         ) : null}

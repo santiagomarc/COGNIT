@@ -21,14 +21,14 @@ function ConceptRow({ concept }: { concept: WeakestConcept }) {
       <div className="flex items-center justify-between gap-3">
         <span className="truncate text-sm font-medium text-foreground">{concept.topic_tag}</span>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${severity.chip}`}>
-          {percentage}% missed
+          <span className="font-mono tnum">{percentage}%</span>&nbsp;missed
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/10">
         <div className={`h-full rounded-full ${severity.bar}`} style={{ width: `${percentage}%` }} />
       </div>
       <p className="text-xs text-muted-foreground">
-        {concept.misses} of {concept.attempts} attempts missed
+        <span className="font-mono tnum">{concept.misses}</span> of <span className="font-mono tnum">{concept.attempts}</span> attempts missed
       </p>
     </div>
   );
@@ -47,7 +47,7 @@ export async function WeakestConcepts({ deckId }: WeakestConceptsProps) {
   }
 
   return (
-    <Card className="glass-card border-primary/20 mt-8">
+    <Card className="glass-card border-border-strong mt-8">
       <CardContent className="space-y-5 p-6">
         <h3 className="flex items-center gap-2 text-xl font-bold tracking-tight">
           <AlertTriangle className="h-5 w-5 text-amber-400" /> Weakest Concepts
@@ -67,7 +67,7 @@ export async function WeakestConcepts({ deckId }: WeakestConceptsProps) {
 
 export function WeakestConceptsSkeleton() {
   return (
-    <Card className="glass-card border-primary/20 mt-8 animate-pulse">
+    <Card className="glass-card border-border-strong mt-8 animate-pulse">
       <CardContent className="space-y-4 p-6">
         <div className="flex items-center gap-2">
           <Target className="h-5 w-5 text-primary/40" />

@@ -66,7 +66,7 @@ export function FeatureGrid() {
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
             Features
           </p>
-          <h2 className="glow-title text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-[-.03em] sm:text-4xl">
             Everything you need to ace every exam
           </h2>
           <p className="mt-3 text-muted-foreground">
@@ -91,9 +91,9 @@ export function FeatureGrid() {
                   damping: 20,
                 }}
                 whileHover={reduced ? undefined : { y: -4, transition: { duration: 0.2 } }}
-                className="glass-card glow-border group rounded-2xl p-6 transition-shadow"
+                className="glass-card group rounded-2xl p-6 transition-shadow"
               >
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 transition-colors group-hover:bg-primary/15">
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border-strong bg-primary/10 transition-colors group-hover:bg-primary/15">
                   <Icon className="h-5 w-5 text-primary" />
                 </div>
                 <h3 className="text-base font-semibold tracking-tight">{feature.title}</h3>

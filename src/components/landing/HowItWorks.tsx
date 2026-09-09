@@ -44,7 +44,7 @@ export function HowItWorks() {
           <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
             How It Works
           </p>
-          <h2 className="glow-title text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="text-3xl font-semibold tracking-[-.03em] sm:text-4xl">
             Three steps to mastery
           </h2>
           <p className="mt-3 text-muted-foreground">
@@ -70,7 +70,7 @@ export function HowItWorks() {
                   className="relative flex gap-6 sm:gap-8"
                 >
                   {/* Step indicator */}
-                  <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 shadow-lg shadow-primary/5 sm:h-16 sm:w-16">
+                  <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-border-strong bg-primary/10 shadow-lg shadow-primary/5 sm:h-16 sm:w-16">
                     <Icon className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
                     {/* Glow ring */}
                     <span className="absolute inset-0 -z-10 rounded-2xl bg-primary/15 blur-md" />
