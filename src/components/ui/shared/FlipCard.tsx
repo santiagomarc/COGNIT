@@ -73,11 +73,15 @@ export function FlipCard({
           whole interaction, so leaking it defeats the exercise.
         */}
         <span className="flip__face flip__face--prompt" aria-hidden={showingAnswer}>
-          <span className="flip__body">{prompt}</span>
+          <span className="flip__scroll">
+            <span className="flip__body">{prompt}</span>
+          </span>
         </span>
         <span className="flip__face flip__face--answer" aria-hidden={!showingAnswer}>
-          <span className="flip__body">{answer}</span>
-          {answerAside}
+          <span className="flip__scroll">
+            <span className="flip__body">{answer}</span>
+            {answerAside}
+          </span>
         </span>
       </span>
       {/* Focus is four corner rules on the card's bounds (§7.7), never a ring. */}

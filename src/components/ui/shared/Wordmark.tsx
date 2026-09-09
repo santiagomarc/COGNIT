@@ -10,33 +10,25 @@ type WordmarkProps = {
 };
 
 const SIZE: Record<NonNullable<WordmarkProps['size']>, string> = {
-  sm: 'text-base',
-  md: 'text-lg',
-  lg: 'text-[28px]',
+  sm: 'text-[27px]',
+  md: 'text-[36px]',
+  lg: 'text-[66px]',
 };
 
 /**
  * The brand mark (design system §6).
  *
- * Every unauthenticated surface — landing nav, landing footer, login, password
- * reset, the shared-deck page — used to draw the logo as a `<Sparkles/>` glyph
- * in a tinted rounded box. That is six of the seventeen sparkle instances §1.1
- * names as the reason this redesign exists, and the glyph said nothing: it was
- * not the product's icon, it was a decoration standing next to the name.
- *
- * §6 resolves this without ceremony — "functional or absent; if a label is
- * clearer than a glyph, ship the label". The name *is* the mark. It carries no
- * hue, so it cannot compete with the state channel, and it needs no asset.
+ * The name *is* the mark. Renders in the signature Instrument Serif font
+ * (`font-serif`) across all sizes, 1.5x scale and font-medium.
  */
 export function Wordmark({ href, size = 'md', className }: WordmarkProps) {
   const isLg = size === 'lg';
   const mark = (
     <span
       className={cn(
-        'text-ink',
-        isLg
-          ? 'font-serif text-[44px] font-normal tracking-[-0.015em] text-balance leading-none'
-          : cn('font-semibold tracking-[-.03em]', SIZE[size]),
+        'font-serif font-medium tracking-[-0.02em] text-ink leading-none',
+        SIZE[size],
+        isLg && 'text-balance',
         className
       )}
     >

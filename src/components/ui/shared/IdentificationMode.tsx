@@ -111,7 +111,7 @@ export function IdentificationMode({
           {/* Question prompt in corner brackets on flat ground (§4 Task 4.1) */}
           <div className="relative flex min-h-[9rem] items-center justify-center px-6 py-8 text-center sm:px-10">
             <CornerBrackets />
-            <p className="mx-auto max-w-[34ch] text-balance font-serif text-[clamp(1.375rem,2.2vw,1.875rem)] leading-[1.32] tracking-[-0.015em] text-ink">
+            <p className="mx-auto max-w-[34ch] text-balance font-serif text-[clamp(2.1rem,3.3vw,2.85rem)] font-medium leading-[1.25] tracking-[-0.02em] text-ink">
               {prompt}
             </p>
           </div>

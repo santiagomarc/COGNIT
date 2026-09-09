@@ -90,7 +90,7 @@ export default function UpdatePasswordPage() {
             >
               Password updated
             </p>
-            <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
+            <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">
               You&apos;re signed in
             </h1>
             <p className="text-sm text-ink-dim">
@@ -104,7 +104,7 @@ export default function UpdatePasswordPage() {
           <>
             {/* ── Header ── */}
             <div className="mb-8">
-              <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
+              <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">
                 Set a new password
               </h1>
               <p className="mt-1.5 text-sm text-ink-dim">

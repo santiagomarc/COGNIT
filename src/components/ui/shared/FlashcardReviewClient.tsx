@@ -184,7 +184,6 @@ export function FlashcardReviewClient({
   const pausedAtRef = useRef<number | null>(null);
   const prefersReducedMotion = useReducedMotion();
   const active = sessionCards[index];
-  const next = sessionCards[index + 1];
   const completed = index >= sessionCards.length;
 
   useEffect(() => {
@@ -631,7 +630,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 font-serif text-[2rem] font-normal leading-[1.2] text-balance">You&apos;re all caught up!</h1>
+          <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">You&apos;re all caught up!</h1>
           <p className="mt-2 text-muted-foreground">
             {emptyMessage}
           </p>
@@ -670,7 +669,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 font-serif text-[2rem] font-normal leading-[1.2] text-balance">Resume your previous session?</h1>
+          <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous session?</h1>
           <p className="mt-2 text-muted-foreground">
             Pick up from card {Math.min(resumeState.index + 1, resumeState.queueCardIds.length)} of {resumeState.queueCardIds.length}.
           </p>
@@ -781,7 +780,7 @@ export function FlashcardReviewClient({
                   <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                     Session
                   </p>
-                  <h2 className="mt-3 font-serif text-[2rem] font-normal leading-[1.2] text-balance">Review complete</h2>
+                  <h2 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">Review complete</h2>
                   <p className="mt-1 text-muted-foreground">
                     You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
                   </p>
@@ -855,14 +854,6 @@ export function FlashcardReviewClient({
                 </p>
 
                 <div className="relative">
-                  {/* The next card peek */}
-                  {next ? (
-                    <div
-                      aria-hidden="true"
-                      className="surface pointer-events-none absolute inset-x-5 top-3 h-full opacity-70"
-                    />
-                  ) : null}
-
                   <m.div
                     drag={showAnswer && !isPaused ? 'x' : false}
                     dragConstraints={{ left: 0, right: 0 }}

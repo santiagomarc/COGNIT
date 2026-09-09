@@ -135,11 +135,12 @@
 
   /* Motion (§5) — instruments do not bounce. One spring survives, in JS. */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-flip: cubic-bezier(0.4, 0, 0.2, 1);
   --dur-focus: 90ms;
   --dur-hover: 120ms;
   --dur-key: 70ms;
   --dur-panel: 160ms;
-  --dur-flip: 340ms;
+  --dur-flip: 520ms;
 }
 
 /*
@@ -598,7 +599,8 @@ button.flip {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   transform-style: preserve-3d;
-  transition: transform var(--dur-flip) var(--ease-out);
+  will-change: transform;
+  transition: transform var(--dur-flip) var(--ease-flip);
 }
 
 .flip__face {
@@ -606,11 +608,31 @@ button.flip {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  transform-style: preserve-3d;
+  -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  /*
+   * CRITICAL: No overflow-y here. Setting overflow on a child of a
+   * preserve-3d container breaks the 3D stacking context in WebKit/Chromium,
+   * making backface-visibility: hidden ineffective — the hidden face's text
+   * bleeds through mirrored. Scrolling is handled by .flip__scroll inside.
+   */
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+/*
+ * Inner scroll container inside each face. Lives *inside* .flip__face so
+ * the 3D transform context is not broken by overflow-y.
+ */
+.flip__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: clamp(1.5rem, 4vw, 2.75rem);
+  display: flex;
+  flex-direction: column;
 }
 
 /*
@@ -640,29 +662,30 @@ button.flip {
   outline-offset: 2px;
 }
 
+/*
+ * Physical Z-separation (1px each) gives the card thickness in 3D space,
+ * preventing coplanar z-fighting and subpixel text bleed between faces.
+ */
+.flip__face--prompt {
+  transform: rotateY(0deg) translateZ(1px);
+}
+
 .flip__face--answer {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(1px);
 }
 
 /*
- * The card prompt and answer — the serif's only sanctioned role (§3.2), at the
- * 32ch measure of §3.3.
- *
- * It centres with auto margins rather than `place-items: center` on the face.
- * That is not a stylistic preference: with `align-items: center` on a scroll
- * container, the overflow at the *start* edge is unreachable, so the first
- * lines of a long answer get pushed above the scrollport with no way back to
- * them. Auto margins collapse to zero the moment the content overflows, so the
- * first word stays at the scroll origin.
+ * The card prompt and answer — 1.5x scale, weightier Instrument Serif (§3.2).
  */
 .flip__body {
   margin-block: auto;
   margin-inline: auto;
-  max-width: 32ch;
+  max-width: 36ch;
   font-family: var(--font-serif);
-  font-size: clamp(1.5625rem, 2.4vw, 2.125rem);
-  line-height: 1.32;
-  letter-spacing: -0.015em;
+  font-size: clamp(2.35rem, 3.6vw, 3.25rem);
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
   text-wrap: balance;
 }
 
@@ -704,15 +727,38 @@ button.flip {
 }
 
 /*
- * The hidden face is invisible but still hit-testable, and it is the later
- * sibling — without this it swallows the wheel events meant for the face the
- * user is actually reading.
+ * In default or focus states, prompt is visible and answer is inactive.
+ * In flipping or graded states, answer is visible and prompt is inactive.
+ *
+ * Rather than fading opacity (which made text dissolve prematurely mid-turn),
+ * visibility transitions discretely at the 50% midpoint (when the card is edge-on at 90°).
+ * This ensures the text stays solid, tactile and crisp throughout the flip while guaranteeing
+ * no inverted text can ever bleed through on the reverse side.
  */
 .flip[data-state='default'] .flip__face--answer,
-.flip[data-state='flipping'] .flip__face--prompt,
-.flip[data-state='graded'] .flip__face--prompt,
 .flip[data-state='focus'] .flip__face--answer {
+  visibility: hidden;
   pointer-events: none;
+  transition: visibility 0s linear calc(var(--dur-flip) * 0.5);
+}
+.flip[data-state='default'] .flip__face--prompt,
+.flip[data-state='focus'] .flip__face--prompt {
+  visibility: visible;
+  pointer-events: auto;
+  transition: visibility 0s linear calc(var(--dur-flip) * 0.5);
+}
+
+.flip[data-state='flipping'] .flip__face--prompt,
+.flip[data-state='graded'] .flip__face--prompt {
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear calc(var(--dur-flip) * 0.5);
+}
+.flip[data-state='flipping'] .flip__face--answer,
+.flip[data-state='graded'] .flip__face--answer {
+  visibility: visible;
+  pointer-events: auto;
+  transition: visibility 0s linear calc(var(--dur-flip) * 0.5);
 }
 
 /* 3 · GRADED — a 160ms state flash keyed to the grade, then the card leaves */
@@ -749,6 +795,9 @@ button.flip {
 @media (prefers-reduced-motion: reduce) {
   .flip__panel {
     transition: none;
+  }
+  .flip__face {
+    transition: none !important;
   }
   .flip[data-state='graded'] {
     animation: none;

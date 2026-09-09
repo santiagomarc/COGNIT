@@ -30,8 +30,8 @@ export const motionTransitions = {
   /** Panels, overlays, modals, list items — anything entering or leaving. */
   panel: { duration: 0.16, ease: EASE_OUT } as Transition,
 
-  /** The card flip. */
-  flip: { duration: 0.34, ease: EASE_OUT } as Transition,
+  /** The card flip — calibrated smooth 3D flip. */
+  flip: { duration: 0.52, ease: [0.4, 0, 0.2, 1] } as Transition,
 };
 
 /**

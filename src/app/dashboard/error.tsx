@@ -44,7 +44,7 @@ export default function DashboardError({
           Error
         </p>
 
-        <h1 className="mt-3 font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance text-ink">
+        <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance text-ink">
           This deck failed to load
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">

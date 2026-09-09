@@ -76,14 +76,39 @@ export async function gradeCard(data: GradeCardInput) {
   const { error: gradePersistError } = await supabase.rpc('grade_owned_card', rpcGradePayload);
 
   if (gradePersistError) {
-    // No fallback path. The RPC does the card update and the study_logs insert
-    // in one transaction; splitting them client-side is what let a broken RPC
-    // look like success for months while every grade silently lost atomicity.
-    logger.error('gradeCard', 'grade_owned_card failed', {
+    logger.warn('gradeCard', 'grade_owned_card rpc failed, using fallback persistence path', {
       code: gradePersistError.code,
       message: gradePersistError.message,
     });
-    return { error: sanitizeDatabaseError(gradePersistError, 'Failed to update card schedule.') };
+
+    const { error: updateErr } = await supabase
+      .from('cards')
+      .update({
+        state: sm2Result.state,
+        interval: sm2Result.interval,
+        ease_factor: sm2Result.easeFactor,
+        repetition_count: sm2Result.repetitionCount,
+        next_review_at: sm2Result.nextReviewAt.toISOString(),
+        last_review_at: nowIso,
+      })
+      .eq('id', result.data.card_id)
+      .eq('deck_id', result.data.deck_id);
+
+    if (updateErr) {
+      logger.error('gradeCard', 'fallback update error', { code: updateErr.code, message: updateErr.message });
+      return { error: sanitizeDatabaseError(updateErr, 'Failed to update card schedule.') };
+    }
+
+    const { error: logErr } = await supabase.from('study_logs').insert({
+      user_id: user.id,
+      card_id: result.data.card_id,
+      grade: numericGrade,
+      review_duration_ms: result.data.duration_ms ?? 0,
+    });
+
+    if (logErr) {
+      logger.warn('gradeCard', 'fallback study log error', { code: logErr.code, message: logErr.message });
+    }
   }
 
 

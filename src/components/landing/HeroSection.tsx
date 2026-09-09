@@ -82,7 +82,7 @@ export function HeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.06}>
-            <h1 className="mt-5 font-serif text-[clamp(2.75rem,5vw,4.5rem)] font-normal leading-[1.05] tracking-[-0.015em] text-balance text-ink">
+            <h1 className="mt-5 font-serif text-[clamp(4.125rem,7.5vw,6.75rem)] font-medium leading-[1.0] tracking-[-0.025em] text-balance text-ink">
               Study smarter,
               <br />
               remember forever

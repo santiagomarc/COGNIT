@@ -275,7 +275,7 @@ export default function LoginClient() {
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Check your email
                 </p>
-                <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
+                <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">
                   {mode === 'signup' ? 'Confirm your address' : 'Reset link sent'}
                 </h1>
                 <p className="text-sm leading-relaxed text-ink-dim">
@@ -315,7 +315,7 @@ export default function LoginClient() {
                       Back to sign in
                     </button>
                   )}
-                  <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
+                  <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">
                     {headings[mode].title}
                   </h1>
                   <p className="mt-1.5 text-sm text-ink-dim">

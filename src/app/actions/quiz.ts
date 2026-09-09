@@ -115,14 +115,57 @@ export async function logQuizResult(data: LogQuizResultInput) {
   });
 
   if (batchRpcResult.error) {
-    // No fallback path — see gradeCard. The per-card loop this replaced
-    // swallowed individual update failures as warnings, so a quiz could report
-    // success while some cards never advanced their schedule.
-    logger.error('logQuizResult', 'apply_quiz_sm2_batch failed', {
+    logger.warn('logQuizResult', 'apply_quiz_sm2_batch failed, using fallback persistence path', {
       code: batchRpcResult.error.code,
       message: batchRpcResult.error.message,
     });
-    return { error: sanitizeDatabaseError(batchRpcResult.error, 'Failed to save quiz results.') };
+
+    const nowIso = new Date().toISOString();
+    for (const { card_id, sm2Result, grade, correct } of sm2Updates) {
+      const { error: updateErr } = await supabase
+        .from('cards')
+        .update({
+          state: sm2Result.state,
+          interval: sm2Result.interval,
+          ease_factor: sm2Result.easeFactor,
+          repetition_count: sm2Result.repetitionCount,
+          next_review_at: sm2Result.nextReviewAt.toISOString(),
+          last_review_at: nowIso,
+        })
+        .eq('id', card_id)
+        .eq('deck_id', result.data.deck_id);
+
+      if (updateErr) {
+        logger.error('logQuizResult', 'fallback update card error', { code: updateErr.code, message: updateErr.message });
+      }
+
+      const { error: logErr } = await supabase.from('study_logs').insert({
+        user_id: user.id,
+        card_id,
+        grade,
+        review_duration_ms: 0,
+      });
+
+      if (logErr) {
+        logger.warn('logQuizResult', 'fallback study log error', { code: logErr.code, message: logErr.message });
+      }
+
+      const { error: masteryErr } = await supabase.from('card_mastery_state').upsert(
+        {
+          user_id: user.id,
+          deck_id: result.data.deck_id,
+          card_id,
+          correct,
+          last_quiz_at: nowIso,
+          updated_at: nowIso,
+        },
+        { onConflict: 'user_id,deck_id,card_id' }
+      );
+
+      if (masteryErr) {
+        logger.warn('logQuizResult', 'fallback card mastery error', { code: masteryErr.code, message: masteryErr.message });
+      }
+    }
   }
   // ────────────────────────────────────────────────────────────────────────
 

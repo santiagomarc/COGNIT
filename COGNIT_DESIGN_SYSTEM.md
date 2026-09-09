@@ -192,13 +192,14 @@ delete the imports, the `--font-orbitron` / `--font-poppins` variables and the `
 
 ### 3.3 Scale
 
-Base is **14px** for application chrome.
+Base is **14px** for application chrome. Instrument Serif display headings and study text use an enlarged 1.5x scale:
 
 ```css
-/* display steps — Instrument Serif */
---type-display-lg: 2.75rem;   /* 44px — page hero, login brand      */
---type-display:    2rem;      /* 32px — page title (h1)             */
---type-display-sm: 1.5rem;    /* 24px — section heading (h2)        */
+/* display steps — Instrument Serif (1.5x enlarged scale, medium weight) */
+--type-display-xl: 4.125rem;  /* 66px — page hero, login brand      */
+--type-display-lg: 3rem;      /* 48px — page title (h1), modal head */
+--type-display:    2.25rem;   /* 36px — section heading (h2)        */
+--type-study-body: clamp(2.35rem, 3.6vw, 3.25rem); /* ~38-52px card text */
 
 /* chrome steps — Geist Sans */
 --type-h3:   1rem;      /* 16px, weight 600  */
@@ -209,8 +210,8 @@ Base is **14px** for application chrome.
 ```
 
 Rules:
-- Display type gets `letter-spacing: -0.015em` and `text-wrap: balance`. Never set Instrument Serif below 24px.
-- Prose measure caps at ~68ch; the card prompt caps at **32ch** (see §7.6).
+- Display type gets `letter-spacing: -0.02em` and `text-wrap: balance`. Never set Instrument Serif below 24px.
+- Prose measure caps at ~68ch; the card prompt caps at **36ch** (see §7.6).
 - Every column of digits gets `font-variant-numeric: tabular-nums`. No exceptions.
 - Uppercase is reserved for the `label` step. Do not uppercase buttons or headings.
 
@@ -283,7 +284,7 @@ in `src/lib/motion-configs.ts`). The new rule:
 | Hover, colour, border | Ease | `120ms ease` |
 | Key press / release | Ease | `70ms ease` |
 | Panel + overlay enter/exit | Ease-out | `160ms cubic-bezier(.2,.8,.2,1)` |
-| Card flip | Ease-out | `340ms cubic-bezier(.2,.8,.2,1)` |
+| Card flip | Smooth Ease-in-out | `520ms cubic-bezier(0.4, 0, 0.2, 1)` |
 | **Card leaving the stack** | **Spring** | `stiffness 260, damping 24` |
 
 That last row is the **only** spring left in the product. It exists because a graded card should feel
