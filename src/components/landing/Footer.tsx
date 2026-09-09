@@ -1,7 +1,6 @@
-'use client';
+/* A server component again: with the sparkle logo replaced by the wordmark there is no hook, no handler and no motion left in this file. */
 
-import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
 
 const footerLinks = {
   Product: [
@@ -25,17 +24,12 @@ const footerLinks = {
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card/20 backdrop-blur-sm">
+    <footer className="border-t border-border">
       <div className="mx-auto max-w-6xl px-6 py-14">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-5">
           {/* Brand column */}
           <div className="lg:col-span-2">
-            <Link href="/" className="inline-flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-border-strong">
-                <Sparkles className="h-4.5 w-4.5 text-primary" />
-              </div>
-              <span className="text-lg font-bold tracking-tight">Cognit</span>
-            </Link>
+            <Wordmark href="/" />
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
               The universal active recall engine. Transform any study material into
               an interactive learning experience powered by AI.
@@ -47,8 +41,8 @@ export function Footer() {
                 <a
                   key={platform}
                   href="#"
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card/40 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                  aria-label={platform}
+                  className="flex h-9 w-9 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dim outline-hidden transition-colors hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  aria-label={`Cognit on ${platform}`}
                 >
                   <SocialIcon name={platform} />
                 </a>
@@ -59,7 +53,7 @@ export function Footer() {
           {/* Link columns */}
           {Object.entries(footerLinks).map(([heading, links]) => (
             <div key={heading}>
-              <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground/80">
+              <h4 className="mb-3 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 {heading}
               </h4>
               <ul className="space-y-2.5">
@@ -67,7 +61,7 @@ export function Footer() {
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      className="rounded-[var(--radius-control)] text-sm text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       {link.label}
                     </a>
@@ -80,11 +74,11 @@ export function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
-          <p className="text-xs text-muted-foreground/60">
+          <p className="text-xs text-ink-dimmer">
             &copy; {new Date().getFullYear()} Cognit. All rights reserved.
           </p>
-          <p className="text-xs text-muted-foreground/60">
-            Built with Next.js, Supabase &amp; OpenAI
+          <p className="text-xs text-ink-dimmer">
+            Built with Next.js, Supabase &amp; Gemini
           </p>
         </div>
       </div>

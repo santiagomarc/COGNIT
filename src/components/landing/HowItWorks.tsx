@@ -1,98 +1,76 @@
-'use client';
+/* A server component: the scroll reveal lives in `RevealOnScroll`, so this file no longer calls a hook of its own. */
 
-import { m, useReducedMotion } from 'framer-motion';
-import { Upload, Wand2, GraduationCap } from 'lucide-react';
+import { RevealOnScroll } from '@/components/motion';
 
 const steps = [
   {
     number: '01',
-    icon: Upload,
     title: 'Upload or type your material',
     description:
       'Drop a PDF, paste your notes, or type questions manually. Cognit handles any format so you can start studying in seconds.',
   },
   {
     number: '02',
-    icon: Wand2,
-    title: 'AI generates smart flashcards',
+    title: 'AI generates the cards',
     description:
-      'Our AI reads your content, identifies key concepts, and creates perfectly-phrased question-answer pairs — no manual work required.',
+      'Cognit reads your content, identifies the key concepts, and writes question-and-answer pairs you can edit before you study them.',
   },
   {
     number: '03',
-    icon: GraduationCap,
     title: 'Master it with spaced repetition',
     description:
-      'The SM-2 algorithm schedules reviews at the optimal moment. Each session gets you closer to long-term retention.',
+      'The SM-2 algorithm schedules each card for the moment you are about to forget it. Every session pushes the next review further out.',
   },
 ];
 
+/**
+ * The three-step explainer (design system §6).
+ *
+ * The step glyphs are gone — one of them was `<Wand2/>`, and the other two were
+ * decorating a list that already numbers itself. §6 is explicit that a number
+ * is a better badge than an icon, and these steps come pre-numbered, so the
+ * icon boxes (each with a `blur-md` "glow ring" behind it) were carrying no
+ * information at all. The gradient rule down the left is now a 1px `--border`.
+ */
 export function HowItWorks() {
-  const reduced = useReducedMotion();
-
   return (
-    <section id="how-it-works" className="relative py-24 sm:py-32">
+    <section id="how-it-works" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
-        {/* Section header */}
-        <m.div
-          initial={reduced ? undefined : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
-          className="mx-auto mb-16 max-w-lg text-center"
-        >
-          <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
-            How It Works
+        <div className="mx-auto mb-16 max-w-lg text-center">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            How it works
           </p>
-          <h2 className="text-3xl font-semibold tracking-[-.03em] sm:text-4xl">
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-.03em] text-ink sm:text-4xl">
             Three steps to mastery
           </h2>
           <p className="mt-3 text-muted-foreground">
             From raw material to lasting knowledge in minutes, not hours.
           </p>
-        </m.div>
-
-        {/* Timeline */}
-        <div className="relative mx-auto max-w-2xl">
-          {/* Vertical line */}
-          <div className="absolute left-6 top-0 bottom-0 w-px bg-gradient-to-b from-primary/30 via-primary/15 to-transparent sm:left-8" />
-
-          <div className="space-y-16">
-            {steps.map((step, i) => {
-              const Icon = step.icon;
-              return (
-                <m.div
-                  key={step.number}
-                  initial={reduced ? undefined : { opacity: 0, x: -24 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: '-60px' }}
-                  transition={{ duration: 0.5, delay: i * 0.15 }}
-                  className="relative flex gap-6 sm:gap-8"
-                >
-                  {/* Step indicator */}
-                  <div className="relative z-10 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-border-strong bg-primary/10 shadow-lg shadow-primary/5 sm:h-16 sm:w-16">
-                    <Icon className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
-                    {/* Glow ring */}
-                    <span className="absolute inset-0 -z-10 rounded-2xl bg-primary/15 blur-md" />
-                  </div>
-
-                  {/* Content */}
-                  <div className="pt-1 sm:pt-3">
-                    <span className="mb-1 block text-xs font-bold uppercase tracking-widest text-primary/60">
-                      Step {step.number}
-                    </span>
-                    <h3 className="text-lg font-semibold tracking-tight sm:text-xl">
-                      {step.title}
-                    </h3>
-                    <p className="mt-2 leading-relaxed text-muted-foreground">
-                      {step.description}
-                    </p>
-                  </div>
-                </m.div>
-              );
-            })}
-          </div>
         </div>
+
+        <ol className="relative mx-auto max-w-2xl border-l border-border pl-8 sm:pl-10">
+          {steps.map((step, i) => (
+            <RevealOnScroll
+              key={step.number}
+              as="li"
+              delay={i * 0.08}
+              className="relative pb-12 last:pb-0"
+            >
+              {/* The marker sits on the rule, at the metric's own weight. */}
+              <span
+                aria-hidden="true"
+                className="absolute -left-[calc(2rem+1px)] top-1 flex h-6 w-[2px] items-center bg-ink sm:-left-[calc(2.5rem+1px)]"
+              />
+              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Step {step.number}
+              </p>
+              <h3 className="mt-2 text-lg font-semibold tracking-[-.02em] text-ink sm:text-xl">
+                {step.title}
+              </h3>
+              <p className="mt-2 leading-relaxed text-muted-foreground">{step.description}</p>
+            </RevealOnScroll>
+          ))}
+        </ol>
       </div>
     </section>
   );

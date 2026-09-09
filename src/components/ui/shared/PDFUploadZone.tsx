@@ -190,7 +190,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
           }}
-          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-container)] border border-dashed p-6 text-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-container)] border border-dashed p-6 text-center transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
             isDragging || selectedFile
               ? 'border-[var(--accent)] bg-surface-raised'
               : 'border-[var(--border-control)] hover:bg-surface-raised'
@@ -249,7 +249,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 id="card-count"
                 value={maxCardChoice}
                 onChange={(e) => setMaxCardChoice(e.target.value)}
-                className="h-[30px] rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className="h-[30px] rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>
@@ -294,7 +294,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               <div className="mt-4 h-[3px] w-48 overflow-hidden bg-border">
                 <m.div
                   className="h-full w-1/2 bg-ink-dim"
-                  animate={reduced ? undefined : { x: ['-100%', '200%'] }}
+                  animate={reduced ? { x: '-100%' } : { x: ['-100%', '200%'] }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                 />
               </div>

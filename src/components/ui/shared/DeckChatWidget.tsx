@@ -284,7 +284,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             type="button"
             onClick={() => setActiveSessionId(session.id)}
             aria-pressed={activeSessionId === session.id}
-            className={`rounded-[var(--radius-control)] border px-3 py-1 text-xs transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+            className={`rounded-[var(--radius-control)] border px-3 py-1 text-xs transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               activeSessionId === session.id
                 ? 'border-[var(--border-control)] bg-surface-raised text-ink'
                 : 'border-border text-ink-dim hover:border-border-strong hover:text-ink'
@@ -346,7 +346,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
                   ) : null}
                   <p className="text-destructive">{state.errorMessage}</p>
                   {state.retryable ? (
-                    <Button type="button" size="sm" variant="outline" onClick={retry} className="gap-1.5">
+                    <Button type="button" size="sm" onClick={retry} className="gap-1.5">
                       <RotateCcw className="h-3 w-3" /> Retry
                     </Button>
                   ) : null}
@@ -365,7 +365,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
               type="button"
               onClick={() => void handleSendMessage(suggestion)}
               disabled={isStreaming}
-              className="rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1 text-xs text-ink-dim transition-colors outline-none hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              className="rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1 text-xs text-ink-dim transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
               {suggestion}
             </button>

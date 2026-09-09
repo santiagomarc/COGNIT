@@ -644,7 +644,7 @@ export function FlashcardReviewClient({
               <Button asChild>
                 <Link href={`/dashboard/${deckId}/quiz?count=10&mode=mcq`}>Take a quiz instead</Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button asChild>
                 <Link href={`/dashboard/${deckId}/study?count=10&scope=include_reviewed`}>
                   Study ahead anyway
                 </Link>
@@ -679,7 +679,7 @@ export function FlashcardReviewClient({
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button onClick={startNewSession} variant="outline">Start New Session</Button>
+            <Button onClick={startNewSession}>Start New Session</Button>
             <Button onClick={resumePreviousSession}>Resume Session</Button>
           </div>
 
@@ -774,8 +774,12 @@ export function FlashcardReviewClient({
         {completed ? (
           <m.div
             key="summary"
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            /* The only motion in this file that was not gated on the
+               preference (§10.5) — and a scale-in is exactly the kind a
+               reduced-motion user asks not to see. */
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
             className="mx-auto max-w-2xl space-y-6"
           >
             <div className="surface p-8 text-center">
@@ -830,7 +834,7 @@ export function FlashcardReviewClient({
             </div>
 
             <div className="flex justify-center gap-3">
-              <Button onClick={restart} variant="outline" className="gap-2">
+              <Button onClick={restart} className="gap-2">
                 <RotateCcw className="h-4 w-4" />
                 Review Again
               </Button>

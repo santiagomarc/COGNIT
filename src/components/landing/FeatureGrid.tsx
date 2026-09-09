@@ -1,108 +1,88 @@
-'use client';
+/* A server component, for the same reason as HowItWorks — the only client code left is inside `RevealOnScroll`. */
 
-import { m, useReducedMotion } from 'framer-motion';
-import {
-  FileText,
-  Wand2,
-  Box,
-  Clock,
-  Moon,
-  Smartphone,
-} from 'lucide-react';
+import { RevealOnScroll } from '@/components/motion';
 
+/*
+ * Each feature leads with a fact rather than a glyph (§6). The old grid gave
+ * every card a tinted icon box — one of them `<Wand2/>` — and the icons were
+ * interchangeable, which is the tell that they were decoration.
+ *
+ * Two descriptions were also no longer true. "Dark Mode" promised "a premium
+ * Deep Navy dark theme with glassmorphism and neon accents"; the product is
+ * true-neutral zinc with no glass and no neon, in two themes that get equal QA.
+ * "3D Flashcards" sold the flip as the feature. The flip is still there, and so
+ * is swipe-to-grade — but what the card is actually for is reading a long
+ * answer without truncation, which is what the copy now says.
+ */
 const features = [
   {
-    icon: FileText,
-    title: 'PDF Import',
+    stat: 'PDF',
+    title: 'Import anything',
     description:
-      'Upload any document and auto-extract study material. Supports PDFs, markdown, and plain text.',
+      'Upload a document and Cognit extracts the study material. PDFs, markdown and plain text.',
   },
   {
-    icon: Wand2,
-    title: 'AI Generation',
+    stat: 'AI',
+    title: 'Cards written for you',
     description:
-      'GPT-powered card creation turns dense content into perfectly-phrased question-answer pairs.',
+      'Dense source material becomes question-and-answer pairs you can edit, tag and quiz on.',
   },
   {
-    icon: Box,
-    title: '3D Flashcards',
+    stat: 'SM-2',
+    title: 'Scheduled, not guessed',
     description:
-      'Buttery-smooth 3D flip animations with drag gestures make studying feel satisfying.',
+      'Every grade moves the card along a real interval. The deck tells you what is due and when.',
   },
   {
-    icon: Clock,
-    title: 'Spaced Repetition',
+    stat: '4',
+    title: 'Grades, on the home row',
     description:
-      'The SM-2 algorithm schedules each card at the scientifically optimal review interval.',
+      'Again, hard, good, easy — bound to 1 through 4, with the interval each one buys shown before you commit.',
   },
   {
-    icon: Moon,
-    title: 'Dark Mode',
+    stat: '2',
+    title: 'Themes, both first-class',
     description:
-      'A premium Deep Navy dark theme with glassmorphism and neon accents, plus a clean light mode.',
+      'A true-neutral light and dark theme. Colour appears only where it reports scheduler state.',
   },
   {
-    icon: Smartphone,
-    title: 'Cross-Platform',
+    stat: '⌘K',
+    title: 'Keyboard first',
     description:
-      'Fully responsive design works on desktop, tablet, and mobile. Study anywhere.',
+      'Jump to any deck, start a session or flip a theme without reaching for the mouse.',
   },
 ];
 
 export function FeatureGrid() {
-  const reduced = useReducedMotion();
-
   return (
-    <section className="relative py-24 sm:py-32">
+    <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
-        {/* Header */}
-        <m.div
-          initial={reduced ? undefined : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.5 }}
-          className="mx-auto mb-14 max-w-lg text-center"
-        >
-          <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-primary">
+        <div className="mx-auto mb-14 max-w-lg text-center">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Features
           </p>
-          <h2 className="text-3xl font-semibold tracking-[-.03em] sm:text-4xl">
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-.03em] text-ink sm:text-4xl">
             Everything you need to ace every exam
           </h2>
           <p className="mt-3 text-muted-foreground">
             Built for serious students who want real results.
           </p>
-        </m.div>
+        </div>
 
-        {/* Grid */}
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature, i) => {
-            const Icon = feature.icon;
-            return (
-              <m.div
-                key={feature.title}
-                initial={reduced ? undefined : { opacity: 0, y: 24, scale: 0.96 }}
-                whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                viewport={{ once: true, margin: '-40px' }}
-                transition={{
-                  delay: i * 0.08,
-                  type: 'spring',
-                  stiffness: 260,
-                  damping: 20,
-                }}
-                whileHover={reduced ? undefined : { y: -4, transition: { duration: 0.2 } }}
-                className="glass-card group rounded-2xl p-6 transition-shadow"
-              >
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl border border-border-strong bg-primary/10 transition-colors group-hover:bg-primary/15">
-                  <Icon className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="text-base font-semibold tracking-tight">{feature.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                  {feature.description}
-                </p>
-              </m.div>
-            );
-          })}
+          {features.map((feature, i) => (
+            <RevealOnScroll key={feature.title} delay={i * 0.05} className="surface p-6">
+              <p className="font-mono text-2xl font-semibold leading-none tracking-[-.03em] tnum text-ink">
+                {feature.stat}
+              </p>
+              <h3 className="mt-4 text-base font-semibold tracking-[-.015em] text-ink">
+                {feature.title}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {feature.description}
+              </p>
+            </RevealOnScroll>
+          ))}
         </div>
       </div>
     </section>

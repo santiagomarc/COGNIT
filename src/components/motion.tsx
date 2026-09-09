@@ -4,7 +4,19 @@ import { m, useReducedMotion, type Variants } from 'framer-motion';
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { motionTransitions } from '@/lib/motion-configs';
 
-function useHasMounted() {
+/**
+ * `false` on the server and on the first client render, `true` afterwards.
+ *
+ * This is what makes reduced-motion safe to branch on. `useReducedMotion()`
+ * cannot know the user's preference during SSR, so any component that renders
+ * `initial={reduced ? false : {...}}` directly ships the *animated* markup from
+ * the server — `opacity: 0` plus a transform — and a reduced-motion client then
+ * renders the resting state, so React finds markup it did not expect and throws
+ * a hydration error. Gating on this hook means server and first client render
+ * are byte-identical resting states for everyone, and the preference is only
+ * consulted once it can actually be read.
+ */
+export function useHasMounted() {
   return useSyncExternalStore(
     () => () => {},
     () => true,
@@ -113,6 +125,42 @@ export function FadeInUp({
     >
       {children}
     </m.div>
+  );
+}
+
+/**
+ * A section that animates in as it scrolls into view.
+ *
+ * The landing page is allowed more expressive motion than the app, but it is
+ * not allowed a hydration mismatch — so scroll reveals go through here rather
+ * than through raw `m.div` + `useReducedMotion()`.
+ */
+export function RevealOnScroll({
+  children,
+  className,
+  delay = 0,
+  as = 'div',
+}: {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+  as?: 'div' | 'li';
+}) {
+  const hasMounted = useHasMounted();
+  const reduced = useReducedMotion();
+  const still = !hasMounted || reduced;
+  const Component = as === 'li' ? m.li : m.div;
+
+  return (
+    <Component
+      initial={still ? false : { opacity: 0, y: 16 }}
+      whileInView={still ? undefined : { opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={still ? { duration: 0 } : { ...motionTransitions.panel, delay }}
+      className={className}
+    >
+      {children}
+    </Component>
   );
 }
 

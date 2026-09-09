@@ -51,7 +51,7 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                     <select
                         value={accentTag}
                         onChange={(event) => setAccentTag(event.target.value)}
-                        className="h-8 w-full rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                        className="h-8 w-full rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-xs outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                         aria-label="Deck subject tag"
                     >
                         <option value="">No tag</option>

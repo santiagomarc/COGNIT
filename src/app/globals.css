@@ -306,7 +306,37 @@
 }
 
 /*
- * ─── Surface (§7.1) — the replacement for .glass-card.
+ * ─── Focus ring (§7.7, §9) — defined once, in CSS, on purpose ───
+ *
+ * Every interactive element must have a visible focus state. The codebase
+ * expressed that with Tailwind's
+ * `outline-hidden focus-visible:outline-2 focus-visible:outline-[var(--accent)]`
+ * recipe on ~28 controls — and in Tailwind v4 that recipe silently does
+ * nothing. `outline-hidden` (like `outline-none`) sets `--tw-outline-style:
+ * none`, and `outline-2` compiles to `outline-style: var(--tw-outline-style)`.
+ * The width, the colour and the offset all landed; the *style* stayed `none`,
+ * so no ring was ever painted. Measured, not assumed: a keyboard-focused
+ * control reported `outline-width: 2px`, `outline-color: rgb(250,250,250)`,
+ * `outline-offset: 2px` — and `outline-style: none`.
+ *
+ * This rule is unlayered, so it beats every Tailwind utility regardless of
+ * specificity, and it uses `:where()` so it has zero specificity of its own —
+ * the components below that define a different focus treatment (the card's
+ * corner brackets, the grade key, the quiz option, the rail) still win.
+ */
+:where(a[href], button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* An element that manages focus on a child (the deck filter) opts in here. */
+:where(.focus-within-ring):focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+ * ─── Surface (§7.1) — the one panel primitive.
  *     Opaque ground, one 1px rule, one chamfer. No blur: it degrades text
  *     contrast and costs compositing on the study canvas.
  */
@@ -323,19 +353,6 @@
 }
 .surface--interactive:hover {
   border-color: var(--border-strong);
-}
-
-/*
- * .glass-card is redefined in place rather than renamed, so all 57 call sites
- * change appearance without being edited (execution plan, Phase 1 risk note).
- * Radius is deliberately NOT set here: these rules are unlayered and would
- * override the `rounded-*` utility each call site already carries — and that
- * utility now resolves to a legal step of the three-radius scale anyway.
- */
-.glass-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--elevate);
 }
 
 /*
@@ -567,6 +584,17 @@ button.flip {
   overscroll-behavior: contain;
   scrollbar-width: thin;
   padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+/*
+ * When the card is the reveal control it is operable, so its bounds are
+ * non-text content that identifies a UI component — WCAG 2.2 SC 1.4.11 applies
+ * and --border-strong (1.91:1 dark / 1.43:1 light) does not meet it. The
+ * read-only <article> form, used for previews, keeps the decorative edge.
+ */
+button.flip {
+  border-color: var(--border-control);
+  cursor: pointer;
 }
 
 .flip__face--answer {
@@ -948,7 +976,13 @@ button.flip {
   padding: 0 9px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
-  color: var(--ink-faint);
+  /*
+   * --ink-dimmer, not --ink-faint. The collapsed rail shows only a glyph, and
+   * --ink-faint is legal for a non-text mark — but the expanded rail reveals a
+   * text label inheriting this colour, and --ink-faint is 2.57:1 dark /
+   * 2.48:1 light. §9 is unconditional: --ink-faint is never text.
+   */
+  color: var(--ink-dimmer);
   background: transparent;
   transition: color var(--dur-hover) ease, background-color var(--dur-hover) ease,
     border-color var(--dur-hover) ease;

@@ -2,27 +2,18 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import { m, useReducedMotion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PasswordStrength } from '@/components/ui/shared/PasswordStrength';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
 import { login, signup, resetPassword, loginWithOAuth } from '@/app/auth/actions';
 import { loginSchema, signupSchema, resetPasswordSchema } from '@/lib/schemas';
-import {
-  Sparkles,
-  BookOpen,
-  Brain,
-  Layers,
-  Eye,
-  EyeOff,
-  Loader2,
-  ArrowLeft,
-  Mail,
-  Github,
-} from 'lucide-react';
+import { motionTransitions } from '@/lib/motion-configs';
+import { useHasMounted } from '@/components/motion';
+import { Eye, EyeOff, Loader2, ArrowLeft, Github } from 'lucide-react';
 
 function GoogleIcon() {
   return (
@@ -36,32 +27,19 @@ function GoogleIcon() {
 }
 import { toast } from 'sonner';
 
-/* ── Floating flashcard illustration props ── */
-const floatingCards = [
-  {
-    rotation: -6,
-    x: '12%',
-    y: '22%',
-    delay: 0,
-    icon: BookOpen,
-    label: 'What is a closure?',
-  },
-  {
-    rotation: 4,
-    x: '58%',
-    y: '36%',
-    delay: 0.8,
-    icon: Brain,
-    label: 'Explain Big-O notation',
-  },
-  {
-    rotation: -3,
-    x: '28%',
-    y: '62%',
-    delay: 1.6,
-    icon: Layers,
-    label: 'Define polymorphism',
-  },
+/*
+ * The left panel's illustration. It used to be three cards bobbing on an
+ * infinite loop, each with a tinted icon box — two of them `<BookOpen/>` and
+ * `<Brain/>`. What a prospective user actually needs to see is what the product
+ * *is*: a prompt, and the interval the scheduler assigns once you answer it.
+ *
+ * So the illustration is now a specimen of the real deck row (§7.5) — a state
+ * tick, a prompt, and a mono interval — which is both honest and free.
+ */
+const SPECIMEN_CARDS = [
+  { prompt: 'What is a closure?', interval: '4d', state: 'var(--state-mastered)' },
+  { prompt: 'Explain Big-O notation', interval: '11h', state: 'var(--state-learning)' },
+  { prompt: 'Define polymorphism', interval: 'due', state: 'var(--state-due)' },
 ];
 
 type AuthMode = 'login' | 'signup' | 'forgot';
@@ -76,7 +54,15 @@ function resolveMode(value: string | null): AuthMode {
 
 export default function LoginClient() {
   const searchParams = useSearchParams();
-  const reduced = useReducedMotion();
+  /*
+   * `useReducedMotion()` cannot know the preference during SSR, so branching a
+   * render-time prop on it alone ships the animated markup from the server and
+   * mismatches for a reduced-motion client. Gating on `useHasMounted` makes the
+   * server and the first client render the same resting state for everyone.
+   */
+  const hasMounted = useHasMounted();
+  const prefersReduced = useReducedMotion();
+  const reduced = !hasMounted || prefersReduced;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -222,76 +208,44 @@ export default function LoginClient() {
   return (
     <div className="flex min-h-screen">
       {/* ═══════════ Left panel (branding) ═══════════ */}
-      <div className="relative hidden w-[60%] overflow-hidden bg-gradient-to-br from-background via-primary/5 to-background lg:flex">
-        {/* Gradient orbs */}
-        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-          <div className="absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-primary/8 blur-3xl" />
-          <div className="absolute -bottom-32 -right-32 h-[360px] w-[360px] rounded-full bg-primary/8 blur-3xl" />
-        </div>
+      <div className="relative hidden w-[55%] flex-col justify-center border-r border-border px-12 lg:flex">
+        <div className="mx-auto w-full max-w-md">
+          <Wordmark href="/" size="lg" />
 
-        {/* Center content */}
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-12">
-          {/* Logo */}
-          <Link href="/" className="mb-6 inline-flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-primary/15">
-              <Sparkles className="h-6 w-6 text-primary" />
-            </div>
-            <span className="text-[28px] font-semibold tracking-[-.03em] text-ink">
-              Cognit
-            </span>
-          </Link>
-
-          <p className="max-w-sm text-center text-lg leading-relaxed text-muted-foreground">
-            The universal active recall engine.
-            <br />
-            <span className="text-foreground/80 font-medium">
-              Study smarter, remember forever.
-            </span>
+          <p className="mt-4 max-w-sm text-lg leading-relaxed text-muted-foreground">
+            The universal active recall engine.{' '}
+            <span className="text-ink">Study smarter, remember forever.</span>
           </p>
 
-          {/* Floating flashcard illustrations */}
-          <div className="relative mt-12 h-72 w-full max-w-md">
-            {floatingCards.map((card) => {
-              const Icon = card.icon;
-              return (
-                <m.div
-                  key={card.label}
-                  className="absolute glass-card rounded-xl border border-border px-5 py-4 shadow-lg"
-                  style={{
-                    left: card.x,
-                    top: card.y,
-                    rotate: card.rotation,
-                  }}
-                  animate={
-                    reduced
-                      ? undefined
-                      : {
-                          y: [0, -10, 0],
-                        }
-                  }
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: 'easeInOut',
-                    delay: card.delay,
-                  }}
+          {/* A specimen of the real deck row (§7.5), not an illustration of one. */}
+          <div className="mt-10 border-t border-border">
+            {SPECIMEN_CARDS.map((card) => (
+              <div
+                key={card.prompt}
+                className="flex items-center gap-3 border-b border-border py-3"
+              >
+                <span
+                  aria-hidden="true"
+                  className="h-4 w-[2px] shrink-0 rounded-[1px]"
+                  style={{ backgroundColor: card.state }}
+                />
+                <span className="min-w-0 flex-1 truncate text-sm text-ink-dim">
+                  {card.prompt}
+                </span>
+                <span
+                  className="font-mono text-[13px] tnum"
+                  style={{ color: card.state }}
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border-strong bg-primary/10">
-                      <Icon className="h-4 w-4 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium whitespace-nowrap">
-                      {card.label}
-                    </span>
-                  </div>
-                </m.div>
-              );
-            })}
+                  {card.interval}
+                </span>
+              </div>
+            ))}
           </div>
-        </div>
 
-        {/* Subtle border on the right edge */}
-        <div className="absolute inset-y-0 right-0 w-px bg-gradient-to-b from-transparent via-primary/15 to-transparent" />
+          <p className="mt-4 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Next review, scheduled by SM-2
+          </p>
+        </div>
       </div>
 
       {/* ═══════════ Right panel (auth form) ═══════════ */}
@@ -301,53 +255,50 @@ export default function LoginClient() {
           <ThemeToggle />
         </div>
 
-        {/* Mobile-only logo */}
-        <Link href="/" className="mb-8 inline-flex items-center gap-2.5 lg:hidden">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border-strong bg-primary/15">
-            <Sparkles className="h-4.5 w-4.5 text-primary" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Cognit</span>
-        </Link>
+        {/* Mobile-only mark */}
+        <div className="mb-8 lg:hidden">
+          <Wordmark href="/" />
+        </div>
 
         <AnimatePresence mode="wait">
           <m.div
             key={emailSent ? 'sent' : mode}
-            initial={reduced ? undefined : { opacity: 0, y: 16 }}
+            initial={reduced ? false : { opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={reduced ? undefined : { opacity: 0, y: -12 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
             className="w-full max-w-sm"
           >
             {/* ── Email sent confirmation ── */}
             {emailSent ? (
-              <div className="text-center space-y-4">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 border border-border-strong">
-                  <Mail className="h-7 w-7 text-primary" />
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight">Check your email</h1>
-                <p className="text-sm text-muted-foreground leading-relaxed">
+              <div className="space-y-4">
+                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Check your email
+                </p>
+                <h1 className="text-2xl font-semibold tracking-[-.025em]">
+                  {mode === 'signup' ? 'Confirm your address' : 'Reset link sent'}
+                </h1>
+                <p className="text-sm leading-relaxed text-muted-foreground">
                   {mode === 'signup'
-                    ? "We've sent a confirmation link to "
-                    : "If an account exists, we've sent a reset link to "}
-                  <span className="font-medium text-foreground">{email}</span>
+                    ? 'We sent a confirmation link to '
+                    : 'If an account exists, we sent a reset link to '}
+                  <span className="font-mono text-ink">{email}</span>. Open it to
+                  {mode === 'signup' ? ' finish signing up.' : ' choose a new password.'}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Didn&apos;t get it? Check your spam folder or{' '}
+                  Nothing after a minute? Check your spam folder, then{' '}
                   <button
                     type="button"
                     onClick={() => setEmailSent(false)}
-                    className="font-medium text-primary hover:underline"
+                    className="rounded-[var(--radius-control)] font-medium text-ink underline underline-offset-4 outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   >
-                    try again
+                    send it again
                   </button>
+                  .
                 </p>
-                <Button
-                  variant="outline"
-                  onClick={() => switchMode('login')}
-                  className="mt-2 gap-2"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Back to Sign In
+                <Button onClick={() => switchMode('login')} className="mt-2 gap-2">
+                  <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  Back to sign in
                 </Button>
               </div>
             ) : (
@@ -358,13 +309,13 @@ export default function LoginClient() {
                     <button
                       type="button"
                       onClick={() => switchMode('login')}
-                      className="mb-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                      className="mb-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] text-sm text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                      Back to Sign In
+                      <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                      Back to sign in
                     </button>
                   )}
-                  <h1 className="text-2xl font-bold tracking-tight">
+                  <h1 className="text-2xl font-semibold tracking-[-.025em]">
                     {headings[mode].title}
                   </h1>
                   <p className="mt-1.5 text-sm text-muted-foreground">
@@ -408,8 +359,7 @@ export default function LoginClient() {
                           <button
                             type="button"
                             onClick={() => switchMode('forgot')}
-                            className="text-xs font-medium text-primary transition-colors hover:underline"
-                            tabIndex={-1}
+                            className="rounded-[var(--radius-control)] text-xs font-medium text-ink-dim underline-offset-4 transition-colors outline-hidden hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                           >
                             Forgot password?
                           </button>
@@ -444,14 +394,14 @@ export default function LoginClient() {
                         <button
                           type="button"
                           onClick={() => setShowPassword((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                          tabIndex={-1}
+                          className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-control)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                          aria-pressed={showPassword}
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
+                            <EyeOff className="h-4 w-4" aria-hidden="true" />
                           ) : (
-                            <Eye className="h-4 w-4" />
+                            <Eye className="h-4 w-4" aria-hidden="true" />
                           )}
                         </button>
                       </div>
@@ -471,33 +421,32 @@ export default function LoginClient() {
 
                   {/* General error */}
                   {generalError && (
-                    <m.div
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                    <p
+                      className="rounded-[var(--radius-container)] border border-[var(--state-lapsed)] px-3 py-2.5 text-sm"
+                      style={{ color: 'var(--state-lapsed)' }}
                       role="alert"
                     >
                       {generalError}
-                    </m.div>
+                    </p>
                   )}
 
                   {/* Submit button */}
-                  <Button type="submit" className="w-full" disabled={isPending}>
+                  <Button type="submit" variant="primary" className="w-full" disabled={isPending}>
                     {isPending ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                         {mode === 'login'
-                          ? 'Signing in...'
+                          ? 'Signing in…'
                           : mode === 'signup'
-                            ? 'Creating account...'
-                            : 'Sending link...'}
+                            ? 'Creating account…'
+                            : 'Sending link…'}
                       </>
                     ) : mode === 'login' ? (
-                      'Sign In'
+                      'Sign in'
                     ) : mode === 'signup' ? (
-                      'Create Account'
+                      'Create account'
                     ) : (
-                      'Send Reset Link'
+                      'Send reset link'
                     )}
                   </Button>
                 </form>
@@ -513,7 +462,6 @@ export default function LoginClient() {
                     <div className="mt-4 grid grid-cols-2 gap-3">
                       <Button
                         type="button"
-                        variant="outline"
                         onClick={() => handleOAuthClick('google')}
                         disabled={oauthProvider !== null || isPending}
                       >
@@ -522,7 +470,6 @@ export default function LoginClient() {
                       </Button>
                       <Button
                         type="button"
-                        variant="outline"
                         onClick={() => handleOAuthClick('github')}
                         disabled={oauthProvider !== null || isPending}
                       >
@@ -544,9 +491,9 @@ export default function LoginClient() {
                       onClick={() =>
                         switchMode(mode === 'login' ? 'signup' : 'login')
                       }
-                      className="font-medium text-primary transition-colors hover:underline"
+                      className="rounded-[var(--radius-control)] font-medium text-ink underline underline-offset-4 outline-hidden transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
-                      {mode === 'login' ? 'Sign Up' : 'Sign In'}
+                      {mode === 'login' ? 'Sign up' : 'Sign in'}
                     </button>
                   </p>
                 )}

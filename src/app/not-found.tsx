@@ -1,140 +1,60 @@
-'use client';
-
-import { Rocket, ArrowLeft, Home, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+
 import { Button } from '@/components/ui/button';
-import { m } from 'framer-motion';
-import { StaggerContainer, StaggerItem } from '@/components/motion';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
 
-const FLOATING_SPARKS = [
-  { top: '12%', left: '18%', driftY: -110, duration: 3.2, delay: 0.2 },
-  { top: '24%', left: '76%', driftY: -92, duration: 4.4, delay: 1.1 },
-  { top: '48%', left: '34%', driftY: -136, duration: 3.8, delay: 0.6 },
-  { top: '62%', left: '68%', driftY: -104, duration: 4.9, delay: 1.8 },
-  { top: '78%', left: '22%', driftY: -88, duration: 3.6, delay: 1.3 },
-];
+export const metadata = {
+  title: 'Page not found · Cognit',
+};
 
+/**
+ * 404 (design system §1.1, §9.4).
+ *
+ * What this replaced was the densest concentration of anti-patterns left in the
+ * codebase: two infinitely-animating blurred orbs, five looping "floating
+ * sparks", a `<Rocket/>` bobbing on a 4-second cycle with a pulsing
+ * `<Sparkles/>` clipped to its corner, a translucent card with `backdrop-blur-xl`,
+ * and a gradient wash over the top. Eleven animations ran forever on a page
+ * whose only job is to get the reader somewhere else.
+ *
+ * The copy went too. "Lost in Space" and "The neural pathway you're trying to
+ * access doesn't exist in our memory banks" said nothing a reader could act on
+ * — and "Home Node" is not a place. An error page says what happened and what
+ * to do next.
+ *
+ * It is a server component now: nothing here needs state, an effect, or the
+ * animation runtime.
+ */
 export default function NotFound() {
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden bg-background">
-      {/* Background Animated Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <m.div
-          animate={{
-            y: [0, -20, 0],
-            rotate: [0, 5, 0],
-          }}
-          transition={{
-            duration: 5,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="absolute -top-10 -left-10 h-64 w-64 rounded-full bg-primary/10 blur-[100px]"
-        />
-        <m.div
-          animate={{
-            y: [0, 20, 0],
-            rotate: [0, -5, 0],
-          }}
-          transition={{
-            duration: 7,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="absolute -bottom-10 -right-10 h-64 w-64 rounded-full bg-primary/10 blur-[100px]"
-        />
-        
-        {/* Floating Sparks */}
-        {FLOATING_SPARKS.map((spark, i) => (
-          <m.div
-            key={i}
-            className="absolute h-2 w-2 rounded-full bg-primary/40"
-            style={{
-              top: spark.top,
-              left: spark.left,
-            }}
-            animate={{
-              y: [0, spark.driftY],
-              opacity: [0, 1, 0],
-              scale: [0, 1, 0],
-            }}
-            transition={{
-              duration: spark.duration,
-              repeat: Infinity,
-              ease: "linear",
-              delay: spark.delay,
-            }}
-          />
-        ))}
-      </div>
+    <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
+      <Wordmark href="/" size="sm" />
 
-      <StaggerContainer className="z-10 w-full max-w-lg">
-        <div className="glass-card mx-auto rounded-3xl p-10 text-center relative overflow-hidden backdrop-blur-xl">
-          {/* Subtle gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none" />
+      <div className="mt-10 border-t border-border pt-8">
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Error
+        </p>
+        <p className="mt-2 font-mono text-[52px] font-semibold leading-none tracking-[-0.04em] tnum text-ink">
+          404
+        </p>
 
-          <StaggerItem>
-            <m.div 
-              className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-primary/10 border border-border-strong relative"
-              animate={{ 
-                y: [0, -10, 0],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            >
-              <Rocket className="h-10 w-10 text-primary" strokeWidth={1.5} />
-              <m.div
-                animate={{
-                  opacity: [0.5, 1, 0.5],
-                  scale: [0.8, 1.2, 0.8],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                className="absolute -bottom-2 -right-2"
-              >
-                <Sparkles className="h-5 w-5 text-ink-dim" />
-              </m.div>
-            </m.div>
-          </StaggerItem>
+        <h1 className="mt-5 text-2xl font-semibold tracking-[-.025em] text-ink">
+          This page does not exist
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          The link may be mistyped, or the deck it pointed at was deleted. Shared
+          deck links also stop working once the owner makes the deck private.
+        </p>
 
-          <StaggerItem>
-            <h1 className="mb-2 font-mono text-7xl font-semibold tracking-[-.03em] tnum text-ink">
-              404
-            </h1>
-          </StaggerItem>
-          
-          <StaggerItem>
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">Lost in Space</h2>
-          </StaggerItem>
-          
-          <StaggerItem>
-            <p className="mt-3 text-base text-muted-foreground leading-relaxed max-w-[280px] mx-auto">
-              The neural pathway you&apos;re trying to access doesn&apos;t exist in our memory banks.
-            </p>
-          </StaggerItem>
-
-          <StaggerItem className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/dashboard" className="w-full sm:w-auto">
-              <Button className="w-full gap-2 group">
-                <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-                Return to Dashboard
-              </Button>
-            </Link>
-            <Link href="/" className="w-full sm:w-auto">
-              <Button variant="outline" className="w-full gap-2">
-                <Home className="h-4 w-4" />
-                Home Node
-              </Button>
-            </Link>
-          </StaggerItem>
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <Button asChild variant="primary">
+            <Link href="/dashboard">Go to your decks</Link>
+          </Button>
+          <Button asChild>
+            <Link href="/">Home</Link>
+          </Button>
         </div>
-      </StaggerContainer>
+      </div>
     </div>
   );
 }

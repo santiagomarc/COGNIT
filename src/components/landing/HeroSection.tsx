@@ -1,194 +1,179 @@
 'use client';
 
 import Link from 'next/link';
-import { m, useScroll, useTransform, useReducedMotion } from 'framer-motion';
-import { useRef } from 'react';
+import { ArrowRight } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Sparkles, ArrowRight, Layers, BarChart3, Brain } from 'lucide-react';
+import { Kbd } from '@/components/ui/Kbd';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
+import { FadeInUp } from '@/components/motion';
 
+/*
+ * The mock dashboard beneath the fold. It is a specimen of the real deck index
+ * (§7.5) — state tick, name, right-aligned mono numerics — rather than a
+ * drawing of one. Showing the actual instrument is both more honest marketing
+ * and the only version that cannot drift from the product.
+ */
+const SPECIMEN_DECKS = [
+  { name: 'Automata Theory', cards: 24, due: 7, mastery: 62, state: 'var(--state-due)' },
+  { name: 'Data Structures', cards: 18, due: 0, mastery: 88, state: 'var(--state-mastered)' },
+  { name: 'Linear Algebra', cards: 31, due: 3, mastery: 41, state: 'var(--state-learning)' },
+];
+
+/**
+ * The landing hero (design system §1.1, §9.2).
+ *
+ * What left, and why each was not a matter of taste:
+ *
+ *  - **Three blurred gradient orbs** (two full-page, one glow under the mockup).
+ *    §1.1 names decorative blurred orbs "the single loudest AI-template tell".
+ *  - **Two `<Sparkles/>`** — one as the logo, one in a badge reading
+ *    "AI-Powered Active Recall", which is a claim about the vendor rather than
+ *    a fact about the reader.
+ *  - **A gradient-clipped headline.** §1.1 bans gradient text outright.
+ *  - **`<Brain/>`** inside the mockup, plus a `colorMap` indirection that only
+ *    existed because two deck tiles wanted different tints.
+ *  - **A scroll-linked parallax** on the mockup (`useScroll` + three
+ *    `useTransform`s + a spring), which ran a transform on every scroll frame.
+ *
+ * It also fixes a **hydration mismatch under `prefers-reduced-motion`**
+ * (pre-existing, reproduced at baseline). The old code passed
+ * `initial={reduced ? undefined : {...}}` to a raw `m.div`. Framer's
+ * `useReducedMotion()` cannot know the user's preference during SSR, so the
+ * server always rendered the *animated* branch — `opacity: 0` and a transform —
+ * and a reduced-motion client then rendered the *unanimated* branch, so React
+ * found markup it did not expect. Motion here now goes through `FadeInUp`,
+ * which resolves the preference behind a `useSyncExternalStore` mounted check:
+ * server and first client render are byte-identical resting states, and motion
+ * only starts once hydration has happened and the preference is actually known.
+ *
+ * Per the plan the landing may keep more expressive motion than the app; what
+ * it may not keep is anything on §1.1's list.
+ */
 export function HeroSection() {
-  const reduced = useReducedMotion();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start start', 'end start'],
-  });
-
-  const mockupY = useTransform(scrollYProgress, [0, 1], [0, 120]);
-  const mockupRotate = useTransform(scrollYProgress, [0, 1], [2, -4]);
-  const mockupScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
-
   return (
-    <section ref={containerRef} className="relative min-h-screen overflow-hidden">
+    <section className="relative">
       {/* ── Navbar ── */}
-      <nav className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 border border-border-strong">
-            <Sparkles className="h-4.5 w-4.5 text-primary" />
-          </div>
-          <span className="text-lg font-bold tracking-tight">Cognit</span>
-        </Link>
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
+        <Wordmark href="/" />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Link href="/login?mode=login">
-            <Button variant="ghost" size="sm">Sign In</Button>
-          </Link>
-          <Link href="/login?mode=signup">
-            <Button size="sm" className="hidden sm:inline-flex">
-              Sign Up
-              <ArrowRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
-          </Link>
+          <Button asChild>
+            <Link href="/login?mode=login">Sign in</Link>
+          </Button>
+          <Button asChild variant="primary" className="hidden sm:inline-flex">
+            <Link href="/login?mode=signup">
+              Sign up
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          </Button>
         </div>
       </nav>
 
-      {/* ── Hero content ── */}
-      <div className="relative z-20 mx-auto max-w-6xl px-6 pt-16 pb-8 md:pt-24">
+      <div className="mx-auto max-w-6xl px-6 pb-8 pt-16 md:pt-24">
         <div className="mx-auto max-w-3xl text-center">
-          {/* Badge */}
-          <m.div
-            initial={reduced ? undefined : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-border-strong bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary backdrop-blur-sm"
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            AI-Powered Active Recall
-          </m.div>
+          <FadeInUp>
+            {/* A number is a better badge than a glyph (§6). */}
+            <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              Spaced repetition · SM-2 · AI card generation
+            </p>
+          </FadeInUp>
 
-          {/* Headline */}
-          <m.h1
-            initial={reduced ? undefined : { opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
-            className="text-5xl font-semibold leading-[1.1] tracking-[-.03em] sm:text-6xl lg:text-7xl"
-          >
-            <span className="bg-gradient-to-br from-foreground via-foreground/90 to-foreground/60 bg-clip-text text-transparent">
+          <FadeInUp delay={0.06}>
+            <h1 className="mt-5 text-5xl font-semibold leading-[1.05] tracking-[-.03em] text-ink sm:text-6xl lg:text-7xl">
               Study smarter,
-            </span>
-            <br />
-            <span className="bg-gradient-to-r from-primary via-primary to-primary/60 bg-clip-text text-transparent">
+              <br />
               remember forever
-            </span>
-          </m.h1>
+            </h1>
+          </FadeInUp>
 
-          {/* Subtitle */}
-          <m.p
-            initial={reduced ? undefined : { opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground sm:text-xl"
-          >
-            Transform any document into interactive flashcards. Let AI do the heavy
-            lifting while spaced repetition ensures you never forget.
-          </m.p>
+          <FadeInUp delay={0.12}>
+            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
+              Turn a PDF into flashcards in about thirty seconds, then let the
+              scheduler decide when you see each one again.
+            </p>
+          </FadeInUp>
 
-          {/* CTAs */}
-          <m.div
-            initial={reduced ? undefined : { opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.35 }}
-            className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4"
-          >
-            <Link href="/login?mode=signup">
-              <Button size="lg" className="w-full px-8 text-base sm:w-auto">
-                Sign Up
-                <ArrowRight className="ml-1.5 h-4 w-4" />
+          <FadeInUp delay={0.18}>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              {/* The page's one filled button (§7.2). */}
+              <Button asChild variant="primary" size="lg" className="w-full px-8 text-base sm:w-auto">
+                <Link href="/login?mode=signup">
+                  Start free
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
               </Button>
-            </Link>
-            <Link href="/login?mode=login">
-              <Button variant="outline" size="lg" className="w-full px-8 text-base sm:w-auto">
-                Sign In
+              <Button asChild size="lg" className="w-full px-8 text-base sm:w-auto">
+                <Link href="/login?mode=login">Sign in</Link>
               </Button>
-            </Link>
-          </m.div>
+            </div>
+          </FadeInUp>
         </div>
 
-        {/* ── Glass browser mockup — hidden on mobile to save GPU ── */}
-        <m.div
-          style={reduced ? undefined : { y: mockupY, rotateX: mockupRotate, scale: mockupScale }}
-          initial={reduced ? undefined : { opacity: 0, y: 60 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.45, type: 'spring', stiffness: 100, damping: 20 }}
-          className="perspective-1000 relative z-10 mx-auto mt-16 max-w-4xl"
-        >
-          <div className="glass-card overflow-hidden rounded-2xl border border-border shadow-2xl shadow-primary/5">
-            {/* Browser chrome */}
-            <div className="flex items-center gap-2 border-b border-border bg-card/60 px-4 py-3">
-              <span className="h-3 w-3 rounded-full bg-destructive/60" />
-              <span className="h-3 w-3 rounded-full bg-yellow-500/60" />
-              <span className="h-3 w-3 rounded-full bg-green-500/60" />
-              <div className="ml-3 flex-1 rounded-md bg-muted/40 px-3 py-1 text-xs text-muted-foreground/60">
+        {/* ── Product specimen ── */}
+        <FadeInUp delay={0.24} className="mx-auto mt-16 max-w-4xl">
+          <div className="surface overflow-hidden">
+            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
+              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 cognit.app/dashboard
-              </div>
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                Search <Kbd>⌘K</Kbd>
+              </span>
             </div>
 
-            {/* Mock dashboard content */}
-            <div className="bg-background/80 p-6 sm:p-8">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <div className="h-4 w-32 rounded bg-foreground/10" />
-                  <div className="mt-2 h-3 w-48 rounded bg-muted-foreground/10" />
-                </div>
-                <div className="h-9 w-24 rounded-lg bg-primary/15" />
-              </div>
+            <div className="p-5 sm:p-7">
+              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Due now
+              </p>
+              <p
+                className="mt-2 font-mono text-[52px] font-semibold leading-none tracking-[-0.04em] tnum"
+                style={{ color: 'var(--state-due)' }}
+              >
+                10
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                across <span className="font-mono tnum text-ink-dim">2</span> decks · about{' '}
+                <span className="font-mono tnum text-ink-dim">4</span> min
+              </p>
 
-              {/*
-                Use a static colorMap instead of dynamic interpolation.
-                Tailwind JIT cannot detect `bg-${color}/10` at build time
-                and will silently skip those classes, leaving elements invisible.
-              */}
-              {(() => {
-                const colorMap: Record<string, { iconBg: string; iconBorder: string; iconText: string }> = {
-                  primary: {
-                    iconBg: 'bg-primary/10',
-                    iconBorder: 'border-border-strong',
-                    iconText: 'text-primary',
-                  },
-                  neon: {
-                    iconBg: 'bg-primary/10',
-                    iconBorder: 'border-border-strong',
-                    iconText: 'text-primary',
-                  },
-                };
-                return (
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    {[
-                      { icon: Layers, label: 'Automata Theory', count: '24 cards', color: 'primary' },
-                      { icon: Brain, label: 'Data Structures', count: '18 cards', color: 'neon' },
-                      { icon: BarChart3, label: 'Linear Algebra', count: '31 cards', color: 'primary' },
-                    ].map((deck) => {
-                      const colors = colorMap[deck.color] ?? colorMap.primary;
-                      return (
-                        <div
-                          key={deck.label}
-                          className="rounded-xl border border-border bg-card/40 p-4 backdrop-blur-sm"
-                        >
-                          <div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${colors.iconBg} border ${colors.iconBorder}`}>
-                            <deck.icon className={`h-[1.125rem] w-[1.125rem] ${colors.iconText}`} />
-                          </div>
-                          <div className="text-sm font-medium">{deck.label}</div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">{deck.count}</div>
-                        </div>
-                      );
-                    })}
+              <div className="mt-7 border-t border-border">
+                <div className="flex items-center gap-3 border-b border-border py-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  <span className="w-[2px] shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">Deck</span>
+                  <span className="w-14 text-right">Cards</span>
+                  <span className="w-12 text-right">Due</span>
+                  <span className="w-16 text-right">Mastery</span>
+                </div>
+
+                {SPECIMEN_DECKS.map((deck) => (
+                  <div key={deck.name} className="flex items-center gap-3 border-b border-border py-2.5">
+                    <span
+                      aria-hidden="true"
+                      className="h-4 w-[2px] shrink-0 rounded-[1px]"
+                      style={{ backgroundColor: deck.state }}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{deck.name}</span>
+                    <span className="w-14 text-right font-mono text-[13px] tnum text-ink-dim">
+                      {deck.cards}
+                    </span>
+                    <span
+                      className="w-12 text-right font-mono text-[13px] tnum"
+                      style={{ color: deck.due > 0 ? 'var(--state-due)' : 'var(--ink-dimmer)' }}
+                    >
+                      {deck.due}
+                    </span>
+                    <span className="w-16 text-right font-mono text-[13px] tnum text-ink-dim">
+                      {deck.mastery}%
+                    </span>
                   </div>
-                );
-              })()}
+                ))}
+              </div>
             </div>
           </div>
-
-          {/* Glow underneath the mockup */}
-          <div className="absolute -inset-x-10 -bottom-10 -z-10 h-40 rounded-full bg-primary/[8%] blur-3xl" />
-        </m.div>
-      </div>
-
-      {/* ── Background decorations (above the global orbs) ── */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute -left-32 top-0 h-[500px] w-[500px] rounded-full bg-gradient-to-br from-primary/10 via-primary/5 to-transparent blur-3xl" />
-        <div className="absolute -right-32 top-32 h-[400px] w-[400px] rounded-full bg-gradient-to-bl from-primary/10 via-primary/5 to-transparent blur-3xl" />
+        </FadeInUp>
       </div>
     </section>
   );

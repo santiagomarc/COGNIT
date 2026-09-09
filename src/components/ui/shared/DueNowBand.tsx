@@ -142,7 +142,7 @@ export function DueNowBand({
             <li key={deck.deckId}>
               <Link
                 href={`/dashboard/${deck.deckId}/study`}
-                className="group inline-flex items-baseline gap-2 rounded-[var(--radius-control)] text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className="group inline-flex items-baseline gap-2 rounded-[var(--radius-control)] text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 <span className="max-w-[14rem] truncate text-ink-dim group-hover:text-ink">
                   {deck.deckTitle}

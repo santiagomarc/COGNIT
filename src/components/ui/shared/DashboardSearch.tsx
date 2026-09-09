@@ -19,7 +19,7 @@ type DashboardSearchProps = {
 export function DashboardSearch({ value, onChange, resultCount, totalCount }: DashboardSearchProps) {
   return (
     <div className="relative">
-      <div className="flex h-[34px] items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--accent)]">
+      <div className="focus-within-ring flex h-[34px] items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-control)] px-3">
         <Search className="h-3.5 w-3.5 shrink-0 text-ink-dimmer" />
         <input
           type="text"
@@ -33,7 +33,7 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
           <button
             type="button"
             onClick={() => onChange('')}
-            className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-control)] text-ink-dimmer transition-colors hover:text-ink"
+            className="flex h-4 w-4 items-center justify-center rounded-[var(--radius-control)] text-ink-dimmer transition-colors outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             aria-label="Clear filter"
           >
             <X className="h-3 w-3" />

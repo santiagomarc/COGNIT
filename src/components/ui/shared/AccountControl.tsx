@@ -57,7 +57,7 @@ export function AccountControl({ email, placement = 'rail' }: AccountControlProp
         className={
           placement === 'rail'
             ? 'rail__btn'
-            : 'inline-flex size-[30px] shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink outline-none transition-colors duration-[120ms] hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]'
+            : 'inline-flex size-[30px] shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink outline-hidden transition-colors duration-[120ms] hover:bg-surface-raised focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]'
         }
       >
         <span

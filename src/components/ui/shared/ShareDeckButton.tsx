@@ -64,7 +64,7 @@ export function ShareDeckButton({ deckId, initialToken }: ShareDeckButtonProps) 
 
   if (!token) {
     return (
-      <Button type="button" variant="outline" onClick={() => toggle(true)} disabled={isPending} className="gap-2">
+      <Button type="button" onClick={() => toggle(true)} disabled={isPending} className="gap-2">
         {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
         Share deck
       </Button>

@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { Layers, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { CloneDeckButton } from '@/components/ui/shared/CloneDeckButton';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
+import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
 import { Button } from '@/components/ui/button';
 
 const PREVIEW_CARD_LIMIT = 12;
@@ -89,44 +90,52 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
 
   return (
     <div id="main-content" className="container mx-auto max-w-5xl space-y-8 p-6 md:p-10">
-      <div className="flex items-center justify-between">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary">
-          <Layers className="h-4 w-4 text-primary" />
-          Cognit
-        </Link>
-        <ThemeToggle />
-      </div>
+      {/*
+        The header is the telemetry strip the rest of the product uses (§7.9),
+        not a centred hero on a translucent card. Someone arriving from a link
+        in Discord should recognise this as the same instrument they will get
+        when they sign up — that recognition is the whole point of the screen.
+      */}
+      <header className="space-y-5">
+        <div className="flex items-center justify-between gap-4">
+          <Wordmark href="/" size="sm" />
+          <ThemeToggle />
+        </div>
 
-      <header className="glass-card space-y-4 rounded-3xl p-8 text-center">
-        <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
-          Shared deck
-        </p>
-        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">{title}</h1>
+        <div className="h-px w-full bg-border" />
 
-        {deck.description ? (
-          <p className="mx-auto max-w-xl text-muted-foreground">{deck.description}</p>
-        ) : null}
+        <div className="space-y-3">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Shared deck
+          </p>
+          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em] text-ink">
+            {title}
+          </h1>
 
-        <p className="text-sm text-muted-foreground">
-          <span className="font-mono tnum">{cardCount}</span>&nbsp;card{cardCount === 1 ? '' : 's'}
-          {cloneCount > 0
-            ? ` · saved by ${cloneCount} ${cloneCount === 1 ? 'person' : 'people'}`
-            : ''}
-        </p>
+          {deck.description ? (
+            <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
+          ) : null}
+        </div>
 
-        <div className="flex flex-col items-center justify-center gap-3 pt-2 sm:flex-row sm:flex-wrap">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <Telemetry label="Cards" value={cardCount} />
+          <Telemetry label="Preview" value={`${previewCards?.length ?? 0}/${cardCount}`} />
+          {cloneCount > 0 ? <Telemetry label="Saved by" value={cloneCount} /> : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
           {user ? (
             <CloneDeckButton shareToken={token} deckTitle={title} />
           ) : (
             <>
-              <Button asChild size="lg" className="gap-2">
+              {/* The screen's one filled button (§7.2). */}
+              <Button asChild variant="primary">
                 <Link href={`/login?redirectTo=${encodeURIComponent(`/s/${token}`)}`}>
-                  <Sparkles className="h-4 w-4" />
-                  Sign up free to save this deck
+                  Save this deck — free
                 </Link>
               </Button>
-              <p className="w-full text-xs text-muted-foreground">
-                No account needed to preview — scroll down and flip the cards.
+              <p className="text-xs text-muted-foreground">
+                No account needed to preview. Flip any card below.
               </p>
             </>
           )}
@@ -134,7 +143,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
       </header>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">
+        <h2 className="text-lg font-semibold tracking-[-.02em] text-ink">
           {cardCount === 0
             ? 'This deck has no cards yet'
             : `Preview ${previewCards?.length ?? 0} of ${cardCount} cards`}

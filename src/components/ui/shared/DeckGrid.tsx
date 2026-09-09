@@ -136,7 +136,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                 key={mode.value}
                 type="button"
                 size="sm"
-                variant={sortMode === mode.value ? 'secondary' : 'ghost'}
+                variant="ghost"
                 aria-pressed={sortMode === mode.value}
                 onClick={() => setSortMode(mode.value)}
               >

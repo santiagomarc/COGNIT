@@ -8,15 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PasswordStrength } from '@/components/ui/shared/PasswordStrength';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
 import { updatePassword } from '@/app/auth/actions';
 import { updatePasswordSchema } from '@/lib/schemas';
-import {
-  Sparkles,
-  Eye,
-  EyeOff,
-  Loader2,
-  CheckCircle2,
-} from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { motionTransitions } from '@/lib/motion-configs';
+import { useHasMounted } from '@/components/motion';
 
 export default function UpdatePasswordPage() {
   const [password, setPassword] = useState('');
@@ -27,7 +24,10 @@ export default function UpdatePasswordPage() {
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
 
-  const reduced = useReducedMotion();
+  // Resting state on the server and on the first client render — see LoginClient.
+  const hasMounted = useHasMounted();
+  const prefersReduced = useReducedMotion();
+  const reduced = !hasMounted || prefersReduced;
 
   function clearFieldError(field: string) {
     setFieldErrors((prev) => {
@@ -72,47 +72,43 @@ export default function UpdatePasswordPage() {
       </div>
 
       <m.div
-        initial={reduced ? undefined : { opacity: 0, y: 16 }}
+        initial={reduced ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 26 }}
+        transition={reduced ? { duration: 0 } : motionTransitions.panel}
         className="w-full max-w-sm"
       >
-        {/* Logo */}
-        <Link
-          href="/"
-          className="mx-auto mb-8 flex w-fit items-center gap-2.5"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border-strong bg-primary/15">
-            <Sparkles className="h-4.5 w-4.5 text-primary" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Cognit</span>
-        </Link>
+        <div className="mb-8">
+          <Wordmark href="/" />
+        </div>
 
         {success ? (
           /* ── Success state ── */
-          <div className="text-center space-y-4">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-green-500/10 border border-green-500/20">
-              <CheckCircle2 className="h-7 w-7 text-green-500" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight">
+          <div className="space-y-4">
+            <p
+              className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]"
+              style={{ color: 'var(--state-mastered)' }}
+            >
               Password updated
+            </p>
+            <h1 className="text-2xl font-semibold tracking-[-.025em]">
+              You&apos;re signed in
             </h1>
             <p className="text-sm text-muted-foreground">
-              Your password has been reset successfully.
+              Your new password is active. Use it the next time you sign in.
             </p>
-            <Button asChild className="mt-2">
-              <Link href="/dashboard">Go to Dashboard</Link>
+            <Button asChild variant="primary" className="mt-2">
+              <Link href="/dashboard">Go to dashboard</Link>
             </Button>
           </div>
         ) : (
           <>
             {/* ── Header ── */}
-            <div className="mb-8 text-center">
-              <h1 className="text-2xl font-bold tracking-tight">
+            <div className="mb-8">
+              <h1 className="text-2xl font-semibold tracking-[-.025em]">
                 Set a new password
               </h1>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Choose a strong password for your account
+                At least 8 characters, with a number and both letter cases.
               </p>
             </div>
 
@@ -120,7 +116,7 @@ export default function UpdatePasswordPage() {
             <form onSubmit={handleSubmit} className="space-y-5" noValidate>
               {/* New password */}
               <div className="space-y-2">
-                <Label htmlFor="password">New Password</Label>
+                <Label htmlFor="password">New password</Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -144,14 +140,14 @@ export default function UpdatePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-control)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    aria-pressed={showPassword}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-4 w-4" aria-hidden="true" />
                     )}
                   </button>
                 </div>
@@ -167,7 +163,7 @@ export default function UpdatePasswordPage() {
 
               {/* Confirm password */}
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">Confirm password</Label>
                 <Input
                   id="confirmPassword"
                   type={showPassword ? 'text' : 'password'}
@@ -198,24 +194,23 @@ export default function UpdatePasswordPage() {
 
               {/* General error */}
               {generalError && (
-                <m.div
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+                <p
+                  className="rounded-[var(--radius-container)] border border-[var(--state-lapsed)] px-3 py-2.5 text-sm"
+                  style={{ color: 'var(--state-lapsed)' }}
                   role="alert"
                 >
                   {generalError}
-                </m.div>
+                </p>
               )}
 
-              <Button type="submit" className="w-full" disabled={isPending}>
+              <Button type="submit" variant="primary" className="w-full" disabled={isPending}>
                 {isPending ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Updating...
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Updating…
                   </>
                 ) : (
-                  'Update Password'
+                  'Update password'
                 )}
               </Button>
             </form>

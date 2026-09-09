@@ -147,9 +147,10 @@ export function FlashcardWithActions({
         ) : (
           <m.div
             key="view"
-            initial={{ opacity: 0, scale: 0.96 }}
+            initial={reduced ? false : { opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
+            exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
             className="space-y-2"
           >
             <div className="flex items-start justify-between gap-2">
@@ -177,7 +178,7 @@ export function FlashcardWithActions({
                     e.stopPropagation();
                     onToggleSelected?.();
                   }}
-                  className="z-20 flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-none hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  className="z-20 flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   title={selected ? 'Unselect card' : 'Select card'}
                   aria-pressed={selected}
                 >
@@ -191,7 +192,7 @@ export function FlashcardWithActions({
                       e.stopPropagation();
                       setIsEditing(true);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-none hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     title="Edit card"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -202,7 +203,7 @@ export function FlashcardWithActions({
                       e.stopPropagation();
                       setShowDeleteConfirm(true);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-none hover:border-[var(--state-lapsed)] hover:text-[var(--state-lapsed)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:border-[var(--state-lapsed)] hover:text-[var(--state-lapsed)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     title="Delete card"
                   >
                     <Trash2 className="h-3.5 w-3.5" />

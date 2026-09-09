@@ -17,8 +17,15 @@ import { cn } from "@/lib/utils"
  *
  * 2. `default` is the neutral outlined control and `primary` is the filled one.
  *    The system spends fill as a scarce resource: one primary button per
- *    screen. Buttons that should be that one are marked `variant="primary"` as
- *    each surface is rebuilt.
+ *    screen.
+ *
+ * 3. Four variants, and only four. Phase 1 kept `outline`, `secondary` and
+ *    `link` alive so ~9,800 LOC could re-skin without being edited; that
+ *    compatibility layer is now gone. `outline` was byte-identical to
+ *    `default` once fill stopped being the default, `link` had no call sites
+ *    left, and `secondary` has been replaced by an `aria-pressed` rule below —
+ *    a strictly better answer, because a toggle can no longer look pressed
+ *    without announcing that it is.
  *
  * Control edges use --border-control (≥3:1), never --border-strong: a button
  * edge is non-text content that carries meaning, so WCAG 2.2 SC 1.4.11 applies.
@@ -31,8 +38,15 @@ const buttonVariants = cva(
     // The tap feedback that used to cost a spring runtime.
     "active:translate-y-px",
     // Every interactive element has a visible focus state (§9).
-    "outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
+    "outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",
     "disabled:pointer-events-none disabled:opacity-50",
+    /*
+     * A toggle's "on" look is driven by aria-pressed rather than by a separate
+     * variant. The `secondary` variant used to carry it, which meant a caller
+     * could style a button as pressed without telling assistive technology, or
+     * set aria-pressed without it showing. Now one attribute does both.
+     */
+    "aria-pressed:border-[var(--border-control)] aria-pressed:bg-surface-raised",
     "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
     "aria-invalid:border-destructive",
   ],
@@ -51,18 +65,6 @@ const buttonVariants = cva(
         // Fill is earned here: destructive confirmation is where it matters.
         destructive:
           "border border-[var(--state-lapsed)] bg-[var(--state-lapsed)] font-semibold text-bg hover:bg-[var(--state-lapsed)]/90 focus-visible:outline-[var(--state-lapsed)]",
-        /*
-         * Retained so existing call sites keep resolving while their surfaces
-         * are rebuilt in later phases. `outline` is the same control as
-         * `default` — the distinction disappeared when fill stopped being the
-         * default. These are pruned once no call site names them.
-         */
-        outline:
-          "border border-[var(--border-control)] bg-transparent text-ink hover:bg-surface-raised",
-        // Reads as "toggled on": a quiet fill that is not the screen's primary.
-        secondary:
-          "border border-[var(--border-control)] bg-surface-raised text-ink hover:bg-surface-raised/70",
-        link: "border border-transparent bg-transparent text-ink underline-offset-4 hover:underline",
       },
       size: {
         default: "h-[34px] px-[14px] text-[13px]",

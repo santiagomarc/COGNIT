@@ -1,42 +1,46 @@
+/**
+ * Study skeleton (design system §9.4).
+ *
+ * Shaped like `FlashcardReviewClient` actually renders: the same container and
+ * padding, a telemetry row with a 1px progress rule under it (the old skeleton
+ * drew an 8px pill inside a `rounded-2xl` panel — a component that no longer
+ * exists), a `--radius-container` card at the real `min-height`, and the four
+ * grade keys. Matching the geometry is the point: a skeleton that guesses is a
+ * layout shift with extra steps.
+ */
 export default function StudyLoading() {
   return (
-    <div className="container mx-auto space-y-6 p-6 md:p-8">
-      {/* Top bar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="glass-skeleton h-4 w-28 rounded" />
-        <div className="glass-skeleton h-4 w-36 rounded" />
-      </div>
-
-      {/* Progress bar */}
-      <div className="glass-card rounded-2xl p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="glass-skeleton h-4 w-16 rounded" />
-          <div className="glass-skeleton h-4 w-8 rounded" />
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-muted/60">
-          <div className="h-full w-0 rounded-full bg-primary/40" />
-        </div>
-      </div>
-
-      {/* Stacked card skeleton */}
-      <div className="relative mx-auto h-[24rem] w-full max-w-2xl">
-        <div className="glass-card absolute inset-0 rounded-3xl opacity-40 scale-[0.96] translate-y-2.5" />
-        <div className="glass-card absolute inset-0 rounded-3xl p-7">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className="glass-skeleton h-1.5 w-1.5 rounded-full" />
-              <div className="glass-skeleton h-3 w-16 rounded" />
+    <div className="container mx-auto p-6 md:p-8">
+      <div className="space-y-6">
+        <header className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <div className="glass-skeleton h-[30px] w-28 rounded-[var(--radius-control)]" />
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="flex items-baseline gap-2">
+                  <div className="glass-skeleton h-3 w-12 rounded-sm" />
+                  <div className="glass-skeleton h-3.5 w-10 rounded-sm" />
+                </div>
+              ))}
             </div>
-            <div className="space-y-2">
-              <div className="glass-skeleton h-5 w-4/5 rounded" />
-              <div className="glass-skeleton h-5 w-3/5 rounded" />
-            </div>
+          </div>
+          {/* The progress rule is 1px, like the real one (§4.3). */}
+          <div className="h-px w-full bg-border" />
+        </header>
+
+        <div className="mx-auto w-full max-w-2xl space-y-4">
+          <div className="glass-skeleton min-h-[14rem] rounded-[var(--radius-container)]" />
+
+          <div className="grid grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="glass-skeleton h-[62px] rounded-[var(--radius-control)]"
+              />
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Bottom action hint */}
-      <div className="glass-skeleton mx-auto h-4 w-48 rounded" />
     </div>
   );
 }

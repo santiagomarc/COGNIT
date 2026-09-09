@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Lightbulb } from 'lucide-react';
 import { getHint } from '@/app/actions/ai-assist';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
@@ -39,9 +38,17 @@ export function HintButton({ cardId, deckId, disabled = false }: HintButtonProps
 
   return (
     <div className="space-y-2">
-      <Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={disabled || isLoading} className="gap-2">
-        <Lightbulb className="h-4 w-4" />
-        {isLoading ? 'Thinking...' : hint ? 'Hide Hint' : 'Get AI Hint'}
+      {/* §1.1 bans the lightbulb, and §6 answers what to put in its place:
+          nothing. The word "hint" is the affordance; a bulb beside it was
+          restating the label in a metaphor. */}
+      <Button
+        type="button"
+        size="sm"
+        onClick={handleClick}
+        disabled={disabled || isLoading}
+        aria-expanded={hint !== null}
+      >
+        {isLoading ? 'Thinking…' : hint ? 'Hide hint' : 'Get a hint'}
       </Button>
       <p className="max-w-sm text-xs text-muted-foreground">
         The hint is AI-generated from the card&apos;s answer and description, and it tries not to reveal the term directly.

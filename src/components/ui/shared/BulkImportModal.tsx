@@ -139,6 +139,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
               className="absolute inset-0 z-[var(--z-overlay)] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
               onClick={() => !isImporting && !isCleaning && setOpen(false)}
             />

@@ -1,8 +1,9 @@
 'use client';
 
-import { m, useInView, useReducedMotion } from 'framer-motion';
+import { useInView, useReducedMotion } from 'framer-motion';
 import { useRef, useEffect, useState } from 'react';
-import { Users, BookOpen, Star } from 'lucide-react';
+
+import { RevealOnScroll } from '@/components/motion';
 
 function AnimatedCounter({ target, suffix = '' }: { target: number; suffix?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -40,51 +41,43 @@ function AnimatedCounter({ target, suffix = '' }: { target: number; suffix?: str
   );
 }
 
+/*
+ * Icons removed (§6): the three glyphs were interchangeable decoration beside
+ * numbers that already say what they are. The counter itself stays — a number
+ * counting up is a legitimate reading of "a number is a better badge", and it
+ * is already gated on `prefers-reduced-motion`.
+ *
+ * The values are the product's existing marketing claims, carried over
+ * unchanged. They are not sourced from anything in this codebase; see the
+ * run report — they need substantiating or removing before launch, and that
+ * is a business decision rather than a design one.
+ */
 const stats = [
-  { icon: Users, value: 10000, suffix: '+', label: 'Active students' },
-  { icon: BookOpen, value: 2000000, suffix: '+', label: 'Cards studied' },
-  { icon: Star, value: 49, suffix: '', label: 'Average rating', display: '4.9★' },
+  { value: 10000, suffix: '+', label: 'Active students' },
+  { value: 2000000, suffix: '+', label: 'Cards studied' },
+  { value: 49, suffix: '', label: 'Average rating', display: '4.9' },
 ];
 
 export function SocialProof() {
-  const reduced = useReducedMotion();
-
   return (
-    <section className="relative border-y border-border bg-card/30 backdrop-blur-sm py-16">
+    <section className="border-y border-border py-16">
       <div className="mx-auto max-w-6xl px-6">
-        <m.div
-          initial={reduced ? undefined : { opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-40px' }}
-          transition={{ duration: 0.5 }}
-          className="grid grid-cols-1 gap-8 sm:grid-cols-3"
-        >
-          {stats.map((stat, i) => {
-            const Icon = stat.icon;
-            return (
-              <m.div
-                key={stat.label}
-                initial={reduced ? undefined : { opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.12, duration: 0.5 }}
-                className="flex flex-col items-center text-center"
-              >
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 border border-border-strong">
-                  <Icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="font-mono text-3xl font-semibold tracking-[-.03em] tnum sm:text-4xl">
-                  {stat.display ? (
-                    stat.display
-                  ) : (
-                    <AnimatedCounter target={stat.value} suffix={stat.suffix} />
-                  )}
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
-              </m.div>
-            );
-          })}
-        </m.div>
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-3">
+          {stats.map((stat, i) => (
+            <RevealOnScroll
+              key={stat.label}
+              delay={i * 0.08}
+              className="flex flex-col items-center text-center"
+            >
+              <p className="font-mono text-3xl font-semibold tracking-[-.03em] tnum text-ink sm:text-4xl">
+                {stat.display ?? <AnimatedCounter target={stat.value} suffix={stat.suffix} />}
+              </p>
+              <p className="mt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                {stat.label}
+              </p>
+            </RevealOnScroll>
+          ))}
+        </div>
       </div>
     </section>
   );

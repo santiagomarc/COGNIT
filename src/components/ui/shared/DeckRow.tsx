@@ -114,7 +114,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
       <Link
         href={`/dashboard/${deck.id}`}
-        className="flex min-w-0 flex-1 items-baseline gap-2.5 rounded-[var(--radius-control)] outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        className="flex min-w-0 flex-1 items-baseline gap-2.5 rounded-[var(--radius-control)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       >
         <span className="truncate text-sm text-ink">{deck.title}</span>
         {deck.tag ? (
@@ -134,7 +134,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
         <div className={DECK_COL.due}>
           <dt className="sr-only">Due</dt>
-          <dd style={{ color: deck.dueCount > 0 ? 'var(--state-due)' : 'var(--ink-faint)' }}>
+          <dd style={{ color: deck.dueCount > 0 ? 'var(--state-due)' : 'var(--ink-dimmer)' }}>
             {deck.dueCount}
           </dd>
         </div>

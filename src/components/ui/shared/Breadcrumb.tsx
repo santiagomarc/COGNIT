@@ -31,7 +31,7 @@ export function Breadcrumb({ decks }: BreadcrumbProps) {
           {deckId ? (
             <Link
               href="/dashboard"
-              className="rounded-[var(--radius-control)] text-ink-dim outline-none transition-colors duration-[120ms] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              className="rounded-[var(--radius-control)] text-ink-dim outline-hidden transition-colors duration-[120ms] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
               Decks
             </Link>

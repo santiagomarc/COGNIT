@@ -32,7 +32,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent text-ink outline-none transition-[background-color,border-color,color] duration-[120ms] ease-out hover:bg-surface-raised active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+      className="relative inline-flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent text-ink outline-hidden transition-[background-color,border-color,color] duration-[120ms] ease-out hover:bg-surface-raised active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
       aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
     >
       <span className="relative h-4 w-4">

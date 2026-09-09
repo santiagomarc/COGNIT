@@ -1,11 +1,25 @@
 'use client';
 
 import { useEffect } from 'react';
-import { m } from 'framer-motion';
-import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 
+import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
+
+/**
+ * Application error boundary (design system §9.4).
+ *
+ * Three things changed. The panel was a translucent card with a `rounded-3xl`
+ * corner and an inline `{ type: 'spring', stiffness: 260 }` entrance — a
+ * spring on the one screen where the user is already unsettled. The
+ * `<AlertTriangle/>` in a tinted box was carrying no information the heading
+ * did not already carry, and its red was a fourth use of hue outside the state
+ * channel. And the copy apologised ("Don't worry — your data is safe") rather
+ * than saying what to do.
+ *
+ * `console.error` is now the project logger, so an error on this path is
+ * scoped and structured like every other one.
+ */
 export default function GlobalError({
   error,
   reset,
@@ -14,45 +28,46 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Unhandled error:', error);
+    logger.error('app', 'unhandled render error', {
+      message: error.message,
+      digest: error.digest,
+    });
   }, [error]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <m.div
-        initial={{ opacity: 0, y: 20, scale: 0.96 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-        className="glass-card mx-auto max-w-lg rounded-3xl p-10 text-center"
-      >
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/10 border border-destructive/20">
-          <AlertTriangle className="h-7 w-7 text-destructive" />
-        </div>
-
-        <h1 className="text-2xl font-bold tracking-tight">Something went wrong</h1>
-        <p className="mt-3 text-sm text-muted-foreground leading-relaxed">
-          An unexpected error occurred. Don&apos;t worry — your data is safe. Try refreshing or head back to the dashboard.
+    <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
+      <div className="w-full max-w-lg">
+        <p
+          className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]"
+          style={{ color: 'var(--state-lapsed)' }}
+        >
+          Error
         </p>
 
-        {error.digest && (
-          <p className="mt-3 rounded-lg bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground font-mono">
-            Error ID: {error.digest}
-          </p>
-        )}
+        <h1 className="mt-3 text-2xl font-semibold tracking-[-.025em] text-ink">
+          This page failed to load
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          The error has been logged. Retrying usually works — if it does not, the
+          problem is on our side rather than with anything you did.
+        </p>
 
-        <div className="mt-7 flex items-center justify-center gap-3">
-          <Button onClick={reset} className="gap-2">
-            <RotateCcw className="h-4 w-4" />
-            Try Again
+        {error.digest ? (
+          <p className="mt-5 border-t border-border pt-4 font-mono text-xs text-ink-dimmer">
+            Reference <span className="text-ink-dim">{error.digest}</span> — quote this if you
+            report it.
+          </p>
+        ) : null}
+
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <Button onClick={reset} variant="primary">
+            Try again
           </Button>
-          <Link href="/dashboard">
-            <Button variant="outline" className="gap-2">
-              <Home className="h-4 w-4" />
-              Dashboard
-            </Button>
-          </Link>
+          <Button asChild>
+            <Link href="/dashboard">Go to your decks</Link>
+          </Button>
         </div>
-      </m.div>
+      </div>
     </div>
   );
 }

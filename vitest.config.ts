@@ -16,7 +16,11 @@ export default defineConfig({
       // deleted: legacy-mastery.ts was 83% covered, so removing it took more
       // covered functions out than uncovered ones. A ratchet down for dead-code
       // removal, not for test rot.
-      thresholds: { lines: 33, functions: 29, branches: 32 },
+      //
+      // Raised at the close of the redesign programme: the navigation phase
+      // added `command-palette.ts` with 16 tests, which moved the measured
+      // figures to lines 34.96 / functions 31.81 / branches 35.14.
+      thresholds: { lines: 34, functions: 31, branches: 35 },
     },
   },
   resolve: {

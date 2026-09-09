@@ -220,7 +220,6 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
           <Button
             type="button"
             size="sm"
-            variant={selectionMode ? 'secondary' : 'default'}
             aria-pressed={selectionMode}
             onClick={handleSelectionModeToggle}
           >
