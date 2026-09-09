@@ -1,37 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import Link from 'next/link';
-import { BookOpen } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DeckActions } from '@/components/ui/shared/DeckActions';
+import { useEffect, useMemo, useState } from 'react';
+
 import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
-import { FadeInUp } from '@/components/motion';
-import { m, AnimatePresence } from 'framer-motion';
-import { getDeckTagGlowColor, parseDeckTitleMetadata } from '@/lib/deck-tags';
-import { getCappedStaggerDelay, motionTransitions } from '@/lib/motion-configs';
-
-function getMasteryBadgeClass(masteryPercentage: number) {
-  if (masteryPercentage >= 85) return 'border-sky-500/30 bg-sky-500/15 text-sky-700 dark:text-sky-300';
-  if (masteryPercentage >= 60) return 'border-emerald-500/30 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300';
-  if (masteryPercentage >= 30) return 'border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300';
-  return 'border-border-strong bg-primary/5 text-primary';
-}
-
-function getMasteryGlowColor(masteryPercentage: number, assessedCards: number) {
-  if (assessedCards === 0) return 'var(--ink-faint)';
-  if (masteryPercentage >= 85) return 'rgba(56, 189, 248, 0.38)';
-  if (masteryPercentage >= 60) return 'rgba(16, 185, 129, 0.35)';
-  if (masteryPercentage >= 30) return 'rgba(245, 158, 11, 0.34)';
-  return 'rgba(99, 102, 241, 0.32)';
-}
-
-const deckDateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
+import { DeckRow, DeckRowLegend, type DeckRowData } from '@/components/ui/shared/DeckRow';
+import { Button } from '@/components/ui/button';
+import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 
 type DeckWithCount = {
   id: string;
@@ -43,13 +17,21 @@ type DeckWithCount = {
   masteryPercentage: number;
   assessedCards: number;
   lastQuizAt: string | null;
+  dueCount: number;
+  easeFactor: number | null;
 };
 
 type DeckGridProps = {
   decks: DeckWithCount[];
 };
 
-type DeckSortMode = 'newest' | 'most-studied';
+type DeckSortMode = 'newest' | 'most-studied' | 'most-due';
+
+const SORT_MODES: { value: DeckSortMode; label: string }[] = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'most-due', label: 'Most due' },
+  { value: 'most-studied', label: 'Most studied' },
+];
 
 function sortDecksNewestFirst(items: DeckWithCount[]) {
   return [...items].sort((a, b) => {
@@ -85,13 +67,35 @@ function sortDecksMostStudied(items: DeckWithCount[]) {
   });
 }
 
+// The order that answers "what should I open right now", which is the question
+// a user with eight decks is actually asking.
+function sortDecksMostDue(items: DeckWithCount[]) {
+  return [...items].sort((a, b) => {
+    if (b.dueCount !== a.dueCount) {
+      return b.dueCount - a.dueCount;
+    }
+    return sortDecksNewestFirst([a, b])[0] === a ? -1 : 1;
+  });
+}
+
 function sortDecks(items: DeckWithCount[], sortMode: DeckSortMode) {
-  if (sortMode === 'most-studied') {
-    return sortDecksMostStudied(items);
-  }
+  if (sortMode === 'most-studied') return sortDecksMostStudied(items);
+  if (sortMode === 'most-due') return sortDecksMostDue(items);
   return sortDecksNewestFirst(items);
 }
 
+/**
+ * The deck index (design system §7.5).
+ *
+ * Decks are rows, not tiles. The old grid was `sm:grid-cols-2` of translucent
+ * cards, so a user with eight decks saw four and had to scroll for the rest —
+ * and each card carried a mastery-tinted glow built from hard-coded `rgba()`
+ * values, which is a hue outside the state channel and a hex in a component
+ * (§2.3). Both are gone: mastery is the bar and the tick.
+ *
+ * There is no enter/exit animation on the list any more either. A staggered
+ * spring per row is fine for four tiles and is noise for twenty rows.
+ */
 export function DeckGrid({ decks }: DeckGridProps) {
   const [search, setSearch] = useState('');
   const [sortMode, setSortMode] = useState<DeckSortMode>('newest');
@@ -110,11 +114,14 @@ export function DeckGrid({ decks }: DeckGridProps) {
   }, [orderedDecks, search]);
 
   return (
-    <div className="space-y-4">
-      {/* Search input */}
-      {localDecks.length > 0 && (
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="md:w-full md:max-w-xl">
+    <section className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Decks <span className="tnum">{orderedDecks.length}</span>
+        </h2>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="sm:w-72">
             <DashboardSearch
               value={search}
               onChange={setSearch}
@@ -123,131 +130,68 @@ export function DeckGrid({ decks }: DeckGridProps) {
             />
           </div>
 
-          <div
-            className="inline-flex self-start rounded-xl border border-border-strong bg-card/60 p-1 backdrop-blur-sm"
-            role="group"
-            aria-label="Deck sort mode"
-          >
-            <button
-              type="button"
-              onClick={() => setSortMode('newest')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${sortMode === 'newest'
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted-foreground hover:text-foreground'}`}
-              aria-pressed={sortMode === 'newest'}
-            >
-              Newest
-            </button>
-            <button
-              type="button"
-              onClick={() => setSortMode('most-studied')}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${sortMode === 'most-studied'
-                ? 'bg-primary/15 text-primary'
-                : 'text-muted-foreground hover:text-foreground'}`}
-              aria-pressed={sortMode === 'most-studied'}
-            >
-              Most Studied
-            </button>
+          <div className="inline-flex gap-1" role="group" aria-label="Deck sort mode">
+            {SORT_MODES.map((mode) => (
+              <Button
+                key={mode.value}
+                type="button"
+                size="sm"
+                variant={sortMode === mode.value ? 'secondary' : 'ghost'}
+                aria-pressed={sortMode === mode.value}
+                onClick={() => setSortMode(mode.value)}
+              >
+                {mode.label}
+              </Button>
+            ))}
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Deck list */}
-      {localDecks.length === 0 ? (
-        <FadeInUp delay={0.2}>
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border-strong bg-card/40 backdrop-blur-md p-8 text-center">
-            <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
-            <p className="text-muted-foreground">No decks yet. Create one to get started!</p>
-          </div>
-        </FadeInUp>
-      ) : filtered.length === 0 ? (
-        <FadeInUp>
-          <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/30 backdrop-blur-md p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              No decks match &ldquo;{search}&rdquo;
-            </p>
-          </div>
-        </FadeInUp>
+      {filtered.length === 0 ? (
+        <p className="border-t border-border py-8 text-center text-sm text-muted-foreground">
+          {localDecks.length === 0
+            ? 'No decks yet. Create one to get started.'
+            : `No decks match “${search}”.`}
+        </p>
       ) : (
-        <m.div className="grid gap-4 sm:grid-cols-2" layout>
-          <AnimatePresence mode="popLayout">
-            {filtered.map((deck, i) => {
-              const cardCount = deck.cards?.[0]?.count ?? 0;
-              const modifiedAt = deck.updated_at || deck.created_at;
-              const { cleanTitle, tag } = parseDeckTitleMetadata(deck.title);
-              const tagGlow = getDeckTagGlowColor(tag);
-              const deckGlow = tagGlow ?? getMasteryGlowColor(deck.masteryPercentage, deck.assessedCards);
-              const deckStyle = {
-                '--deck-glow': deckGlow,
-              } as CSSProperties;
-              return (
-                <m.div
-                  key={deck.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.96, y: 24 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.96, y: -24 }}
-                  transition={{
-                    ...motionTransitions.panel,
-                    delay: getCappedStaggerDelay(i),
-                  }}
-                >
-                  <Card
-                    className="glass-card group relative rounded-2xl transition-all duration-300 hover:shadow-[0_0_30px_-10px_var(--deck-glow)]"
-                    style={deckStyle}
-                  >
-                    <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <Link
-                        href={`/dashboard/${deck.id}`}
-                        className="space-y-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring flex-1 min-w-0"
-                      >
-                        <CardTitle className="group-hover:text-primary transition-colors duration-200 truncate">
-                          {cleanTitle}
-                        </CardTitle>
-                        <CardDescription className="flex flex-wrap items-center gap-2 text-xs">
-                          <span className="font-mono tnum">{deckDateFormatter.format(new Date(modifiedAt))}</span>
-                          <span className="inline-flex items-center rounded-full border border-border-strong bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
-                            <span className="font-mono tnum">{cardCount}</span>&nbsp;card{cardCount !== 1 ? 's' : ''}
-                          </span>
-                          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium ${getMasteryBadgeClass(deck.masteryPercentage)}`}>
-                            {deck.assessedCards > 0 ? <><span className="font-mono tnum">{deck.masteryPercentage}%</span>&nbsp;mastery</> : 'No quiz data'}
-                          </span>
-                          {tag ? (
-                            <span
-                              className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-                              style={{ borderColor: deckGlow, backgroundColor: 'color-mix(in srgb, var(--deck-glow) 28%, transparent)', color: 'var(--foreground)' }}
-                            >
-                              {tag}
-                            </span>
-                          ) : null}
-                          <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: deckGlow }} />
-                        </CardDescription>
-                      </Link>
-                      <DeckActions
-                        deckId={deck.id}
-                        currentTitle={deck.title}
-                        onDeleteOptimistic={() => {
-                          setLocalDecks((prev) => prev.filter((item) => item.id !== deck.id));
-                        }}
-                        onDeleteRollback={() => {
-                          setLocalDecks((prev) => {
-                            if (prev.some((item) => item.id === deck.id)) {
-                              return prev;
-                            }
-                            return [deck, ...prev];
-                          });
-                        }}
-                      />
-                    </div>
-                  </CardHeader>
-                </Card>
-              </m.div>
+        <div className="border-t border-border">
+          <DeckRowLegend />
+
+          {filtered.map((deck) => {
+            const { cleanTitle, tag } = parseDeckTitleMetadata(deck.title);
+            const row: DeckRowData = {
+              id: deck.id,
+              title: cleanTitle,
+              tag,
+              cardCount: deck.cards?.[0]?.count ?? 0,
+              dueCount: deck.dueCount,
+              easeFactor: deck.easeFactor,
+              masteryPercentage: deck.masteryPercentage,
+              assessedCards: deck.assessedCards,
+              lastQuizAt: deck.lastQuizAt,
+            };
+
+            return (
+              <DeckRow
+                key={deck.id}
+                deck={row}
+                rawTitle={deck.title}
+                onDeleteOptimistic={() => {
+                  setLocalDecks((prev) => prev.filter((item) => item.id !== deck.id));
+                }}
+                onDeleteRollback={() => {
+                  setLocalDecks((prev) => {
+                    if (prev.some((item) => item.id === deck.id)) {
+                      return prev;
+                    }
+                    return [deck, ...prev];
+                  });
+                }}
+              />
             );
           })}
-          </AnimatePresence>
-        </m.div>
+        </div>
       )}
-    </div>
+    </section>
   );
 }

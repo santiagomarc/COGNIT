@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BrainCircuit, Loader2, MessageSquarePlus, RotateCcw, Send, TriangleAlert } from 'lucide-react';
+import { Loader2, MessageSquarePlus, RotateCcw, Send, TriangleAlert } from 'lucide-react';
 import {
   createDeckChatSession,
   getDeckChatMessages,
@@ -247,25 +247,29 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   const showEmptyState = messages.length === 0 && !isStreaming && state.status !== 'error';
 
   return (
-    <section className="glass-card rounded-2xl p-5">
+    <section className="surface p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Chat with Your Deck</h2>
-          <p className="text-sm text-muted-foreground">Ask concept questions grounded in your own flashcards.</p>
+          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Chat with your deck
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Ask concept questions grounded in your own flashcards.
+          </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleCreateSession} disabled={isCreatingSession} className="gap-2">
+        <Button type="button" size="sm" onClick={handleCreateSession} disabled={isCreatingSession} className="gap-2">
           <MessageSquarePlus className="h-4 w-4" />
-          {isCreatingSession ? 'Creating...' : 'New Chat'}
+          {isCreatingSession ? 'Creating…' : 'New chat'}
         </Button>
       </div>
 
       {indexStatus && indexStatus.pending > 0 ? (
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs">
-          <span className="text-amber-700 dark:text-amber-200">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-l-2 border-[var(--state-learning)] py-1 pl-3 text-xs">
+          <span className="text-muted-foreground">
             {indexStatus.pending} of {indexStatus.total} cards aren&apos;t indexed yet.
             Chat can only answer from indexed cards.
           </span>
-          <Button type="button" size="sm" variant="outline" onClick={runSync} disabled={isSyncing}>
+          <Button type="button" size="sm" onClick={runSync} disabled={isSyncing}>
             {isSyncing ? (
               <><Loader2 className="mr-1 h-3 w-3 animate-spin" /> Indexing…</>
             ) : 'Index now'}
@@ -279,10 +283,11 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             key={session.id}
             type="button"
             onClick={() => setActiveSessionId(session.id)}
-            className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+            aria-pressed={activeSessionId === session.id}
+            className={`rounded-[var(--radius-control)] border px-3 py-1 text-xs transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               activeSessionId === session.id
-                ? 'border-border-strong bg-primary/15 text-primary'
-                : 'border-border bg-card/50 text-muted-foreground hover:border-border-strong hover:text-foreground'
+                ? 'border-[var(--border-control)] bg-surface-raised text-ink'
+                : 'border-border text-ink-dim hover:border-border-strong hover:text-ink'
             }`}
           >
             {session.title?.trim() || 'Untitled chat'}
@@ -290,15 +295,17 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         ))}
       </div>
 
-      <div ref={scrollRef} className="h-[22rem] overflow-y-auto rounded-xl border border-border bg-card/20 p-3">
+      <div
+        ref={scrollRef}
+        className="h-[22rem] overflow-y-auto overscroll-contain rounded-[var(--radius-container)] border border-border p-3"
+      >
         {isLoadingMessages ? (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Loading chat history...
+            Loading chat history…
           </div>
         ) : showEmptyState ? (
-          <div className="flex h-full flex-col items-center justify-center text-center text-sm text-muted-foreground">
-            <BrainCircuit className="mb-2 h-6 w-6 text-primary" />
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
             Ask your first question to start this study conversation.
           </div>
         ) : (
@@ -310,7 +317,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             {/* Live streaming bubble */}
             {isStreaming ? (
               <div className="flex justify-start">
-                <div className="max-w-[90%] space-y-2 rounded-xl border border-border bg-card/60 px-3 py-2 text-sm">
+                <div className="max-w-[90%] space-y-2 rounded-[var(--radius-container)] border border-border px-3 py-2 text-sm">
                   {state.references.length > 0 ? (
                     <SourceChips references={state.references} />
                   ) : null}
@@ -318,7 +325,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
                   {state.answer ? (
                     <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">
                       {state.answer}
-                      <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-primary align-text-bottom" />
+                      <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-ink align-text-bottom" />
                     </p>
                   ) : (
                     <p className="flex items-center gap-2 text-muted-foreground">
@@ -331,7 +338,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             ) : null}
 
             {state.status === 'error' ? (
-              <div className="flex items-start gap-2 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-2 text-sm">
+              <div className="flex items-start gap-2 rounded-[var(--radius-container)] border border-[var(--state-lapsed)] px-3 py-2 text-sm">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                 <div className="space-y-2">
                   {state.answer ? (
@@ -358,7 +365,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
               type="button"
               onClick={() => void handleSendMessage(suggestion)}
               disabled={isStreaming}
-              className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-700 transition-colors hover:bg-emerald-500/15 dark:text-emerald-300"
+              className="rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1 text-xs text-ink-dim transition-colors outline-none hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
               {suggestion}
             </button>
@@ -401,7 +408,7 @@ function SourceChips({ references }: { references: ChatReference[] }) {
         <span
           key={ref.id}
           title={ref.similarity !== null ? `${Math.round(ref.similarity * 100)}% match` : undefined}
-          className="rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[10px] text-primary"
+          className="rounded-[var(--radius-control)] border border-border px-2 py-0.5 font-mono text-[10px] text-ink-dimmer"
         >
           {ref.front}
         </span>
@@ -416,20 +423,20 @@ function ChatBubble({ message }: { message: ChatMessage }) {
   // An un-grounded answer says "your deck doesn't cover this". Rendering it in
   // the normal assistant style would make a refusal look like an answer.
   const bubbleClass = isUser
-    ? 'border border-border-strong bg-primary/15 text-foreground'
+    ? 'border border-[var(--border-control)] bg-surface-raised text-ink'
     : message.ungrounded
-      ? 'border border-amber-500/25 bg-amber-500/10 text-amber-900 dark:text-amber-100'
-      : 'border border-border bg-card/60 text-muted-foreground';
+      ? 'border border-border border-l-2 border-l-[var(--state-learning)] text-ink-dim'
+      : 'border border-border text-ink-dim';
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[90%] space-y-2 rounded-xl px-3 py-2 text-sm ${bubbleClass}`}>
+      <div className={`max-w-[90%] space-y-2 rounded-[var(--radius-container)] px-3 py-2 text-sm ${bubbleClass}`}>
         {message.references && message.references.length > 0 ? (
           <SourceChips references={message.references} />
         ) : null}
 
         {message.ungrounded ? (
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700 dark:text-amber-300">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-learning)]">
             Not covered by this deck
           </p>
         ) : null}
@@ -437,7 +444,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
 
         {!message.references && !isUser && message.referenced_card_ids?.length > 0 ? (
-          <p className="text-[11px] uppercase tracking-[0.14em] text-primary/70">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
             {message.referenced_card_ids.length} source
             {message.referenced_card_ids.length === 1 ? '' : 's'} from your deck
           </p>

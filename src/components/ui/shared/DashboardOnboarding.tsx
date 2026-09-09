@@ -2,8 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { m } from 'framer-motion';
-import { FileText, Loader2, PenLine, Sparkles, Upload } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { createDeck } from '@/app/actions/deck';
 import { bulkImportCards } from '@/app/actions/card';
 import { STARTER_DECKS, STARTER_DECK_KEYS, type StarterDeckKey } from '@/lib/starter-decks';
@@ -73,28 +72,33 @@ export function DashboardOnboarding({
   }
 
   return (
-    <m.div
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="glass-card space-y-6 rounded-3xl p-6 md:p-8"
-    >
-      <div className="space-y-2 text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
-          <Sparkles className="h-6 w-6 text-primary" />
-        </div>
-        <h2 className="text-2xl font-bold tracking-tight">Welcome to Cognit</h2>
-        <p className="mx-auto max-w-lg text-sm text-muted-foreground">
-          Turn any material into flashcards, then let spaced repetition decide when you
-          review them. Pick the fastest way to start:
+    <div className="surface space-y-8 p-6 md:p-8">
+      <div className="max-w-xl space-y-3">
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Getting started
+        </p>
+        <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">
+          Cognit schedules what you review, and when
+        </h2>
+        <p className="text-sm leading-relaxed text-muted-foreground">
+          Turn your material into flashcards, grade each one as you recall it, and the SM-2
+          scheduler decides when it comes back — sooner for what you find hard, later for what you
+          already know. Three ways to start, fastest first.
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <OnboardingCard
-          icon={<Sparkles className="h-5 w-5 text-primary" />}
+      {/*
+        Three numbered steps, not three icon tiles. The panel used to lead with
+        a sparkle glyph in a tinted square, which is the universal "AI template"
+        tell (§6) and told a new user nothing. The times below are the fact that
+        actually helps them choose.
+      */}
+      <ol className="grid gap-px border-t border-border md:grid-cols-3 md:border-t-0">
+        <OnboardingStep
+          index={1}
           title="Try a starter deck"
-          body="20 ready-made cards. Start reviewing in about five seconds."
-          badge="Fastest"
+          body="20 ready-made cards, already written. You are reviewing in about five seconds."
+          cost="~5s"
         >
           <div className="flex flex-wrap gap-2">
             {STARTER_DECK_KEYS.map((key) => (
@@ -102,7 +106,6 @@ export function DashboardOnboarding({
                 key={key}
                 type="button"
                 size="sm"
-                variant="outline"
                 onClick={() => createStarterDeck(key)}
                 disabled={loadingKey !== null}
                 className="gap-1.5"
@@ -112,66 +115,66 @@ export function DashboardOnboarding({
               </Button>
             ))}
           </div>
-        </OnboardingCard>
+        </OnboardingStep>
 
-        <OnboardingCard
-          icon={<Upload className="h-5 w-5 text-primary" />}
+        <OnboardingStep
+          index={2}
           title="Upload a PDF"
-          body="Lecture slides, a chapter, your own notes. The AI writes the cards."
-          badge="Most popular"
+          body="Lecture slides, a chapter, your own notes. The cards get written for you."
+          cost="~30s"
         >
-          <Button type="button" size="sm" onClick={onCreateOwn} className="gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            New deck + upload
+          {/* The screen's one filled button: this is the path most new users
+              should take, so it is the one that gets fill (§7.2). */}
+          <Button type="button" size="sm" variant="primary" onClick={onCreateOwn}>
+            New deck, then upload
           </Button>
-        </OnboardingCard>
+        </OnboardingStep>
 
-        <OnboardingCard
-          icon={<PenLine className="h-5 w-5 text-primary" />}
+        <OnboardingStep
+          index={3}
           title="Write your own"
           body={'Paste notes as "Term - Definition", or add cards one at a time.'}
+          cost="~2m"
         >
-          <Button type="button" size="sm" variant="outline" onClick={onCreateOwn}>
+          <Button type="button" size="sm" onClick={onCreateOwn}>
             Create a deck
           </Button>
-        </OnboardingCard>
-      </div>
-    </m.div>
+        </OnboardingStep>
+      </ol>
+    </div>
   );
 }
 
-function OnboardingCard({
-  icon,
+function OnboardingStep({
+  index,
   title,
   body,
-  badge,
+  cost,
   children,
 }: {
-  icon: ReactNode;
+  index: number;
   title: string;
   body: string;
-  badge?: string;
+  cost: string;
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card/30 p-5">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-border-strong bg-primary/10">
-          {icon}
-        </div>
-        {badge ? (
-          <span className="rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-            {badge}
-          </span>
-        ) : null}
+    <li className="flex flex-col gap-3 border-b border-border py-5 md:border-b-0 md:border-t md:pr-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          Step {index}
+        </span>
+        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          {cost}
+        </span>
       </div>
 
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold tracking-tight text-foreground">{title}</h3>
-        <p className="text-xs leading-relaxed text-muted-foreground">{body}</p>
+        <h3 className="text-sm font-semibold tracking-[-.015em] text-foreground">{title}</h3>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">{body}</p>
       </div>
 
       <div className="mt-auto pt-1">{children}</div>
-    </div>
+    </li>
   );
 }

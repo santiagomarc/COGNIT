@@ -113,22 +113,35 @@ export function Flashcard({ question, answer }: FlashcardProps) {
           transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.flip}
           style={{ transformStyle: 'preserve-3d' }}
         >
+          {/*
+            Opaque, one rule, one chamfer (§7.1). The two translucent blurred
+            faces this replaces were the last non-scrim `backdrop-blur` in the
+            product, and they degraded the contrast of the very text the card
+            exists to show.
+
+            Neither face clamps (defect F-02): `line-clamp` puts
+            `overflow: hidden` on the paragraph, so it never overflows its face
+            and the face's own scroll has nothing to scroll — the text ends up
+            truncated *and* unreachable. Each face scrolls instead.
+          */}
           <div className="backface-hidden absolute inset-0">
-            <div className="h-full rounded-2xl border border-border-strong bg-card/60 p-6 text-card-foreground shadow-lg backdrop-blur-xl">
-              <div className="mb-3 flex items-center gap-2">
-                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                <p className="text-xs font-semibold uppercase tracking-widest text-primary/80">Question</p>
-              </div>
-              <p className="line-clamp-6 font-serif text-lg leading-[1.32]">{question}</p>
+            <div className="surface flex h-full flex-col overflow-hidden p-5">
+              <p className="mb-2 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Question
+              </p>
+              <p className="min-h-0 flex-1 overflow-y-auto overscroll-contain font-serif text-lg leading-[1.32] [scrollbar-width:thin]">
+                {question}
+              </p>
             </div>
           </div>
           <div className="backface-hidden rotate-y-180 absolute inset-0">
-            <div className="h-full rounded-2xl border border-border-strong bg-card/60 p-6 text-card-foreground shadow-lg backdrop-blur-md">
-              <div className="mb-3 flex items-center gap-2">
-                <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
-                <p className="text-xs font-semibold uppercase tracking-widest text-ink-dim">Answer</p>
-              </div>
-              <p className="line-clamp-6 font-serif text-lg leading-[1.32] text-foreground/90">{answer}</p>
+            <div className="surface flex h-full flex-col overflow-hidden p-5">
+              <p className="mb-2 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Answer
+              </p>
+              <p className="min-h-0 flex-1 overflow-y-auto overscroll-contain font-serif text-lg leading-[1.32] text-ink-dim [scrollbar-width:thin]">
+                {answer}
+              </p>
             </div>
           </div>
         </m.div>

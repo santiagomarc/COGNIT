@@ -69,7 +69,7 @@ export function DockNav() {
           className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 z-[var(--z-rail)] w-[calc(100%-1.25rem)] max-w-fit -translate-x-1/2"
           aria-label="Primary navigation"
         >
-          <div className="glass-card mx-auto flex items-center gap-1 rounded-2xl border border-border-strong px-2 py-2 shadow-2xl">
+          <div className="surface mx-auto flex items-center gap-1 rounded-2xl border border-border-strong px-2 py-2 shadow-2xl">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = item.href === '/dashboard'

@@ -62,10 +62,15 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
   }
 
   return (
-    <form ref={formRef} action={handleSubmit} className="glass-card rounded-2xl p-5 text-card-foreground">
-      <div className="mb-4 space-y-1">
-        <h2 className="text-lg font-semibold tracking-tight">Add Card</h2>
-        <p className="text-sm text-muted-foreground">Create a new flashcard for this deck.</p>
+    <form ref={formRef} action={handleSubmit} className="surface p-5">
+      <div className="mb-4">
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Add a card
+        </h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Write one flashcard by hand. The question is what you are shown; the answer is what you
+          are trying to recall.
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -108,7 +113,7 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
 
       <div className="mt-4 flex items-center justify-end">
         <Button type="submit" disabled={isLoading}>
-          {isLoading ? 'Adding...' : 'Add Card'}
+          {isLoading ? 'Adding…' : 'Add card'}
         </Button>
       </div>
     </form>

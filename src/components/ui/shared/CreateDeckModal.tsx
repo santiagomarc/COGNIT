@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, m, useReducedMotion } from 'framer-motion';
-import { Plus, Sparkles, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+
 import { createDeck } from '@/app/actions/deck';
 import { createDeckSchema } from '@/lib/schemas';
 import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
@@ -14,12 +14,19 @@ import { motionTransitions } from '@/lib/motion-configs';
 import { OPEN_CREATE_DECK_EVENT } from '@/lib/dashboard-events';
 import { toast } from 'sonner';
 
-type CreateDeckModalProps = {
-  totalDecks: number;
-  totalCards: number;
-};
-
-export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps) {
+/**
+ * Create a deck (design system §7.8).
+ *
+ * This used to be a *tile* that flipped between a "quick actions" face and a
+ * form, wedged into the lower cell of a `grid-rows-[7fr_5fr]` stats column —
+ * five-twelfths of a third of the dashboard for the most important entry point
+ * a new user has (defect F-06). It is a real dialog now, opened from a button
+ * in the due-now band, and the tile is gone.
+ *
+ * The `OPEN_CREATE_DECK_EVENT` listener is kept: the onboarding panel lives in
+ * a different part of the tree and still asks for this by name.
+ */
+export function CreateDeckModal() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -29,10 +36,9 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   const formRef = useRef<HTMLFormElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
 
-  // The onboarding panel lives in a different grid area and cannot pass props
-  // here, so it asks via a named event instead.
   useEffect(() => {
     const handleOpenRequest = () => setOpen(true);
     window.addEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
@@ -45,10 +51,45 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
       return;
     }
 
-    if (triggerRef.current) {
-      triggerRef.current.focus();
-    }
+    triggerRef.current?.focus();
   }, [open]);
+
+  // Escape closes; Tab is trapped inside the dialog (§9 — a modal that leaks
+  // focus to the page behind it is not modal).
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (!open) return;
+
+      if (event.key === 'Escape') {
+        if (!isLoading) setOpen(false);
+        return;
+      }
+
+      if (event.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    },
+    [isLoading, open]
+  );
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   async function handleSubmit() {
     setFieldError(null);
@@ -95,89 +136,46 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
   }
 
   return (
-    <div className="glass-card h-full rounded-2xl p-3">
-      <div className="relative h-full overflow-hidden rounded-xl border border-border bg-card/35 p-3">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,color-mix(in_oklab,var(--primary)_16%,transparent),transparent_48%)]" />
+    <>
+      <Button ref={triggerRef} type="button" onClick={() => setOpen(true)} disabled={isLoading}>
+        {isLoading ? 'Creating…' : 'New deck'}
+      </Button>
 
-        <AnimatePresence mode="wait" initial={false}>
-          {!open ? (
+      <AnimatePresence>
+        {open ? (
+          <div className="fixed inset-0 z-[var(--z-modal)] flex items-center justify-center">
+            {/* The scrim (§7.8) — `--z-overlay`, and the 4px blur that modal
+                scrims are the only permitted use of in the product. */}
             <m.div
-              key="quick-actions-face"
-              initial={{ opacity: 0, rotateX: -6, y: 6 }}
-              animate={{ opacity: 1, rotateX: 0, y: 0 }}
-              exit={{ opacity: 0, rotateX: 6, y: -6 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="relative flex h-full flex-col justify-between gap-3"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Quick Actions</p>
-                  <p className="mt-1 text-sm font-medium text-foreground">Keep momentum today</p>
-                </div>
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-strong bg-primary/10 text-primary">
-                  <Sparkles className="h-4 w-4" />
-                </span>
-              </div>
+              onClick={() => !isLoading && setOpen(false)}
+              className="absolute inset-0 z-[var(--z-overlay)] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
+            />
 
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="rounded-full border border-border-strong bg-card/80 px-2 py-1 text-foreground/85">
-                  {totalDecks} deck{totalDecks !== 1 ? 's' : ''}
-                </span>
-                <span className="rounded-full border border-border-strong bg-card/80 px-2 py-1 text-foreground/85">
-                  {totalCards} total card{totalCards !== 1 ? 's' : ''}
-                </span>
-              </div>
-
-              <div className="grid gap-2">
-                <button
-                  ref={triggerRef}
-                  type="button"
-                  onClick={() => setOpen(true)}
-                  className="inline-flex h-15 w-full items-center justify-center gap-2 rounded-xl border border-border-strong bg-card/120 px-4 text-sm font-semibold text-foreground shadow-none transition-all hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.98]"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Create New Deck</span>
-                </button>
-              </div>
-            </m.div>
-          ) : (
             <m.div
-              key="create-deck-face"
-              initial={{ opacity: 0, rotateX: 6, y: 6 }}
-              animate={{ opacity: 1, rotateX: 0, y: 0 }}
-              exit={{ opacity: 0, rotateX: -6, y: -6 }}
-              transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="relative flex h-full flex-col justify-between gap-3"
+              ref={dialogRef}
               role="dialog"
-              aria-modal="false"
+              aria-modal="true"
               aria-labelledby="create-deck-title"
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && !isLoading) {
-                  setOpen(false);
-                }
-              }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
+              className="surface relative z-[var(--z-modal)] mx-4 w-full max-w-[480px] border-border-strong p-6"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 id="create-deck-title" className="text-sm font-semibold tracking-tight text-foreground">
-                    Create New Deck
-                  </h2>
-                  <p className="mt-1 text-xs text-muted-foreground">Name it and start adding cards.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => !isLoading && setOpen(false)}
-                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                  aria-label="Close create deck form"
-                  disabled={isLoading}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                New deck
+              </p>
+              <h2 id="create-deck-title" className="mt-2 text-base font-semibold tracking-[-.015em]">
+                Name it and start adding cards
+              </h2>
 
-              <form ref={formRef} action={handleSubmit} className="space-y-3">
+              <form ref={formRef} action={handleSubmit} className="mt-5 space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="inline-deck-title">Deck Title</Label>
+                  <Label htmlFor="inline-deck-title">Deck title</Label>
                   <Input
                     ref={inputRef}
                     id="inline-deck-title"
@@ -189,9 +187,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                     aria-describedby={fieldError ? 'inline-title-error' : undefined}
                     onChange={(e) => {
                       setDraftTitle(e.target.value);
-                      if (fieldError) {
-                        setFieldError(null);
-                      }
+                      if (fieldError) setFieldError(null);
                     }}
                   />
                   {fieldError && (
@@ -202,7 +198,7 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="inline-deck-tag">Accent Tag</Label>
+                  <Label htmlFor="inline-deck-tag">Subject tag</Label>
                   <select
                     id="inline-deck-tag"
                     value={accentTag}
@@ -219,24 +215,18 @@ export function CreateDeckModal({ totalDecks, totalCards }: CreateDeckModalProps
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setOpen(false)}
-                    disabled={isLoading}
-                  >
+                  <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={isLoading}>
                     Cancel
                   </Button>
-                  <Button type="submit" size="sm" disabled={isLoading}>
-                    {isLoading ? 'Creating...' : 'Create Deck'}
+                  <Button type="submit" variant="primary" disabled={isLoading}>
+                    {isLoading ? 'Creating…' : 'Create deck'}
                   </Button>
                 </div>
               </form>
             </m.div>
-          )}
-        </AnimatePresence>
-      </div>
-    </div>
+          </div>
+        ) : null}
+      </AnimatePresence>
+    </>
   );
 }

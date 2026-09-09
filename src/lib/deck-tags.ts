@@ -1,15 +1,24 @@
-const DECK_TAG_GLOW_COLORS = {
-  ai: 'rgba(139, 92, 246, 0.36)',
-  cs: 'rgba(59, 130, 246, 0.36)',
-  math: 'rgba(14, 165, 233, 0.36)',
-  bio: 'rgba(16, 185, 129, 0.36)',
-  chem: 'rgba(6, 182, 212, 0.35)',
-  physics: 'rgba(245, 158, 11, 0.35)',
-  history: 'rgba(249, 115, 22, 0.35)',
-  language: 'rgba(236, 72, 153, 0.34)',
-  law: 'rgba(168, 85, 247, 0.34)',
-  business: 'rgba(34, 197, 94, 0.34)',
-} as const;
+/*
+ * Subject tags are a label, not a colour.
+ *
+ * This list used to be a map of tag → `rgba(…)` glow, and every one of those
+ * ten values was a hue outside the state channel and a hard-coded colour in a
+ * module (§2.2, §2.3). The dashboard drew them as a shadow behind each deck
+ * tile and as a tinted chip; the deck row renders the tag as text in the label
+ * step instead, so the colours had no remaining consumer.
+ */
+const DECK_TAGS = [
+  'ai',
+  'cs',
+  'math',
+  'bio',
+  'chem',
+  'physics',
+  'history',
+  'language',
+  'law',
+  'business',
+] as const;
 
 export const DECK_TAG_OPTIONS = [
   { value: 'ai', label: 'AI' },
@@ -24,9 +33,9 @@ export const DECK_TAG_OPTIONS = [
   { value: 'business', label: 'Business' },
 ] as const;
 
-export type DeckTag = keyof typeof DECK_TAG_GLOW_COLORS;
+export type DeckTag = (typeof DECK_TAGS)[number];
 
-export const DECK_TAG_VALUES = Object.keys(DECK_TAG_GLOW_COLORS) as DeckTag[];
+export const DECK_TAG_VALUES: DeckTag[] = [...DECK_TAGS];
 
 const DECK_TAG_PREFIX_REGEX = /^\s*(?:\[([a-z0-9-]{2,20})\]|#([a-z0-9-]{2,20}))\s*/i;
 
@@ -81,13 +90,4 @@ export function buildDeckTitleWithTag(title: string, tag?: string | null) {
   }
 
   return `[${normalizedTag}] ${baseTitle}`;
-}
-
-export function getDeckTagGlowColor(tag: string | null | undefined) {
-  const normalizedTag = normalizeDeckTag(tag);
-  if (!normalizedTag) {
-    return null;
-  }
-
-  return DECK_TAG_GLOW_COLORS[normalizedTag] ?? null;
 }

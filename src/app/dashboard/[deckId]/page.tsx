@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
-import { ArrowLeft, BrainCircuit, Sparkles, Trophy } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { AddCardForm } from '@/components/ui/shared/AddCardForm';
 import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
@@ -12,8 +12,8 @@ import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { FadeInUp } from '@/components/motion';
 import { Button } from '@/components/ui/button';
+import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { Input } from '@/components/ui/input';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
@@ -55,31 +55,31 @@ type DeckDetailSnapshot = {
   masteryRowsErrorMessage: string | null;
 };
 
-function getMasteryBarClass(masteryPercentage: number) {
-  if (masteryPercentage >= 85) return 'bg-sky-400';
-  if (masteryPercentage >= 60) return 'bg-emerald-400';
-  if (masteryPercentage >= 30) return 'bg-amber-400';
-  return 'bg-red-400';
+/**
+ * Mastery is the one thing on this page that reports SM-2 state, so it is the
+ * one thing that gets a hue — and only at the threshold that means something.
+ * The four-step sky/emerald/amber/red ramp this replaces invented three
+ * boundaries the scheduler does not have (§2.2).
+ */
+function masteryBarColor(masteryPercentage: number) {
+  return masteryPercentage >= 70 ? 'var(--state-mastered)' : 'var(--ink-dim)';
 }
 
-function formatLastQuizLabel(lastQuizAt: string | null) {
+/** Compact age for the telemetry strip: `today`, `2d`, `3mo`. */
+function formatLastQuizAge(lastQuizAt: string | null) {
   if (!lastQuizAt) {
-    return 'Take your first quiz to start measuring mastery.';
+    return '—';
   }
 
-  const now = Date.now();
-  const diffMs = now - new Date(lastQuizAt).getTime();
-  const dayDiff = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+  const dayDiff = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(lastQuizAt).getTime()) / (1000 * 60 * 60 * 24)),
+  );
 
-  if (dayDiff === 0) {
-    return 'Last quizzed today';
-  }
-
-  if (dayDiff === 1) {
-    return 'Last quizzed 1 day ago';
-  }
-
-  return `Last quizzed ${dayDiff} days ago`;
+  if (dayDiff === 0) return 'today';
+  if (dayDiff < 30) return `${dayDiff}d`;
+  if (dayDiff < 365) return `${Math.round(dayDiff / 30)}mo`;
+  return `${Math.round(dayDiff / 365)}y`;
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -319,280 +319,285 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   const unprovenCards = Math.max(totalCards - masteredCards, 0);
   const hasCards = totalCards > 0;
 
+  const scopeOptions = [
+    { value: 'due', label: 'Due only', defaultChecked: true },
+    { value: 'include_reviewed', label: 'Include reviewed', defaultChecked: false },
+    { value: 'unmastered_only', label: 'Unmastered only', defaultChecked: false },
+  ];
+
+  const modeOptions = [
+    { value: 'mcq', label: 'Multiple choice', defaultChecked: true },
+    { value: 'identification', label: 'Identification', defaultChecked: false },
+  ];
+
   const addContentSection = (
     <>
-      <FadeInUp delay={0.1}>
-        <div id="add-content" className="flex flex-wrap items-center justify-between gap-3 scroll-mt-28">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">
-              {hasCards ? 'Add Content' : 'Start Here: Add Your First Cards'}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {hasCards
-                ? 'Add individual cards, bulk-import structured notes, or generate cards from a PDF.'
-                : 'Add individual cards, bulk-import notes, or generate cards from a PDF to unlock study and quiz modes.'}
-            </p>
-          </div>
-          <BulkImportModal deckId={deckId} />
+      <div id="add-content" className="flex flex-wrap items-end justify-between gap-3 scroll-mt-28">
+        <div>
+          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            {hasCards ? 'Add content' : 'Start here'}
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {hasCards
+              ? 'Add individual cards, bulk-import structured notes, or generate cards from a PDF.'
+              : 'Add cards, bulk-import notes, or generate from a PDF to unlock study and quiz modes.'}
+          </p>
         </div>
-      </FadeInUp>
+        <BulkImportModal deckId={deckId} />
+      </div>
 
-      <FadeInUp delay={0.12}>
-        <AddCardForm deckId={deckId} />
-      </FadeInUp>
-
-      <FadeInUp delay={0.15}>
-        <PDFUploadZone deckId={deckId} />
-      </FadeInUp>
-
-      <FadeInUp delay={0.18}>
-        <DeckChatWidget deckId={deckId} />
-      </FadeInUp>
+      <AddCardForm deckId={deckId} />
+      <PDFUploadZone deckId={deckId} />
+      <DeckChatWidget deckId={deckId} />
     </>
   );
 
   return (
     <div className="container mx-auto space-y-8 p-6 md:p-8">
-      <FadeInUp>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
-            >
+      <header className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <Button asChild variant="ghost" size="sm" className="gap-2 px-2">
+            <Link href="/dashboard">
               <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
+              Dashboard
             </Link>
+          </Button>
+          <div className="flex items-center gap-2">
+            <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
             <ThemeToggle />
           </div>
+        </div>
 
-          <div className="glass-card space-y-6 rounded-2xl p-6">
-            <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">{deckTitleMeta.cleanTitle}</h1>
-                  {deckTitleMeta.tag ? (
-                    <span className="inline-flex items-center rounded-full border border-border-strong bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                      {deckTitleMeta.tag}
-                    </span>
-                  ) : null}
-                </div>
-                {deck.description ? (
-                  <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
-                ) : (
-                  <p className="text-sm text-muted-foreground/60">No description yet.</p>
-                )}
-              </div>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">
+              {deckTitleMeta.cleanTitle}
+            </h1>
+            {deckTitleMeta.tag ? (
+              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                {deckTitleMeta.tag}
+              </span>
+            ) : null}
+          </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="inline-flex items-center rounded-full border border-border-strong bg-primary/5 px-3 py-1 text-sm font-medium text-primary">
-                  <span className="font-mono tnum">{totalCards}</span>&nbsp;cards
-                </div>
-                <div className="inline-flex items-center rounded-full border border-border-strong bg-card/50 px-3 py-1 text-sm text-muted-foreground">
-                  <span className="font-mono tnum">{quizReadyCards}/{totalCards}</span>&nbsp;quiz-ready
-                </div>
-                <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
-              </div>
-            </div>
+          {deck.description ? (
+            <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
+          ) : null}
+        </div>
 
-            <div className="rounded-2xl border border-border bg-card/30 p-5">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                    <Trophy className="h-4 w-4 text-primary" />
-                    Deck Mastery
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatLastQuizLabel(lastQuizAt)}
-                  </p>
-                </div>
-                <div className="text-left md:text-right">
-                  <p className="font-mono tnum text-3xl font-semibold tracking-[-.03em] text-foreground">{masteryPercentage}%</p>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-mono tnum">{masteredCards}/{totalCards}</span> cards currently proven in quizzes
-                  </p>
-                </div>
-              </div>
+        {/* Deck telemetry (§7.9). Mastery is the only reading here that is a
+            state, so it is the only one that can take a hue. */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          <Telemetry label="Cards" value={totalCards} />
+          <Telemetry label="Quiz-ready" value={`${quizReadyCards}/${totalCards}`} />
+          <Telemetry
+            label="Mastery"
+            value={`${masteryPercentage}%`}
+            tone={masteryPercentage >= 70 ? 'mastered' : 'ink'}
+          />
+          <Telemetry label="Proven" value={`${masteredCards}/${totalCards}`} />
+          <Telemetry label="Last quiz" value={formatLastQuizAge(lastQuizAt)} />
+        </div>
 
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted/50">
-                <div
-                  className={`h-full rounded-full transition-all ${getMasteryBarClass(masteryPercentage)}`}
-                  style={{ width: `${Math.min(masteryPercentage, 100)}%` }}
+        <div className="h-[3px] w-full bg-border" aria-hidden="true">
+          <div
+            className="h-full"
+            style={{
+              width: `${Math.min(masteryPercentage, 100)}%`,
+              backgroundColor: masteryBarColor(masteryPercentage),
+            }}
+          />
+        </div>
+
+        {lastQuizAt === null ? (
+          <p className="text-sm text-muted-foreground">
+            Take your first quiz to start measuring mastery.
+          </p>
+        ) : null}
+      </header>
+
+      {topTopics.length > 0 ? (
+        <section className="surface p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              Top concepts
+            </h2>
+            <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              From AI topic tags
+            </p>
+          </div>
+          {/* A count is a better badge than a tint (§6), and a topic is not an
+              SM-2 state, so it gets no colour at all. */}
+          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+            {topTopics.map(([topic, count]) => (
+              <li key={topic} className="flex items-baseline gap-2 text-sm">
+                <span className="text-ink">{topic}</span>
+                <span className="font-mono text-[13px] tnum text-ink-dimmer">{count}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {hasCards ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* ── Review ── */}
+          <form action={`/dashboard/${deckId}/study`} method="get" className="surface flex flex-col p-5">
+            <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              Review flashcards
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Spaced repetition. This is the flow that advances your daily review count, streak and
+              heatmap.
+            </p>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+              <label className="space-y-1.5 text-left">
+                <span className="block font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Session cards
+                </span>
+                <Input
+                  name="count"
+                  type="number"
+                  min={sessionBounds.min || undefined}
+                  max={sessionBounds.max || undefined}
+                  step={1}
+                  defaultValue={sessionBounds.defaultCount || undefined}
+                  className="w-28"
+                  aria-label="Number of flashcards to review"
                 />
-              </div>
-            </div>
+              </label>
 
-            {topTopics.length > 0 ? (
-              <div className="rounded-2xl border border-border bg-card/25 p-5">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">Top Concepts</p>
-                  <p className="text-xs text-muted-foreground">From AI topic tags</p>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {topTopics.map(([topic, count]) => (
-                    <span
-                      key={topic}
-                      className="inline-flex items-center gap-1 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs text-sky-700 dark:text-sky-200"
+              <fieldset className="space-y-1.5">
+                <legend className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Card scope
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {scopeOptions.map((option) => (
+                    <label
+                      key={option.value}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1.5 text-[13px] text-ink transition-colors hover:bg-surface-raised has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]"
                     >
-                      <span>{topic}</span>
-                      <span className="text-sky-700/80 dark:text-sky-300/80">{count}</span>
-                    </span>
+                      <input
+                        type="radio"
+                        name="scope"
+                        value={option.value}
+                        defaultChecked={option.defaultChecked}
+                        className="accent-[var(--accent)]"
+                      />
+                      {option.label}
+                    </label>
                   ))}
                 </div>
-              </div>
-            ) : null}
+              </fieldset>
+            </div>
 
-            {hasCards ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                <form action={`/dashboard/${deckId}/study`} method="get" className="rounded-2xl border border-border bg-card/25 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <BrainCircuit className="h-4 w-4 text-primary" />
-                        Review Flashcards
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Build recall with spaced repetition. This is the flow that advances your daily review count, streak, and heatmap.
-                      </p>
-                    </div>
-                  </div>
+            <p className="mt-4 border-l-2 border-border-strong pl-3 text-xs leading-relaxed text-muted-foreground">
+              Due mode keeps normal SM-2 scheduling. Include reviewed fills the session with
+              scheduled cards even when they are not due yet. Unmastered covers cards still in new,
+              learning or relearning states.
+            </p>
 
-                  <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
-                    <label className="space-y-1 text-left">
-                      <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
-                        Session cards
-                      </span>
-                      <Input
-                        name="count"
-                        type="number"
-                        min={sessionBounds.min || undefined}
-                        max={sessionBounds.max || undefined}
-                        step={1}
-                        defaultValue={sessionBounds.defaultCount || undefined}
-                        className="w-28"
-                        aria-label="Number of flashcards to review"
-                      />
-                    </label>
+            <div className="mt-5 flex justify-end pt-1">
+              {/* The deck page's one filled button (§7.2): review is the flow
+                  the whole product is built around. */}
+              <Button type="submit" variant="primary">
+                Review flashcards
+              </Button>
+            </div>
+          </form>
 
-                    <fieldset className="space-y-2">
-                      <legend className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Card scope</legend>
-                      <div className="flex flex-wrap gap-2">
-                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
-                          <input type="radio" name="scope" value="due" defaultChecked className="accent-primary" />
-                          Due only (SM-2)
-                        </label>
-                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
-                          <input type="radio" name="scope" value="include_reviewed" className="accent-primary" />
-                          Force include reviewed
-                        </label>
-                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
-                          <input type="radio" name="scope" value="unmastered_only" className="accent-primary" />
-                          Only not reviewed/mastered
-                        </label>
-                      </div>
-                    </fieldset>
-                  </div>
+          {/* ── Quiz ── */}
+          <form action={`/dashboard/${deckId}/quiz`} method="get" className="surface flex flex-col p-5">
+            <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              Take quiz
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Test what you know in a dedicated assessment. Quiz results update this deck&apos;s
+              mastery score.
+            </p>
 
-                  <div className="mt-4 rounded-xl border border-border bg-background/30 p-3">
-                    <p className="text-xs text-muted-foreground">
-                      Due mode keeps normal SM-2 scheduling. Force include reviewed fills the session with scheduled cards even if they are not due yet.
-                      Unmastered mode includes cards still in new, learning, or relearning states.
-                    </p>
-                  </div>
+            <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
+              <label className="space-y-1.5 text-left">
+                <span className="block font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Quiz cards
+                </span>
+                <Input
+                  name="count"
+                  type="number"
+                  min={sessionBounds.min || undefined}
+                  max={sessionBounds.max || undefined}
+                  step={1}
+                  defaultValue={sessionBounds.defaultCount || undefined}
+                  className="w-28"
+                  aria-label="Number of quiz cards"
+                />
+              </label>
 
-                  <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
-                    <Button type="submit">Review Flashcards</Button>
-                  </div>
-                </form>
-
-                <form action={`/dashboard/${deckId}/quiz`} method="get" className="rounded-2xl border border-border bg-card/25 p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        Take Quiz
-                      </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Test what you know in a dedicated assessment flow. Quiz results update this deck&apos;s mastery score.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
-                    <label className="space-y-1 text-left">
-                      <span className="block font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
-                        Quiz cards
-                      </span>
-                      <Input
-                        name="count"
-                        type="number"
-                        min={sessionBounds.min || undefined}
-                        max={sessionBounds.max || undefined}
-                        step={1}
-                        defaultValue={sessionBounds.defaultCount || undefined}
-                        className="w-28"
-                        aria-label="Number of quiz cards"
-                      />
-                    </label>
-
-                    <fieldset className="space-y-2">
-                      <legend className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Mode</legend>
-                      <div className="flex flex-wrap gap-2">
-                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
-                          <input type="radio" name="mode" value="mcq" defaultChecked className="accent-primary" />
-                          MCQ
-                        </label>
-                        <label className="inline-flex items-center gap-2 rounded-full border border-border bg-background/40 px-3 py-2 text-sm text-foreground">
-                          <input type="radio" name="mode" value="identification" className="accent-primary" />
-                          Identification
-                        </label>
-                      </div>
-                    </fieldset>
-                  </div>
-
-                  <div className="mt-4 space-y-2 rounded-xl border border-border bg-background/30 p-3">
-                    <label className="inline-flex items-center gap-2 text-sm text-foreground">
+              <fieldset className="space-y-1.5">
+                <legend className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Mode
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {modeOptions.map((option) => (
+                    <label
+                      key={option.value}
+                      className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1.5 text-[13px] text-ink transition-colors hover:bg-surface-raised has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]"
+                    >
                       <input
-                        type="checkbox"
-                        name="focus_unproven"
-                        value="1"
-                        className="accent-primary"
+                        type="radio"
+                        name="mode"
+                        value={option.value}
+                        defaultChecked={option.defaultChecked}
+                        className="accent-[var(--accent)]"
                       />
-                      Force include all unproven cards ({unprovenCards})
+                      {option.label}
                     </label>
-                    <p className="text-xs text-muted-foreground">
-                      If enabled, quiz size auto-expands to include every card not yet proven in quiz mastery.
-                    </p>
-                  </div>
-
-                  <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs text-muted-foreground">
-                      {quizReadyCards < totalCards
-                        ? 'Some cards still need AI enrichment. The quiz route will prepare missing prompts automatically.'
-                        : 'All cards are ready for both quiz modes.'}
-                    </p>
-                    <Button type="submit" variant="outline">Start Quiz</Button>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-border-strong bg-primary/5 p-5">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-foreground">This deck is empty. Add your first cards to unlock Study and Quiz.</p>
-                    <p className="text-sm text-muted-foreground">
-                      Start by writing one card, bulk importing your notes, or generating cards from a PDF.
-                    </p>
-                  </div>
-                  <Button asChild>
-                    <Link href="#add-content">Add Cards Now</Link>
-                  </Button>
+                  ))}
                 </div>
-              </div>
-            )}
-          </div>
+              </fieldset>
+            </div>
+
+            <div className="mt-4 space-y-1.5">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+                <input
+                  type="checkbox"
+                  name="focus_unproven"
+                  value="1"
+                  className="accent-[var(--accent)]"
+                />
+                Include all unproven cards (<span className="font-mono tnum">{unprovenCards}</span>)
+              </label>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Expands the quiz to cover every card not yet proven in quiz mastery.
+              </p>
+            </div>
+
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5">
+              <p className="text-xs text-muted-foreground">
+                {quizReadyCards < totalCards
+                  ? 'Some cards still need AI enrichment. The quiz route prepares missing prompts automatically.'
+                  : 'All cards are ready for both quiz modes.'}
+              </p>
+              <Button type="submit">Start quiz</Button>
+            </div>
+          </form>
         </div>
-      </FadeInUp>
+      ) : (
+        <section className="surface flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              This deck is empty. Add your first cards to unlock study and quiz.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Write one card, bulk-import your notes, or generate cards from a PDF.
+            </p>
+          </div>
+          <Button asChild variant="primary">
+            <Link href="#add-content">Add cards now</Link>
+          </Button>
+        </section>
+      )}
 
       {addContentSection}
 
@@ -605,17 +610,13 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
       {hasCards ? (
         <>
-          <FadeInUp delay={0.2}>
-            <Suspense fallback={<WeakestConceptsSkeleton />}>
-              <WeakestConcepts deckId={deckId} />
-            </Suspense>
-          </FadeInUp>
+          <Suspense fallback={<WeakestConceptsSkeleton />}>
+            <WeakestConcepts deckId={deckId} />
+          </Suspense>
 
-          <FadeInUp delay={0.2}>
-            <Suspense fallback={<QuizHistorySkeleton />}>
-              <QuizHistorySection deckId={deckId} />
-            </Suspense>
-          </FadeInUp>
+          <Suspense fallback={<QuizHistorySkeleton />}>
+            <QuizHistorySection deckId={deckId} />
+          </Suspense>
         </>
       ) : null}
     </div>

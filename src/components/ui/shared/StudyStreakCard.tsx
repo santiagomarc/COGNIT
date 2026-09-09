@@ -1,9 +1,4 @@
-'use client';
-
-import { m, useReducedMotion } from 'framer-motion';
-import { Flame, Target, Trophy } from 'lucide-react';
 import { ActivityHeatmap } from './ActivityHeatmap';
-import { motionTransitions } from '@/lib/motion-configs';
 
 type StudyStreakCardProps = {
   streak: number;
@@ -13,32 +8,46 @@ type StudyStreakCardProps = {
   todayStudiedCount: number;
   todayIso: string;
   activity: { date: string; count: number }[];
+  /** Share of quiz-assessed cards answered correctly; null with no quiz data. */
+  retentionPercentage: number | null;
+  assessedCards: number;
 };
 
-type Level = {
-  name: string;
-  min: number;
-  next: number | null;
-};
+const DAILY_GOAL = 20;
+const SPARK_DAYS = 30;
 
-const LEVELS: Level[] = [
-  { name: 'Rookie', min: 0, next: 100 },
-  { name: 'Explorer', min: 100, next: 300 },
-  { name: 'Scholar', min: 300, next: 700 },
-  { name: 'Sage', min: 700, next: 1500 },
-  { name: 'Legend', min: 1500, next: null },
-];
+/**
+ * Builds the last `SPARK_DAYS` of review counts, gaps included.
+ *
+ * A sparkline drawn only from days that have entries lies: a week off shows as
+ * a flat line rather than a hole.
+ */
+function buildRecentSeries(activity: { date: string; count: number }[], todayIso: string) {
+  const byDate = new Map(activity.map((entry) => [entry.date, entry.count]));
+  const today = new Date(`${todayIso}T00:00:00Z`);
+  const anchor = Number.isNaN(today.getTime()) ? new Date() : today;
 
-function getLevel(totalStudiedCards: number): Level {
-  let level = LEVELS[0];
-  for (const candidate of LEVELS) {
-    if (totalStudiedCards >= candidate.min) {
-      level = candidate;
-    }
+  const series: { date: string; count: number }[] = [];
+  for (let offset = SPARK_DAYS - 1; offset >= 0; offset -= 1) {
+    const day = new Date(anchor);
+    day.setUTCDate(day.getUTCDate() - offset);
+    const iso = day.toISOString().slice(0, 10);
+    series.push({ date: iso, count: byDate.get(iso) ?? 0 });
   }
-  return level;
+  return series;
 }
 
+/**
+ * The two retrospective panels, demoted below the deck index (Phase 6.5).
+ *
+ * They sat in the top band taking two-thirds of it, which put the least
+ * actionable thing on the page above the most actionable one (defect F-06).
+ * Retention and a streak report what already happened; nothing here is a task.
+ *
+ * This is a server component now — the old version was `'use client'` only to
+ * run a repeating flame-scale animation and two width springs, none of which
+ * survived §5's "instruments do not bounce".
+ */
 export function StudyStreakCard({
   streak,
   longestStreak,
@@ -47,142 +56,122 @@ export function StudyStreakCard({
   todayStudiedCount,
   todayIso,
   activity,
+  retentionPercentage,
+  assessedCards,
 }: StudyStreakCardProps) {
-  const reduced = useReducedMotion();
-  const active = studiedToday;
-  const level = getLevel(totalStudiedCards);
-  const nextLevelTarget = level.next;
-  const dailyGoal = 20;
-  const dailyGoalProgress = Math.min(100, Math.round((todayStudiedCount / dailyGoal) * 100));
-  const levelProgress =
-    nextLevelTarget === null
-      ? 100
-      : Math.min(
-          100,
-          Math.round(((totalStudiedCards - level.min) / (nextLevelTarget - level.min)) * 100),
-        );
+  const series = buildRecentSeries(activity, todayIso);
+  const peak = Math.max(1, ...series.map((point) => point.count));
+  const dailyGoalProgress = Math.min(100, Math.round((todayStudiedCount / DAILY_GOAL) * 100));
+
   return (
-    <m.div
-      initial={false}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={reduced ? { duration: 0 } : { ...motionTransitions.panel, delay: 0.05 }}
-      className="glass-card rounded-2xl p-5 md:p-6"
-    >
-      {/* Flat ground: the two blur orbs and the radial gradient wash that used
-          to sit here were the loudest AI-template tell in the dashboard. */}
-      <div className="relative overflow-hidden rounded-xl border border-border bg-surface-raised p-4 md:p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
-                active ? 'bg-orange-500/15 border-orange-500/30' : 'bg-muted/20 border-border'
-              }`}
-            >
-              <m.div
-                animate={
-                  active && !reduced
-                    ? {
-                        scale: [1, 1.14, 1],
-                        rotate: [0, -4, 4, 0],
-                      }
-                    : undefined
-                }
-                transition={{
-                  duration: 1.4,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
+    <div className="grid gap-4 lg:grid-cols-2">
+      {/* ── Recall ── */}
+      <section className="surface min-w-0 p-5 md:p-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Recall accuracy
+          </h2>
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+            {assessedCards} assessed
+          </p>
+        </div>
+
+        <p className="mt-3 font-mono text-[34px] font-semibold leading-none tracking-[-0.03em] tnum">
+          {retentionPercentage === null ? '—' : `${retentionPercentage}%`}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {retentionPercentage === null
+            ? 'Take a quiz to start measuring recall.'
+            : 'Share of quiz-assessed cards answered correctly.'}
+        </p>
+
+        {/* Reviews over the last 30 days. Bars, not a curve: the underlying
+            series is a count per day, and a smoothed line would invent values
+            between them. */}
+        <div className="mt-5">
+          <div className="flex h-10 items-end gap-[2px]" aria-hidden="true">
+            {series.map((point) => (
+              <span
+                key={point.date}
+                className="block flex-1 rounded-[1px]"
+                style={{
+                  height: point.count === 0 ? '1px' : `${Math.max(8, (point.count / peak) * 100)}%`,
+                  backgroundColor: point.count === 0 ? 'var(--border)' : 'var(--ink-dim)',
                 }}
-              >
-                <Flame
-                  className={`h-5 w-5 ${
-                    active ? 'text-orange-500' : 'text-muted-foreground/60'
-                  }`}
-                />
-              </m.div>
-            </div>
-
-            <div>
-              <h3 className="text-sm font-semibold tracking-tight text-muted-foreground uppercase">
-                Study Activity
-              </h3>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="font-mono text-3xl font-semibold tracking-[-.03em] tnum text-[var(--state-streak)]">{streak}</span>
-                <span className="text-sm text-muted-foreground">day streak</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 rounded-lg border border-border-strong bg-primary/10 px-3 py-2">
-            <Trophy className="h-4 w-4 text-primary" />
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Level</p>
-              <p className="text-sm font-semibold">{level.name}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Longest Streak</p>
-            <p className="text-lg font-semibold tracking-[-.03em]"><span className="font-mono tnum">{longestStreak}</span> days</p>
-          </div>
-          <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Cards Studied</p>
-            <p className="font-mono text-lg font-semibold tracking-[-.03em] tnum">{totalStudiedCards}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
-            <p className="text-xs text-muted-foreground">Today</p>
-            <p className="font-mono text-lg font-semibold tracking-[-.03em] tnum">{todayStudiedCount}</p>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-3">
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Target className="h-3.5 w-3.5" />
-                Daily goal: <span className="font-mono tnum">{dailyGoal}</span>&nbsp;cards
-              </span>
-              <span className="font-mono tnum">{dailyGoalProgress}%</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted/50">
-              <m.div
-                initial={reduced ? undefined : { width: 0 }}
-                animate={{ width: `${dailyGoalProgress}%` }}
-                transition={reduced ? { duration: 0 } : motionTransitions.panel}
-                className="h-full rounded-full bg-ink-dim"
               />
-            </div>
+            ))}
           </div>
+          <p className="mt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Reviews · last <span className="tnum">{SPARK_DAYS}</span> days · peak{' '}
+            <span className="tnum">{peak}</span>
+          </p>
+        </div>
+      </section>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Progress to next level</span>
-              <span className="font-mono tnum">{nextLevelTarget === null ? 'MAX' : `${totalStudiedCards}/${nextLevelTarget}`}</span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted/50">
-              <m.div
-                initial={reduced ? undefined : { width: 0 }}
-                animate={{ width: `${levelProgress}%` }}
-                transition={reduced ? { duration: 0 } : motionTransitions.panel}
-                className="h-full rounded-full bg-ink-dim"
-              />
-            </div>
+      {/* ── Streak ── */}
+      <section className="surface min-w-0 p-5 md:p-6">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Streak
+          </h2>
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            {studiedToday ? 'Logged today' : 'Not logged today'}
+          </p>
+        </div>
+
+        <p
+          className="mt-3 font-mono text-[34px] font-semibold leading-none tracking-[-0.03em] tnum"
+          style={{ color: streak > 0 ? 'var(--state-streak)' : 'var(--ink)' }}
+        >
+          {streak}d
+        </p>
+
+        <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4">
+          <div>
+            <dt className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              Longest
+            </dt>
+            <dd className="mt-1 font-mono text-[15px] tnum text-ink">{longestStreak}d</dd>
           </div>
-        </div>
-      </div>
+          <div>
+            <dt className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              Today
+            </dt>
+            <dd className="mt-1 font-mono text-[15px] tnum text-ink">
+              {todayStudiedCount}/{DAILY_GOAL}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              All time
+            </dt>
+            <dd className="mt-1 font-mono text-[15px] tnum text-ink">{totalStudiedCards}</dd>
+          </div>
+        </dl>
 
-      <div className="mt-5 rounded-xl border border-border bg-card/40 p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h4 className="text-sm font-semibold tracking-tight">Daily Activity Tracker</h4>
-          {!studiedToday ? (
-            <p className="text-xs text-orange-400/80">Study today to protect your streak.</p>
-          ) : (
-            <p className="text-xs text-emerald-400/80">You logged activity today.</p>
-          )}
+        <div className="mt-4">
+          <div className="h-[3px] w-full bg-border" aria-hidden="true">
+            <div
+              className="h-full"
+              style={{
+                width: `${dailyGoalProgress}%`,
+                backgroundColor:
+                  dailyGoalProgress >= 100 ? 'var(--state-mastered)' : 'var(--ink-dim)',
+              }}
+            />
+          </div>
+          <p className="mt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Daily goal <span className="tnum">{dailyGoalProgress}%</span>
+          </p>
         </div>
-        <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={todayIso} />
-      </div>
-    </m.div>
+
+        {/* Six months of day cells has a min-content width wider than a phone.
+            It scrolls inside its own box rather than stretching the grid track
+            and taking the whole page sideways with it. */}
+        <div className="mt-5 overflow-x-auto border-t border-border pt-4">
+          <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={todayIso} />
+        </div>
+      </section>
+    </div>
   );
 }

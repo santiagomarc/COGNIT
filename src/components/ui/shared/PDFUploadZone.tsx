@@ -5,9 +5,10 @@ import { generateCards } from '@/app/actions/ai-generate';
 import { enrichCards } from '@/app/actions/ai-enrich';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
+import { motionTransitions } from '@/lib/motion-configs';
 import { toast } from 'sonner';
-import { m, AnimatePresence } from 'framer-motion';
-import { Upload, FileText, Brain, Sparkles, X, CheckCircle2 } from 'lucide-react';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Upload, X } from 'lucide-react';
 
 type PDFUploadZoneProps = {
   deckId: string;
@@ -43,6 +44,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const reduced = useReducedMotion();
   const [, startEnrichTransition] = useTransition();
 
   const resolvedMaxCardCount = maxCardChoice === 'max' ? PDF_GENERATION_MAX_COUNT : Number(maxCardChoice);
@@ -164,15 +166,15 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
 
   return (
     <div className="space-y-4">
-      {/* ─── Drop Zone ─── */}
-      <div className="glass-card relative rounded-2xl p-5 text-card-foreground">
+      {/* ─── Drop zone ─── */}
+      <div className="surface relative p-5">
         <div className="mb-4 space-y-1">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold tracking-tight">Generate from PDF</h2>
-          </div>
+          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Generate from PDF
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Upload a PDF and our AI will create flashcards from its content.
+            Upload lecture slides, a chapter or your own notes. Cards are written from the text and
+            saved to this deck.
           </p>
         </div>
 
@@ -188,16 +190,11 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
           }}
-          className={`
-            group relative flex min-h-40 cursor-pointer flex-col items-center justify-center
-            rounded-xl border-2 border-dashed transition-all duration-300
-            ${isDragging
-              ? 'border-border-strong bg-primary/10'
-              : selectedFile
-                ? 'border-border-strong bg-primary/5'
-                : 'border-border-strong bg-card/30 hover:border-border-strong hover:bg-card/50'
-            }
-          `}
+          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-container)] border border-dashed p-6 text-center transition-colors outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+            isDragging || selectedFile
+              ? 'border-[var(--accent)] bg-surface-raised'
+              : 'border-[var(--border-control)] hover:bg-surface-raised'
+          }`}
         >
           <input
             ref={inputRef}
@@ -209,66 +206,50 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           />
 
           {selectedFile ? (
-            <m.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center gap-3 p-6"
-            >
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                <FileText className="h-6 w-6 text-primary" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium">{selectedFile.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  <span className="font-mono tnum">{(selectedFile.size / 1024 / 1024).toFixed(2)}</span>&nbsp;MB
-                </p>
-              </div>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-sm font-medium">{selectedFile.name}</p>
+              <p className="font-mono text-[13px] tnum text-ink-dim">
+                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+              </p>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   clearFile();
                 }}
-                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                className="mt-1 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs text-ink-dimmer transition-colors hover:text-ink"
               >
                 <X className="h-3 w-3" />
                 Remove
               </button>
-            </m.div>
+            </div>
           ) : (
-            <div className="flex flex-col items-center gap-3 p-6">
-              <div className={`
-                flex h-12 w-12 items-center justify-center rounded-full transition-colors
-                ${isDragging ? 'bg-primary/20' : 'bg-muted/50 group-hover:bg-primary/10'}
-              `}>
-                <Upload className={`h-6 w-6 transition-colors ${isDragging ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'}`} />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium">
-                  {isDragging ? 'Drop your PDF here' : 'Drag & drop a PDF here'}
-                </p>
-                <p className="text-xs text-muted-foreground">or click to browse (max 10 MB)</p>
-              </div>
+            <div className="flex flex-col items-center gap-2">
+              <Upload className="h-5 w-5 text-ink-dimmer" />
+              <p className="text-sm font-medium">
+                {isDragging ? 'Drop your PDF here' : 'Drag a PDF here, or click to browse'}
+              </p>
+              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                PDF · max 10 MB
+              </p>
             </div>
           )}
         </div>
 
-        {/* Controls row */}
         {selectedFile && (
-          <m.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 flex flex-wrap items-center justify-between gap-3"
-          >
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <label htmlFor="card-count" className="text-sm text-muted-foreground">
-                Max cards to generate:
+              <label
+                htmlFor="card-count"
+                className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+              >
+                Max cards
               </label>
               <select
                 id="card-count"
                 value={maxCardChoice}
                 onChange={(e) => setMaxCardChoice(e.target.value)}
-                className="h-8 rounded-lg border border-border-strong bg-card/60 px-2 text-sm backdrop-blur-sm outline-none focus:border-[var(--border-control)] focus:ring-2 focus:ring-ring"
+                className="h-[30px] rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-sm outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>
@@ -279,92 +260,72 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               </select>
             </div>
 
-            <Button onClick={handleGenerate} disabled={isGenerating}>
-              <Sparkles className="h-4 w-4" />
-              Generate Cards
+            <Button onClick={handleGenerate} variant="primary" disabled={isGenerating}>
+              {isGenerating ? 'Generating…' : 'Generate cards'}
             </Button>
-          </m.div>
+          </div>
         )}
 
-        {/* ─── Generation Overlay ─── */}
+        {/*
+          The working state is a scrim over the zone it belongs to — the one
+          place a blur is permitted (§7.8). What it replaces was a pulsing brain
+          glyph, which said nothing about progress and everything about being an
+          AI demo (§6).
+        */}
         <AnimatePresence>
           {isGenerating && (
             <m.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 z-10 flex flex-col items-center justify-center rounded-2xl bg-background/80 backdrop-blur-md"
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
+              className="absolute inset-0 z-[var(--z-sticky)] flex flex-col items-center justify-center rounded-[var(--radius-container)] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
+              role="status"
+              aria-live="polite"
             >
-              <m.div
-                animate={{ scale: [1, 1.15, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10"
-              >
-                <Brain className="h-8 w-8 text-primary" />
-              </m.div>
-              <p className="text-sm font-medium">Generating cards...</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Reading your PDF and creating flashcards with AI
+              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Working
               </p>
-              <m.div
-                className="mt-4 h-1 w-48 overflow-hidden rounded-full bg-muted"
-              >
+              <p className="mt-2 text-sm font-medium">Reading your PDF and writing cards</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This usually takes under a minute for a chapter.
+              </p>
+
+              <div className="mt-4 h-[3px] w-48 overflow-hidden bg-border">
                 <m.div
-                  className="h-full rounded-full bg-primary"
-                  animate={{ x: ['-100%', '100%'] }}
+                  className="h-full w-1/2 bg-ink-dim"
+                  animate={reduced ? undefined : { x: ['-100%', '200%'] }}
                   transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{ width: '50%' }}
                 />
-              </m.div>
+              </div>
             </m.div>
           )}
         </AnimatePresence>
       </div>
 
-      {/* ─── Generated Cards Preview ─── */}
-      <AnimatePresence>
-        {generatedCards.length > 0 && (
-          <m.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -12 }}
-            className="space-y-3"
-          >
-            <div className="flex items-center gap-2 text-sm font-medium text-primary">
-              <CheckCircle2 className="h-4 w-4" />
-              {generatedCards.length} cards generated and saved
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {generatedCards.map((card, i) => (
-                <m.div
-                  key={i}
-                  initial={{ opacity: 0, y: 16, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{
-                    delay: i * 0.06,
-                    type: 'spring',
-                    stiffness: 260,
-                    damping: 20,
-                  }}
-                  className="glass-card rounded-xl p-4"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary/70 mb-1">
-                    Q
-                  </p>
-                  <p className="text-sm leading-relaxed">{card.front}</p>
-                  <hr className="my-2 border-border" />
-                  <p className="text-xs font-semibold uppercase tracking-wider text-ink-dim mb-1">
-                    A
-                  </p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {card.back}
-                  </p>
-                </m.div>
-              ))}
-            </div>
-          </m.div>
-        )}
-      </AnimatePresence>
+      {/* ─── Generated cards ─── */}
+      {generatedCards.length > 0 && (
+        <div className="space-y-3">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            <span className="tnum">{generatedCards.length}</span> cards generated and saved
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {generatedCards.map((card, i) => (
+              <div key={i} className="surface p-4">
+                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Question
+                </p>
+                <p className="mt-1 text-sm leading-relaxed">{card.front}</p>
+                <hr className="my-3 border-border" />
+                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Answer
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.back}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

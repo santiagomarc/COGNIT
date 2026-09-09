@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { m, AnimatePresence } from 'framer-motion';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Pencil, Trash2, X, Check, Square, CheckSquare } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
+import { motionTransitions } from '@/lib/motion-configs';
 import { updateCard, deleteCard } from '@/app/actions/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +56,7 @@ export function FlashcardWithActions({
   const [editableDescription, setEditableDescription] = useState(description);
   const [isLoading, setIsLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const reduced = useReducedMotion();
 
   async function handleSave() {
     setIsLoading(true);
@@ -87,7 +89,13 @@ export function FlashcardWithActions({
   }
 
   return (
-    <div className={`group relative ${selectionMode && selected ? 'rounded-2xl ring-2 ring-primary/40 ring-offset-2 ring-offset-background' : ''}`}>
+    <div
+      className={`group relative ${
+        selectionMode && selected
+          ? 'rounded-[var(--radius-container)] outline outline-2 outline-offset-2 outline-[var(--accent)]'
+          : ''
+      }`}
+    >
       <AnimatePresence mode="wait">
         {isEditing ? (
           <m.div
@@ -95,8 +103,8 @@ export function FlashcardWithActions({
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-            className="glass-card flex h-56 flex-col gap-3 rounded-2xl p-5"
+            transition={reduced ? { duration: 0 } : motionTransitions.panel}
+            className="surface flex h-56 flex-col gap-3 p-5"
           >
             <Input
               value={editableTerm}
@@ -132,7 +140,7 @@ export function FlashcardWithActions({
                 disabled={isLoading}
               >
                 <Check className="mr-1 h-3.5 w-3.5" />
-                {isLoading ? 'Saving...' : 'Save'}
+                {isLoading ? 'Saving…' : 'Save'}
               </Button>
             </div>
           </m.div>
@@ -145,23 +153,21 @@ export function FlashcardWithActions({
             className="space-y-2"
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex max-w-[75%] flex-wrap gap-1">
+              <div className="flex max-w-[75%] flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 {typeof cardNumber === 'number' ? (
-                  <span className="rounded-full border border-border-strong bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
-                    Card #{cardNumber}
-                  </span>
+                  <span className="tnum">#{cardNumber}</span>
                 ) : null}
-                <span className="rounded-full border border-border-strong bg-card/80 px-2 py-1 text-[10px] uppercase tracking-[0.2em] text-primary backdrop-blur-sm">
-                  {SOURCE_LABELS[source]}
+                <span>{SOURCE_LABELS[source]}</span>
+                {/* The only state on this card, so the only thing that may take
+                    a hue — and the word carries it too (§2.3). */}
+                <span
+                  style={{
+                    color: quizReady ? 'var(--state-mastered)' : 'var(--state-learning)',
+                  }}
+                >
+                  {quizReady ? 'Quiz ready' : 'Quiz pending'}
                 </span>
-                <span className={`rounded-full border px-2 py-1 text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm ${quizReady ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
-                  {quizReady ? 'Quiz Ready' : 'Quiz Pending'}
-                </span>
-                {importedBy ? (
-                  <span className="rounded-full border border-border bg-card/80 px-2 py-1 text-[10px] text-muted-foreground backdrop-blur-sm">
-                    {importedBy}
-                  </span>
-                ) : null}
+                {importedBy ? <span className="truncate normal-case tracking-normal">{importedBy}</span> : null}
               </div>
 
               {selectionMode ? (
@@ -171,7 +177,7 @@ export function FlashcardWithActions({
                     e.stopPropagation();
                     onToggleSelected?.();
                   }}
-                  className="z-20 flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-border-strong text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                  className="z-20 flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-none hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   title={selected ? 'Unselect card' : 'Select card'}
                   aria-pressed={selected}
                 >
@@ -185,7 +191,7 @@ export function FlashcardWithActions({
                       e.stopPropagation();
                       setIsEditing(true);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-border-strong text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-none hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     title="Edit card"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -196,7 +202,7 @@ export function FlashcardWithActions({
                       e.stopPropagation();
                       setShowDeleteConfirm(true);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg bg-card/80 backdrop-blur-sm border border-destructive/20 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-none hover:border-[var(--state-lapsed)] hover:text-[var(--state-lapsed)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     title="Delete card"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -211,7 +217,7 @@ export function FlashcardWithActions({
                 {topicTags.map((tag) => (
                   <span
                     key={`${cardId}-${tag}`}
-                    className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-sky-700 dark:text-sky-300"
+                    className="rounded-[var(--radius-control)] border border-border px-2 py-0.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
                   >
                     {tag}
                   </span>

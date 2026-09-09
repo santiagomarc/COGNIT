@@ -1,10 +1,10 @@
 'use client';
 
-import type { QuizHistoryEntry } from '@/index';
 import Link from 'next/link';
-import { Card, CardContent } from '@/components/ui/card';
+
+import type { QuizHistoryEntry } from '@/index';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Target, Calendar, XCircle, CheckCircle2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const quizHistoryDateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'short',
@@ -14,101 +14,118 @@ const quizHistoryDateFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: 'UTC',
 });
 
-function getScoreClass(percentage: number) {
-  if (percentage >= 80) return 'bg-green-500/20 text-green-400';
-  if (percentage >= 50) return 'bg-yellow-500/20 text-yellow-400';
-  return 'bg-red-500/20 text-red-400';
+/**
+ * A quiz score is a reading, not an SM-2 state, so it is `--ink` up and down
+ * the list — except at the two ends, where it genuinely reports one: a pass
+ * that clears the mastery bar, and a run that will drop ease.
+ *
+ * The green/yellow/red pill this replaces gave three thresholds a colour and a
+ * fill, which made a page of ordinary results look like an alarm panel.
+ */
+function scoreColor(percentage: number) {
+  if (percentage >= 80) return 'var(--state-mastered)';
+  if (percentage < 50) return 'var(--state-lapsed)';
+  return 'var(--ink)';
 }
 
 export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry[]; deckId: string }) {
   if (!history || history.length === 0) {
     return (
-      <Card className="glass-card border-border-strong mt-8">
-        <CardContent className="flex flex-col items-center justify-center p-8 text-muted-foreground">
-          <Target className="w-12 h-12 mb-4 opacity-50" />
-          <p className="text-center">No quiz history yet. Take your first quiz to start your mastery timeline.</p>
-          <Link
-            href={`/dashboard/${deckId}/quiz?mode=mcq`}
-            className="mt-4 inline-flex items-center rounded-md border border-border-strong bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-          >
-            Take your first quiz
-          </Link>
-        </CardContent>
-      </Card>
+      <section className="surface p-5 text-center md:p-6">
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Quiz history
+        </h2>
+        <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+          No quiz history yet. Take your first quiz to start your mastery timeline.
+        </p>
+        <Button asChild className="mt-4">
+          <Link href={`/dashboard/${deckId}/quiz?mode=mcq`}>Take your first quiz</Link>
+        </Button>
+      </section>
     );
   }
 
   return (
-    <div className="space-y-4 mt-8">
-      <h3 className="text-xl font-bold tracking-tight flex items-center gap-2">
-        <Target className="w-5 h-5 text-primary" /> Performance History
-      </h3>
-      
-      <Accordion type="single" collapsible className="w-full space-y-2">
+    <section className="surface p-5 md:p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Quiz history
+        </h2>
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          {history.length} attempts
+        </p>
+      </div>
+
+      <Accordion type="single" collapsible className="mt-4 w-full border-t border-border">
         {history.map((result) => {
           const percentage = result.score_percentage;
           const date = quizHistoryDateFormatter.format(new Date(result.created_at));
 
           return (
-            <AccordionItem value={result.id} key={result.id} className="glass-card border-border-strong px-4 rounded-xl">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center justify-between w-full pr-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-full font-mono text-lg font-semibold tnum ${getScoreClass(percentage)}`}>
-                      {percentage}%
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <span className="font-semibold">{result.mode.toUpperCase()} Mode</span>
-                      <span className="text-sm text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> <span className="font-mono tnum">{date}</span>
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium">
-                    {result.correct_cards} / {result.total_cards} Correct
-                  </div>
+            <AccordionItem value={result.id} key={result.id} className="border-b border-border">
+              <AccordionTrigger className="py-3 hover:no-underline">
+                <div className="flex w-full items-center gap-4 pr-3 text-left">
+                  <span
+                    className="w-12 shrink-0 font-mono text-[15px] font-semibold tnum"
+                    style={{ color: scoreColor(percentage) }}
+                  >
+                    {percentage}%
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                    {result.mode === 'mcq' ? 'Multiple choice' : 'Identification'}
+                  </span>
+                  <span className="hidden shrink-0 font-mono text-[13px] tnum text-ink-dim sm:block">
+                    {result.correct_cards}/{result.total_cards}
+                  </span>
+                  <span className="hidden shrink-0 font-mono text-[13px] tnum text-ink-dimmer md:block">
+                    {date}
+                  </span>
                 </div>
               </AccordionTrigger>
-              
-              <AccordionContent className="pt-4 pb-6 border-t border-border">
+
+              <AccordionContent className="border-t border-border pb-5 pt-4">
                 {result.incorrect_answers && result.incorrect_answers.length > 0 ? (
                   <div className="space-y-3">
-                    <p className="text-sm text-red-400 font-medium mb-2">Needs Review ({result.wrong_count} Missed):</p>
+                    <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+                      Needs review · {result.wrong_count} missed
+                    </p>
                     {result.incorrect_answers.map((mistake, i) => (
-                      <div key={i} className="bg-background/50 p-3 rounded-lg border border-red-500/20 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex items-center rounded-full border border-border-strong bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            {mistake.card_number ? `Card #${mistake.card_number}` : 'Card #?'}
-                          </span>
-                          <p className="text-sm font-medium">{mistake.prompt}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="flex items-start gap-1 text-red-400">
-                            <XCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>
-                              You answered: <br/>
-                              <strong className="opacity-80">{mistake.user_answer ?? 'Not recorded for this attempt'}</strong>
+                      <div key={i} className="flex gap-3">
+                        {/* A 2px state tick instead of a tinted card (§7.5). */}
+                        <span
+                          aria-hidden="true"
+                          className="mt-1 h-4 w-[2px] shrink-0 rounded-[1px] bg-[var(--state-lapsed)]"
+                        />
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex flex-wrap items-baseline gap-2">
+                            <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+                              {mistake.card_number ? `#${mistake.card_number}` : '#?'}
                             </span>
+                            <p className="text-sm font-medium text-foreground">{mistake.prompt}</p>
                           </div>
-                          <div className="flex items-start gap-1 text-green-400">
-                            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>Correct term: <br/><strong className="opacity-80">{mistake.correct_answer}</strong></span>
-                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            You answered:{' '}
+                            <span className="text-[var(--state-lapsed)]">
+                              {mistake.user_answer ?? 'Not recorded for this attempt'}
+                            </span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Correct term: <span className="text-ink">{mistake.correct_answer}</span>
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-green-400 p-4 bg-green-500/10 rounded-lg">
-                    <CheckCircle2 className="w-5 h-5" />
-                    <span>Flawless run! You got everything correct.</span>
-                  </div>
+                  <p className="text-sm text-[var(--state-mastered)]">
+                    Flawless run — every question correct.
+                  </p>
                 )}
               </AccordionContent>
             </AccordionItem>
           );
         })}
       </Accordion>
-    </div>
+    </section>
   );
 }

@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { m, AnimatePresence } from 'framer-motion';
-import { Sparkles, Upload, X, Wand2 } from 'lucide-react';
+import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Upload, X } from 'lucide-react';
 import { bulkImportCards } from '@/app/actions/card';
 import { sanitizeNotes } from '@/app/actions/ai-assist';
 import { enrichCards } from '@/app/actions/ai-enrich';
@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { parseDelimitedNotes } from '@/lib/parser';
 import { formatActionError } from '@/lib/ai-feedback';
+import { motionTransitions } from '@/lib/motion-configs';
 import { toast } from 'sonner';
 
 type BulkImportModalProps = {
@@ -28,6 +29,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
   const [isImporting, startImportTransition] = useTransition();
   const [, startEnrichTransition] = useTransition();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
   const triggerRef = useRef<HTMLElement | null>(null);
 
   const preview = useMemo(() => parseDelimitedNotes(notes, delimiter), [notes, delimiter]);
@@ -125,9 +127,9 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} variant="outline" className="gap-2">
+      <Button onClick={() => setOpen(true)} className="gap-2">
         <Upload className="h-4 w-4" />
-        Bulk Import Notes
+        Bulk import
       </Button>
 
       <AnimatePresence>
@@ -137,38 +139,38 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+              className="absolute inset-0 z-[var(--z-overlay)] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
               onClick={() => !isImporting && !isCleaning && setOpen(false)}
             />
 
             <m.div
               ref={dialogRef}
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 16 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-              className="glass-card relative z-10 flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-border"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={reduced ? { duration: 0 } : motionTransitions.panel}
+              className="surface relative z-[var(--z-modal)] flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden border-border-strong"
               role="dialog"
               aria-modal="true"
               aria-labelledby="bulk-import-title"
             >
               <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
                 <div className="space-y-1">
-                  <h2 id="bulk-import-title" className="text-xl font-semibold tracking-tight">
-                    Bulk Import Notes
+                  <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                    Bulk import
+                  </p>
+                  <h2 id="bulk-import-title" className="text-base font-semibold tracking-[-.015em]">
+                    Paste your notes
                   </h2>
                   <p className="text-sm text-muted-foreground">
-                    Paste exact Term-Description lines, preview them live, then enrich quiz data in the background.
+                    Exact Term-Description lines, previewed live. Quiz data is enriched in the
+                    background after import.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => !isImporting && !isCleaning && setOpen(false)}
-                  className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
-                  aria-label="Close"
-                >
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="Close"
+                  onClick={() => !isImporting && !isCleaning && setOpen(false)}>
                   <X className="h-4 w-4" />
-                </button>
+                </Button>
               </div>
 
               <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -205,8 +207,8 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                         disabled={isCleaning || isImporting || !notes.trim()}
                         className="gap-2"
                       >
-                        <Wand2 className="h-4 w-4" />
-                        {isCleaning ? 'Cleaning...' : 'Magic Clean'}
+                        {/* A verb beats a wand (§6). */}
+                        {isCleaning ? 'Cleaning…' : 'Clean up'}
                       </Button>
                     </div>
                     <Textarea
@@ -236,11 +238,12 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                   <Button
                     type="button"
                     onClick={handleImport}
+                    variant="primary"
                     disabled={isImporting || isCleaning || preview.cards.length === 0}
-                    className="gap-2"
                   >
-                    <Sparkles className="h-4 w-4" />
-                    {isImporting ? 'Importing...' : `Import ${preview.cards.length} Card${preview.cards.length === 1 ? '' : 's'}`}
+                    {isImporting
+                      ? 'Importing…'
+                      : `Import ${preview.cards.length} card${preview.cards.length === 1 ? '' : 's'}`}
                   </Button>
                 </div>
               </div>

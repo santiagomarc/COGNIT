@@ -5,12 +5,19 @@ import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
 import { SemanticSearchModal } from '@/components/ui/shared/SemanticSearchModal';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
-import { DueTodayCard } from '@/components/ui/shared/DueTodayCard';
+import { DashboardTelemetry } from '@/components/ui/shared/DashboardTelemetry';
+import { DueNowBand } from '@/components/ui/shared/DueNowBand';
+import { ReviewForecast } from '@/components/ui/shared/ReviewForecast';
 import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
-import { FadeInUp } from '@/components/motion';
 import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
+import {
+  buildSevenDayForecast,
+  estimateSessionMinutes,
+  meanEaseByDeck,
+  oldestOverdueDays,
+  type CardScheduleRow,
+} from '@/lib/dashboard-forecast';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
-import { Layers } from 'lucide-react';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type DashboardDeckRow = {
@@ -33,6 +40,8 @@ type DashboardSnapshot = {
   activityDays: ActivityDayRow[];
   totalStudiedCards: number;
   masterySummaryRows: DeckMasterySummaryRow[];
+  cardSchedule: CardScheduleRow[];
+  cardScheduleTruncated: boolean;
 };
 
 // One row per distinct day ever studied, with that day's review count —
@@ -65,6 +74,36 @@ async function loadMasterySummary(
   return rpcResult.data ?? [];
 }
 
+
+/*
+ * One projection of every card's schedule, used for two things: the seven-day
+ * forecast and each deck's mean ease factor.
+ *
+ * There is no RPC for either — `get_due_cards_by_deck` reports a single "due
+ * now" count per deck, `get_study_activity_days` is retrospective, and
+ * `get_deck_mastery_summary` carries no scheduling state — so both are derived
+ * here rather than added as two more round-trips. Three narrow columns and a
+ * bounded row count keeps it cheap, and it runs inside the existing
+ * `Promise.all` alongside the other dashboard reads.
+ */
+const CARD_SCHEDULE_ROW_CAP = 20_000;
+
+async function loadCardSchedule(
+  supabase: SupabaseServerClient
+): Promise<{ rows: CardScheduleRow[]; truncated: boolean }> {
+  const { data, error } = await supabase
+    .from('cards')
+    .select('deck_id, ease_factor, next_review_at')
+    .limit(CARD_SCHEDULE_ROW_CAP);
+
+  if (error) {
+    console.error('[dashboard] card schedule query failed:', error.message);
+    return { rows: [], truncated: false };
+  }
+
+  const rows = (data as CardScheduleRow[] | null) ?? [];
+  return { rows, truncated: rows.length >= CARD_SCHEDULE_ROW_CAP };
+}
 
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   const { data: relationalDecks, error: relationalDecksError } = await supabase
@@ -153,15 +192,17 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     errorMessage: deckQueryErrorMessage,
   } = await loadDeckRowsWithFallback(supabase);
 
-  const [dueByDeckRows, activityDays, { count: totalStudiedCards }, masterySummary] = await Promise.all([
-    loadDueByDeckRows(supabase, userId, nowIso),
-    loadActivityDays(supabase, userId),
-    supabase
-      .from('study_logs')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId),
-    loadMasterySummary(supabase, userId),
-  ]);
+  const [dueByDeckRows, activityDays, { count: totalStudiedCards }, masterySummary, cardSchedule] =
+    await Promise.all([
+      loadDueByDeckRows(supabase, userId, nowIso),
+      loadActivityDays(supabase, userId),
+      supabase
+        .from('study_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId),
+      loadMasterySummary(supabase, userId),
+      loadCardSchedule(supabase),
+    ]);
 
   return {
     deckRows,
@@ -171,6 +212,8 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     activityDays,
     totalStudiedCards: totalStudiedCards ?? 0,
     masterySummaryRows: masterySummary,
+    cardSchedule: cardSchedule.rows,
+    cardScheduleTruncated: cardSchedule.truncated,
   };
 }
 
@@ -190,7 +233,15 @@ export default async function Dashboard() {
     activityDays,
     totalStudiedCards,
     masterySummaryRows,
+    cardSchedule,
+    cardScheduleTruncated,
   } = await loadDashboardSnapshot(user.id);
+
+  if (cardScheduleTruncated) {
+    console.warn(
+      `[dashboard] card schedule hit the ${CARD_SCHEDULE_ROW_CAP}-row cap; forecast and per-deck ease are partial.`
+    );
+  }
 
   if (deckQueryUsedFallback && deckQueryErrorMessage) {
     console.warn('[dashboard] relational deck count query failed, fallback was used:', deckQueryErrorMessage);
@@ -209,8 +260,11 @@ export default async function Dashboard() {
     .sort((a, b) => b.dueCount - a.dueCount);
 
   const totalDue = dueByDeckRows.reduce((total, row) => total + row.due_count, 0);
-  const totalDecks = deckRows.length;
-  const totalCards = deckRows.reduce((sum, deck) => sum + (deck.cards?.[0]?.count ?? 0), 0);
+
+  const forecastDays = buildSevenDayForecast(cardSchedule);
+  const easeByDeck = meanEaseByDeck(cardSchedule);
+  const overdueDays = oldestOverdueDays(cardSchedule);
+  const estimatedMinutes = estimateSessionMinutes(totalDue);
 
   const masteryByDeck = new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();
   for (const row of masterySummaryRows) {
@@ -220,6 +274,11 @@ export default async function Dashboard() {
       lastQuizAt: row.last_quiz_at,
     });
   }
+
+  const assessedCards = masterySummaryRows.reduce((sum, row) => sum + row.assessed_cards, 0);
+  const masteredCards = masterySummaryRows.reduce((sum, row) => sum + row.mastered_cards, 0);
+  const retentionPercentage =
+    assessedCards > 0 ? Math.round((masteredCards / assessedCards) * 100) : null;
 
   // Already deduplicated by day (the RPC groups by activity_date)
   const uniqueDays = new Set<string>(activityDays.map((row) => row.activity_date));
@@ -281,35 +340,80 @@ export default async function Dashboard() {
     longestStreak = Math.max(longestStreak, currentRun);
   }
 
+  // The most recently updated deck is where an "import PDF" without a chosen
+  // target should land, and the fallback session target when nothing is due.
+  const mostRecentDeck = [...deckRows].sort((a, b) =>
+    (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at)
+  )[0];
+
+  const sessionHref = deckBreakdown[0]
+    ? `/dashboard/${deckBreakdown[0].deckId}/study`
+    : mostRecentDeck
+      ? `/dashboard/${mostRecentDeck.id}/study?scope=include_reviewed`
+      : null;
+
   return (
-    <div className="container mx-auto p-6 md:p-8 pb-28 space-y-8">
-      {/* ── Header ── */}
-      <FadeInUp>
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 border border-border-strong">
-              <Layers className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">Dashboard</h1>
-              <p className="text-sm text-muted-foreground">Welcome back, {user.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
+    /*
+     * `pb-28` is gone from here (defect F-03). It was applied on this page *and*
+     * again on `dashboard/layout.tsx`, so the two nested to 224px of dead space
+     * for a dock about 74px tall. The layout keeps its copy: the dock still
+     * exists on this route until the navigation phase, and stripping the
+     * clearance now would push this content underneath it.
+     */
+    <div className="container mx-auto space-y-8 p-6 md:p-8">
+      <DashboardTelemetry
+        totalDue={totalDue}
+        retentionPercentage={retentionPercentage}
+        streakDays={streak}
+        reviewedToday={todayStudiedCount}
+        actions={
+          <>
             <SemanticSearchModal />
             <ThemeToggle />
+          </>
+        }
+      />
+
+      {deckRows.length === 0 ? (
+        <DashboardOnboarding />
+      ) : (
+        <>
+          <DueNowBand
+            totalDue={totalDue}
+            dueDecks={deckBreakdown}
+            oldestOverdueDays={overdueDays}
+            estimatedMinutes={estimatedMinutes}
+            sessionHref={sessionHref}
+            importHref={mostRecentDeck ? `/dashboard/${mostRecentDeck.id}#add-content` : null}
+          >
+            <CreateDeckModal />
+          </DueNowBand>
+
+          <div id="deck-collection" className="scroll-mt-24">
+            <DeckGrid
+              decks={deckRows.map((deck) => {
+                const mastery = masteryByDeck.get(deck.id);
+                const deckTotalCards = deck.cards?.[0]?.count ?? 0;
+                const masteryPercentage =
+                  deckTotalCards > 0 && mastery
+                    ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
+                    : 0;
+
+                return {
+                  ...deck,
+                  masteryPercentage,
+                  assessedCards: mastery?.assessedCards ?? 0,
+                  lastQuizAt: mastery?.lastQuizAt ?? null,
+                  dueCount: dueByDeck.get(deck.id) ?? 0,
+                  easeFactor: easeByDeck.get(deck.id) ?? null,
+                };
+              })}
+            />
           </div>
-        </div>
-      </FadeInUp>
 
-      {/* ── Stats Row: Due Today + Activity Board ── */}
-      <div className="grid items-stretch gap-4 md:grid-cols-3">
-        <div className="grid gap-4 md:h-full md:min-h-0 md:grid-rows-[7fr_5fr]">
-          <DueTodayCard totalDue={totalDue} deckBreakdown={deckBreakdown} className="min-h-0" />
+          <ReviewForecast days={forecastDays} />
 
-          <CreateDeckModal totalDecks={totalDecks} totalCards={totalCards} />
-        </div>
-        <div className="md:col-span-2 md:h-full">
+          {/* Retrospective, so it sits below the work (Phase 6.5). */}
           <StudyStreakCard
             streak={streak}
             longestStreak={longestStreak}
@@ -318,37 +422,10 @@ export default async function Dashboard() {
             todayStudiedCount={todayStudiedCount}
             todayIso={today}
             activity={activity}
+            retentionPercentage={retentionPercentage}
+            assessedCards={assessedCards}
           />
-        </div>
-      </div>
-
-      {/* ── Deck Grid with Search ── */}
-      {deckRows.length === 0 ? (
-        <FadeInUp delay={0.15}>
-          <DashboardOnboarding />
-        </FadeInUp>
-      ) : (
-      <FadeInUp delay={0.15}>
-        <div id="deck-collection" className="scroll-mt-24">
-        <DeckGrid
-          decks={deckRows
-            .map((deck) => {
-              const mastery = masteryByDeck.get(deck.id);
-              const deckTotalCards = deck.cards?.[0]?.count ?? 0;
-              const masteryPercentage = deckTotalCards > 0 && mastery
-                ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
-                : 0;
-
-              return {
-                ...deck,
-                masteryPercentage,
-                assessedCards: mastery?.assessedCards ?? 0,
-                lastQuizAt: mastery?.lastQuizAt ?? null,
-              };
-            })}
-        />
-        </div>
-      </FadeInUp>
+        </>
       )}
     </div>
   );

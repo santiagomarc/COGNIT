@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, CheckSquare, Square, Trash2, X } from 'lucide-react';
+import { CheckSquare, Square, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { bulkDeleteCards, getDeckCardsPage } from '@/app/actions/card';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
@@ -161,15 +161,19 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
   if (deckCards.length === 0) {
     if (errorMessage) {
       return (
-        <div className="flex min-h-60 flex-col items-center justify-center rounded-2xl border border-destructive/20 bg-destructive/5 backdrop-blur-md p-8 text-center">
-          <BookOpen className="mb-4 h-10 w-10 text-destructive/60" />
-          <h2 className="text-xl font-semibold tracking-tight text-destructive">Unable to load cards right now</h2>
-          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+        <div className="surface p-8 text-center">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-lapsed)]">
+            Load failed
+          </p>
+          <h2 className="mt-3 text-base font-semibold tracking-[-.015em]">
+            Unable to load cards right now
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
             There was a temporary network issue loading this deck&apos;s cards. Your data is safe.
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => router.refresh()}>
-              Try Again
+            <Button size="sm" variant="primary" onClick={() => router.refresh()}>
+              Try again
             </Button>
             <Button asChild size="sm">
               <a href="#add-content">Add a card</a>
@@ -180,20 +184,22 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
     }
 
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-border-strong bg-card/30 backdrop-blur-md p-8 text-center">
-        <BookOpen className="mb-4 h-10 w-10 text-muted-foreground" />
-        <h2 className="text-xl font-semibold tracking-tight">No cards in this deck yet</h2>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
-          Add cards by hand, paste your notes, or let the AI read a PDF for you.
+      <div className="rounded-[var(--radius-container)] border border-dashed border-border-strong p-8 text-center">
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Cards
+        </p>
+        <h2 className="mt-3 text-base font-semibold tracking-[-.015em]">No cards in this deck yet</h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          Add cards by hand, paste your notes, or generate them from a PDF.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-          <Button asChild size="sm">
+          <Button asChild size="sm" variant="primary">
             <a href="#add-content">Add a card</a>
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button asChild size="sm">
             <a href="#add-content">Bulk import notes</a>
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button asChild size="sm">
             <a href="#add-content">Generate from PDF</a>
           </Button>
         </div>
@@ -203,18 +209,19 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card/25 p-3">
-        <div className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
           {selectionMode
             ? `${selectedCount} of ${deckCards.length} selected`
             : `${deckCards.length} cards`}
-        </div>
+        </p>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             size="sm"
-            variant={selectionMode ? 'secondary' : 'outline'}
+            variant={selectionMode ? 'secondary' : 'default'}
+            aria-pressed={selectionMode}
             onClick={handleSelectionModeToggle}
           >
             {selectionMode ? <X className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
@@ -225,7 +232,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
             <>
               <Button type="button" size="sm" variant="ghost" onClick={handleSelectAllToggle}>
                 {allSelected ? <Square className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
-                {allSelected ? 'Clear All' : 'Select All'}
+                {allSelected ? 'Clear all' : 'Select all'}
               </Button>
               <Button
                 type="button"
@@ -235,7 +242,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
                 disabled={selectedCount === 0 || isBulkDeleting}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete Selected
+                Delete selected
               </Button>
             </>
           ) : null}
@@ -266,12 +273,8 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
 
       {totalCards !== undefined && deckCards.length < totalCards ? (
         <div className="mt-8 flex flex-col items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleLoadMore}
-            disabled={isLoadingMore}
-          >
-            {isLoadingMore ? 'Loading cards...' : `Load more cards (${deckCards.length} of ${totalCards})`}
+          <Button onClick={handleLoadMore} disabled={isLoadingMore}>
+            {isLoadingMore ? 'Loading cards…' : `Load more cards (${deckCards.length} of ${totalCards})`}
           </Button>
         </div>
       ) : null}
@@ -281,7 +284,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         onOpenChange={setShowBulkDeleteConfirm}
         title={`Delete ${selectedCount} selected card${selectedCount === 1 ? '' : 's'}?`}
         description="This action cannot be undone. The selected flashcards will be permanently removed."
-        confirmLabel="Delete Selected"
+        confirmLabel="Delete selected"
         variant="destructive"
         loading={isBulkDeleting}
         onConfirm={handleBulkDelete}

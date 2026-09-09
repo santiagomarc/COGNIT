@@ -52,7 +52,7 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                         value={accentTag}
                         onChange={(event) => setAccentTag(event.target.value)}
                         className="h-8 w-full rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-xs outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                        aria-label="Deck accent tag"
+                        aria-label="Deck subject tag"
                     >
                         <option value="">No tag</option>
                         {DECK_TAG_OPTIONS.map((option) => (
@@ -65,6 +65,7 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                 <Button
                     size="icon"
                     variant="ghost"
+                    aria-label="Save deck name"
                     onClick={async () => {
                         setIsLoading(true);
                         const result = await updateDeck(deckId, title, accentTag || null);
@@ -78,11 +79,12 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                     }}
                     disabled={isLoading}
                 >
-                    <Check className="h-4 w-4 text-green-500" />
+                    <Check className="h-4 w-4" />
                 </Button>
                 <Button
                     size="icon"
                     variant="ghost"
+                    aria-label="Cancel rename"
                     onClick={() => {
                         setIsEditing(false);
                         const currentTitleMeta = parseDeckTitleMetadata(currentTitle);
@@ -90,7 +92,7 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                         setAccentTag(currentTitleMeta.tag ?? '');
                     }}
                 >
-                    <X className="h-4 w-4 text-red-500" />
+                    <X className="h-4 w-4" />
                 </Button>
             </div>
         );
@@ -108,8 +110,9 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                         setAccentTag(currentTitleMeta.tag ?? '');
                         setIsEditing(true);
                     }}
-                    title="Rename Deck"
-                    className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
+                    title="Rename deck"
+                    aria-label="Rename deck"
+                    className="h-8 w-8"
                 >
                     <Pencil className="h-4 w-4" />
                 </Button>
@@ -118,8 +121,9 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                     size="icon"
                     variant="ghost"
                     onClick={() => setShowDeleteConfirm(true)}
-                    title="Delete Deck"
-                    className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                    title="Delete deck"
+                    aria-label="Delete deck"
+                    className="h-8 w-8 hover:border-[var(--state-lapsed)] hover:text-[var(--state-lapsed)]"
                 >
                     <Trash2 className="h-4 w-4" />
                 </Button>
