@@ -109,7 +109,7 @@ export function ConfirmDialog({
             exit={{ opacity: 0, y: 6 }}
             transition={reduced ? { duration: 0 } : motionTransitions.panel}
             ref={dialogRef}
-            className="surface relative z-[var(--z-modal)] mx-4 max-h-[calc(100vh-2rem)] w-full max-w-[480px] overflow-y-auto border-border-strong p-6"
+            className="panel relative z-[var(--z-modal)] mx-4 max-h-[calc(100vh-2rem)] w-full max-w-[480px] overflow-y-auto p-6"
             role="alertdialog"
             aria-modal="true"
             aria-labelledby="confirm-title"

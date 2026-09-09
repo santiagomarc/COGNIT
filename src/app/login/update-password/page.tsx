@@ -75,7 +75,7 @@ export default function UpdatePasswordPage() {
         initial={reduced ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={reduced ? { duration: 0 } : motionTransitions.panel}
-        className="w-full max-w-sm"
+        className="panel w-full max-w-[420px] p-8"
       >
         <div className="mb-8">
           <Wordmark href="/" />
@@ -90,10 +90,10 @@ export default function UpdatePasswordPage() {
             >
               Password updated
             </p>
-            <h1 className="text-2xl font-semibold tracking-[-.025em]">
+            <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
               You&apos;re signed in
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-ink-dim">
               Your new password is active. Use it the next time you sign in.
             </p>
             <Button asChild variant="primary" className="mt-2">
@@ -104,10 +104,10 @@ export default function UpdatePasswordPage() {
           <>
             {/* ── Header ── */}
             <div className="mb-8">
-              <h1 className="text-2xl font-semibold tracking-[-.025em]">
+              <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
                 Set a new password
               </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
+              <p className="mt-1.5 text-sm text-ink-dim">
                 At least 8 characters, with a number and both letter cases.
               </p>
             </div>
@@ -140,7 +140,7 @@ export default function UpdatePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-control)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     aria-pressed={showPassword}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
@@ -195,7 +195,7 @@ export default function UpdatePasswordPage() {
               {/* General error */}
               {generalError && (
                 <p
-                  className="rounded-[var(--radius-container)] border border-[var(--state-lapsed)] px-3 py-2.5 text-sm"
+                  className="rounded-[var(--radius-md)] border border-[var(--state-lapsed)] px-3 py-2.5 text-sm"
                   style={{ color: 'var(--state-lapsed)' }}
                   role="alert"
                 >

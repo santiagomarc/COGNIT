@@ -267,7 +267,7 @@ export default function LoginClient() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
             transition={reduced ? { duration: 0 } : motionTransitions.panel}
-            className="w-full max-w-sm"
+            className="panel w-full max-w-[420px] p-8"
           >
             {/* ── Email sent confirmation ── */}
             {emailSent ? (
@@ -275,10 +275,10 @@ export default function LoginClient() {
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Check your email
                 </p>
-                <h1 className="text-2xl font-semibold tracking-[-.025em]">
+                <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
                   {mode === 'signup' ? 'Confirm your address' : 'Reset link sent'}
                 </h1>
-                <p className="text-sm leading-relaxed text-muted-foreground">
+                <p className="text-sm leading-relaxed text-ink-dim">
                   {mode === 'signup'
                     ? 'We sent a confirmation link to '
                     : 'If an account exists, we sent a reset link to '}
@@ -290,7 +290,7 @@ export default function LoginClient() {
                   <button
                     type="button"
                     onClick={() => setEmailSent(false)}
-                    className="rounded-[var(--radius-control)] font-medium text-ink underline underline-offset-4 outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="rounded-[var(--radius-sm)] font-medium text-ink underline underline-offset-4 outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   >
                     send it again
                   </button>
@@ -309,16 +309,16 @@ export default function LoginClient() {
                     <button
                       type="button"
                       onClick={() => switchMode('login')}
-                      className="mb-3 inline-flex items-center gap-1.5 rounded-[var(--radius-control)] text-sm text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      className="mb-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] text-sm text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                       Back to sign in
                     </button>
                   )}
-                  <h1 className="text-2xl font-semibold tracking-[-.025em]">
+                  <h1 className="font-serif text-[2rem] font-normal leading-tight tracking-[-0.015em] text-balance">
                     {headings[mode].title}
                   </h1>
-                  <p className="mt-1.5 text-sm text-muted-foreground">
+                  <p className="mt-1.5 text-sm text-ink-dim">
                     {headings[mode].desc}
                   </p>
                 </div>
@@ -359,7 +359,7 @@ export default function LoginClient() {
                           <button
                             type="button"
                             onClick={() => switchMode('forgot')}
-                            className="rounded-[var(--radius-control)] text-xs font-medium text-ink-dim underline-offset-4 transition-colors outline-hidden hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                            className="rounded-[var(--radius-sm)] text-xs font-medium text-ink-dim underline-offset-4 transition-colors outline-hidden hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                           >
                             Forgot password?
                           </button>
@@ -394,7 +394,7 @@ export default function LoginClient() {
                         <button
                           type="button"
                           onClick={() => setShowPassword((v) => !v)}
-                          className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-control)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                          className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                           aria-pressed={showPassword}
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
@@ -422,7 +422,7 @@ export default function LoginClient() {
                   {/* General error */}
                   {generalError && (
                     <p
-                      className="rounded-[var(--radius-container)] border border-[var(--state-lapsed)] px-3 py-2.5 text-sm"
+                      className="rounded-[var(--radius-md)] border border-[var(--state-lapsed)] px-3 py-2.5 text-sm"
                       style={{ color: 'var(--state-lapsed)' }}
                       role="alert"
                     >
@@ -491,7 +491,7 @@ export default function LoginClient() {
                       onClick={() =>
                         switchMode(mode === 'login' ? 'signup' : 'login')
                       }
-                      className="rounded-[var(--radius-control)] font-medium text-ink underline underline-offset-4 outline-hidden transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      className="rounded-[var(--radius-sm)] font-medium text-ink underline underline-offset-4 outline-hidden transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       {mode === 'login' ? 'Sign up' : 'Sign in'}
                     </button>

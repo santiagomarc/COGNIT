@@ -113,15 +113,26 @@ export function DeckGrid({ decks }: DeckGridProps) {
     return orderedDecks.filter((d) => parseDeckTitleMetadata(d.title).cleanTitle.toLowerCase().includes(q));
   }, [orderedDecks, search]);
 
-  return (
-    <section className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-          Decks <span className="tnum">{orderedDecks.length}</span>
-        </h2>
+  const totalCards = useMemo(
+    () => localDecks.reduce((sum, d) => sum + (d.cards?.[0]?.count ?? 0), 0),
+    [localDecks]
+  );
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="sm:w-72">
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer shrink-0">
+            All decks
+          </h2>
+          <div className="hidden sm:block h-px flex-1 bg-border" />
+          <span className="font-mono text-[11px] text-ink-dimmer shrink-0 tnum">
+            {orderedDecks.length} {orderedDecks.length === 1 ? 'deck' : 'decks'} · {totalCards} cards
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="w-36 sm:w-48">
             <DashboardSearch
               value={search}
               onChange={setSearch}
@@ -139,6 +150,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
                 variant="ghost"
                 aria-pressed={sortMode === mode.value}
                 onClick={() => setSortMode(mode.value)}
+                className="h-[32px] px-2 text-xs"
               >
                 {mode.label}
               </Button>

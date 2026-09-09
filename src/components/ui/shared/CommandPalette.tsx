@@ -320,7 +320,7 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="surface relative z-[var(--z-modal)] flex max-h-[calc(100dvh-3rem)] w-full max-w-2xl flex-col overflow-hidden border-border-strong"
+              className="panel relative z-[var(--z-modal)] flex max-h-[calc(100dvh-3rem)] w-full max-w-2xl flex-col overflow-hidden"
               role="dialog"
               aria-modal="true"
               aria-labelledby="command-palette-title"
@@ -450,7 +450,7 @@ function PaletteRowView({
       data-active={isActive}
       onMouseMove={() => onHover(index)}
       onClick={row.run}
-      className="flex cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-control)] px-3 py-2 data-[active=true]:bg-[var(--surface-raised)]"
+      className="flex cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-sm)] px-3 py-2 data-[active=true]:bg-[var(--surface-raised)]"
     >
       <div className="min-w-0">
         <p className="truncate text-sm text-ink">{row.label}</p>

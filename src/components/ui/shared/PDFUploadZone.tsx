@@ -217,7 +217,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                   e.stopPropagation();
                   clearFile();
                 }}
-                className="mt-1 inline-flex items-center gap-1 rounded-[var(--radius-control)] text-xs text-ink-dimmer transition-colors hover:text-ink"
+                className="mt-1 inline-flex items-center gap-1 rounded-[var(--radius-xs)] text-xs text-ink-dimmer transition-colors hover:text-ink"
               >
                 <X className="h-3 w-3" />
                 Remove
@@ -249,7 +249,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 id="card-count"
                 value={maxCardChoice}
                 onChange={(e) => setMaxCardChoice(e.target.value)}
-                className="h-[30px] rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-2 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className="h-[32px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-surface px-2 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>

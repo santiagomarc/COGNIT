@@ -29,11 +29,14 @@ const SIZE: Record<NonNullable<WordmarkProps['size']>, string> = {
  * hue, so it cannot compete with the state channel, and it needs no asset.
  */
 export function Wordmark({ href, size = 'md', className }: WordmarkProps) {
+  const isLg = size === 'lg';
   const mark = (
     <span
       className={cn(
-        'font-semibold tracking-[-.03em] text-ink',
-        SIZE[size],
+        'text-ink',
+        isLg
+          ? 'font-serif text-[44px] font-normal tracking-[-0.015em] text-balance leading-none'
+          : cn('font-semibold tracking-[-.03em]', SIZE[size]),
         className
       )}
     >

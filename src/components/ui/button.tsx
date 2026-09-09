@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils"
 const buttonVariants = cva(
   [
     "inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 whitespace-nowrap",
-    "rounded-[var(--radius-control)] font-medium",
+    "rounded-[var(--radius-sm)] font-medium",
     "transition-[background-color,border-color,color] duration-[120ms] ease-out",
     // The tap feedback that used to cost a spring runtime.
     "active:translate-y-px",
@@ -58,7 +58,7 @@ const buttonVariants = cva(
           "border border-[var(--border-control)] bg-transparent text-ink hover:bg-surface-raised",
         // The one filled button on a screen.
         primary:
-          "border border-[var(--accent)] bg-[var(--accent)] font-semibold text-[var(--accent-ink)] hover:bg-[var(--accent)]/90",
+          "border border-[var(--accent)] bg-[var(--accent)] font-semibold text-[var(--accent-ink)] shadow-[var(--elevate-1)] hover:bg-[var(--accent)]/90",
         // Edge appears only on hover, so a row of them reads as text until used.
         ghost:
           "border border-transparent bg-transparent text-ink hover:border-[var(--border-strong)] hover:bg-surface-raised",
@@ -67,12 +67,12 @@ const buttonVariants = cva(
           "border border-[var(--state-lapsed)] bg-[var(--state-lapsed)] font-semibold text-bg hover:bg-[var(--state-lapsed)]/90 focus-visible:outline-[var(--state-lapsed)]",
       },
       size: {
-        default: "h-[34px] px-[14px] text-[13px]",
-        sm: "h-[30px] gap-1.5 px-3 text-[13px]",
-        lg: "h-[38px] px-5 text-sm",
-        icon: "size-[34px]",
-        "icon-sm": "size-[30px]",
-        "icon-lg": "size-[38px]",
+        default: "h-[40px] px-4 text-sm",
+        sm: "h-[32px] gap-1.5 px-3 text-[13px]",
+        lg: "h-[44px] px-5 text-sm",
+        icon: "size-[40px]",
+        "icon-sm": "size-[32px]",
+        "icon-lg": "size-[44px]",
       },
     },
     defaultVariants: {

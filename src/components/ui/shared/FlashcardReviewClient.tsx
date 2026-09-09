@@ -631,7 +631,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 text-xl font-semibold tracking-[-.025em]">You&apos;re all caught up!</h1>
+          <h1 className="mt-3 font-serif text-[2rem] font-normal leading-[1.2] text-balance">You&apos;re all caught up!</h1>
           <p className="mt-2 text-muted-foreground">
             {emptyMessage}
           </p>
@@ -670,7 +670,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 text-xl font-semibold tracking-[-.025em]">Resume your previous session?</h1>
+          <h1 className="mt-3 font-serif text-[2rem] font-normal leading-[1.2] text-balance">Resume your previous session?</h1>
           <p className="mt-2 text-muted-foreground">
             Pick up from card {Math.min(resumeState.index + 1, resumeState.queueCardIds.length)} of {resumeState.queueCardIds.length}.
           </p>
@@ -692,267 +692,246 @@ export function FlashcardReviewClient({
   }
 
   return (
-    <div className="container mx-auto p-6 md:p-8">
+    <div className="flex min-h-[100dvh] flex-col bg-bg">
       {/* Paused means paused: the page behind the scrim is inert, so keyboard
           focus cannot walk past it into the controls it is covering. */}
-      <div className="space-y-6" inert={isPaused && !completed}>
-      {/*
-        Session telemetry (§7.9). Label in the `label` step, value in Geist Mono
-        with tabular figures so nothing in the strip twitches as the clock runs.
-        None of these readings is a state, so none of them takes a state colour.
-      */}
-      <header className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={saveAndExit}
-            disabled={isPending || isSubmittingGrade}
-            className="gap-2 px-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Save &amp; exit
-          </Button>
+      <div className="flex flex-1 flex-col" inert={isPaused && !completed}>
+        {/* Part 1: Session telemetry header (§7.9) */}
+        <header className="flex-none p-4 md:px-8 md:pt-6 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={saveAndExit}
+              disabled={isPending || isSubmittingGrade}
+              className="gap-2 px-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Save &amp; exit
+            </Button>
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            {/* The deck name is prose, so it stays in the sans face — mono is
-                for the numbers a user reads as data (§3.2). */}
-            <div className="flex items-baseline gap-2">
-              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                Deck
-              </span>
-              <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">
-                {deckTitle}
-              </span>
-            </div>
-
-            <Telemetry
-              label="Card"
-              value={`${Math.min(index + 1, sessionCards.length)}/${sessionCards.length}`}
-            />
-            <Telemetry label="Ease" value={active ? active.ease_factor.toFixed(2) : '—'} />
-            <Telemetry label="Elapsed" value={formatDuration(sessionDuration)} />
-
-            {/* The keycap is bound to the control it triggers, never listed
-                in a footer strip (§7.3), and never hidden responsively. */}
-            {!completed ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={togglePause}
-                aria-pressed={isPaused}
-                className="gap-2 px-2"
-              >
-                {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                {isPaused ? 'Resume' : 'Pause'}
-                <Kbd>P</Kbd>
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        {/* A 1px progress rule, not an 8px pill — depth is rule weight (§4.3). */}
-        <div className="h-px w-full bg-border">
-          <m.div
-            className="h-px bg-ink-dim"
-            initial={false}
-            animate={{ width: `${Math.min(progress, 100)}%` }}
-            transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
-          />
-        </div>
-      </header>
-
-      <div className="sr-only" aria-live="polite" aria-atomic="true">
-        {completed
-          ? `Flashcard review complete. ${effectiveAttemptCount} reviews completed.`
-          : `Card ${index + 1} of ${sessionCards.length}.`}
-      </div>
-
-      <AnimatePresence mode="wait">
-        {completed ? (
-          <m.div
-            key="summary"
-            /* The only motion in this file that was not gated on the
-               preference (§10.5) — and a scale-in is exactly the kind a
-               reduced-motion user asks not to see. */
-            initial={prefersReducedMotion ? false : { opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
-            className="mx-auto max-w-2xl space-y-6"
-          >
-            <div className="surface p-8 text-center">
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                Session
-              </p>
-              <h2 className="mt-3 text-xl font-semibold tracking-[-.025em]">Review complete</h2>
-              <p className="mt-1 text-muted-foreground">
-                You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-4 gap-3">
-              {[
-                { label: 'Again', count: againCount, color: 'text-[var(--state-lapsed)]' },
-                { label: 'Hard', count: hardCount, color: 'text-[var(--state-due)]' },
-                { label: 'Good', count: goodCount, color: 'text-[var(--state-mastered)]' },
-                { label: 'Easy', count: easyCount, color: 'text-[var(--state-neutral)]' },
-              ].map((stat) => (
-                <div key={stat.label} className="surface p-4 text-center">
-                  <p className={`font-mono text-2xl font-semibold tnum ${stat.color}`}>{stat.count}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* A label reads better than a glyph and costs less (§6). */}
-            <div className="surface divide-y divide-border">
-              <div className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-muted-foreground">Session duration</span>
-                <span className="font-mono text-sm font-medium tnum">{formatDuration(sessionDuration)}</span>
-              </div>
-              <div className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-muted-foreground">Avg. per review</span>
-                <span className="font-mono text-sm font-medium tnum">
-                  {effectiveAttemptCount > 0 ? formatDuration(Math.round(sessionDuration / effectiveAttemptCount)) : '—'}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {/* The deck name is prose, so it stays in the sans face — mono is
+                  for the numbers a user reads as data (§3.2). */}
+              <div className="flex items-baseline gap-2">
+                <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Deck
                 </span>
-              </div>
-              <div className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm text-muted-foreground">Retention rate</span>
-                <span className="font-mono text-sm font-medium tnum">
-                  {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
+                <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">
+                  {deckTitle}
                 </span>
               </div>
 
-              {nextReviewSummary ? (
-                <div className="flex items-center justify-between gap-3 px-5 py-3">
-                  <span className="text-sm text-muted-foreground">Next review</span>
-                  <span className="text-right font-mono text-sm font-medium tnum">{nextReviewSummary}</span>
-                </div>
-              ) : null}
-            </div>
+              <Telemetry
+                label="Card"
+                value={`${Math.min(index + 1, sessionCards.length)}/${sessionCards.length}`}
+              />
+              <Telemetry label="Ease" value={active ? active.ease_factor.toFixed(2) : '—'} />
+              <Telemetry label="Elapsed" value={formatDuration(sessionDuration)} />
 
-            <div className="flex justify-center gap-3">
-              <Button onClick={restart} className="gap-2">
-                <RotateCcw className="h-4 w-4" />
-                Review Again
-              </Button>
-              <Button asChild variant="primary" className="gap-2">
-                <Link href={`/dashboard/${deckId}`}>
-                  Back to deck
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </m.div>
-        ) : (
-          <m.div
-            key={active.id}
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -18 }}
-            /* The one spring left in the product (§5): a graded card should
-               feel like it has mass as it leaves the stack. */
-            transition={prefersReducedMotion ? { duration: 0 } : cardLeaveSpring}
-            className="mx-auto w-full max-w-2xl space-y-4"
-          >
-            <div className="relative">
-              {/* The next card, peeking out from under this one — the stack has
-                  depth because there is another card in it, not for effect. */}
-              {next ? (
-                <div
-                  aria-hidden="true"
-                  className="surface pointer-events-none absolute inset-x-5 top-3 h-full opacity-70"
-                />
-              ) : null}
-
-              <m.div
-                drag={showAnswer && !isPaused ? 'x' : false}
-                dragConstraints={{ left: 0, right: 0 }}
-                style={{ x: dragX, rotate }}
-                onDragEnd={(_, info) => {
-                  if (showAnswer) {
-                    if (info.offset.x > 120) commitGrade('good');
-                    else if (info.offset.x < -120) commitGrade('again');
-                  }
-                }}
-                className="relative cursor-grab active:cursor-grabbing"
-              >
-                <FlipCard
-                  state={flipState}
-                  grade={committedGrade ?? undefined}
-                  /* F-07: `card.front` is the answer and `card.back` is the
-                     question. The lie stops at this boundary — no component
-                     below here sees either name. */
-                  prompt={active.id_question ?? active.back}
-                  answer={active.front}
-                  answerAside={
-                    active.mnemonic ? (
-                      <span className="flip__aside">
-                        <span className="flip__aside-label">Memory aid</span>
-                        {active.mnemonic}
-                      </span>
-                    ) : null
-                  }
-                  onReveal={handleCardActivate}
-                  ariaLabel={
-                    showAnswer
-                      ? peeking
-                        ? 'Showing the question again. Press to return to the answer.'
-                        : 'Showing the answer. Grade it with keys 1 to 4.'
-                      : 'Showing the question. Press to reveal the answer.'
-                  }
-                />
-              </m.div>
-            </div>
-
-            {/*
-              The action band. Both of its states are the same height, so
-              revealing an answer never moves the grade deck below it — which,
-              with the deck itself always mounted, is what takes the layout
-              shift on reveal to zero.
-            */}
-            <div className="flex min-h-[34px] items-center justify-between gap-4">
-              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                {flipState === 'default' ? 'Question' : 'Answer'}
-              </span>
-
-              {!showAnswer ? (
-                /* The study screen's one filled button (§7.2). */
-                <Button
-                  type="button"
-                  variant="primary"
-                  onClick={() => setShowAnswer(true)}
-                  disabled={isPaused}
-                  className="gap-2"
-                >
-                  Show answer
-                  <Kbd>Space</Kbd>
-                </Button>
-              ) : (
+              {/* The keycap is bound to the control it triggers, never listed
+                  in a footer strip (§7.3), and never hidden responsively. */}
+              {!completed ? (
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setPeeking((value) => !value)}
-                  disabled={isPaused}
+                  size="sm"
+                  onClick={togglePause}
+                  aria-pressed={isPaused}
+                  className="gap-2 px-2"
                 >
-                  {peeking ? 'Back to answer' : 'Show question'}
+                  {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                  {isPaused ? 'Resume' : 'Pause'}
+                  <Kbd>P</Kbd>
                 </Button>
-              )}
+              ) : null}
             </div>
+          </div>
 
-            {/*
-              The grade deck (§7.4). It is mounted from the first frame and
-              merely inert before the reveal: mounting it on reveal is what used
-              to shove the page down mid-session, and a deck that is visible
-              from the start also tells a first-time user what is about to be
-              asked of them.
+          {/* A 1px progress rule, not an 8px pill — depth is rule weight (§4.3). */}
+          <div className="h-px w-full bg-border">
+            <m.div
+              className="h-px bg-ink-dim"
+              initial={false}
+              animate={{ width: `${Math.min(progress, 100)}%` }}
+              transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
+            />
+          </div>
+        </header>
 
-              On mobile this band is the bottom chrome — there is no dock on
-              this route (Run 1, Task 0.2) and nothing floats above the keys.
-            */}
-            <div className="grade-deck-dock">
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {completed
+            ? `Flashcard review complete. ${effectiveAttemptCount} reviews completed.`
+            : `Card ${index + 1} of ${sessionCards.length}.`}
+        </div>
+
+        {/* Part 2: Centered stage (§5 Task 3.2) */}
+        <main className="flex flex-1 items-center justify-center p-4 md:p-8">
+          <AnimatePresence mode="wait">
+            {completed ? (
+              <m.div
+                key="summary"
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 20, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
+                className="mx-auto w-full max-w-2xl space-y-6"
+              >
+                <div className="surface p-8 text-center">
+                  <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                    Session
+                  </p>
+                  <h2 className="mt-3 font-serif text-[2rem] font-normal leading-[1.2] text-balance">Review complete</h2>
+                  <p className="mt-1 text-muted-foreground">
+                    You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { label: 'Again', count: againCount, color: 'text-[var(--state-lapsed)]' },
+                    { label: 'Hard', count: hardCount, color: 'text-[var(--state-due)]' },
+                    { label: 'Good', count: goodCount, color: 'text-[var(--state-mastered)]' },
+                    { label: 'Easy', count: easyCount, color: 'text-[var(--state-neutral)]' },
+                  ].map((stat) => (
+                    <div key={stat.label} className="surface p-4 text-center">
+                      <p className={`font-mono text-2xl font-semibold tnum ${stat.color}`}>{stat.count}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="surface divide-y divide-border">
+                  <div className="flex items-center justify-between px-5 py-3">
+                    <span className="text-sm text-muted-foreground">Session duration</span>
+                    <span className="font-mono text-sm font-medium tnum">{formatDuration(sessionDuration)}</span>
+                  </div>
+                  <div className="flex items-center justify-between px-5 py-3">
+                    <span className="text-sm text-muted-foreground">Avg. per review</span>
+                    <span className="font-mono text-sm font-medium tnum">
+                      {effectiveAttemptCount > 0 ? formatDuration(Math.round(sessionDuration / effectiveAttemptCount)) : '—'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-5 py-3">
+                    <span className="text-sm text-muted-foreground">Retention rate</span>
+                    <span className="font-mono text-sm font-medium tnum">
+                      {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
+                    </span>
+                  </div>
+
+                  {nextReviewSummary ? (
+                    <div className="flex items-center justify-between gap-3 px-5 py-3">
+                      <span className="text-sm text-muted-foreground">Next review</span>
+                      <span className="text-right font-mono text-sm font-medium tnum">{nextReviewSummary}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="flex justify-center gap-3">
+                  <Button onClick={restart} className="gap-2">
+                    <RotateCcw className="h-4 w-4" />
+                    Review Again
+                  </Button>
+                  <Button asChild variant="primary" className="gap-2">
+                    <Link href={`/dashboard/${deckId}`}>
+                      Back to deck
+                      <ChevronRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </m.div>
+            ) : (
+              <m.div
+                key={active.id}
+                initial={{ opacity: 0, y: 22 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -18 }}
+                transition={prefersReducedMotion ? { duration: 0 } : cardLeaveSpring}
+                className="mx-auto w-full max-w-2xl space-y-3"
+              >
+                {/* Eyebrow above the card (§5 Task 3.3) */}
+                <p className="text-center font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  {flipState === 'default' ? 'Question' : 'Answer'}
+                </p>
+
+                <div className="relative">
+                  {/* The next card peek */}
+                  {next ? (
+                    <div
+                      aria-hidden="true"
+                      className="surface pointer-events-none absolute inset-x-5 top-3 h-full opacity-70"
+                    />
+                  ) : null}
+
+                  <m.div
+                    drag={showAnswer && !isPaused ? 'x' : false}
+                    dragConstraints={{ left: 0, right: 0 }}
+                    style={{ x: dragX, rotate }}
+                    onDragEnd={(_, info) => {
+                      if (showAnswer) {
+                        if (info.offset.x > 120) commitGrade('good');
+                        else if (info.offset.x < -120) commitGrade('again');
+                      }
+                    }}
+                    className="relative cursor-grab active:cursor-grabbing"
+                  >
+                    <FlipCard
+                      state={flipState}
+                      grade={committedGrade ?? undefined}
+                      prompt={active.id_question ?? active.back}
+                      answer={active.front}
+                      answerAside={
+                        active.mnemonic ? (
+                          <span className="flip__aside">
+                            <span className="flip__aside-label">Memory aid</span>
+                            {active.mnemonic}
+                          </span>
+                        ) : null
+                      }
+                      onReveal={handleCardActivate}
+                      ariaLabel={
+                        showAnswer
+                          ? peeking
+                            ? 'Showing the question again. Press to return to the answer.'
+                            : 'Showing the answer. Grade it with keys 1 to 4.'
+                          : 'Showing the question. Press to reveal the answer.'
+                      }
+                    />
+                  </m.div>
+                </div>
+
+                {/* Minimal, centered reveal affordance (§5 Task 3.3) */}
+                <div className="flex min-h-[38px] items-center justify-center pt-2">
+                  {!showAnswer ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowAnswer(true)}
+                      disabled={isPaused}
+                      className="reveal-hint"
+                    >
+                      <Kbd>Space</Kbd>
+                      <span>reveal answer</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPeeking((value) => !value)}
+                      disabled={isPaused}
+                      className="reveal-hint"
+                    >
+                      <span>{peeking ? 'Back to answer' : 'Show question'}</span>
+                    </button>
+                  )}
+                </div>
+              </m.div>
+            )}
+          </AnimatePresence>
+        </main>
+
+        {/* Part 3: Pinned bottom grade band (§5 Task 3.2) */}
+        {!completed ? (
+          <footer className="grade-band">
+            <div className="mx-auto w-full max-w-2xl">
               <div
                 className="grade-deck"
                 data-armed={showAnswer ? 'true' : 'false'}
@@ -971,9 +950,8 @@ export function FlashcardReviewClient({
                 ))}
               </div>
             </div>
-          </m.div>
-        )}
-      </AnimatePresence>
+          </footer>
+        ) : null}
       </div>
 
       {/*
@@ -995,7 +973,7 @@ export function FlashcardReviewClient({
             transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.panel}
             className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
           >
-            <div className="surface mx-4 w-full max-w-md border-border-strong p-8 text-center">
+            <div className="panel mx-4 w-full max-w-md p-8 text-center">
               <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 Session paused
               </p>

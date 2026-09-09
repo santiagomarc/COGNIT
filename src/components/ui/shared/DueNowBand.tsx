@@ -73,57 +73,45 @@ export function DueNowBand({
   const deckWord = dueDecks.length === 1 ? 'deck' : 'decks';
 
   return (
-    <section className="surface p-6 md:p-7">
-      <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Due now
-          </p>
-
-          {/* The `metric` step (§3.3): the one big number on the dashboard. */}
+    <section className="surface surface--raised p-5 md:px-6 md:py-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4 min-w-0">
+          {/* The metric step (§3.3) */}
           <p
-            className="mt-2 font-mono text-[52px] font-semibold leading-none tracking-[-0.04em] tnum"
+            className="font-mono text-[44px] font-semibold leading-none tracking-[-0.04em] tnum shrink-0"
             style={{ color: hasWork ? 'var(--state-due)' : 'var(--ink)' }}
           >
             {totalDue}
           </p>
 
-          <p className="mt-3 text-sm text-muted-foreground">
-            {hasWork ? (
-              <>
-                across <span className="font-mono tnum text-ink-dim">{dueDecks.length}</span>{' '}
-                {deckWord}
-                {oldestOverdueDays !== null && oldestOverdueDays > 0 ? (
-                  <>
-                    {' · oldest overdue '}
-                    <span className="font-mono tnum text-ink-dim">{oldestOverdueDays}d</span>
-                  </>
-                ) : null}
-                {' · about '}
-                <span className="font-mono tnum text-ink-dim">{estimatedMinutes}</span> min
-              </>
-            ) : (
-              'Nothing is due. Study ahead, or come back when the scheduler brings cards round.'
-            )}
-          </p>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-ink truncate">
+              {hasWork ? (
+                <>
+                  cards due across <span className="font-mono tnum">{dueDecks.length}</span> {deckWord}
+                </>
+              ) : (
+                'All caught up'
+              )}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-dim truncate">
+              {hasWork ? (
+                <>
+                  {oldestOverdueDays !== null && oldestOverdueDays > 0 ? (
+                    <>
+                      oldest is <span className="font-mono tnum">{oldestOverdueDays} days</span> overdue ·{' '}
+                    </>
+                  ) : null}
+                  est. <span className="font-mono tnum">{estimatedMinutes}</span> min
+                </>
+              ) : (
+                'No reviews scheduled. Study ahead or add new material.'
+              )}
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* The dashboard's one filled button (§7.2). */}
-          {sessionHref ? (
-            <Button asChild variant="primary" className="gap-2">
-              <Link href={sessionHref}>
-                {hasWork ? 'Start session' : 'Study ahead'}
-                <Kbd>S</Kbd>
-              </Link>
-            </Button>
-          ) : null}
-
-          {/*
-            * The create-deck dialog is mounted by the shell layout now, so this
-            * is a trigger rather than the dialog itself — which is also why the
-            * onboarding panel can open it when this band is not rendered.
-            */}
+        <div className="flex items-center gap-2 shrink-0">
           <Button type="button" onClick={requestOpenCreateDeck} aria-haspopup="dialog">
             New deck
           </Button>
@@ -133,27 +121,41 @@ export function DueNowBand({
               <Link href={importHref}>Import PDF</Link>
             </Button>
           ) : null}
+
+          {/* The dashboard's one filled button (§7.2). */}
+          {sessionHref ? (
+            <Button asChild variant="primary" className="gap-2">
+              <Link href={sessionHref}>
+                {hasWork ? 'Start session' : 'Study ahead'}
+                <Kbd>S</Kbd>
+              </Link>
+            </Button>
+          ) : null}
         </div>
       </div>
 
       {hasWork && dueDecks.length > 0 ? (
-        <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 border-t border-border pt-4">
-          {dueDecks.slice(0, 6).map((deck) => (
-            <li key={deck.deckId}>
-              <Link
-                href={`/dashboard/${deck.deckId}/study`}
-                className="group inline-flex items-baseline gap-2 rounded-[var(--radius-control)] text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-              >
-                <span className="max-w-[14rem] truncate text-ink-dim group-hover:text-ink">
-                  {deck.deckTitle}
-                </span>
-                <span className="font-mono text-[13px] tnum" style={{ color: 'var(--state-due)' }}>
-                  {deck.dueCount}
-                </span>
-              </Link>
-            </li>
+        <div className="mt-4 flex items-center gap-x-4 overflow-x-auto border-t border-border pt-3 text-xs whitespace-nowrap scrollbar-none">
+          {dueDecks.slice(0, 5).map((deck) => (
+            <Link
+              key={deck.deckId}
+              href={`/dashboard/${deck.deckId}/study`}
+              className="group inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            >
+              <span className="max-w-[13rem] truncate text-ink-dim group-hover:text-ink">
+                {deck.deckTitle}
+              </span>
+              <span className="font-mono text-[12px] tnum" style={{ color: 'var(--state-due)' }}>
+                {deck.dueCount}
+              </span>
+            </Link>
           ))}
-        </ul>
+          {dueDecks.length > 5 ? (
+            <span className="font-mono text-[11px] text-ink-dimmer">
+              +{dueDecks.length - 5} more
+            </span>
+          ) : null}
+        </div>
       ) : null}
     </section>
   );

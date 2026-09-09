@@ -77,7 +77,7 @@ export function DashboardOnboarding({
         <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
           Getting started
         </p>
-        <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">
+        <h2 className="font-serif text-[2rem] font-normal leading-[1.2] tracking-[-0.015em] text-balance">
           Cognit schedules what you review, and when
         </h2>
         <p className="text-sm leading-relaxed text-muted-foreground">

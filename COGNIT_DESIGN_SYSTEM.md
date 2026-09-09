@@ -1,8 +1,10 @@
 # Cognit — Design System
 
 **Codename:** Obsidian Telemetry
-**Status:** Approved 2026-09-09 · Rev. A
+**Status:** Approved 2026-09-09 · Rev. B (corrected via `COGNIT_UI_CORRECTIONS_PLAN.md`)
 **Applies to:** Next.js 16 (App Router) · React 19 · Tailwind v4 (CSS-first) · Framer Motion 12
+
+> **Changelog (Rev. B):** Refined 5-step radius scale, 3-step elevation scale, widened Instrument Serif to display headings ≥24px, added `.panel` for sparse surfaces, confirmed unfilled bracketed card canvas, and adjusted button primary budget.
 
 ---
 
@@ -37,10 +39,8 @@ time, by people under mild time pressure. It competes with Anki and RemNote. It 
 
 Three principles:
 
-**1. Almost nothing is filled.**
-Structure is carried by 1px rules on a single flat ground. When only three surfaces on a screen have
-a background, the eye lands on them without any glow doing the work. Fill is a scarce resource spent
-on the one thing that matters.
+**1. Almost nothing is filled on dense surfaces; sparse surfaces get contained, elevated panels.**
+On dense operational screens (dashboard, tables), structure is carried by 1px rules on a single flat ground with `--elevate-flat`. On sparse screens (login, modals, empty states), the focal object is enclosed in a `.panel` with `--radius-xl` and `--elevate-2` so it has tangible subject/figure presence. Fill remains a disciplined resource.
 
 **2. Colour is a state channel, not decoration.**
 The accent is white (dark theme) / near-black (light theme). Hue is reserved *exclusively* for SM-2
@@ -184,32 +184,32 @@ delete the imports, the `--font-orbitron` / `--font-poppins` variables and the `
 
 | Face | Used for | Never used for |
 |---|---|---|
-| **Geist Sans** | All UI chrome, headings, body, buttons, labels | Numeric data |
+| **Geist Sans** | All UI chrome, body, buttons, and section headings < 24px | Numeric data, display headings ≥24px |
 | **Geist Mono** | Every number the user reads as data: counts, due totals, ease factors, intervals, timers, percentages, dates, keycaps, uppercase micro-labels | Prose |
-| **Instrument Serif** | **The card prompt and answer only** | Anything else, ever |
+| **Instrument Serif** | **Display headings ≥24px (`h1`, large section heads, login brand/title), and the card prompt/answer** | Body text, chrome, buttons, or any text < 24px |
 
-The serif is the single editorial gesture in an otherwise technical system. Its entire job is to make
-the thing being studied feel unlike the chrome around it. Using it for a page heading destroys that.
+> **No Bold Serif Rule:** Instrument Serif is a high-contrast editorial serif designed at regular weight (400). It has **no bold weight**. Never apply `font-bold` or `font-semibold` to Instrument Serif — if a heading looks weak, adjust its size step or tracking, not its weight.
 
 ### 3.3 Scale
 
-Base is **14px** for application chrome (not 16px — the default is too loose for this density).
+Base is **14px** for application chrome.
 
-| Step | Size / line-height | Tracking | Use |
-|---|---|---|---|
-| `display` | 34px / 1.32 | `-0.01em` | Card prompt (serif) |
-| `display-sm` | 25px / 1.30 | `-0.01em` | Card prompt, mobile (serif) |
-| `h1` | 28px / 1.15 | `-0.03em` | Page title (max — density beats scale) |
-| `h2` | 20px / 1.25 | `-0.025em` | Section |
-| `h3` | 16px / 1.35 | `-0.015em` | Subsection, card title |
-| `body` | 14px / 1.5 | `0` | Default |
-| `body-sm` | 13px / 1.5 | `0` | Table cells, secondary |
-| `caption` | 12px / 1.45 | `0` | Helper text |
-| `label` | 10px / 1.5 | `0.16em` | **Uppercase**, mono, `--ink-dimmer` |
-| `metric` | 52px / 1 | `-0.04em` | The one big number on the dashboard band (mono) |
+```css
+/* display steps — Instrument Serif */
+--type-display-lg: 2.75rem;   /* 44px — page hero, login brand      */
+--type-display:    2rem;      /* 32px — page title (h1)             */
+--type-display-sm: 1.5rem;    /* 24px — section heading (h2)        */
+
+/* chrome steps — Geist Sans */
+--type-h3:   1rem;      /* 16px, weight 600  */
+--type-body: 0.875rem;  /* 14px              */
+--type-sm:   0.8125rem; /* 13px              */
+--type-cap:  0.75rem;   /* 12px              */
+--type-label:0.625rem;  /* 10px, mono, uppercase, 0.16em */
+```
 
 Rules:
-- Headings get `text-wrap: balance`.
+- Display type gets `letter-spacing: -0.015em` and `text-wrap: balance`. Never set Instrument Serif below 24px.
 - Prose measure caps at ~68ch; the card prompt caps at **32ch** (see §7.6).
 - Every column of digits gets `font-variant-numeric: tabular-nums`. No exceptions.
 - Uppercase is reserved for the `label` step. Do not uppercase buttons or headings.
@@ -223,30 +223,37 @@ Rules:
 4px base unit. Use `4 · 6 · 8 · 10 · 12 · 16 · 20 · 26 · 32 · 40`. Lay out sibling groups with
 flex/grid `gap` — never per-element margins that collapse or double.
 
-### 4.2 Radius — three steps, assigned by role
+### 4.2 Radius — five-step proportional scale
+
+Corner radius is proportional to the component's bounding box. A 2px corner on a 44px input or a 320px panel reads as an unresolved right angle.
 
 | Token | Value | Applies to |
 |---|---|---|
-| `--radius-control` | `2px` | Buttons, inputs, keys, options, keycaps, ticks |
-| `--radius-container` | `6px` | Panels, bands, cards, modals |
-| `--radius-pill` | `999px` | **Avatars only.** Not badges, not buttons. |
+| `--radius-xs` | `4px` | Keycaps (`<Kbd>`), tags, micro-badges, indicators |
+| `--radius-sm` | `6px` | Interactive controls: buttons (`h-[40px]`), chips, segment toggles |
+| `--radius-md` | `8px` | Data controls: inputs (`h-[44px]`), quiz options (`.opt`), grade keys (`.key`) |
+| `--radius-lg` | `12px` | Structural containers: dense `.surface` blocks, due-now band, inner cards |
+| `--radius-xl` | `16px` | Sparse contained objects: `.panel` (login card, modals, dialogs) |
+| `--radius-pill` | `999px` | Avatars, full-pill state badges |
 
-If you are reaching for a fourth radius, the answer is one of these three. The old codebase used
-`rounded-lg/xl/2xl/3xl/full` interchangeably (208 occurrences, no rule) — that is what we are fixing.
+Aliases:
+- `--radius-control: var(--radius-sm)` (6px)
+- `--radius-container: var(--radius-lg)` (12px)
 
-### 4.3 Elevation
+> **Proportionality Rule:** Never put a corner < 6px on any interactive element ≥40px tall. Inputs get 8px; buttons get 6px; panels get 16px.
 
-There is no shadow scale. Depth is expressed by **rule weight**, not by blur.
+### 4.3 Elevation — three steps, neutral depth
 
-```css
-/* the only elevation in the system */
-box-shadow: var(--elevate);
-```
+There are no colored shadows, no glows, and no backdrop blurs behind content. Depth is neutral shadow and subtle highlights:
 
-- Dark: an inner 1px top highlight — reads as a physical chamfer catching light from above.
-- Light: a 1px hairline drop shadow — a chamfer is invisible on white.
+| Step | Dark Mode | Light Mode | Use on |
+|---|---|---|---|
+| `--elevate-flat` | `inset 0 1px 0 rgb(255 255 255 / 0.05)` | `0 1px 2px rgb(24 24 27 / 0.05)` | Dense surfaces — deck table, telemetry, forecast |
+| `--elevate-1` | `inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5)` | `0 1px 3px rgb(24 24 27 / 0.08)` | Interactive raised things — grade keys, buttons at rest, options, due-now band |
+| `--elevate-2` | `inset 0 1px 0 rgb(255 255 255 / 0.08), 0 8px 28px -8px rgb(0 0 0 / 0.7)` | `0 8px 28px -8px rgb(24 24 27 / 0.16)` | **Sparse-screen panels and modals** — login card, command palette, dialogs |
 
-Modal overlays are the sole exception and may use a scrim (§7.8).
+Aliases:
+- `--elevate: var(--elevate-flat)` (backward-compatibility alias)
 
 ### 4.4 Z-index scale
 
@@ -299,19 +306,33 @@ Every animation must be disabled under `prefers-reduced-motion: reduce`. The exi
 
 ## 7. Component specs
 
-### 7.1 Surface
+### 7.1 Surface and Panel
 
-The replacement for `.glass-card`. Opaque, one chamfer, one rule.
+The structural container classes:
 
 ```css
+/* dense: flat, structural — deck table, forecast, telemetry */
 .surface {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-container);
-  box-shadow: var(--elevate);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-flat);
 }
 .surface--interactive { transition: border-color 120ms ease; }
 .surface--interactive:hover { border-color: var(--border-strong); }
+
+/* sparse: a real, contained, elevated object — login card, modals, dialogs */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevate-2);
+}
+
+/* raised interactive surface */
+.surface--raised {
+  box-shadow: var(--elevate-1);
+}
 ```
 
 Only interactive surfaces get a hover state. A static panel that lights up on hover is noise.
@@ -342,7 +363,7 @@ Only interactive surfaces get a hover state. A static panel that lights up on ho
 .btn--ghost:hover { border-color: var(--border-strong); }
 ```
 
-One primary button per screen. The dashboard's is "Start session".
+At most one primary button per screen. A screen whose primary action is a specialised control (e.g. the grade deck on the study canvas) has none. The dashboard's is "Start session".
 
 > **Do not** wrap buttons in `framer-motion`. The current `button.tsx` returns an `m.button` with a
 > `whileTap` spring, which pulls the animation runtime into every page that renders a button. A CSS
@@ -443,6 +464,8 @@ A deck is a **row of type with its numbers right-aligned**, not a tile.
 
 ### 7.6 FlipCard
 
+The study canvas card has **no background fill, no full border, and no box-shadow**. It sits directly on the flat ground, framed only by `CornerBrackets`:
+
 Four states, driven by **one `data-state` attribute** rather than conditional class strings.
 
 ```tsx
@@ -451,6 +474,7 @@ type FlipState = 'default' | 'flipping' | 'graded' | 'focus';
 <article data-state={state} data-grade={lastGrade ?? undefined} className="flip">
   <div className="flip__face flip__face--prompt">{prompt}</div>
   <div className="flip__face flip__face--answer">{answer}</div>
+  <CornerBrackets />
 </article>
 ```
 
@@ -467,9 +491,18 @@ type FlipState = 'default' | 'flipping' | 'graded' | 'focus';
 ```css
 .flip {
   position: relative;
-  min-height: 14rem;            /* grows with content — never a fixed height */
-  transform-style: preserve-3d;
-  transition: transform 340ms cubic-bezier(.2,.8,.2,1);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 14rem;
+  max-height: min(60vh, 26rem);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+  text-align: center;
+  perspective: 1400px;
+  --commit: var(--state-neutral);
   /* NO cursor tilt. The text plane stays square to the eye. */
 }
 

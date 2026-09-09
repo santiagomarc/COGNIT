@@ -137,7 +137,7 @@ export function CreateDeckModal() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="surface relative z-[var(--z-modal)] mx-4 w-full max-w-[480px] border-border-strong p-6"
+              className="panel relative z-[var(--z-modal)] mx-4 w-full max-w-[480px] p-6"
             >
               <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 New deck
@@ -176,7 +176,7 @@ export function CreateDeckModal() {
                     id="inline-deck-tag"
                     value={accentTag}
                     onChange={(event) => setAccentTag(event.target.value)}
-                    className="h-[34px] w-full rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-3 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="h-[40px] w-full rounded-[var(--radius-md)] border border-[var(--border-control)] bg-surface px-3 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   >
                     <option value="">None</option>
                     {DECK_TAG_OPTIONS.map((option) => (

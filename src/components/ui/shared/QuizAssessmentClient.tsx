@@ -535,12 +535,12 @@ export function QuizAssessmentClient({
 
   if (sessionCards.length === 0) {
     return (
-      <div className="container mx-auto p-6 md:p-8">
+      <div className="flex min-h-[100dvh] items-center justify-center p-6 md:p-8 bg-bg">
         <div className="surface mx-auto max-w-2xl p-10 text-center">
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Quiz
           </p>
-          <h1 className="mt-3 text-xl font-semibold tracking-[-.025em]">No cards available for a quiz yet</h1>
+          <h1 className="mt-3 font-serif text-[2rem] leading-[1.2] text-balance">No cards available for a quiz yet</h1>
           <p className="mt-2 text-muted-foreground">
             Add cards to this deck first, then come back to test your recall.
           </p>
@@ -562,12 +562,12 @@ export function QuizAssessmentClient({
 
   if (resumeState) {
     return (
-      <div className="container mx-auto p-6 md:p-8">
+      <div className="flex min-h-[100dvh] items-center justify-center p-6 md:p-8 bg-bg">
         <div className="surface mx-auto max-w-2xl p-10 text-center">
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Quiz
           </p>
-          <h1 className="mt-3 text-xl font-semibold tracking-[-.025em]">Resume your previous quiz?</h1>
+          <h1 className="mt-3 font-serif text-[2rem] leading-[1.2] text-balance">Resume your previous quiz?</h1>
           <p className="mt-2 text-muted-foreground">
             Pick up from question {Math.min(resumeState.index + 1, resumeState.sessionCards.length)} of {resumeState.sessionCards.length}.
           </p>
@@ -596,7 +596,7 @@ export function QuizAssessmentClient({
   const resultActionButtonClass = 'gap-2 min-w-[11.5rem] justify-center';
 
   return (
-    <div className="container mx-auto p-6 md:p-8">
+    <div className="flex min-h-[100dvh] flex-col bg-bg">
       {/*
         While the quiz is paused the page behind the scrim is inert. A scrim
         that only stops the mouse is not a guard: keyboard focus walked straight
@@ -605,19 +605,18 @@ export function QuizAssessmentClient({
         (F-01). The overlay and the quit dialog are siblings of this wrapper, so
         they stay operable.
       */}
-      <div className="space-y-6" inert={isPaused && !completed}>
-      {/*
-        Quiz telemetry (§7.9). `P` was bound at all times and shown nowhere in
-        the UI (defect F-05); it now sits on the control it triggers, beside the
-        elapsed clock it affects. The "Shortcuts" panel this replaces was a hint
-        strip — the thing §7.3 exists to get rid of.
-      */}
-      <header className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => requestQuit(`/dashboard/${deckId}`)} className="gap-2 px-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to deck
-          </Button>
+      <div className="flex flex-1 flex-col" inert={isPaused && !completed}>
+        {/*
+          Part 1: Quiz telemetry header (§7.9, §4 Task 4.3). `P` was bound at all times and
+          shown nowhere in the UI (defect F-05); it now sits on the control it triggers, beside
+          the elapsed clock it affects.
+        */}
+        <header className="flex-none p-4 md:px-8 md:pt-6 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+            <Button type="button" variant="ghost" size="sm" onClick={() => requestQuit(`/dashboard/${deckId}`)} className="gap-2 px-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to deck
+            </Button>
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <div className="flex items-baseline gap-2">
@@ -706,8 +705,8 @@ export function QuizAssessmentClient({
           : `Question ${index + 1} of ${sessionCards.length}. ${getModeLabel(quizMode)} mode.`}
       </div>
 
-      <AnimatePresence mode="wait">
-        {completed ? (
+      {completed ? (
+        <main className="flex flex-1 items-start justify-center p-4 md:p-8">
           <m.div
             key="summary"
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
@@ -929,59 +928,50 @@ export function QuizAssessmentClient({
                 ))}
               </div>
             </div>
-
-            
           </m.div>
-        ) : (
-          <m.div
-            key={`${quizMode}-${active.id}`}
-            initial={{ opacity: 0, y: 22 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -18 }}
-            transition={reduced ? { duration: 0 } : motionTransitions.panel}
-            className="mx-auto w-full max-w-2xl space-y-4"
-          >
-            {quizMode === 'mcq' ? (
-              <MCQMode
-                key={active.id}
-                card={active}
-                disabled={isPaused}
-                enrichmentPending={isEnriching && activeNeedsMcq}
-                onResolve={(_, wasCorrect, answer) =>
-                  resolveQuestion({
-                    cardId: active.id,
-                    prompt: active.id_question ?? active.back,
-                    correctAnswer: active.front,
-                    userAnswer: answer,
-                    correct: wasCorrect,
-                  })
-                }
-                onAnswered={handleAnswered}
-                onFallbackToIdentification={() => setQuizMode('identification')}
-              />
-            ) : (
-              <IdentificationMode
-                key={active.id}
-                deckId={deckId}
-                card={active}
-                disabled={isPaused}
-                enrichmentPending={isEnriching && activeNeedsIdentificationPrompt}
-                onAnswered={handleAnswered}
-                onResolve={(_, score, answer) =>
-                  resolveQuestion({
-                    cardId: active.id,
-                    prompt: active.id_question ?? active.back,
-                    correctAnswer: active.front,
-                    userAnswer: answer,
-                    correct: score >= 0.7,
-                    score,
-                  })
-                }
-              />
-            )}
-          </m.div>
-        )}
-      </AnimatePresence>
+        </main>
+      ) : (
+        <div className="flex flex-1 flex-col">
+          {quizMode === 'mcq' ? (
+            <MCQMode
+              key={active.id}
+              card={active}
+              disabled={isPaused}
+              enrichmentPending={isEnriching && activeNeedsMcq}
+              onResolve={(_, wasCorrect, answer) =>
+                resolveQuestion({
+                  cardId: active.id,
+                  prompt: active.id_question ?? active.back,
+                  correctAnswer: active.front,
+                  userAnswer: answer,
+                  correct: wasCorrect,
+                })
+              }
+              onAnswered={handleAnswered}
+              onFallbackToIdentification={() => setQuizMode('identification')}
+            />
+          ) : (
+            <IdentificationMode
+              key={active.id}
+              deckId={deckId}
+              card={active}
+              disabled={isPaused}
+              enrichmentPending={isEnriching && activeNeedsIdentificationPrompt}
+              onAnswered={handleAnswered}
+              onResolve={(_, score, answer) =>
+                resolveQuestion({
+                  cardId: active.id,
+                  prompt: active.id_question ?? active.back,
+                  correctAnswer: active.front,
+                  userAnswer: answer,
+                  correct: score >= 0.7,
+                  score,
+                })
+              }
+            />
+          )}
+        </div>
+      )}
       </div>
 
       <AnimatePresence>

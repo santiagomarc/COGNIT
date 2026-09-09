@@ -6,15 +6,11 @@ import { Toaster } from "sonner";
 import "./globals.css";
 
 /*
- * Design system §3.1. Three faces with hard role assignments (§3.2):
+ * Design system §3.1 (Rev. B). Three faces with clear role assignments (§3.2):
  *
- *   Geist Sans       — all UI chrome, headings, body, buttons, labels
+ *   Instrument Serif — display headings ≥24px and the card prompt/answer (never bold)
+ *   Geist Sans       — all UI chrome, body, buttons, and headings <24px
  *   Geist Mono       — every number the user reads as data, and micro-labels
- *   Instrument Serif — the card prompt and answer, and nothing else, ever
- *
- * The serif is the single editorial gesture in an otherwise technical system;
- * its whole job is to make the thing being studied feel unlike the chrome
- * around it. Using it for a page heading destroys that.
  *
  * Orbitron and Poppins are gone: a sci-fi display face was doing the work that
  * weight and tracking should do.

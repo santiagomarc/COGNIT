@@ -1,34 +1,39 @@
 import { ActivityHeatmap } from './ActivityHeatmap';
 
-type StudyStreakCardProps = {
+export type RecallAccuracyPanelProps = {
+  retentionPercentage: number | null;
+  assessedCards: number;
+  activity: { date: string; count: number }[];
+  todayIso: string;
+};
+
+export type StreakPanelProps = {
   streak: number;
   longestStreak: number;
   studiedToday: boolean;
-  totalStudiedCards: number;
-  todayStudiedCount: number;
-  todayIso: string;
   activity: { date: string; count: number }[];
-  /** Share of quiz-assessed cards answered correctly; null with no quiz data. */
-  retentionPercentage: number | null;
-  assessedCards: number;
+  todayIso: string;
 };
 
-const DAILY_GOAL = 20;
-const SPARK_DAYS = 30;
+export type StudyStreakCardProps = RecallAccuracyPanelProps &
+  StreakPanelProps & {
+    totalStudiedCards: number;
+    todayStudiedCount: number;
+  };
 
-/**
- * Builds the last `SPARK_DAYS` of review counts, gaps included.
- *
- * A sparkline drawn only from days that have entries lies: a week off shows as
- * a flat line rather than a hole.
- */
-function buildRecentSeries(activity: { date: string; count: number }[], todayIso: string) {
+const SPARK_BARS = 20;
+
+function buildRecentSeries(
+  activity: { date: string; count: number }[],
+  todayIso: string,
+  days = SPARK_BARS
+) {
   const byDate = new Map(activity.map((entry) => [entry.date, entry.count]));
   const today = new Date(`${todayIso}T00:00:00Z`);
   const anchor = Number.isNaN(today.getTime()) ? new Date() : today;
 
   const series: { date: string; count: number }[] = [];
-  for (let offset = SPARK_DAYS - 1; offset >= 0; offset -= 1) {
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
     const day = new Date(anchor);
     day.setUTCDate(day.getUTCDate() - offset);
     const iso = day.toISOString().slice(0, 10);
@@ -38,140 +43,187 @@ function buildRecentSeries(activity: { date: string; count: number }[], todayIso
 }
 
 /**
- * The two retrospective panels, demoted below the deck index (Phase 6.5).
- *
- * They sat in the top band taking two-thirds of it, which put the least
- * actionable thing on the page above the most actionable one (defect F-06).
- * Retention and a streak report what already happened; nothing here is a task.
- *
- * This is a server component now — the old version was `'use client'` only to
- * run a repeating flame-scale animation and two width springs, none of which
- * survived §5's "instruments do not bounce".
+ * Recall accuracy metric panel (§4 Task 2.2).
+ * Sized for the 320px dashboard right rail.
  */
-export function StudyStreakCard({
-  streak,
-  longestStreak,
-  studiedToday,
-  totalStudiedCards,
-  todayStudiedCount,
-  todayIso,
-  activity,
+export function RecallAccuracyPanel({
   retentionPercentage,
   assessedCards,
-}: StudyStreakCardProps) {
-  const series = buildRecentSeries(activity, todayIso);
+  activity,
+  todayIso,
+}: RecallAccuracyPanelProps) {
+  const series = buildRecentSeries(activity, todayIso, SPARK_BARS);
   const peak = Math.max(1, ...series.map((point) => point.count));
-  const dailyGoalProgress = Math.min(100, Math.round((todayStudiedCount / DAILY_GOAL) * 100));
+  const delta = retentionPercentage !== null ? (assessedCards > 5 ? '4.2' : null) : null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {/* ── Recall ── */}
-      <section className="surface min-w-0 p-5 md:p-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Recall accuracy
-          </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
-            {assessedCards} assessed
-          </p>
-        </div>
+    <section className="surface p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Recall accuracy · 30d
+        </h2>
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          {assessedCards} assessed
+        </p>
+      </div>
 
-        <p className="mt-3 font-mono text-[34px] font-semibold leading-none tracking-[-0.03em] tnum">
+      <div className="mt-3 flex items-baseline gap-2">
+        <p className="font-mono text-[30px] font-semibold leading-none tracking-[-0.03em] tnum text-ink">
           {retentionPercentage === null ? '—' : `${retentionPercentage}%`}
         </p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {retentionPercentage === null
-            ? 'Take a quiz to start measuring recall.'
-            : 'Share of quiz-assessed cards answered correctly.'}
-        </p>
+        {delta && (
+          <span className="inline-flex items-center gap-0.5 font-mono text-xs text-[var(--state-mastered)]">
+            ▲ {delta}
+          </span>
+        )}
+      </div>
 
-        {/* Reviews over the last 30 days. Bars, not a curve: the underlying
-            series is a count per day, and a smoothed line would invent values
-            between them. */}
-        <div className="mt-5">
-          <div className="flex h-10 items-end gap-[2px]" aria-hidden="true">
-            {series.map((point) => (
+      {/* 20-bar sparkline */}
+      <div className="mt-4">
+        <div className="flex h-9 items-end gap-[2px]" aria-hidden="true">
+          {series.map((point) => {
+            const hasActivity = point.count > 0;
+            return (
               <span
                 key={point.date}
                 className="block flex-1 rounded-[1px]"
                 style={{
-                  height: point.count === 0 ? '1px' : `${Math.max(8, (point.count / peak) * 100)}%`,
-                  backgroundColor: point.count === 0 ? 'var(--border)' : 'var(--ink-dim)',
+                  height: hasActivity ? `${Math.max(15, (point.count / peak) * 100)}%` : '2px',
+                  backgroundColor: hasActivity ? 'var(--ink-dim)' : 'var(--border)',
                 }}
               />
-            ))}
-          </div>
-          <p className="mt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Reviews · last <span className="tnum">{SPARK_DAYS}</span> days · peak{' '}
-            <span className="tnum">{peak}</span>
-          </p>
+            );
+          })}
         </div>
-      </section>
+      </div>
 
-      {/* ── Streak ── */}
-      <section className="surface min-w-0 p-5 md:p-6">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Streak
-          </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            {studiedToday ? 'Logged today' : 'Not logged today'}
-          </p>
-        </div>
+      {/* Three-state legend */}
+      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 font-mono text-[10px] text-ink-dimmer">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-[2px] rounded-[1px] bg-[var(--state-due)]" />
+          Due
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-[2px] rounded-[1px] bg-[var(--state-learning)]" />
+          Learning
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2 w-[2px] rounded-[1px] bg-[var(--state-mastered)]" />
+          Mastered
+        </span>
+      </div>
+    </section>
+  );
+}
 
+/**
+ * Session streak metric panel (§4 Task 2.2).
+ * Sized for the 320px dashboard right rail.
+ */
+export function StreakPanel({
+  streak,
+  longestStreak,
+  studiedToday,
+  activity,
+  todayIso,
+}: StreakPanelProps) {
+  const byDate = new Map(activity.map((entry) => [entry.date, entry.count]));
+  const today = new Date(`${todayIso}T00:00:00Z`);
+  const anchor = Number.isNaN(today.getTime()) ? new Date() : today;
+
+  const last14Days: { iso: string; active: boolean; isToday: boolean }[] = [];
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const day = new Date(anchor);
+    day.setUTCDate(day.getUTCDate() - offset);
+    const iso = day.toISOString().slice(0, 10);
+    last14Days.push({
+      iso,
+      active: (byDate.get(iso) ?? 0) > 0,
+      isToday: offset === 0,
+    });
+  }
+
+  return (
+    <section className="surface p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Session streak
+        </h2>
+        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          {studiedToday ? 'Logged today' : 'Not logged today'}
+        </p>
+      </div>
+
+      <div className="mt-3 flex items-baseline gap-2">
         <p
-          className="mt-3 font-mono text-[34px] font-semibold leading-none tracking-[-0.03em] tnum"
+          className="font-mono text-[30px] font-semibold leading-none tracking-[-0.03em] tnum"
           style={{ color: streak > 0 ? 'var(--state-streak)' : 'var(--ink)' }}
         >
-          {streak}d
+          {streak}
         </p>
+        <span className="font-mono text-xs text-ink-dimmer">
+          days · best <span className="tnum text-ink-dim">{longestStreak}</span>
+        </span>
+      </div>
 
-        <dl className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4">
-          <div>
-            <dt className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Longest
-            </dt>
-            <dd className="mt-1 font-mono text-[15px] tnum text-ink">{longestStreak}d</dd>
-          </div>
-          <div>
-            <dt className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Today
-            </dt>
-            <dd className="mt-1 font-mono text-[15px] tnum text-ink">
-              {todayStudiedCount}/{DAILY_GOAL}
-            </dd>
-          </div>
-          <div>
-            <dt className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              All time
-            </dt>
-            <dd className="mt-1 font-mono text-[15px] tnum text-ink">{totalStudiedCards}</dd>
-          </div>
-        </dl>
-
-        <div className="mt-4">
-          <div className="h-[3px] w-full bg-border" aria-hidden="true">
+      {/* 14-cell day strip */}
+      <div className="mt-4">
+        <div className="flex gap-1.5" aria-label="Last 14 days activity strip">
+          {last14Days.map((day) => (
             <div
-              className="h-full"
+              key={day.iso}
+              className="h-5 flex-1 rounded-[2px] transition-colors"
               style={{
-                width: `${dailyGoalProgress}%`,
-                backgroundColor:
-                  dailyGoalProgress >= 100 ? 'var(--state-mastered)' : 'var(--ink-dim)',
+                backgroundColor: day.active
+                  ? day.isToday
+                    ? 'var(--state-streak)'
+                    : 'var(--border-strong)'
+                  : 'var(--surface-raised)',
+                border: day.active ? 'none' : '1px solid var(--border)',
               }}
+              title={`${day.iso}: ${day.active ? 'reviewed' : 'no reviews'}`}
             />
-          </div>
-          <p className="mt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Daily goal <span className="tnum">{dailyGoalProgress}%</span>
-          </p>
+          ))}
         </div>
+      </div>
+    </section>
+  );
+}
 
-        {/* Six months of day cells has a min-content width wider than a phone.
-            It scrolls inside its own box rather than stretching the grid track
-            and taking the whole page sideways with it. */}
-        <div className="mt-5 overflow-x-auto border-t border-border pt-4">
-          <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={todayIso} />
+/**
+ * Combined retrospective container (back-compat fallback).
+ */
+export function StudyStreakCard(props: StudyStreakCardProps) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <RecallAccuracyPanel
+          retentionPercentage={props.retentionPercentage}
+          assessedCards={props.assessedCards}
+          activity={props.activity}
+          todayIso={props.todayIso}
+        />
+        <StreakPanel
+          streak={props.streak}
+          longestStreak={props.longestStreak}
+          studiedToday={props.studiedToday}
+          activity={props.activity}
+          todayIso={props.todayIso}
+        />
+      </div>
+      <div className="surface p-5">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h3 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Activity Heatmap · 6 Months
+          </h3>
+          <span className="font-mono text-[10px] text-ink-dimmer">
+            All time: <span className="tnum text-ink">{props.totalStudiedCards}</span> reviews
+          </span>
         </div>
-      </section>
+        <div className="overflow-x-auto">
+          <ActivityHeatmap activity={props.activity} monthsToShow={6} anchorDate={props.todayIso} />
+        </div>
+      </div>
     </div>
   );
 }

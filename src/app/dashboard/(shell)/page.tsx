@@ -5,7 +5,8 @@ import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding'
 import { DashboardTelemetry } from '@/components/ui/shared/DashboardTelemetry';
 import { DueNowBand } from '@/components/ui/shared/DueNowBand';
 import { ReviewForecast } from '@/components/ui/shared/ReviewForecast';
-import { StudyStreakCard } from '@/components/ui/shared/StudyStreakCard';
+import { RecallAccuracyPanel, StreakPanel } from '@/components/ui/shared/StudyStreakCard';
+import { ActivityHeatmap } from '@/components/ui/shared/ActivityHeatmap';
 import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
 import {
   buildSevenDayForecast,
@@ -366,53 +367,91 @@ export default async function Dashboard() {
       {deckRows.length === 0 ? (
         <DashboardOnboarding />
       ) : (
-        <>
-          <DueNowBand
-            totalDue={totalDue}
-            dueDecks={deckBreakdown}
-            oldestOverdueDays={overdueDays}
-            estimatedMinutes={estimatedMinutes}
-            sessionHref={sessionHref}
-            importHref={mostRecentDeck ? `/dashboard/${mostRecentDeck.id}#add-content` : null}
-          />
-
-          <div id="deck-collection" className="scroll-mt-24">
-            <DeckGrid
-              decks={deckRows.map((deck) => {
-                const mastery = masteryByDeck.get(deck.id);
-                const deckTotalCards = deck.cards?.[0]?.count ?? 0;
-                const masteryPercentage =
-                  deckTotalCards > 0 && mastery
-                    ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
-                    : 0;
-
-                return {
-                  ...deck,
-                  masteryPercentage,
-                  assessedCards: mastery?.assessedCards ?? 0,
-                  lastQuizAt: mastery?.lastQuizAt ?? null,
-                  dueCount: dueByDeck.get(deck.id) ?? 0,
-                  easeFactor: easeByDeck.get(deck.id) ?? null,
-                };
-              })}
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
+          <div className="min-w-0 space-y-6">
+            <DueNowBand
+              totalDue={totalDue}
+              dueDecks={deckBreakdown}
+              oldestOverdueDays={overdueDays}
+              estimatedMinutes={estimatedMinutes}
+              sessionHref={sessionHref}
+              importHref={mostRecentDeck ? `/dashboard/${mostRecentDeck.id}#add-content` : null}
             />
+
+            {/* Mobile-only metric panels: stacked below DueNowBand, above DeckGrid */}
+            <div className="space-y-4 lg:hidden">
+              <RecallAccuracyPanel
+                retentionPercentage={retentionPercentage}
+                assessedCards={assessedCards}
+                activity={activity}
+                todayIso={today}
+              />
+              <StreakPanel
+                streak={streak}
+                longestStreak={longestStreak}
+                studiedToday={studiedToday}
+                activity={activity}
+                todayIso={today}
+              />
+            </div>
+
+            <div id="deck-collection" className="scroll-mt-24">
+              <DeckGrid
+                decks={deckRows.map((deck) => {
+                  const mastery = masteryByDeck.get(deck.id);
+                  const deckTotalCards = deck.cards?.[0]?.count ?? 0;
+                  const masteryPercentage =
+                    deckTotalCards > 0 && mastery
+                      ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
+                      : 0;
+
+                  return {
+                    ...deck,
+                    masteryPercentage,
+                    assessedCards: mastery?.assessedCards ?? 0,
+                    lastQuizAt: mastery?.lastQuizAt ?? null,
+                    dueCount: dueByDeck.get(deck.id) ?? 0,
+                    easeFactor: easeByDeck.get(deck.id) ?? null,
+                  };
+                })}
+              />
+            </div>
+
+            <ReviewForecast days={forecastDays} />
+
+            {/* Activity history heatmap below forecast */}
+            <div className="surface p-5">
+              <div className="mb-3 flex items-baseline justify-between">
+                <h3 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Activity History · 6 Months
+                </h3>
+                <span className="font-mono text-[10px] text-ink-dimmer">
+                  All time: <span className="tnum text-ink">{totalStudiedCards}</span> reviews
+                </span>
+              </div>
+              <div className="overflow-x-auto">
+                <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={today} />
+              </div>
+            </div>
           </div>
 
-          <ReviewForecast days={forecastDays} />
-
-          {/* Retrospective, so it sits below the work (Phase 6.5). */}
-          <StudyStreakCard
-            streak={streak}
-            longestStreak={longestStreak}
-            studiedToday={studiedToday}
-            totalStudiedCards={totalStudiedCards}
-            todayStudiedCount={todayStudiedCount}
-            todayIso={today}
-            activity={activity}
-            retentionPercentage={retentionPercentage}
-            assessedCards={assessedCards}
-          />
-        </>
+          {/* Desktop-only right rail (visible at first paint, 320px) */}
+          <aside className="hidden space-y-4 lg:block">
+            <RecallAccuracyPanel
+              retentionPercentage={retentionPercentage}
+              assessedCards={assessedCards}
+              activity={activity}
+              todayIso={today}
+            />
+            <StreakPanel
+              streak={streak}
+              longestStreak={longestStreak}
+              studiedToday={studiedToday}
+              activity={activity}
+              todayIso={today}
+            />
+          </aside>
+        </div>
       )}
     </div>
   );

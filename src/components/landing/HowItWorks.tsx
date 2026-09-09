@@ -40,7 +40,7 @@ export function HowItWorks() {
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             How it works
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-.03em] text-ink sm:text-4xl">
+          <h2 className="mt-3 font-serif text-[clamp(2rem,3vw,2.5rem)] font-normal leading-[1.15] tracking-[-0.015em] text-balance text-ink">
             Three steps to mastery
           </h2>
           <p className="mt-3 text-muted-foreground">

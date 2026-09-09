@@ -72,28 +72,47 @@
   --color-accent-foreground: var(--ink);
 
   /*
-   * Radius (§4.2): three steps by role, no fourth. The inherited scale is
-   * collapsed onto them so the 208 existing `rounded-*` call sites land on a
-   * legal value instead of inventing a fifth.
+   * Radius (§2.1, §4.2): remapped to 5-step scale so utility classes land on
+   * legal steps.
    */
-  --radius-sm: var(--radius-control);
-  --radius-md: var(--radius-control);
-  --radius-lg: var(--radius-container);
-  --radius-xl: var(--radius-container);
-  --radius-2xl: var(--radius-container);
-  --radius-3xl: var(--radius-container);
-  --radius-4xl: var(--radius-container);
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-xs);   /* rounded-sm  */
+  --radius-md: var(--radius-sm);   /* rounded-md  */
+  --radius-lg: var(--radius-md);   /* rounded-lg  */
+  --radius-xl: var(--radius-lg);   /* rounded-xl  */
+  --radius-2xl: var(--radius-lg);  /* rounded-2xl */
+  --radius-3xl: var(--radius-xl);  /* rounded-3xl */
+  --radius-4xl: var(--radius-xl);
 }
 
 /*
  * ─── Structural tokens — theme-independent (§4.2, §4.4) ───
  */
 :root {
-  /* Radius — three steps, assigned by role */
-  --radius-control: 2px;    /* buttons, inputs, keys, keycaps, ticks */
-  --radius-container: 6px;  /* panels, bands, cards, modals          */
-  --radius-pill: 999px;     /* avatars only                          */
+  /* Radius — five steps, assigned by role (§2.1) */
+  --radius-xs: 4px;   /* < 24px tall: ticks, keycaps, micro-chips        */
+  --radius-sm: 6px;   /* 24-40px: buttons, small controls, options       */
+  --radius-md: 8px;   /* 40-56px: inputs, list rows, grade keys          */
+  --radius-lg: 12px;  /* panels, bands, cards, the due-now band          */
+  --radius-xl: 16px;  /* modals, the login panel, large containers       */
+  --radius-pill: 999px; /* avatars and status pills only                 */
+
+  /* Back-compat aliases (§2.1) */
+  --radius-control: var(--radius-sm);
+  --radius-container: var(--radius-lg);
   --radius: var(--radius-container);
+
+  /* Display steps — Instrument Serif (§2.2) */
+  --type-display-lg: 2.75rem;   /* 44px — page hero, login brand      */
+  --type-display:    2rem;      /* 32px — page title (h1)             */
+  --type-display-sm: 1.5rem;    /* 24px — section heading (h2)        */
+
+  /* Chrome steps — Geist Sans (§2.2) */
+  --type-h3:   1rem;      /* 16px, weight 600  */
+  --type-body: 0.875rem;  /* 14px              */
+  --type-sm:   0.8125rem; /* 13px              */
+  --type-cap:  0.75rem;   /* 12px              */
+  --type-label:0.625rem;  /* 10px, mono, uppercase, 0.16em */
 
   /* Z-scale — the single source of stacking order. This is the fix for F-01.
      Never write a raw z-50 again; if a new layer is needed, add a token here. */
@@ -147,7 +166,10 @@
   --accent: #18181b;
   --accent-ink: #ffffff;
 
-  --elevate: 0 1px 2px rgb(24 24 27 / 0.06);
+  --elevate-flat: 0 1px 2px rgb(24 24 27 / 0.05);
+  --elevate-1:    0 1px 3px rgb(24 24 27 / 0.08);
+  --elevate-2:    0 8px 28px -8px rgb(24 24 27 / 0.16), 0 1px 3px rgb(24 24 27 / 0.06);
+  --elevate: var(--elevate-flat);   /* back-compat alias */
   --key-face: linear-gradient(180deg, #ffffff, #f4f4f5);
   --key-edge: 0 1px 0 #d4d4d8;
 
@@ -206,7 +228,10 @@
   --accent: #fafafa;
   --accent-ink: #09090b;
 
-  --elevate: inset 0 1px 0 rgb(255 255 255 / 0.06);
+  --elevate-flat: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  --elevate-1:    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
+  --elevate-2:    inset 0 1px 0 rgb(255 255 255 / 0.08), 0 8px 28px -8px rgb(0 0 0 / 0.7);
+  --elevate: var(--elevate-flat);   /* back-compat alias */
   --key-face: linear-gradient(180deg, #1f1f23, #131316);
   --key-edge: 0 1px 0 #000;
 
@@ -340,12 +365,24 @@
  *     Opaque ground, one 1px rule, one chamfer. No blur: it degrades text
  *     contrast and costs compositing on the study canvas.
  */
+/* dense: flat, structural — unchanged behaviour */
 .surface {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-container);
-  box-shadow: var(--elevate);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-flat);
 }
+
+/* sparse: a real, contained, elevated object */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevate-2);
+}
+
+/* raised interactive */
+.surface--raised { box-shadow: var(--elevate-1); }
 
 /* Only interactive surfaces get a hover. A static panel that lights up is noise. */
 .surface--interactive {
@@ -372,7 +409,7 @@
   padding: 1px 4px;
   min-width: 16px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-xs);
   background: var(--surface);
   color: var(--ink-dim);
   white-space: nowrap;
@@ -409,8 +446,8 @@
   background: var(--key-face);
   border: 1px solid var(--border-control);
   border-top-color: var(--border-strong);
-  border-radius: var(--radius-control);
-  box-shadow: var(--elevate), var(--key-edge);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevate-1), var(--key-edge);
   padding: 11px 12px 10px;
   display: flex;
   flex-direction: column;
@@ -532,10 +569,9 @@
   max-height: min(60vh, 26rem);
   padding: 0;
   margin: 0;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-container);
-  background: var(--surface);
-  box-shadow: var(--elevate);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   color: var(--ink);
   font: inherit;
   text-align: center;
@@ -546,6 +582,7 @@
 }
 
 button.flip {
+  border: 0;
   cursor: pointer;
 }
 
@@ -556,19 +593,9 @@ button.flip {
  * survives being drawn on a plane that is mid-rotation.
  */
 .flip__panel {
-  /*
-   * `flex: 1 1 auto` + `min-height: 0` is what actually makes the card bounded.
-   * As a grid item it took its content height and overflowed the card's
-   * max-height instead of scrolling, because a grid row sized by content is not
-   * shrunk by a max-height on its container. As a shrinkable flex item it grows
-   * to the card's min-height when the content is short and shrinks to the
-   * max-height when it is long — which is when the face's own scroll engages.
-   */
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  /* An explicitly bounded row, so the faces inherit the panel's real height
-     rather than each re-deriving it from content. */
   grid-template-rows: minmax(0, 1fr);
   transform-style: preserve-3d;
   transition: transform var(--dur-flip) var(--ease-out);
@@ -587,14 +614,30 @@ button.flip {
 }
 
 /*
- * When the card is the reveal control it is operable, so its bounds are
- * non-text content that identifies a UI component — WCAG 2.2 SC 1.4.11 applies
- * and --border-strong (1.91:1 dark / 1.43:1 light) does not meet it. The
- * read-only <article> form, used for previews, keeps the decorative edge.
+ * ─── Reveal hint (§5 Task 3.3) ───
+ * Minimal, quiet centered affordance beneath the un-filled study card.
  */
-button.flip {
-  border-color: var(--border-control);
+.reveal-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-inline: auto;
+  padding: 8px 14px;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink-dimmer);
+  font-size: var(--type-sm);
   cursor: pointer;
+  transition: color var(--dur-hover) ease;
+}
+.reveal-hint:hover {
+  color: var(--ink-dim);
+}
+.reveal-hint:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 .flip__face--answer {
@@ -619,7 +662,7 @@ button.flip {
   font-family: var(--font-serif);
   font-size: clamp(1.5625rem, 2.4vw, 2.125rem);
   line-height: 1.32;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   text-wrap: balance;
 }
 
@@ -745,6 +788,22 @@ button.flip {
   opacity: 1;
 }
 
+/*
+ * ─── Grade band (§5 Task 3.2) ───
+ * Pinned bottom band with 1px top rule.
+ */
+.grade-band {
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 14px 20px 18px;
+}
+@media (max-width: 640px) {
+  .grade-band {
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @media (max-width: 640px) {
   /*
    * On mobile the grade deck *is* the bottom chrome. There is no dock and no
@@ -785,24 +844,27 @@ button.flip {
 .opt {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  min-height: 44px;
-  padding: 11px 14px;
+  min-height: 48px;
+  padding: 12px 16px;
   text-align: left;
   border: 1px solid var(--border-control);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-md);
   background: var(--surface);
+  box-shadow: var(--elevate-1);
   color: var(--ink);
   cursor: pointer;
   transition:
     border-color var(--dur-hover) ease,
     background-color var(--dur-hover) ease,
+    box-shadow var(--dur-hover) ease,
     opacity var(--dur-hover) ease;
 }
 
 .opt:hover:not(:disabled) {
   background: var(--surface-raised);
+  box-shadow: var(--elevate-1);
 }
 
 .opt:focus-visible {
@@ -815,13 +877,15 @@ button.flip {
 }
 
 .opt[data-result='correct'] {
+  background: color-mix(in srgb, var(--state-mastered) 8%, var(--surface));
   border-color: var(--state-mastered);
-  color: var(--state-mastered);
+  color: var(--ink);
 }
 
 .opt[data-result='wrong'] {
+  background: color-mix(in srgb, var(--state-lapsed) 8%, var(--surface));
   border-color: var(--state-lapsed);
-  color: var(--state-lapsed);
+  color: var(--ink);
 }
 
 /* What the user did not pick recedes once the answer is known. */

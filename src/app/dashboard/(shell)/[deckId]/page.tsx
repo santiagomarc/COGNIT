@@ -363,7 +363,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
 
         <div className="space-y-3">
           <div className="flex flex-wrap items-baseline gap-3">
-            <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-.03em]">
+            <h1 className="font-serif text-[2rem] font-normal leading-[1.2] tracking-[-0.015em] text-balance text-ink">
               {deckTitleMeta.cleanTitle}
             </h1>
             {deckTitleMeta.tag ? (

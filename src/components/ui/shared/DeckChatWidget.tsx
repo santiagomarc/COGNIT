@@ -284,7 +284,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
             type="button"
             onClick={() => setActiveSessionId(session.id)}
             aria-pressed={activeSessionId === session.id}
-            className={`rounded-[var(--radius-control)] border px-3 py-1 text-xs transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+            className={`rounded-[var(--radius-sm)] border px-3 py-1 text-xs transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
               activeSessionId === session.id
                 ? 'border-[var(--border-control)] bg-surface-raised text-ink'
                 : 'border-border text-ink-dim hover:border-border-strong hover:text-ink'
@@ -365,7 +365,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
               type="button"
               onClick={() => void handleSendMessage(suggestion)}
               disabled={isStreaming}
-              className="rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1 text-xs text-ink-dim transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              className="rounded-[var(--radius-sm)] border border-[var(--border-control)] px-3 py-1 text-xs text-ink-dim transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
               {suggestion}
             </button>
@@ -408,7 +408,7 @@ function SourceChips({ references }: { references: ChatReference[] }) {
         <span
           key={ref.id}
           title={ref.similarity !== null ? `${Math.round(ref.similarity * 100)}% match` : undefined}
-          className="rounded-[var(--radius-control)] border border-border px-2 py-0.5 font-mono text-[10px] text-ink-dimmer"
+          className="rounded-[var(--radius-xs)] border border-border px-2 py-0.5 font-mono text-[10px] text-ink-dimmer"
         >
           {ref.front}
         </span>

@@ -150,7 +150,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="surface relative z-[var(--z-modal)] flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden border-border-strong"
+              className="panel relative z-[var(--z-modal)] flex max-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col overflow-hidden"
               role="dialog"
               aria-modal="true"
               aria-labelledby="bulk-import-title"
