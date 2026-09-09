@@ -44,3 +44,28 @@ Plan §3.5 puts `src/lib/embeddings.ts` in Phase 3, but Phase 2 Tasks 2.1 and 2.
 call `embedTexts()`. **Phase 2 creates that file**; Phase 3 only consumes it. `toVectorLiteral`
 also lives there, not in `src/lib/rag.ts` as §3.4 shows. The Phase 2 and Phase 3 prompts
 both carry this correction.
+
+---
+
+# Redesign programme — "Obsidian Telemetry"
+
+A separate, later programme from the five production phases above. Specification lives in
+`COGNIT_DESIGN_SYSTEM.md`; phase definitions and the 10 verified defects live in
+`COGNIT_REDESIGN_EXECUTION_PLAN.md`.
+
+The plan defines 11 phases. They are executed in **5 runs**, grouped by coupling — phases that share
+components or would look half-finished in isolation run together.
+
+| Run | File | Phases | Est. | Depends on |
+|---|---|---|---|---|
+| 1 | `REDESIGN_RUN_1_FOUNDATION.md` | 0–3 · defects, tokens, primitives, type | 3 d | — |
+| 2 | *(generate after Run 1)* | 4–5 · study canvas, quiz surface | 3.5 d | Run 1 |
+| 3 | *(generate after Run 2)* | 6–7 · dashboard, deck detail, modals | 4 d | Run 2 |
+| 4 | *(generate after Run 3)* | 8 · navigation, rail, ⌘K | 1.5 d | Run 3 |
+| 5 | *(generate after Run 4)* | 9–10 · landing, auth, light-mode & a11y QA | 3 d | Run 4 |
+
+Same handoff rule as above: **save the completion report each run produces** and paste it above the
+next prompt under `## Carry-forward from Run N`.
+
+Run 4 is deliberately isolated — it is the only run that changes navigation muscle memory, so it
+gets its own review cycle.
