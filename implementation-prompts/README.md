@@ -56,13 +56,16 @@ A separate, later programme from the five production phases above. Specification
 The plan defines 11 phases. They are executed in **5 runs**, grouped by coupling — phases that share
 components or would look half-finished in isolation run together.
 
-| Run | File | Phases | Est. | Depends on |
+| Run | File | Phases | Est. | Status |
 |---|---|---|---|---|
-| 1 | `REDESIGN_RUN_1_FOUNDATION.md` | 0–3 · defects, tokens, primitives, type | 3 d | — |
-| 2 | *(generate after Run 1)* | 4–5 · study canvas, quiz surface | 3.5 d | Run 1 |
-| 3 | *(generate after Run 2)* | 6–7 · dashboard, deck detail, modals | 4 d | Run 2 |
-| 4 | *(generate after Run 3)* | 8 · navigation, rail, ⌘K | 1.5 d | Run 3 |
-| 5 | *(generate after Run 4)* | 9–10 · landing, auth, light-mode & a11y QA | 3 d | Run 4 |
+| 1 | `REDESIGN_RUN_1_FOUNDATION.md` | 0–3 · defects, tokens, primitives, type | 3 d | **Done** |
+| 2 | `REDESIGN_RUN_2_STUDY_QUIZ.md` | 4–5 · study canvas, quiz surface | 3.5 d | Next |
+| 3 | `REDESIGN_RUN_3_DASHBOARD_DECK.md` | 6–7 · dashboard, deck detail, modals | 4 d | After Run 2 |
+| 4 | `REDESIGN_RUN_4_NAVIGATION.md` | 8 · navigation, rail, ⌘K | 1.5 d | After Run 3 |
+| 5 | `REDESIGN_RUN_5_SURFACES_QA.md` | 9–10 · landing, auth, light-mode & a11y QA | 3 d | After Run 4 |
+
+Runs 2–5 were written against Run 1's completion report and carry its findings forward. Each still
+begins by looking for the *previous* run's report — paste it above the prompt.
 
 Same handoff rule as above: **save the completion report each run produces** and paste it above the
 next prompt under `## Carry-forward from Run N`.

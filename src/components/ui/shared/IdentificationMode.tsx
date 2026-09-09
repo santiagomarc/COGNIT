@@ -1,8 +1,8 @@
 'use client';
 
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, CircleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/Kbd';
 import { Input } from '@/components/ui/input';
 import { HintButton } from '@/components/ui/shared/HintButton';
 import { similarity } from '@/lib/fuzzy';
@@ -98,59 +98,79 @@ export function IdentificationMode({
   }
 
   return (
-    <div className="glass-card rounded-3xl p-7">
-      <div className="mb-4 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
-        <span>Identification Prompt</span>
-        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${card.id_question ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
-          {promptStatusLabel}
-        </span>
+    <div className="surface p-6 sm:p-7">
+      <div className="mb-5 flex items-center justify-between gap-3 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <span>Identification</span>
+        <span>{promptStatusLabel}</span>
       </div>
 
-      <p className="mb-4 text-sm text-muted-foreground">
-        {promptStatusText}
-      </p>
-
-      <div className="space-y-4">
-        <div className="rounded-2xl border border-border bg-background/25 px-6 py-6 text-center text-lg leading-relaxed">
+      <div className="space-y-5">
+        {/* The card prompt — the serif's one sanctioned role (§3.2). */}
+        <p className="mx-auto max-w-[36ch] text-balance text-center font-serif text-[clamp(1.25rem,2vw,1.625rem)] leading-[1.32] tracking-[-0.01em]">
           {prompt}
-        </div>
+        </p>
+
+        <p className="text-sm text-muted-foreground">{promptStatusText}</p>
 
         {enrichmentPending && !card.id_question ? (
-          <div className="rounded-xl border border-border bg-card/20 px-4 py-3 text-sm text-muted-foreground">
-            AI is preparing a cleaner question-style clue for this card. You can still answer using the saved description right now.
-          </div>
+          <p className="border-l-2 border-border-strong pl-3 text-sm text-muted-foreground">
+            AI is preparing a cleaner question-style clue for this card. You can still answer using
+            the saved description right now.
+          </p>
         ) : null}
 
         {result ? (
-          <div className="space-y-4 rounded-2xl border border-border bg-card/20 p-4">
-            <div className="flex items-start gap-3">
-              {result.grade === 'again' ? (
-                <CircleAlert className="mt-0.5 h-5 w-5 text-red-400" />
-              ) : (
-                <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-400" />
-              )}
-              <div className="space-y-1 text-sm">
-                <p>
-                  <span className="font-semibold text-foreground">Your answer:</span> {result.answer}
-                </p>
-                <p>
-                  <span className="font-semibold text-foreground">Correct term:</span> {card.front}
-                </p>
-                <p className="text-muted-foreground">
-                  Similarity score: <span className="font-mono tnum">{Math.round(result.score * 100)}%</span>
-                </p>
+          /* Inline at the point of the error, never a modal, and it never takes
+             the keyboard: Enter and Space both still advance (§5.5). */
+          <div className="space-y-4 border-t border-border pt-4">
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
+                  You
+                </dt>
+                <dd
+                  className={
+                    result.grade === 'again'
+                      ? 'text-[var(--state-lapsed)]'
+                      : 'text-[var(--state-mastered)]'
+                  }
+                >
+                  {result.answer}
+                </dd>
               </div>
-            </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
+                  Term
+                </dt>
+                <dd className="text-ink">{card.front}</dd>
+              </div>
+              <div className="flex gap-2">
+                <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
+                  Match
+                </dt>
+                <dd className="font-mono tnum text-ink-dim">{Math.round(result.score * 100)}%</dd>
+              </div>
+            </dl>
             <div className="flex justify-end">
-              <Button type="button" onClick={() => onResolve(result.grade, result.score, result.answer)} disabled={disabled}>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={() => onResolve(result.grade, result.score, result.answer)}
+                disabled={disabled}
+                className="gap-2"
+              >
                 Continue
+                <Kbd>Enter</Kbd>
               </Button>
             </div>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor={`id-answer-${card.id}`} className="text-sm font-medium">
+              <label
+                htmlFor={`id-answer-${card.id}`}
+                className="block font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+              >
                 Type the term
               </label>
               <Input
@@ -164,8 +184,16 @@ export function IdentificationMode({
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <HintButton cardId={card.id} deckId={deckId} disabled={disabled} />
-              <Button type="submit" disabled={disabled || !answer.trim()}>
-                Check Answer
+              {/* The binding sits on the control it triggers, at every
+                  breakpoint (§7.3). */}
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={disabled || !answer.trim()}
+                className="gap-2"
+              >
+                Check answer
+                <Kbd>Enter</Kbd>
               </Button>
             </div>
           </form>

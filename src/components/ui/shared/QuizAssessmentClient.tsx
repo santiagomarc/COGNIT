@@ -4,16 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   ArrowLeft,
-  Brain,
   ChevronRight,
-  CircleAlert,
-  CircleCheckBig,
-  Keyboard,
   Pause,
   Play,
   RotateCcw,
-  Sparkles,
-  Timer,
   Volume2,
   VolumeX,
   Vibrate,
@@ -29,6 +23,8 @@ import { useFeedbackPrefs } from '@/lib/use-feedback-prefs';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
 import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/Kbd';
+import { Telemetry } from '@/components/ui/shared/Telemetry';
 import type { QuizMode, StudySessionCard } from '@/lib/study';
 import { formatActionError } from '@/lib/ai-feedback';
 import { motionTransitions } from '@/lib/motion-configs';
@@ -154,7 +150,6 @@ export function QuizAssessmentClient({
       return null;
     }
   });
-  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
   const [isEnriching, startEnrichmentTransition] = useTransition();
@@ -475,7 +470,6 @@ export function QuizAssessmentClient({
     setQuitDialogOpen(false);
     setPendingQuitHref(null);
     setResumeState(null);
-    setShowShortcutHelp(false);
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     didCelebrate.current = false;
@@ -532,7 +526,6 @@ export function QuizAssessmentClient({
     setIsPaused(false);
     setSessionDurationMs(0);
     setResumeState(null);
-    setShowShortcutHelp(false);
     clearStoredSession();
     requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
@@ -543,11 +536,11 @@ export function QuizAssessmentClient({
   if (sessionCards.length === 0) {
     return (
       <div className="container mx-auto p-6 md:p-8">
-        <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
-            <Brain className="h-7 w-7 text-primary" />
-          </div>
-          <h1 className="text-2xl font-semibold">No cards available for a quiz yet</h1>
+        <div className="surface mx-auto max-w-2xl p-10 text-center">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Quiz
+          </p>
+          <h1 className="mt-3 text-xl font-semibold tracking-[-.025em]">No cards available for a quiz yet</h1>
           <p className="mt-2 text-muted-foreground">
             Add cards to this deck first, then come back to test your recall.
           </p>
@@ -555,11 +548,11 @@ export function QuizAssessmentClient({
             {totalInDeck} card{totalInDeck !== 1 ? 's' : ''} currently in this deck
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild>
+            <Button asChild variant="primary">
               <Link href={`/dashboard/${deckId}#add-content`}>Add cards now</Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href={`/dashboard/${deckId}`}>Back to Deck</Link>
+            <Button asChild>
+              <Link href={`/dashboard/${deckId}`}>Back to deck</Link>
             </Button>
           </div>
         </div>
@@ -570,11 +563,11 @@ export function QuizAssessmentClient({
   if (resumeState) {
     return (
       <div className="container mx-auto p-6 md:p-8">
-        <div className="glass-card mx-auto max-w-2xl rounded-3xl p-10 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border-strong bg-primary/10">
-            <Brain className="h-7 w-7 text-primary" />
-          </div>
-          <h1 className="text-2xl font-semibold">Resume your previous quiz?</h1>
+        <div className="surface mx-auto max-w-2xl p-10 text-center">
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Quiz
+          </p>
+          <h1 className="mt-3 text-xl font-semibold tracking-[-.025em]">Resume your previous quiz?</h1>
           <p className="mt-2 text-muted-foreground">
             Pick up from question {Math.min(resumeState.index + 1, resumeState.sessionCards.length)} of {resumeState.sessionCards.length}.
           </p>
@@ -583,8 +576,8 @@ export function QuizAssessmentClient({
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button onClick={startFreshSession} variant="outline">Start New Quiz</Button>
-            <Button onClick={resumePreviousSession}>Resume Quiz</Button>
+            <Button onClick={startFreshSession}>Start new quiz</Button>
+            <Button onClick={resumePreviousSession} variant="primary">Resume quiz</Button>
           </div>
 
           <Link href={`/dashboard/${deckId}`} className="mt-4 inline-block">
@@ -603,145 +596,109 @@ export function QuizAssessmentClient({
   const resultActionButtonClass = 'gap-2 min-w-[11.5rem] justify-center';
 
   return (
-    <div className="container mx-auto space-y-6 p-6 pb-28 md:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <button
-          type="button"
-          onClick={() => requestQuit(`/dashboard/${deckId}`)}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-primary"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to Deck
-        </button>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-          <span className="max-w-[12rem] truncate sm:max-w-none">{deckTitle}</span>
-          <span className="rounded-full border border-border bg-card/30 px-2.5 py-1 text-xs font-medium text-foreground">
-            {getModeLabel(quizMode)} Quiz
-          </span>
-          <span className="flex items-center gap-1 text-xs">
-            <Timer className="h-3 w-3" />
-            <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>
-          </span>
-          {!completed ? (
+    <div className="container mx-auto p-6 pb-28 md:p-8">
+      {/*
+        While the quiz is paused the page behind the scrim is inert. A scrim
+        that only stops the mouse is not a guard: keyboard focus walked straight
+        past it into "Back to deck", the pause toggle and the feedback switches,
+        which is the same class of hole as the dock painting over the overlay
+        (F-01). The overlay and the quit dialog are siblings of this wrapper, so
+        they stay operable.
+      */}
+      <div className="space-y-6" inert={isPaused && !completed}>
+      {/*
+        Quiz telemetry (§7.9). `P` was bound at all times and shown nowhere in
+        the UI (defect F-05); it now sits on the control it triggers, beside the
+        elapsed clock it affects. The "Shortcuts" panel this replaces was a hint
+        strip — the thing §7.3 exists to get rid of.
+      */}
+      <header className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          <Button type="button" variant="ghost" size="sm" onClick={() => requestQuit(`/dashboard/${deckId}`)} className="gap-2 px-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to deck
+          </Button>
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="flex items-baseline gap-2">
+              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Deck
+              </span>
+              <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">
+                {deckTitle}
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-2">
+              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Mode
+              </span>
+              <span className="text-[13px] leading-none text-ink">{getModeLabel(quizMode)}</span>
+            </div>
+
+            <Telemetry
+              label="Question"
+              value={`${Math.min(index + 1, sessionCards.length)}/${sessionCards.length}`}
+            />
+            <Telemetry label="Elapsed" value={formatDuration(sessionDuration)} />
+
+            {!completed ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsPaused((value) => !value)}
+                aria-pressed={isPaused}
+                className="gap-2 px-2"
+              >
+                {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+                {isPaused ? 'Resume' : 'Pause'}
+                <Kbd>P</Kbd>
+              </Button>
+            ) : null}
+
             <Button
               type="button"
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5"
-              onClick={() => setIsPaused((value) => !value)}
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => updateFeedbackPrefs({ ...feedbackPrefs, sound: !feedbackPrefs.sound })}
+              aria-pressed={feedbackPrefs.sound}
+              title={feedbackPrefs.sound ? 'Turn answer sounds off' : 'Turn answer sounds on'}
             >
-              {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-              {isPaused ? 'Resume' : 'Pause'}
+              {feedbackPrefs.sound ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+              <span className="sr-only">{feedbackPrefs.sound ? 'Sound on' : 'Sound off'}</span>
             </Button>
-          ) : null}
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5"
-            onClick={() => updateFeedbackPrefs({ ...feedbackPrefs, sound: !feedbackPrefs.sound })}
-            aria-pressed={feedbackPrefs.sound}
-            title={feedbackPrefs.sound ? 'Turn answer sounds off' : 'Turn answer sounds on'}
-          >
-            {feedbackPrefs.sound ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
-            <span className="sr-only">{feedbackPrefs.sound ? 'Sound on' : 'Sound off'}</span>
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5"
-            onClick={() => updateFeedbackPrefs({ ...feedbackPrefs, haptics: !feedbackPrefs.haptics })}
-            aria-pressed={feedbackPrefs.haptics}
-            title={feedbackPrefs.haptics ? 'Turn vibration off' : 'Turn vibration on'}
-          >
-            <Vibrate className={`h-3.5 w-3.5 ${feedbackPrefs.haptics ? '' : 'opacity-40'}`} />
-            <span className="sr-only">{feedbackPrefs.haptics ? 'Vibration on' : 'Vibration off'}</span>
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-8 gap-1.5"
-            onClick={() => setShowShortcutHelp((value) => !value)}
-          >
-            <Keyboard className="h-3.5 w-3.5" />
-            Shortcuts
-          </Button>
-        </div>
-      </div>
 
-      <div className="glass-card rounded-2xl p-4 md:p-5">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Progress</p>
-            <p className="mt-2 text-lg font-semibold tracking-[-.03em] text-foreground">
-              {completed ? 'Quiz complete' : <span className="font-mono tnum">{`Question ${index + 1} of ${sessionCards.length}`}</span>}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-border bg-card/30 px-2.5 py-1 font-medium text-foreground">
-              {getModeLabel(quizMode)}
-            </span>
-            <span className="rounded-full border border-border bg-card/30 px-2.5 py-1 font-medium text-foreground">
-              <span className="font-mono tnum">{Math.min(progress, 100)}%</span>&nbsp;complete
-            </span>
-            <span className="flex items-center gap-1 rounded-full border border-border bg-card/30 px-2.5 py-1 font-medium text-foreground">
-              <Timer className="h-3 w-3" />
-              <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>
-            </span>
-            {isPaused && !completed ? (
-              <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 font-medium text-amber-700 dark:text-amber-200">
-                Paused
-              </span>
-            ) : null}
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => updateFeedbackPrefs({ ...feedbackPrefs, haptics: !feedbackPrefs.haptics })}
+              aria-pressed={feedbackPrefs.haptics}
+              title={feedbackPrefs.haptics ? 'Turn vibration off' : 'Turn vibration on'}
+            >
+              <Vibrate className={`h-3.5 w-3.5 ${feedbackPrefs.haptics ? '' : 'opacity-40'}`} />
+              <span className="sr-only">{feedbackPrefs.haptics ? 'Vibration on' : 'Vibration off'}</span>
+            </Button>
           </div>
         </div>
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60">
+
+        {/* A 1px progress rule — depth is rule weight, not blur (§4.3). */}
+        <div className="h-px w-full bg-border">
           <m.div
-            className="h-full rounded-full bg-primary"
+            className="h-px bg-ink-dim"
+            initial={false}
             animate={{ width: `${Math.min(progress, 100)}%` }}
             transition={reduced ? { duration: 0 } : motionTransitions.panel}
           />
         </div>
-      </div>
 
-      {showShortcutHelp ? (
-        <div className="glass-card rounded-2xl border border-border p-4 text-sm">
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Keyboard Shortcuts</p>
-          <div className="mt-3 grid gap-2 text-muted-foreground sm:grid-cols-2">
-            {quizMode === 'mcq' ? (
-              <>
-                <p>
-                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">1-4</span>{' '}
-                  Select an MCQ option
-                </p>
-                <p>
-                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
-                  Continue after feedback
-                </p>
-              </>
-            ) : (
-              <>
-                <p>
-                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>{' '}
-                  Check typed answer
-                </p>
-                <p>
-                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Enter</span>
-                  {' or '}
-                  <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">Space</span>{' '}
-                  Continue after feedback
-                </p>
-              </>
-            )}
-            <p>
-              <span className="rounded border border-border-strong bg-card/40 px-1.5 py-0.5 font-mono text-[11px]">P</span>{' '}
-              Pause or resume the quiz
-            </p>
-          </div>
-        </div>
-      ) : null}
+        {isPaused && !completed ? (
+          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-due)]">
+            Paused
+          </p>
+        ) : null}
+      </header>
 
       <div className="sr-only" aria-live="polite" aria-atomic="true">
         {completed
@@ -759,7 +716,7 @@ export function QuizAssessmentClient({
             className="mx-auto max-w-4xl space-y-6"
           >
             <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-              <div className="glass-card relative overflow-hidden rounded-3xl p-8">
+              <div className="surface relative overflow-hidden p-8">
                 {/* Fires at a strong pass, harder at a perfect score. Suppressed
                     entirely under prefers-reduced-motion. */}
                 <MasteryConfetti
@@ -774,9 +731,9 @@ export function QuizAssessmentClient({
                       <span className="font-mono tnum">{scoreSummary.correctCount}</span> of <span className="font-mono tnum">{results.length}</span> answered correctly in <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>.
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-border-strong bg-primary/10 px-4 py-3 text-center">
+                  <div className="rounded-[var(--radius-control)] border border-border-strong px-4 py-3 text-center">
                     <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Grade</p>
-                    <p className="mt-1 font-mono text-3xl font-semibold tnum text-primary">{scoreSummary.letterGrade}</p>
+                    <p className="mt-1 font-mono text-3xl font-semibold tnum text-ink">{scoreSummary.letterGrade}</p>
                   </div>
                 </div>
 
@@ -800,15 +757,15 @@ export function QuizAssessmentClient({
                     {quizBadges.map((badge) => {
                       const toneClass =
                         badge.tone === 'emerald'
-                          ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200'
+                          ? 'border-[var(--state-mastered)] text-[var(--state-mastered)]'
                           : badge.tone === 'amber'
-                            ? 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200'
-                            : 'border-border-strong bg-primary/10 text-primary';
+                            ? 'border-[var(--state-streak)] text-[var(--state-streak)]'
+                            : 'border-border-strong text-ink';
 
                       return (
                         <span
                           key={badge.title}
-                          className={`rounded-full border px-3 py-1.5 text-xs font-medium ${toneClass}`}
+                          className={`rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-medium ${toneClass}`}
                           title={badge.description}
                         >
                           {badge.title}
@@ -818,11 +775,10 @@ export function QuizAssessmentClient({
                   </div>
                 ) : null}
 
-                <div className="mt-6 rounded-2xl border border-border bg-card/20 p-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2 text-foreground">
-                    <Sparkles className="h-4 w-4 text-primary" />
+                <div className="mt-6 border-t border-border pt-4 text-sm text-muted-foreground">
+                  <p className="text-foreground">
                     Mastery is updated from quiz performance. Daily streaks still come from flashcard review.
-                  </div>
+                  </p>
                   {isSavingResult ? (
                     <p className="mt-2">
                       {isRematchSession ? 'Saving this rematch attempt...' : 'Saving this quiz attempt...'}
@@ -839,94 +795,135 @@ export function QuizAssessmentClient({
                 </div>
               </div>
 
-              <div className="glass-card rounded-3xl p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-semibold tracking-tight">Focus Next</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {incorrectResults.length > 0
-                        ? 'Use flashcards to reinforce the misses before re-testing.'
-                        : 'You cleared every question. A review pass keeps the streak moving.'}
-                    </p>
-                  </div>
-                  {incorrectResults.length > 0 ? (
-                    <CircleAlert className="h-5 w-5 text-amber-700 dark:text-amber-300" />
-                  ) : (
-                    <CircleCheckBig className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
-                  )}
+              <div className="surface p-6">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className="text-base font-semibold tracking-[-.015em]">Focus next</h3>
+                  {/* A count beats a glyph (§6), and it is the fact the panel
+                      is actually reporting. */}
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] tnum text-ink-dimmer">
+                    {incorrectResults.length} missed
+                  </span>
                 </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {incorrectResults.length > 0
+                    ? 'Use flashcards to reinforce the misses before re-testing.'
+                    : 'You cleared every question. A review pass keeps the streak moving.'}
+                </p>
 
                 {incorrectResults.length > 0 ? (
-                  <div className="mt-5 space-y-3">
+                  <div className="mt-5 divide-y divide-border border-t border-border">
                     {incorrectResults.slice(0, 5).map((entry) => (
-                      <div key={entry.cardId} className="rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
-                        <p className="text-sm font-medium text-foreground">{entry.prompt}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">Your answer: {entry.userAnswer || 'No answer recorded'}</p>
-                        <p className="mt-1 text-xs text-red-700 dark:text-red-200">Correct answer: {entry.correctAnswer}</p>
+                      <div key={entry.cardId} className="flex gap-3 py-3">
+                        <span
+                          aria-hidden="true"
+                          className="mt-1 h-4 w-[2px] shrink-0 rounded-[1px] bg-[var(--state-lapsed)]"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{entry.prompt}</p>
+                          <p className="mt-1.5 text-xs text-muted-foreground">
+                            Your answer: {entry.userAnswer || 'No answer recorded'}
+                          </p>
+                          <p className="mt-0.5 text-xs text-[var(--state-lapsed)]">
+                            Correct answer: {entry.correctAnswer}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-700 dark:text-emerald-200">
+                  <p className="mt-5 border-t border-border pt-4 text-sm text-muted-foreground">
                     Strong pass. You can re-run the quiz in the other mode or move back into review to keep your daily streak active.
-                  </div>
+                  </p>
                 )}
               </div>
             </div>
 
             <div className="flex flex-wrap justify-center gap-5">
+              {/*
+                One filled button on the screen (§7.2). It is whichever action
+                the result argues for: with misses on the board that is the
+                rematch; with a clean sweep it is going back to the deck.
+              */}
               {incorrectResults.length > 0 ? (
-                <Button onClick={rematchMissed} size="lg" className={resultActionButtonClass}>
+                <Button onClick={rematchMissed} variant="primary" size="lg" className={resultActionButtonClass}>
                   <RotateCcw className="h-4 w-4" />
-                  Rematch Missed ({incorrectResults.length})
+                  {/* One flex item, not three: the button is a flex row with a
+                      gap, so a bare <span> around the count would space the
+                      parentheses away from it. */}
+                  <span>
+                    Rematch missed (<span className="tnum">{incorrectResults.length}</span>)
+                  </span>
                 </Button>
               ) : null}
-              <Button onClick={restart} variant="outline" size="lg" className={resultActionButtonClass}>
+              <Button onClick={restart} size="lg" className={resultActionButtonClass}>
                 <RotateCcw className="h-4 w-4" />
-                Retake Quiz
+                Retake quiz
               </Button>
-              <Button asChild variant="outline" size="lg" className={resultActionButtonClass}>
+              <Button asChild size="lg" className={resultActionButtonClass}>
                 <Link href={`/dashboard/${deckId}/study`}>
-                  Review Flashcards
+                  Review flashcards
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               </Button>
-              <Button asChild size="lg" className={resultActionButtonClass}>
+              <Button
+                asChild
+                variant={incorrectResults.length > 0 ? 'default' : 'primary'}
+                size="lg"
+                className={resultActionButtonClass}
+              >
                 <Link href={`/dashboard/${deckId}`}>
-                  Back to Deck
+                  Back to deck
                   <ChevronRight className="h-4 w-4" />
                 </Link>
               </Button>
             </div>
 
-            <div className="glass-card rounded-3xl p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold tracking-tight">Question Diagnostics</h3>
-                  <p className="text-sm text-muted-foreground">Misses are listed with your answer so the next review pass has a clear target.</p>
-                </div>
-              </div>
+            <div className="surface p-6">
+              <h3 className="text-base font-semibold tracking-[-.015em]">Question diagnostics</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Misses are listed with your answer so the next review pass has a clear target.
+              </p>
 
-              <div className="mt-5 grid gap-3">
+              {/*
+                A 2px state tick per row (§7.5) instead of a tinted card and a
+                glyph — and the word beside it carries the same fact, so the
+                colour is never doing the work alone (WCAG 1.4.1).
+              */}
+              <div className="mt-5 divide-y divide-border border-t border-border">
                 {results.map((entry, resultIndex) => (
-                  <div
-                    key={`${entry.cardId}-${resultIndex}`}
-                    className={`rounded-2xl border p-4 ${entry.correct ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-red-500/20 bg-red-500/10'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
+                  <div key={`${entry.cardId}-${resultIndex}`} className="flex gap-3 py-3">
+                    <span
+                      aria-hidden="true"
+                      className="mt-1 h-4 w-[2px] shrink-0 rounded-[1px]"
+                      style={{
+                        backgroundColor: entry.correct
+                          ? 'var(--state-mastered)'
+                          : 'var(--state-lapsed)',
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <p className="text-sm font-medium text-foreground">{entry.prompt}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">Your answer: {entry.userAnswer || 'No answer recorded'}</p>
-                        <p className="mt-1 text-xs text-foreground/90">Correct answer: {entry.correctAnswer}</p>
-                        {typeof entry.score === 'number' ? (
-                          <p className="mt-1 font-mono text-xs tnum text-muted-foreground">Similarity score: {Math.round(entry.score * 100)}%</p>
-                        ) : null}
+                        <span
+                          className="font-mono text-[10px] uppercase tracking-[0.16em]"
+                          style={{
+                            color: entry.correct ? 'var(--state-mastered)' : 'var(--state-lapsed)',
+                          }}
+                        >
+                          {entry.correct ? 'Correct' : 'Missed'}
+                        </span>
                       </div>
-                      {entry.correct ? (
-                        <CircleCheckBig className="h-5 w-5 shrink-0 text-emerald-700 dark:text-emerald-300" />
-                      ) : (
-                        <CircleAlert className="h-5 w-5 shrink-0 text-red-700 dark:text-red-300" />
-                      )}
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Your answer: {entry.userAnswer || 'No answer recorded'}
+                      </p>
+                      <p className="mt-0.5 text-xs text-foreground/90">
+                        Correct answer: {entry.correctAnswer}
+                      </p>
+                      {typeof entry.score === 'number' ? (
+                        <p className="mt-0.5 font-mono text-xs tnum text-muted-foreground">
+                          Similarity score: {Math.round(entry.score * 100)}%
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -985,6 +982,7 @@ export function QuizAssessmentClient({
           </m.div>
         )}
       </AnimatePresence>
+      </div>
 
       <AnimatePresence>
         {isPaused && !completed ? (
@@ -994,28 +992,53 @@ export function QuizAssessmentClient({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={reduced ? { duration: 0 } : motionTransitions.panel}
-            className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-background/75 backdrop-blur-md"
+            /*
+              The scrim per §7.8: `--z-overlay` (100), which is above the rail
+              at 20 — DOM order can no longer decide whether the old dock
+              painted over the quit guard (F-01) — and a 4px blur, the only
+              backdrop-filter permitted anywhere in the product, because it sits
+              over content that is deliberately out of use.
+            */
+            className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
           >
             <m.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 10, scale: 0.98 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quiz-paused-title"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="glass-card mx-4 w-full max-w-md rounded-3xl p-8 text-center"
+              className="surface z-[var(--z-modal)] mx-4 w-full max-w-[480px] border-border-strong p-8 text-center"
             >
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz Paused</p>
-              <h3 className="mt-3 text-2xl font-semibold tracking-tight">Timer is on hold</h3>
+              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                Quiz paused
+              </p>
+              <h3 id="quiz-paused-title" className="mt-3 text-xl font-semibold tracking-[-.025em]">
+                Timer is on hold
+              </h3>
               <p className="mt-2 text-sm text-muted-foreground">
                 Resume when you are ready to continue. Your progress is preserved.
               </p>
-              <Button
-                type="button"
-                className="mt-6 gap-2"
-                onClick={() => setIsPaused(false)}
-              >
-                <Play className="h-4 w-4" />
-                Resume Quiz
-              </Button>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <Button type="button" className="gap-2" onClick={() => setIsPaused(false)} autoFocus>
+                  <Play className="h-4 w-4" />
+                  Resume quiz
+                  <Kbd>P</Kbd>
+                </Button>
+                {/*
+                  The only other way out of the scrim, and it goes through the
+                  quit confirmation — which is what the old dock bypassed
+                  entirely (F-01).
+                */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => requestQuit(`/dashboard/${deckId}`)}
+                >
+                  Quit quiz
+                </Button>
+              </div>
             </m.div>
           </m.div>
         ) : null}

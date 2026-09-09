@@ -484,6 +484,313 @@
   }
 }
 
+/*
+ * ─── FlipCard (§7.6) — the study canvas ───
+ *
+ * Four states driven by ONE `data-state` attribute rather than conditional
+ * class strings, so the component ships a contract instead of a stylesheet in
+ * its props.
+ *
+ * `min-height`, never a fixed height. Both faces share a single grid cell, so
+ * the card is always as tall as the taller face — revealing an answer moves
+ * nothing on screen (CLS 0). Past `max-height` the face scrolls: Cognit
+ * generates cards from PDFs, so long answers are the norm, not the edge case.
+ */
+.flip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 14rem;
+  max-height: min(60vh, 26rem);
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-container);
+  background: var(--surface);
+  box-shadow: var(--elevate);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+  appearance: none;
+  perspective: 1400px;
+  /* Fallback so the commit flash resolves even without a data-grade. */
+  --commit: var(--state-neutral);
+}
+
+button.flip {
+  cursor: pointer;
+}
+
+/*
+ * The rotating plane is an inner element, not `.flip` itself. Two reasons:
+ * the focus brackets (§7.7) must stay square to the eye while the card turns,
+ * and the commit flash is an inset shadow on the card's real bounds — neither
+ * survives being drawn on a plane that is mid-rotation.
+ */
+.flip__panel {
+  /*
+   * `flex: 1 1 auto` + `min-height: 0` is what actually makes the card bounded.
+   * As a grid item it took its content height and overflowed the card's
+   * max-height instead of scrolling, because a grid row sized by content is not
+   * shrunk by a max-height on its container. As a shrinkable flex item it grows
+   * to the card's min-height when the content is short and shrinks to the
+   * max-height when it is long — which is when the face's own scroll engages.
+   */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  /* An explicitly bounded row, so the faces inherit the panel's real height
+     rather than each re-deriving it from content. */
+  grid-template-rows: minmax(0, 1fr);
+  transform-style: preserve-3d;
+  transition: transform var(--dur-flip) var(--ease-out);
+}
+
+.flip__face {
+  grid-area: 1 / 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  backface-visibility: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+.flip__face--answer {
+  transform: rotateY(180deg);
+}
+
+/*
+ * The card prompt and answer — the serif's only sanctioned role (§3.2), at the
+ * 32ch measure of §3.3.
+ *
+ * It centres with auto margins rather than `place-items: center` on the face.
+ * That is not a stylistic preference: with `align-items: center` on a scroll
+ * container, the overflow at the *start* edge is unreachable, so the first
+ * lines of a long answer get pushed above the scrollport with no way back to
+ * them. Auto margins collapse to zero the moment the content overflows, so the
+ * first word stays at the scroll origin.
+ */
+.flip__body {
+  margin-block: auto;
+  margin-inline: auto;
+  max-width: 32ch;
+  font-family: var(--font-serif);
+  font-size: clamp(1.5625rem, 2.4vw, 2.125rem);
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* A mnemonic belongs to the answer, so it scrolls with it — mounting it as a
+   sibling panel below the card would move the grade deck on reveal. */
+.flip__aside {
+  margin: 20px auto 0;
+  max-width: 44ch;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--ink-dim);
+  text-wrap: initial;
+}
+
+.flip__aside-label {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dimmer);
+}
+
+/* 1 · DEFAULT — the prompt is up */
+.flip[data-state='default'] .flip__panel {
+  transform: rotateY(0deg);
+}
+
+/* 2 · FLIPPING / revealed, and 3 · GRADED, which is still answer-side */
+.flip[data-state='flipping'] .flip__panel,
+.flip[data-state='graded'] .flip__panel {
+  transform: rotateY(180deg);
+}
+
+/*
+ * The hidden face is invisible but still hit-testable, and it is the later
+ * sibling — without this it swallows the wheel events meant for the face the
+ * user is actually reading.
+ */
+.flip[data-state='default'] .flip__face--answer,
+.flip[data-state='flipping'] .flip__face--prompt,
+.flip[data-state='graded'] .flip__face--prompt,
+.flip[data-state='focus'] .flip__face--answer {
+  pointer-events: none;
+}
+
+/* 3 · GRADED — a 160ms state flash keyed to the grade, then the card leaves */
+.flip[data-state='graded'] {
+  animation: commit 160ms ease-out;
+}
+.flip[data-state='graded'][data-grade='again'] { --commit: var(--state-lapsed); }
+.flip[data-state='graded'][data-grade='hard']  { --commit: var(--state-due); }
+.flip[data-state='graded'][data-grade='good']  { --commit: var(--state-mastered); }
+.flip[data-state='graded'][data-grade='easy']  { --commit: var(--state-neutral); }
+
+@keyframes commit {
+  from { box-shadow: inset 0 0 0 1px var(--commit); }
+  to   { box-shadow: inset 0 0 0 1px transparent; }
+}
+
+/* 4 · KEYBOARD FOCUS — corner brackets, never a ring */
+.flip:focus-visible {
+  outline: none;
+}
+.flip:focus-visible .brk,
+.flip[data-state='focus'] .brk {
+  border-color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .flip {
+    /* The grade deck owns the bottom band on this route (§8); the card takes
+       what is left rather than pushing the keys off screen. */
+    max-height: min(48vh, 22rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip__panel {
+    transition: none;
+  }
+  .flip[data-state='graded'] {
+    animation: none;
+  }
+}
+
+/*
+ * ─── Grade deck (§7.4, §8) ───
+ *
+ * Always mounted. Before reveal it is present but inert — that is what removes
+ * the layout shift the old mount-on-reveal grid caused, and it also tells a
+ * first-time user what is about to be asked of them.
+ */
+.grade-deck {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  transition: opacity var(--dur-hover) ease;
+}
+
+.grade-deck[data-armed='false'] {
+  opacity: 0.55;
+}
+
+/*
+ * The two dimming rules must not compound. An unarmed deck already reads as
+ * inert at 0.55; stacking the key's own :disabled opacity on top took the
+ * labels to ~0.2 and made a deck that is meant to be *readable* before the
+ * reveal illegible instead.
+ */
+.grade-deck[data-armed='false'] .key:disabled {
+  opacity: 1;
+}
+
+/* The key being committed keeps its detent rather than fading with the deck. */
+.key[data-down='true']:disabled {
+  opacity: 1;
+}
+
+@media (max-width: 640px) {
+  /*
+   * On mobile the grade deck *is* the bottom chrome. There is no dock and no
+   * bottom bar on this route, so the keys own the bottom band, sit inside the
+   * home-indicator safe area, and have nothing floating above them.
+   */
+  .grade-deck-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-sticky);
+    margin-inline: -1.5rem;
+    padding: 10px 1.5rem calc(10px + env(safe-area-inset-bottom));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grade-deck {
+    transition: none;
+  }
+}
+
+/*
+ * ─── Quiz option (§7.2 control edge · §2.2 state channel) ───
+ *
+ * An option is an operable control, so its edge is --border-control (≥3:1,
+ * WCAG 2.2 SC 1.4.11) rather than the decorative --border. Correct and wrong
+ * are the only hues it may carry, and each is paired with a word in the inline
+ * result so colour is never the sole carrier of meaning (WCAG 1.4.1).
+ */
+.opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px 14px;
+  text-align: left;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-hover) ease,
+    background-color var(--dur-hover) ease,
+    opacity var(--dur-hover) ease;
+}
+
+.opt:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.opt:disabled {
+  cursor: default;
+}
+
+.opt[data-result='correct'] {
+  border-color: var(--state-mastered);
+  color: var(--state-mastered);
+}
+
+.opt[data-result='wrong'] {
+  border-color: var(--state-lapsed);
+  color: var(--state-lapsed);
+}
+
+/* What the user did not pick recedes once the answer is known. */
+.opt[data-result='muted'] {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opt {
+    transition: none;
+  }
+}
+
 .glass-skeleton {
   position: relative;
   overflow: hidden;

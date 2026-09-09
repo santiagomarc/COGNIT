@@ -1,131 +1,113 @@
-'use client';
+import type { ReactNode } from 'react';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { m, useMotionValue, useReducedMotion, useSpring, useTransform, type SpringOptions } from 'framer-motion';
-import { motionTransitions } from '@/lib/motion-configs';
+import { CornerBrackets } from '@/components/ui/CornerBrackets';
+import type { StudyGrade } from '@/lib/sm2';
+import { cn } from '@/lib/utils';
 
-/*
- * Local to this file on purpose. `motion-configs.ts` now holds exactly one
- * spring — the card leaving the stack — and the cursor tilt is not it.
+/**
+ * The four states of the study card (design system §7.6). One attribute, not a
+ * bag of conditional class strings — the CSS in `globals.css` owns every
+ * transition and this component owns none of them.
  *
- * The tilt is defect F-08: on a card the user is actively reading, the text
- * plane is never square to the eye and never still. It is removed from the
- * study canvas in Phase 4 and survives only on the marketing showpiece, so
- * this constant is deleted along with it rather than promoted to a token.
+ * `focus` is normally reached through `:focus-visible` and does not need to be
+ * passed; it exists so the state can also be driven explicitly.
  */
-const tiltSpring: SpringOptions = {
-  stiffness: 300,
-  damping: 30,
-  mass: 0.85,
-};
+export type FlipState = 'default' | 'flipping' | 'graded' | 'focus';
 
 type FlipCardProps = {
-  front: ReactNode;
-  back: ReactNode;
-  /** Controlled: the owner decides which face is showing. */
-  isFlipped: boolean;
-  /** Omit to make the card non-interactive (the parent handles input). */
-  onFlip?: () => void;
-  className?: string;
-  faceClassName?: string;
+  /**
+   * What the user is asked. **Never `front`/`back`** (defect F-07): in this
+   * schema `card.front` is the answer and `card.back` is the question, so a
+   * component API that repeated those names would invert every deck in the
+   * product for whoever read it next. The mapping happens at the boundary:
+   *
+   * ```tsx
+   * <FlipCard prompt={card.id_question ?? card.back} answer={card.front} />
+   * ```
+   */
+  prompt: ReactNode;
+  /** What the user is trying to recall. */
+  answer: ReactNode;
+  state: FlipState;
+  /** Colours the 160ms commit flash. Only meaningful while `state` is `graded`. */
+  grade?: StudyGrade;
+  /** Extra content rendered inside the answer face — a mnemonic, typically. */
+  answerAside?: ReactNode;
+  /** Omit to render an inert card: the element becomes an `<article>`. */
+  onReveal?: () => void;
   ariaLabel?: string;
+  className?: string;
 };
 
 /**
- * The 3D flip visual, extracted from Flashcard.tsx so the study view can reuse
- * it while keeping `showAnswer` in its own state — that state also drives
- * keyboard grading and drag-to-grade, so it cannot live in here.
+ * The study canvas card.
  *
- * Cursor tilt is disabled on touch devices and under prefers-reduced-motion.
+ * There is **no cursor tilt** here (defect F-08). A ±8° plane tracking the
+ * pointer means the text the user is reading is never square to the eye and
+ * never still; it was the largest single contributor to the app's floaty
+ * quality. The tilt survives only on the marketing showpiece in
+ * `Flashcard.tsx`, where the card is looked at rather than read.
+ *
+ * Both faces occupy the same grid cell, so the card is always as tall as the
+ * taller of the two and revealing an answer moves nothing on screen.
  */
 export function FlipCard({
-  front,
-  back,
-  isFlipped,
-  onFlip,
-  className = 'relative h-56 w-full',
-  faceClassName = '',
+  prompt,
+  answer,
+  state,
+  grade,
+  answerAside,
+  onReveal,
   ariaLabel,
+  className,
 }: FlipCardProps) {
-  const [supportsCursorTilt, setSupportsCursorTilt] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const prefersReducedMotion = useReducedMotion();
+  const showingAnswer = state !== 'default';
 
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [8, -8]), tiltSpring);
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-8, 8]), tiltSpring);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const hoverQuery = window.matchMedia('(hover: hover) and (pointer: fine)');
-    const updateTiltAvailability = () => {
-      setSupportsCursorTilt(hoverQuery.matches && !prefersReducedMotion);
-    };
-
-    updateTiltAvailability();
-
-    if (typeof hoverQuery.addEventListener === 'function') {
-      hoverQuery.addEventListener('change', updateTiltAvailability);
-      return () => hoverQuery.removeEventListener('change', updateTiltAvailability);
-    }
-
-    hoverQuery.addListener(updateTiltAvailability);
-    return () => hoverQuery.removeListener(updateTiltAvailability);
-  }, [prefersReducedMotion]);
-
-  function handleMouseMove(event: React.MouseEvent<HTMLDivElement>) {
-    if (!supportsCursorTilt || !cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    mouseX.set((event.clientX - rect.left) / rect.width - 0.5);
-    mouseY.set((event.clientY - rect.top) / rect.height - 0.5);
-  }
-
-  function handleMouseLeave() {
-    if (!supportsCursorTilt) return;
-    mouseX.set(0);
-    mouseY.set(0);
-  }
-
-  const body = (
-    <m.div
-      ref={cardRef}
-      className={`${className} gpu-layer`}
-      style={
-        supportsCursorTilt
-          ? { rotateX, rotateY, transformStyle: 'preserve-3d' }
-          : { transformStyle: 'preserve-3d' }
-      }
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
-    >
-      <m.div
-        className="relative h-full w-full"
-        animate={{ rotateY: isFlipped ? 180 : 0 }}
-        transition={prefersReducedMotion ? { duration: 0 } : motionTransitions.flip}
-        style={{ transformStyle: 'preserve-3d' }}
-      >
-        <div className={`backface-hidden absolute inset-0 ${faceClassName}`}>{front}</div>
-        <div className={`backface-hidden rotate-y-180 absolute inset-0 ${faceClassName}`}>{back}</div>
-      </m.div>
-    </m.div>
+  const faces = (
+    <>
+      <span className="flip__panel">
+        {/*
+          The face that is turned away is hidden from assistive technology as
+          well as from the eye. Without this a screen-reader user hears the
+          answer while the card still reads "question" — the reveal is the
+          whole interaction, so leaking it defeats the exercise.
+        */}
+        <span className="flip__face flip__face--prompt" aria-hidden={showingAnswer}>
+          <span className="flip__body">{prompt}</span>
+        </span>
+        <span className="flip__face flip__face--answer" aria-hidden={!showingAnswer}>
+          <span className="flip__body">{answer}</span>
+          {answerAside}
+        </span>
+      </span>
+      {/* Focus is four corner rules on the card's bounds (§7.7), never a ring. */}
+      <CornerBrackets />
+    </>
   );
 
-  if (!onFlip) {
-    return body;
+  if (onReveal) {
+    return (
+      <button
+        type="button"
+        onClick={onReveal}
+        data-state={state}
+        data-grade={grade}
+        aria-label={ariaLabel}
+        className={cn('flip', className)}
+      >
+        {faces}
+      </button>
+    );
   }
 
   return (
-    <m.button
-      type="button"
-      onClick={onFlip}
-      className="group w-full text-left perspective-1000"
-      aria-label={ariaLabel ?? 'Flip flashcard'}
-      aria-pressed={isFlipped}
-      whileTap={prefersReducedMotion ? undefined : { scale: 0.97 }}
+    <article
+      data-state={state}
+      data-grade={grade}
+      aria-label={ariaLabel}
+      className={cn('flip', className)}
     >
-      {body}
-    </m.button>
+      {faces}
+    </article>
   );
 }
