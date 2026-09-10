@@ -61,7 +61,7 @@ export function FeatureGrid() {
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Features
           </p>
-          <h2 className="mt-3 font-serif text-[clamp(3rem,4.5vw,3.75rem)] font-medium leading-[1.08] tracking-[-0.02em] text-balance text-ink">
+          <h2 className="mt-3 font-serif text-[clamp(3rem,4.5vw,3.75rem)] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
             Everything you need to ace every exam
           </h2>
           <p className="mt-3 text-muted-foreground">
@@ -71,7 +71,11 @@ export function FeatureGrid() {
 
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, i) => (
-            <RevealOnScroll key={feature.title} delay={i * 0.05} className="surface p-6">
+            <RevealOnScroll
+              key={feature.title}
+              delay={i * 0.05}
+              className="surface relative overflow-hidden rounded-lg p-6 border border-border transition-colors hover:border-border-strong dark:hover:border-white/20"
+            >
               <p className="font-mono text-2xl font-semibold leading-none tracking-[-.03em] tnum text-ink">
                 {feature.stat}
               </p>

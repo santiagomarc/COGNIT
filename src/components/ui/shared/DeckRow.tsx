@@ -103,7 +103,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
   return (
     <div
-      className={`group -mx-2 ${DECK_COL.row} border-b border-border px-2 py-2.5 transition-colors last:border-b-0 hover:bg-surface`}
+      className={`group -mx-2 ${DECK_COL.row} h-[38px] border-b border-border px-2 transition-colors last:border-b-0 hover:bg-surface`}
     >
       {/*
         The tick carries no label: every fact it encodes is already spelled out
@@ -151,7 +151,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
           <dd className="flex items-center justify-end gap-2">
             {/* 104 × 3px, track --border, fill --ink-dim, stepping to
                 --state-mastered at 70% — the one place mastery earns a hue. */}
-            <span aria-hidden="true" className="block h-[3px] w-[104px] overflow-hidden bg-border">
+            <span aria-hidden="true" className="block h-[3px] w-[104px] overflow-hidden rounded-[1px] bg-border-strong">
               <span
                 className="block h-full"
                 style={{

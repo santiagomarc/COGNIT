@@ -55,34 +55,23 @@ export function HeroSection() {
   return (
     <section className="relative">
       {/* ── Navbar ── */}
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-5">
-        <Wordmark href="/" />
+      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 pt-8 pb-4 sm:pt-12 sm:pb-6">
+        <Wordmark href="/" size="md" />
 
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button asChild>
-            <Link href="/login?mode=login">Sign in</Link>
-          </Button>
-          <Button asChild variant="primary" className="hidden sm:inline-flex">
-            <Link href="/login?mode=signup">
-              Sign up
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </Button>
-        </div>
+        <ThemeToggle />
       </nav>
 
-      <div className="mx-auto max-w-6xl px-6 pb-8 pt-16 md:pt-24">
+      <div className="mx-auto max-w-6xl px-6 pb-8 pt-6 md:pt-10">
         <div className="mx-auto max-w-3xl text-center">
           <FadeInUp>
             {/* A number is a better badge than a glyph (§6). */}
-            <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Spaced repetition · SM-2 · AI card generation
+            <p className="font-mono text-[12px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+              Spaced repetition · SM-2 · AI Flashcard Generator
             </p>
           </FadeInUp>
 
           <FadeInUp delay={0.06}>
-            <h1 className="mt-5 font-serif text-[clamp(4.125rem,7.5vw,6.75rem)] font-medium leading-[1.0] tracking-[-0.025em] text-balance text-ink">
+            <h1 className="mt-5 font-serif text-[clamp(4.125rem,7.5vw,6.75rem)] leading-[1.0] tracking-[-0.025em] text-balance text-ink">
               Study smarter,
               <br />
               remember forever
@@ -90,9 +79,8 @@ export function HeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.12}>
-            <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
-              Turn a PDF into flashcards in about thirty seconds, then let the
-              scheduler decide when you see each one again.
+            <p className="mx-auto mt-8 max-w-xl font-mono text-[15px] leading-relaxed text-slate-100">
+              Turn dense documents into high-yield flashcards in 30 seconds. Let the SM-2 algorithm engineer your retention.
             </p>
           </FadeInUp>
 
@@ -114,7 +102,9 @@ export function HeroSection() {
 
         {/* ── Product specimen ── */}
         <FadeInUp delay={0.24} className="mx-auto mt-16 max-w-4xl">
-          <div className="surface overflow-hidden">
+          <div className="surface relative overflow-hidden rounded-lg border border-border/80 dark:border-white/10 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_24px_60px_-12px_rgba(0,0,0,0.4)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_68px_-12px_rgba(0,0,0,0.85),0_0_40px_-10px_rgba(255,255,255,0.05)]">
+            {/* Top specular hairline highlight */}
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
             <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
               <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 cognit.app/dashboard

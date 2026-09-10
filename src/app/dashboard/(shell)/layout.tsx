@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { createClient } from '@/lib/supabase/server';
 import { AccountControl } from '@/components/ui/shared/AccountControl';
+import { AmbientField } from '@/components/ui/shared/AmbientField';
 import { AppRail } from '@/components/ui/shared/AppRail';
 import { Breadcrumb } from '@/components/ui/shared/Breadcrumb';
 import { CommandPalette } from '@/components/ui/shared/CommandPalette';
@@ -84,6 +85,14 @@ export default async function ShellLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-dvh">
+      {/*
+        Mounted once for the whole chromed subtree, and deliberately not in the
+        root layout: `(focus)` — study and quiz — is a single card on a flat
+        ground and must stay that way (§8). The rail and header already carry
+        --z-rail / --z-sticky, so only #main-content needs lifting off z-0.
+      */}
+      <AmbientField />
+
       <AppRail email={user.email ?? null} />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -102,7 +111,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
           </div>
         </header>
 
-        <div id="main-content" role="main" className="min-w-0 flex-1">
+        <div id="main-content" role="main" className="relative z-[1] min-w-0 flex-1">
           {children}
         </div>
       </div>

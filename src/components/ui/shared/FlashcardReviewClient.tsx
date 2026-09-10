@@ -630,7 +630,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">You&apos;re all caught up!</h1>
+          <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">You&apos;re all caught up!</h1>
           <p className="mt-2 text-muted-foreground">
             {emptyMessage}
           </p>
@@ -669,7 +669,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous session?</h1>
+          <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous session?</h1>
           <p className="mt-2 text-muted-foreground">
             Pick up from card {Math.min(resumeState.index + 1, resumeState.queueCardIds.length)} of {resumeState.queueCardIds.length}.
           </p>
@@ -780,7 +780,7 @@ export function FlashcardReviewClient({
                   <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                     Session
                   </p>
-                  <h2 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">Review complete</h2>
+                  <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Review complete</h2>
                   <p className="mt-1 text-muted-foreground">
                     You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
                   </p>

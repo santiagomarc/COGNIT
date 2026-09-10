@@ -540,7 +540,7 @@ export function QuizAssessmentClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Quiz
           </p>
-          <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">No cards available for a quiz yet</h1>
+          <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">No cards available for a quiz yet</h1>
           <p className="mt-2 text-muted-foreground">
             Add cards to this deck first, then come back to test your recall.
           </p>
@@ -567,7 +567,7 @@ export function QuizAssessmentClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Quiz
           </p>
-          <h1 className="mt-3 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous quiz?</h1>
+          <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous quiz?</h1>
           <p className="mt-2 text-muted-foreground">
             Pick up from question {Math.min(resumeState.index + 1, resumeState.sessionCards.length)} of {resumeState.sessionCards.length}.
           </p>

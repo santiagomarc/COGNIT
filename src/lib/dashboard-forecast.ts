@@ -17,9 +17,8 @@ export type CardScheduleRow = {
 export type ForecastDay = {
   /** `YYYY-MM-DD`, UTC. */
   date: string;
-  /** Cards falling due on that day. Day 0 also absorbs everything overdue. */
+  /** Cards falling due on that day. */
   count: number;
-  isToday: boolean;
 };
 
 const DAY_MS = 86_400_000;
@@ -29,14 +28,18 @@ function toIsoDate(ms: number): string {
 }
 
 /**
- * Seven columns starting today.
+ * Seven columns starting **tomorrow**.
  *
- * Anything scheduled on or before today lands in the first column, overdue
- * included — a card that slipped three weeks ago is work for *today*, and
- * giving it a column of its own in the past would be a chart of regret rather
- * than a forecast. That does mean column 0 can exceed the "due now" reading in
- * the telemetry header by whatever is scheduled for later today; the header
- * counts what is due at this instant, this counts the day.
+ * This used to start today, with everything overdue folded into column 0. That
+ * was defensible in isolation and unreadable on real data: at 519 due, today's
+ * column is ~4.6x the tallest projected day, so every other bar collapses to a
+ * stub and the chart stops answering the question it exists for — *when does
+ * the rest arrive*. The forecast now sits inside the due-now band, where
+ * today's figure is already the hero number a few inches away, so plotting it
+ * twice bought nothing and cost the chart (Run 6, Task 2.5).
+ *
+ * Anything due today or overdue is therefore **not** in this window. It is not
+ * lost: it is the `totalDue` reading the band leads with.
  */
 export function buildSevenDayForecast(
   rows: CardScheduleRow[],
@@ -44,6 +47,7 @@ export function buildSevenDayForecast(
   days = 7
 ): ForecastDay[] {
   const todayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const firstDayMs = todayStartMs + DAY_MS;
 
   const buckets = new Array<number>(days).fill(0);
 
@@ -59,16 +63,17 @@ export function buildSevenDayForecast(
       new Date(dueMs).getUTCDate()
     );
 
-    const offset = Math.round((dueDayMs - todayStartMs) / DAY_MS);
-    if (offset >= days) continue;
+    const offset = Math.round((dueDayMs - firstDayMs) / DAY_MS);
+    // Overdue and due-today fall before the window; they are the band's hero
+    // figure, not a column here.
+    if (offset < 0 || offset >= days) continue;
 
-    buckets[Math.max(0, offset)] += 1;
+    buckets[offset] += 1;
   }
 
   return buckets.map((count, index) => ({
-    date: toIsoDate(todayStartMs + index * DAY_MS),
+    date: toIsoDate(firstDayMs + index * DAY_MS),
     count,
-    isToday: index === 0,
   }));
 }
 

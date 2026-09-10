@@ -2,11 +2,11 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
-import { DashboardTelemetry } from '@/components/ui/shared/DashboardTelemetry';
+import { GreetingHeader } from '@/components/ui/shared/GreetingHeader';
 import { DueNowBand } from '@/components/ui/shared/DueNowBand';
-import { ReviewForecast } from '@/components/ui/shared/ReviewForecast';
-import { RecallAccuracyPanel, StreakPanel } from '@/components/ui/shared/StudyStreakCard';
-import { ActivityHeatmap } from '@/components/ui/shared/ActivityHeatmap';
+import { CreateDeckPanel } from '@/components/ui/shared/CreateDeckPanel';
+import { SignalPanel } from '@/components/ui/shared/SignalPanel';
+import { resolveDisplayName } from '@/lib/display-name';
 import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
 import {
   buildSevenDayForecast,
@@ -338,11 +338,19 @@ export default async function Dashboard() {
     longestStreak = Math.max(longestStreak, currentRun);
   }
 
-  // The most recently updated deck is where an "import PDF" without a chosen
-  // target should land, and the fallback session target when nothing is due.
+  // The fallback session target when nothing is due. It used to also be where
+  // an "import PDF" without a chosen target landed; that button is gone from
+  // this page entirely (Run 6, requirement 3).
   const mostRecentDeck = [...deckRows].sort((a, b) =>
     (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at)
   )[0];
+
+  /*
+   * Resolved on the server so the greeting never round-trips an address to the
+   * client. `null` is a real answer and GreetingHeader renders correctly for
+   * it — see resolveDisplayName and audit finding F-06.
+   */
+  const greetingName = resolveDisplayName(user);
 
   const sessionHref = deckBreakdown[0]
     ? `/dashboard/${deckBreakdown[0].deckId}/study`
@@ -355,103 +363,79 @@ export default async function Dashboard() {
      * No bottom padding here, and none in any other page under /dashboard:
      * `dashboard/layout.tsx` is the single owner of bottom clearance, via
      * `var(--dock-clearance)` (F-03 closed).
+     *
+     * Four full-width bands, not a two-column split (Run 6, Task 2.4). The
+     * 320px right rail is gone: it cost the deck table a fifth of its width at
+     * deck names where that width is not spare, and the two readings it held
+     * lose nothing by sitting in the signal panel instead.
+     *
+     * The band heights below are load-bearing. Requirement 1 — heatmap and
+     * activity visible at first paint at 1440x900 — holds at these values;
+     * anything added above the deck index pushes the heatmap under the fold.
      */
-    <div className="container mx-auto space-y-8 p-6 md:p-8">
-      <DashboardTelemetry
+    <div className="container mx-auto flex flex-col gap-4 p-4 md:gap-4 md:px-8 md:py-6">
+      <GreetingHeader
+        name={greetingName}
         totalDue={totalDue}
         retentionPercentage={retentionPercentage}
         streakDays={streak}
         reviewedToday={todayStudiedCount}
+        dueDeckCount={deckBreakdown.length}
+        deckCount={deckRows.length}
       />
 
       {deckRows.length === 0 ? (
         <DashboardOnboarding />
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px] lg:items-start">
-          <div className="min-w-0 space-y-6">
-            <DueNowBand
-              totalDue={totalDue}
-              dueDecks={deckBreakdown}
-              oldestOverdueDays={overdueDays}
-              estimatedMinutes={estimatedMinutes}
-              sessionHref={sessionHref}
-              importHref={mostRecentDeck ? `/dashboard/${mostRecentDeck.id}#add-content` : null}
+        <>
+          <section className="flex flex-col items-stretch gap-4 lg:flex-row">
+            <div className="min-w-0 flex-1">
+              <DueNowBand
+                totalDue={totalDue}
+                dueDecks={deckBreakdown}
+                oldestOverdueDays={overdueDays}
+                estimatedMinutes={estimatedMinutes}
+                sessionHref={sessionHref}
+                forecastDays={forecastDays}
+              />
+            </div>
+
+            <CreateDeckPanel deckCount={deckRows.length} />
+          </section>
+
+          <SignalPanel
+            retentionPercentage={retentionPercentage}
+            assessedCards={assessedCards}
+            streak={streak}
+            longestStreak={longestStreak}
+            studiedToday={studiedToday}
+            activity={activity}
+            todayIso={today}
+            totalStudiedCards={totalStudiedCards}
+          />
+
+          <div id="deck-collection" className="scroll-mt-24">
+            <DeckGrid
+              decks={deckRows.map((deck) => {
+                const mastery = masteryByDeck.get(deck.id);
+                const deckTotalCards = deck.cards?.[0]?.count ?? 0;
+                const masteryPercentage =
+                  deckTotalCards > 0 && mastery
+                    ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
+                    : 0;
+
+                return {
+                  ...deck,
+                  masteryPercentage,
+                  assessedCards: mastery?.assessedCards ?? 0,
+                  lastQuizAt: mastery?.lastQuizAt ?? null,
+                  dueCount: dueByDeck.get(deck.id) ?? 0,
+                  easeFactor: easeByDeck.get(deck.id) ?? null,
+                };
+              })}
             />
-
-            {/* Mobile-only metric panels: stacked below DueNowBand, above DeckGrid */}
-            <div className="space-y-4 lg:hidden">
-              <RecallAccuracyPanel
-                retentionPercentage={retentionPercentage}
-                assessedCards={assessedCards}
-                activity={activity}
-                todayIso={today}
-              />
-              <StreakPanel
-                streak={streak}
-                longestStreak={longestStreak}
-                studiedToday={studiedToday}
-                activity={activity}
-                todayIso={today}
-              />
-            </div>
-
-            <div id="deck-collection" className="scroll-mt-24">
-              <DeckGrid
-                decks={deckRows.map((deck) => {
-                  const mastery = masteryByDeck.get(deck.id);
-                  const deckTotalCards = deck.cards?.[0]?.count ?? 0;
-                  const masteryPercentage =
-                    deckTotalCards > 0 && mastery
-                      ? Math.round((mastery.masteredCards / deckTotalCards) * 100)
-                      : 0;
-
-                  return {
-                    ...deck,
-                    masteryPercentage,
-                    assessedCards: mastery?.assessedCards ?? 0,
-                    lastQuizAt: mastery?.lastQuizAt ?? null,
-                    dueCount: dueByDeck.get(deck.id) ?? 0,
-                    easeFactor: easeByDeck.get(deck.id) ?? null,
-                  };
-                })}
-              />
-            </div>
-
-            <ReviewForecast days={forecastDays} />
-
-            {/* Activity history heatmap below forecast */}
-            <div className="surface p-5">
-              <div className="mb-3 flex items-baseline justify-between">
-                <h3 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                  Activity History · 6 Months
-                </h3>
-                <span className="font-mono text-[10px] text-ink-dimmer">
-                  All time: <span className="tnum text-ink">{totalStudiedCards}</span> reviews
-                </span>
-              </div>
-              <div className="overflow-x-auto">
-                <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={today} />
-              </div>
-            </div>
           </div>
-
-          {/* Desktop-only right rail (visible at first paint, 320px) */}
-          <aside className="hidden space-y-4 lg:block">
-            <RecallAccuracyPanel
-              retentionPercentage={retentionPercentage}
-              assessedCards={assessedCards}
-              activity={activity}
-              todayIso={today}
-            />
-            <StreakPanel
-              streak={streak}
-              longestStreak={longestStreak}
-              studiedToday={studiedToday}
-              activity={activity}
-              todayIso={today}
-            />
-          </aside>
-        </div>
+        </>
       )}
     </div>
   );

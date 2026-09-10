@@ -1,0 +1,2218 @@
+<title>Obsidian Telemetry Rev. C</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   Cognit — Obsidian Telemetry · mockup stylesheet
+   Tokens mirror src/app/globals.css exactly, except where marked  ★ NEW.
+   Theme is a `.dark` ANCESTOR class (same mechanism as the app), so a
+   screen frame can carry it as well as <html>.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --radius-xs: 4px;  --radius-sm: 6px;  --radius-md: 8px;
+  --radius-lg: 12px; --radius-xl: 16px; --radius-pill: 999px;
+  --radius-control: var(--radius-sm);
+  --radius-container: var(--radius-lg);
+
+  /* Display steps — Instrument Serif. Values from COGNIT_DESIGN_SYSTEM.md
+     §3.3 (Rev. B, 1.5x enlarged scale), which is what the components
+     actually render today. globals.css still holds the older 44/32/24 set. */
+  --type-display-xl: 4.125rem;  /* 66px */
+  --type-display-lg: 3rem;      /* 48px */
+  --type-display:    2.25rem;   /* 36px */
+  --type-display-sm: 1.5rem;    /* 24px */
+
+  --type-h3: 1rem; --type-body: .875rem; --type-sm: .8125rem;
+  --type-cap: .75rem; --type-label: .625rem;
+
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --dur-hover: 120ms;
+
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+  --font-serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+}
+
+/* ─── LIGHT — its own composition, not an inversion ─── */
+:root {
+  color-scheme: light;
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-raised: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --border-control: #8a8a93;
+  --ink: #18181b;
+  --ink-dim: #52525b;
+  --ink-dimmer: #71717a;
+  --ink-faint: #a1a1aa;
+  --accent: #18181b;
+  --accent-ink: #ffffff;
+
+  --elevate-flat: 0 1px 2px rgb(24 24 27 / .05);
+  --elevate-1:    0 1px 3px rgb(24 24 27 / .08);
+  --elevate-2:    0 8px 28px -8px rgb(24 24 27 / .16), 0 1px 3px rgb(24 24 27 / .06);
+  --key-face: linear-gradient(180deg, #ffffff, #f4f4f5);
+  --key-edge: 0 1px 0 #d4d4d8;
+
+  --state-due: #c2410c;
+  --state-learning: #a16207;
+  --state-mastered: #15803d;
+  --state-lapsed: #b91c1c;
+  --state-streak: #b45309;
+  --state-neutral: var(--ink);
+
+  /* ★ NEW — the recessed plane. The step the system does not have. */
+  --raised-bg: #ffffff;
+  --recess: #f4f4f5;
+  --elevate-inset: inset 0 1px 3px rgb(24 24 27 / .07);
+  /* ★ NEW — specular top edge. No job on a white card; the drop shadow
+     already separates it from the ground, so this is deliberately off. */
+  --spec: transparent;
+  /* ★ NEW — ambient. On a light ground, light-from-above means the
+     PERIPHERY recedes; on dark it means the top glows. Same role,
+     opposite implementation — this is what "not an inversion" means. */
+  --amb-field:
+    radial-gradient(ellipse 110% 75% at 50% -5%, rgb(255 255 255 / .85), transparent 55%),
+    radial-gradient(ellipse 100% 90% at 50% 8%, transparent 42%, rgb(24 24 27 / .038) 100%);
+  --amb-grain-opacity: .020;
+  --heat-ramp-0: rgb(24 24 27 / .055);
+  --heat-ramp-1: rgb(24 24 27 / .15);
+  --heat-ramp-2: rgb(24 24 27 / .29);
+  --heat-ramp-3: rgb(24 24 27 / .48);
+  --heat-ramp-4: rgb(24 24 27 / .72);
+}
+
+/* ─── DARK — the default and the design's home ─── */
+.dark {
+  color-scheme: dark;
+  --bg: #09090b;
+  --surface: #131316;
+  --surface-raised: #1f1f23;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --border-control: #63636d;
+  --ink: #fafafa;
+  --ink-dim: #a1a1aa;
+  --ink-dimmer: #82828b;
+  --ink-faint: #52525b;
+  --accent: #fafafa;
+  --accent-ink: #09090b;
+
+  --elevate-flat: inset 0 1px 0 rgb(255 255 255 / .05);
+  --elevate-1:    inset 0 1px 0 rgb(255 255 255 / .06), 0 1px 3px rgb(0 0 0 / .5);
+  --elevate-2:    inset 0 1px 0 rgb(255 255 255 / .08), 0 8px 28px -8px rgb(0 0 0 / .7);
+  --key-face: linear-gradient(180deg, #1f1f23, #131316);
+  --key-edge: 0 1px 0 #000;
+
+  --state-due: #fb923c;
+  --state-learning: #facc15;
+  --state-mastered: #4ade80;
+  --state-lapsed: #f87171;
+  --state-streak: #ffb020;
+  --state-neutral: var(--ink);
+
+  --raised-bg: #1f1f23;
+  --recess: #0b0b0d;
+  --elevate-inset: inset 0 1px 3px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .012);
+  --spec: rgb(255 255 255 / .085);
+  --amb-field:
+    radial-gradient(ellipse 115% 62% at 50% -8%, rgb(255 255 255 / .050), rgb(255 255 255 / .014) 42%, transparent 70%),
+    radial-gradient(ellipse 70% 55% at 88% 68%, rgb(255 255 255 / .022), transparent 62%),
+    radial-gradient(ellipse 90% 70% at 50% 45%, transparent 46%, rgb(0 0 0 / .30) 100%);
+  --amb-grain-opacity: .032;
+  --heat-ramp-0: rgb(250 250 250 / .05);
+  --heat-ramp-1: rgb(250 250 250 / .14);
+  --heat-ramp-2: rgb(250 250 250 / .25);
+  --heat-ramp-3: rgb(250 250 250 / .42);
+  --heat-ramp-4: rgb(250 250 250 / .64);
+}
+
+/* ═══ SCREEN FRAME ═════════════════════════════════════════════════════ */
+.screen {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.screen--desktop { width: 1440px; height: 900px; }
+.screen--mobile  { width: 390px;  height: 844px; }
+
+/* ═══ AMBIENT — paint only. No canvas, no rAF, no per-frame work. ═══════
+   Two layers: one radial light field, one static grain tile. Both are
+   background-images on a single pointer-events:none element. Nothing here
+   animates, so there is nothing for prefers-reduced-motion to disable. */
+.amb { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.amb::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--amb-field);
+}
+.amb::after {
+  content: ''; position: absolute; inset: 0;
+  opacity: var(--amb-grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+}
+.stage { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
+
+/* ═══ PLANES ═══════════════════════════════════════════════════════════ */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-flat);
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevate-2);
+}
+.raised {
+  background: var(--raised-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-1);
+}
+/* ★ NEW — the well. Content that is contained but subordinate. */
+.well {
+  background: var(--recess);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-inset);
+}
+/* ★ NEW — masked specular top edge. Fades at the corners so a 1300px
+   panel does not read as a drawn rectangle. */
+.spec { position: relative; }
+.spec::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: linear-gradient(90deg, transparent, var(--spec) 18%, var(--spec) 82%, transparent);
+  pointer-events: none;
+}
+
+/* ★ NEW — gradient-masked hairline. Structure, not decoration. */
+.rule { height: 1px; background: linear-gradient(90deg, transparent, var(--border-strong) 6%, var(--border-strong) 94%, transparent); }
+.rule--soft { background: linear-gradient(90deg, transparent, var(--border) 4%, var(--border) 96%, transparent); }
+.rule--v { width: 1px; align-self: stretch; background: linear-gradient(180deg, transparent, var(--border-strong) 10%, var(--border-strong) 90%, transparent); }
+
+/* ═══ TYPE ═════════════════════════════════════════════════════════════ */
+/* Instrument Serif ships at 400 only. Never a weight above it — there is
+   no bold, so anything higher is a synthetic smear. */
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  line-height: 1.08;
+  text-wrap: balance;
+  color: var(--ink);
+}
+.d-xl { font-size: var(--type-display-xl); }
+.d-lg { font-size: var(--type-display-lg); }
+.d    { font-size: var(--type-display); }
+.d-sm { font-size: var(--type-display-sm); }
+
+.lbl {
+  font-family: var(--font-mono);
+  font-size: 10px; line-height: 1.5;
+  text-transform: uppercase; letter-spacing: .16em;
+  color: var(--ink-dimmer);
+}
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--ink-dim); }
+.dimmer { color: var(--ink-dimmer); }
+h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
+/* An unstyled <a> inherits the UA's indigo. On a system whose first rule is
+   "no hue outside the state channel", that is a live regression waiting on
+   any link that forgets a colour — so links inherit by default. */
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; padding: 0; }
+
+/* ═══ CONTROLS ═════════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 34px; padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control);
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  color: var(--ink); background: transparent; cursor: pointer;
+  transition: border-color var(--dur-hover) ease, background var(--dur-hover) ease;
+}
+.btn:hover { background: var(--surface-raised); }
+.btn--primary {
+  background: var(--accent); color: var(--accent-ink);
+  border-color: var(--accent); font-weight: 600;
+  box-shadow: var(--elevate-1);
+}
+.btn--lg { height: 40px; padding: 0 18px; font-size: 14px; }
+.btn--ghost { border-color: transparent; }
+
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; line-height: 1.5;
+  padding: 1px 4px; min-width: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface); color: var(--ink-dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.dark .btn--primary .kbd { background: rgb(0 0 0 / .12); border-color: rgb(0 0 0 / .2); color: rgb(9 9 11 / .7); }
+.btn--primary .kbd { background: rgb(255 255 255 / .16); border-color: rgb(255 255 255 / .28); color: rgb(255 255 255 / .85); }
+
+.input {
+  display: block; width: 100%; height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+}
+.input::placeholder { color: var(--ink-dimmer); }
+
+/* Corner brackets — the system's focus & bounds idiom. */
+.brk { position: absolute; width: 14px; height: 14px; border: 1px solid var(--border-strong); pointer-events: none; }
+.brk--tl { top:0; left:0;     border-right:0; border-bottom:0; }
+.brk--tr { top:0; right:0;    border-left:0;  border-bottom:0; }
+.brk--bl { bottom:0; left:0;  border-right:0; border-top:0; }
+.brk--br { bottom:0; right:0; border-left:0;  border-top:0; }
+
+/* Grade key — the one tactile exception. */
+.key {
+  position: relative; overflow: hidden;
+  background: var(--key-face);
+  border: 1px solid var(--border-control);
+  border-top-color: var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevate-1), var(--key-edge);
+  padding: 11px 12px 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.key::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background: var(--key-state); }
+.key .kn { font-size: 13px; font-weight: 600; color: var(--ink); }
+.key .ki { font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.key .kk { position:absolute; top:8px; left:9px; font-family: var(--font-mono); font-size:10px; color: var(--ink-dimmer); }
+
+/* State tick — 2px × 16px, the deck row's only hue. */
+.tick { display:block; width:2px; height:16px; border-radius:1px; flex: none; }
+
+/* ═══ TELEMETRY ════════════════════════════════════════════════════════ */
+.tele { display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); }
+.tele__v { font-size: 13px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tele-row { display: flex; align-items: baseline; gap: 24px; }
+
+/* ═══ CHART MARKS ══════════════════════════════════════════════════════
+   Per dataviz: thin marks, hairline recessive axes, 2px surface gaps,
+   sequential = ONE hue light→dark, no value-ramp on nominal categories. */
+.heat { display: grid; grid-auto-flow: column; gap: var(--cellgap, 2px); }
+.heat__wk { display: grid; grid-template-rows: repeat(7, var(--cell, 10px)); gap: var(--cellgap, 2px); }
+.heat__c { width: var(--cell, 10px); height: var(--cell, 10px); border-radius: 2px; background: var(--heat-ramp-0); }
+.heat__c[data-i="1"] { background: var(--heat-ramp-1); }
+.heat__c[data-i="2"] { background: var(--heat-ramp-2); }
+.heat__c[data-i="3"] { background: var(--heat-ramp-3); }
+.heat__c[data-i="4"] { background: var(--heat-ramp-4); }
+
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+.spark span { flex: 1; border-radius: 2px 2px 0 0; background: var(--ink-dim); min-height: 2px; }
+.spark span[data-zero] { background: var(--border); height: 2px !important; border-radius: 1px; }
+
+.bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end; }
+.bars__col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bars__track { display: flex; align-items: flex-end; height: 52px; width: 100%; max-width: 30px; }
+.bars__b { width: 100%; border-radius: 3px 3px 0 0; background: var(--border-strong); }
+.bars__b[data-today] { background: var(--state-due); }
+
+.meter { display:block; height: 3px; width: 104px; background: var(--border-strong); overflow: hidden; border-radius: 1px; }
+.meter > i { display:block; height:100%; background: var(--ink-dim); }
+.meter > i[data-mastered] { background: var(--state-mastered); }
+
+.dayrow { display: flex; gap: 4px; }
+.dayrow i { flex: 1; height: 20px; border-radius: 2px; background: var(--surface-raised); border: 1px solid var(--border); }
+.dayrow i[data-on] { background: var(--border-strong); border-color: transparent; }
+.dayrow i[data-today] { background: var(--state-streak); border-color: transparent; }
+
+/* ═══ DECK ROWS ════════════════════════════════════════════════════════ */
+.drow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px; height: 38px;
+  border-bottom: 1px solid var(--border);
+}
+.drow:last-child { border-bottom: 0; }
+.drow__n { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.drow__t { font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dnum { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink-dim); }
+.legend { display: flex; align-items: center; gap: 12px; padding: 0 14px; height: 26px; border-bottom: 1px solid var(--border); }
+
+/* ── Document chrome. Namespaced --doc-* so it never collides with the
+      screen tokens, which must stay pinned to each frame's own theme. ── */
+:root {
+  --doc-bg: #fbfbfc;  --doc-surface: #ffffff; --doc-sunk: #f4f4f5;
+  --doc-ink: #18181b; --doc-dim: #52525b;     --doc-dimmer: #71717a;
+  --doc-line: #e4e4e7; --doc-line-strong: #d4d4d8;
+  --doc-shadow: 0 8px 28px -10px rgb(24 24 27 / .14), 0 1px 2px rgb(24 24 27 / .05);
+  --doc-mark: #c2410c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --doc-bg: #09090b;  --doc-surface: #131316; --doc-sunk: #0b0b0d;
+    --doc-ink: #fafafa; --doc-dim: #a1a1aa;     --doc-dimmer: #82828b;
+    --doc-line: #27272a; --doc-line-strong: #3f3f46;
+    --doc-shadow: 0 8px 28px -10px rgb(0 0 0 / .7);
+    --doc-mark: #fb923c;
+  }
+}
+:root[data-theme="dark"] {
+  --doc-bg: #09090b;  --doc-surface: #131316; --doc-sunk: #0b0b0d;
+  --doc-ink: #fafafa; --doc-dim: #a1a1aa;     --doc-dimmer: #82828b;
+  --doc-line: #27272a; --doc-line-strong: #3f3f46;
+  --doc-shadow: 0 8px 28px -10px rgb(0 0 0 / .7);
+  --doc-mark: #fb923c;
+}
+
+body { background: var(--doc-bg); color: var(--doc-ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1180px; margin-inline: auto; padding: 0 28px 96px; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--doc-dimmer); }
+.dserif { font-family: var(--font-serif); font-weight: 400; letter-spacing: -.02em; line-height: 1.06; text-wrap: balance; }
+.masthead { padding: 72px 0 36px; }
+.masthead h1 { font-size: clamp(44px, 6vw, 74px); margin-top: 16px; }
+.lede { margin-top: 20px; max-width: 66ch; font-size: 17px; color: var(--doc-dim); }
+.lede strong { color: var(--doc-ink); font-weight: 500; }
+
+.factstrip { margin-top: 30px; display: flex; flex-wrap: wrap; gap: 0 40px; padding-top: 18px; border-top: 1px solid var(--doc-line-strong); }
+.fact { display: flex; flex-direction: column; gap: 5px; padding: 4px 0; }
+.fact b { font-family: var(--font-mono); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+nav.jump { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 4px; padding: 12px 0; margin-bottom: 8px;
+           background: color-mix(in srgb, var(--doc-bg) 92%, transparent); border-bottom: 1px solid var(--doc-line); }
+nav.jump a { font-family: var(--font-mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+             color: var(--doc-dimmer); padding: 6px 10px; border-radius: 6px; border: 1px solid transparent; }
+nav.jump a:hover, nav.jump a:focus-visible { color: var(--doc-ink); border-color: var(--doc-line-strong); }
+
+section { padding-top: 62px; scroll-margin-top: 60px; }
+section > h2 { font-size: clamp(30px, 3.4vw, 40px); margin-top: 12px; }
+section > .sub { margin-top: 14px; max-width: 70ch; color: var(--doc-dim); }
+h3.h { font-size: 19px; font-weight: 600; margin-top: 40px; letter-spacing: -.01em; }
+h4.h { font-size: 15px; font-weight: 600; margin-top: 26px; }
+p + p, .body > * + * { margin-top: 14px; }
+.prose { max-width: 72ch; }
+.prose p { margin-top: 14px; color: var(--doc-dim); }
+.prose p strong, .prose li strong { color: var(--doc-ink); font-weight: 600; }
+.prose ul { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.prose li { position: relative; padding-left: 20px; color: var(--doc-dim); }
+.prose li::before { content: ''; position: absolute; left: 2px; top: .62em; width: 6px; height: 1px; background: var(--doc-line-strong); }
+code { font-family: var(--font-mono); font-size: .87em; padding: 1px 5px; border-radius: 4px;
+       background: var(--doc-sunk); border: 1px solid var(--doc-line); color: var(--doc-ink); }
+a.lnk { color: var(--doc-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--doc-line-strong); }
+a.lnk:hover { text-decoration-color: var(--doc-ink); }
+:focus-visible { outline: 2px solid var(--doc-ink); outline-offset: 2px; }
+
+.tbl { margin-top: 22px; width: 100%; overflow-x: auto; border: 1px solid var(--doc-line); border-radius: 12px; background: var(--doc-surface); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--doc-line); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-mono); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--doc-dimmer); font-weight: 400; white-space: nowrap; }
+td { color: var(--doc-dim); }
+td:first-child { color: var(--doc-ink); font-weight: 500; white-space: nowrap; }
+td code, th code { background: none; border: 0; padding: 0; }
+
+.callout { margin-top: 24px; padding: 18px 20px; border-radius: 12px; background: var(--doc-sunk);
+           border: 1px solid var(--doc-line); border-left: 2px solid var(--doc-mark); }
+.callout p { color: var(--doc-dim); }
+.callout p:first-child { margin-top: 0; }
+.callout .eyebrow { color: var(--doc-mark); }
+
+pre { margin-top: 16px; padding: 14px 16px; border-radius: 10px; background: var(--doc-sunk); border: 1px solid var(--doc-line);
+      overflow-x: auto; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65; color: var(--doc-dim); }
+pre b { color: var(--doc-ink); font-weight: 500; }
+
+/* ── mockup frames ──────────────────────────────────────────────────── */
+.shot { margin-top: 22px; }
+.shot__cap { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding-bottom: 9px; }
+.shot__cap .t { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--doc-ink); }
+.shot__cap .d { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; color: var(--doc-dimmer); }
+.frame { position: relative; aspect-ratio: var(--ar, 1440 / 900); overflow: hidden; border: 1px solid var(--doc-line-strong); border-radius: 12px; box-shadow: var(--doc-shadow); background: #09090b; }
+.frame--light { background: #fbfbfc; }
+.frame > .screen { transform-origin: top left; }
+.pair { margin-top: 22px; display: grid; gap: 22px; grid-template-columns: minmax(0, 264px) minmax(0, 1fr); align-items: start; }
+@media (max-width: 820px) { .pair { grid-template-columns: minmax(0, 1fr); } }
+.opt { margin-top: 34px; padding-top: 26px; border-top: 1px solid var(--doc-line); }
+.badge { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em;
+         text-transform: uppercase; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--doc-line-strong); color: var(--doc-dim); }
+.badge--rec { border-color: var(--doc-ink); color: var(--doc-ink); }
+.cols { margin-top: 26px; display: grid; gap: 26px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.card { padding: 20px; border: 1px solid var(--doc-line); border-radius: 12px; background: var(--doc-surface); }
+.card h4 { font-size: 15px; font-weight: 600; }
+.card p { margin-top: 9px; font-size: 14px; color: var(--doc-dim); }
+footer { margin-top: 76px; padding-top: 22px; border-top: 1px solid var(--doc-line-strong); color: var(--doc-dimmer); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+</style>
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Cognit · Design review · 10 September 2026</p>
+  <h1 class="dserif">Obsidian Telemetry Rev. C</h1>
+  <p class="lede">The chassis was right and the composition was wrong. This is a layout and depth study for
+    <strong>login</strong>, <strong>dashboard</strong> and <strong>deck</strong> — built as live HTML at native
+    resolution, on the palette, the state channel and the type system already approved in Rev. B.
+    <strong>No new visual identity. No new hue.</strong></p>
+
+  <div class="factstrip">
+    <span class="fact"><span class="eyebrow">Surfaces</span><b>3</b></span>
+    <span class="fact"><span class="eyebrow">Screens</span><b>9</b></span>
+    <span class="fact"><span class="eyebrow">New tokens</span><b>3</b></span>
+    <span class="fact"><span class="eyebrow">Per-frame work</span><b>0</b></span>
+    <span class="fact"><span class="eyebrow">Deck rows above fold</span><b>9</b></span>
+    <span class="fact"><span class="eyebrow">Anti-patterns added</span><b>0</b></span>
+  </div>
+</header>
+
+<nav class="jump">
+  <a href="#diagnosis">Diagnosis</a>
+  <a href="#research">Research</a>
+  <a href="#depth">Depth vocabulary</a>
+  <a href="#login">Login</a>
+  <a href="#dashboard">Dashboard</a>
+  <a href="#deck">Deck page</a>
+  <a href="#build">Implementation</a>
+  <a href="#drift">Drift found</a>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="diagnosis">
+  <p class="eyebrow">01 · What is actually wrong</p>
+  <h2 class="dserif">A three-step ladder, one step spent</h2>
+  <div class="prose">
+    <p>The brief says the app reads &ldquo;flat and static&rdquo; and that almost everything is black, grey and
+      white. Both halves of that sentence are true, but only the first one is a defect. The palette is doing its
+      job. The problem is that <strong>every container on every screen is the same plane</strong>.</p>
+    <p>The system defines three surface steps — <code>--bg #09090b</code>, <code>--surface #131316</code>,
+      <code>--surface-raised #1f1f23</code> — and one elevation, <code>--elevate-flat</code>, an inset white
+      highlight at 5&nbsp;% opacity. On the deck page, six <code>.surface</code> blocks and roughly ten major
+      components all sit at <em>that same step</em>, with <em>that same elevation</em>, at near-equal visual
+      weight. Nothing is primary because nothing is anywhere.</p>
+    <p>That is not a colour problem, and it will not be fixed by adding one. It is fixed by spending the ladder:
+      putting the primary object <em>above</em> the surface, the subordinate content <em>below</em> it, and
+      letting light fall across the ground behind both.</p>
+  </div>
+
+  <div class="callout">
+    <p class="eyebrow">The operative rule from the brief, restated</p>
+    <p>Banned: chromatic decorative blobs, coloured glow, neon shadow, any hue that does not encode
+      spaced-repetition state. Permitted: monochromatic ambient lighting — low-opacity white/zinc radial fields,
+      fine grain, vignettes, specular hairlines — used to create <strong>planes and depth</strong>. Depth in this
+      system comes from light and elevation, never from colour. Every device below obeys that.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="research">
+  <p class="eyebrow">02 · Research</p>
+  <h2 class="dserif">What mature dark products actually do</h2>
+  <p class="sub">Named techniques, not vibes. Each one is here because it solves a specific part of the flatness
+    problem without touching hue.</p>
+
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Source</th><th>Technique</th><th>Where it lands here</th></tr></thead>
+    <tbody>
+      <tr><td>Linear</td><td>Elevation is a <em>luminance step on the surface background</em> (white opacity
+        <code>0.02 → 0.04 → 0.05</code>), not a shadow. The plane boundary is a
+        <code>1px solid rgba(255,255,255,0.05–0.08)</code> border.</td>
+        <td>Validates the existing ladder and says to <em>use</em> all of it. Cognit's steps are already correct;
+          they were simply never assigned by role.</td></tr>
+      <tr><td>Linear</td><td>The <strong>recessed plane</strong>:
+        <code>box-shadow: rgba(0,0,0,0.2) 0 0 12px 0 inset</code> for sunken panels.</td>
+        <td>The one step Cognit does not have. Becomes <code>.well</code> — the deck index and the card list.
+          This single addition is what lets three containers read at three weights.</td></tr>
+      <tr><td>Raycast</td><td>Dark-on-dark bands separated by hairline dividers, <em>never</em> alternating
+        light/dark sections. Surface ladder <code>#07080a → #0d0d0d → #101111</code>, 6–10px radii.</td>
+        <td>The dashboard's four bands. No band changes brightness to mark itself; the rule and the plane do it.</td></tr>
+      <tr><td>Vercel Geist</td><td>A repeating texture at 5–10&nbsp;% opacity on a 16/24px grid; &ldquo;every
+        divider, border and disabled state lives on its own deliberate step.&rdquo;</td>
+        <td>The static grain tile, and the discipline of picking <code>--border</code> vs
+          <code>--border-strong</code> vs <code>--border-control</code> by role rather than by taste.</td></tr>
+      <tr><td>Your own <code>LandingBackground.tsx</code></td><td>The &ldquo;specular horizon hairline&rdquo; —
+        a 1px rule painted with a radial gradient so it fades to nothing at both ends.</td>
+        <td>Promoted from decoration to <strong>structure</strong>. Every section rule and column divider in these
+          mockups is gradient-masked. It is the cheapest single fix for &ldquo;everything looks like a box&rdquo;.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 class="h">One computed finding you should know about</h3>
+  <div class="prose">
+    <p>Rather than eyeball the state channel, I ran it through the dataviz palette validator. The result is worth
+      recording, because it makes an existing rule load-bearing:</p>
+  </div>
+<pre><b>LIGHT</b>  --state-learning #a16207  ↔  --state-due #c2410c
+       ΔE <b>0.6</b> (deuteranopia)  ·  ΔE <b>8.8</b> (normal vision)
+
+<b>DARK</b>   --state-learning #facc15  ↔  --state-due #fb923c     ΔE <b>14.6</b> (normal vision)
+       --state-mastered #4ade80  ↔  --state-learning #facc15  ΔE <b>6.8</b> (protanopia)</pre>
+  <div class="prose">
+    <p>In light mode, <strong>due and learning are effectively the same colour to a deuteranope</strong>, and they
+      are already hard to separate with full colour vision. I am <em>not</em> proposing a change — §5 puts the
+      state channel out of scope, and each value is a deliberate semantic choice. But it means §2.3's
+      &ldquo;colour is never the only carrier of meaning&rdquo; is not a belt-and-braces nicety; it is the only
+      thing keeping the state channel legible. Every swatch in these mockups carries a word or a number beside it,
+      and any future &ldquo;just show the ticks&rdquo; shortcut is a real accessibility regression.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="depth">
+  <p class="eyebrow">03 · The vocabulary</p>
+  <h2 class="dserif">Five planes, four devices, zero animation</h2>
+
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Plane</th><th>Dark</th><th>Light</th><th>Role</th><th>New?</th></tr></thead>
+    <tbody>
+      <tr><td>Recessed</td><td><code>#0b0b0d</code> + inset</td><td><code>#f4f4f5</code> + inset</td>
+        <td>A well. Contained but subordinate — the deck index, the card list.</td><td>Yes</td></tr>
+      <tr><td>Ground</td><td><code>#09090b</code></td><td><code>#fbfbfc</code></td><td>The page.</td><td>—</td></tr>
+      <tr><td>Surface</td><td><code>#131316</code></td><td><code>#ffffff</code></td><td>Dense panels. Unchanged.</td><td>—</td></tr>
+      <tr><td>Raised</td><td><code>#1f1f23</code> + <code>--elevate-1</code></td><td><code>#ffffff</code> + shadow</td>
+        <td>Exactly one per screen: the thing the screen is for.</td><td>Token</td></tr>
+      <tr><td>Ambient</td><td>radial white 0→5&nbsp;%</td><td>radial ink 0→3.8&nbsp;%</td>
+        <td>Light, not a surface. Behind everything.</td><td>Yes</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="cols">
+    <div class="card"><h4>Ambient field</h4><p>Two or three large <code>radial-gradient</code> stops on one
+      <code>pointer-events:none</code> layer. Static — the landing page's breathing halos with the animation
+      removed.</p></div>
+    <div class="card"><h4>Static grain</h4><p>The same SVG fractal-noise data URI, 180px tile, 3.2&nbsp;% dark /
+      2.0&nbsp;% light, plain opacity — no <code>mix-blend-mode</code>, which would force a compositing pass.</p></div>
+    <div class="card"><h4>Gradient hairline</h4><p><code>linear-gradient(90deg, transparent, var(--border-strong),
+      transparent)</code>. Section rules and column dividers stop reading as box edges.</p></div>
+    <div class="card"><h4>Specular top edge</h4><p>A masked 1px highlight that fades at the corners, so a 1300px
+      panel does not read as a drawn rectangle. Deliberately <em>off</em> in light mode, where a white edge on a
+      white card has no job.</p></div>
+  </div>
+
+  <div class="callout">
+    <p class="eyebrow">Performance — the §3 constraint</p>
+    <p><code>LandingBackground</code> runs ~5,500 distance checks per frame plus three canvas ribbons. None of
+      that appears here. All four devices above are <code>background-image</code> paints on one element per
+      screen: <strong>zero per-frame work, no canvas, no <code>requestAnimationFrame</code>, no cursor
+      tracking</strong>. Nothing animates, so there is nothing for <code>prefers-reduced-motion</code> to
+      disable — which is a stronger guarantee than respecting it.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="login">
+  <p class="eyebrow">04 · Surface one</p>
+  <h2 class="dserif">Login</h2>
+  <p class="sub">&ldquo;It looks flat and boring and too generic layout.&rdquo; A panel and a serif heading had
+    already landed here and it still read generic — so the answer is not more panel.</p>
+
+  <div class="shot">
+    <div class="shot__cap"><span class="t">Login · desktop</span><span class="d">1440 × 900 · dark</span></div>
+    <div class="frame" data-w="1440" style="--ar:1440/900"><div class="screen screen--desktop dark" id="login-d">
+  <div class="amb"></div>
+  <div class="stage" style="flex-direction:row">
+
+    <!-- ═══ LEFT · a still life of the product, not a description of it ═══
+         The three specimen rows were the one genuinely good element on the
+         old page and they were a footnote. They are now the base of a
+         column whose subject is the object the product is built around:
+         a card, and the four intervals the scheduler will offer for it. -->
+    <section style="width:58%;flex:none;display:flex;flex-direction:column;justify-content:center;padding:0 0 0 88px">
+      <div style="width:100%;max-width:470px">
+
+        <p class="serif d-xl" style="line-height:.92">Cognit</p>
+        <p style="margin-top:14px;font-size:17px;line-height:1.5;color:var(--ink-dim);max-width:30ch">
+          The universal active recall engine.
+          <span style="color:var(--ink)">Study smarter, remember forever.</span>
+        </p>
+
+        <!-- the card: corner brackets on the flat ground, no fill (§7.6) -->
+        <div style="position:relative;margin-top:42px;padding:30px 26px;display:grid;place-items:center;min-height:118px">
+          <span class="brk brk--tl"></span><span class="brk brk--tr"></span>
+          <span class="brk brk--bl"></span><span class="brk brk--br"></span>
+          <p class="serif" style="font-size:31px;line-height:1.24;text-align:center;max-width:21ch">What is a closure, and what does it capture?</p>
+        </div>
+
+        <!-- the grade deck, inert. Real SM-2 intervals; Easy stays colourless. -->
+        <div style="margin-top:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;opacity:.62">
+          <div class="key" style="--key-state:var(--state-lapsed)"><span class="kk">1</span><span class="kn">Again</span><span class="ki">1m</span></div>
+          <div class="key" style="--key-state:var(--state-due)"><span class="kk">2</span><span class="kn">Hard</span><span class="ki">10m</span></div>
+          <div class="key" style="--key-state:var(--state-mastered)"><span class="kk">3</span><span class="kn">Good</span><span class="ki">4d</span></div>
+          <div class="key" style="--key-state:var(--state-neutral)"><span class="kk">4</span><span class="kn">Easy</span><span class="ki">9d</span></div>
+        </div>
+        <p class="lbl" style="margin-top:12px">Every key shows the interval before you commit</p>
+
+        <div class="rule" style="margin-top:34px"></div>
+        <ul>
+          <li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <i class="tick" style="background:var(--state-learning)"></i>
+            <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Explain Big-O notation</span>
+            <span class="mono" style="font-size:13px;color:var(--state-learning)">11h</span>
+          </li>
+          <li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <i class="tick" style="background:var(--state-due)"></i>
+            <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Define polymorphism</span>
+            <span class="mono" style="font-size:13px;color:var(--state-due)">due</span>
+          </li>
+          <li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <i class="tick" style="background:var(--state-mastered)"></i>
+            <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">What is a monad?</span>
+            <span class="mono" style="font-size:13px;color:var(--state-mastered)">4d</span>
+          </li>
+        </ul>
+        <p class="lbl" style="margin-top:14px">Next review, scheduled by SM-2</p>
+      </div>
+    </section>
+
+    <!-- the divider fades at both ends — a hard border-r is what made the
+         old page read as two pasted rectangles -->
+    <div class="rule--v" style="height:100%"></div>
+
+    <!-- ═══ RIGHT · the one lifted object on the page ═══════════════════ -->
+    <section style="flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;padding:0 40px">
+      <span style="position:absolute;top:24px;right:28px;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <i style="display:block;width:13px;height:13px;border-radius:50%;border:1.4px solid var(--ink-dim);background:linear-gradient(90deg,var(--ink-dim) 50%,transparent 50%)"></i>
+      </span>
+
+      <div class="panel" style="width:100%;max-width:420px;padding:32px">
+        <h1 class="serif d">Welcome back</h1>
+        <p style="margin-top:8px;font-size:14px;color:var(--ink-dim)">Sign in to access your study decks</p>
+
+        <div style="margin-top:26px;display:flex;flex-direction:column;gap:18px">
+          <div>
+            <label class="dim" style="display:block;font-size:13px;font-weight:500;margin-bottom:7px">Email</label>
+            <span class="input" style="display:flex;align-items:center;color:var(--ink-dimmer)">you@example.com</span>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+              <label class="dim" style="font-size:13px;font-weight:500">Password</label>
+              <span style="font-size:12px;font-weight:500;color:var(--ink-dim)">Forgot password?</span>
+            </div>
+            <span class="input" style="display:flex;align-items:center;justify-content:space-between;color:var(--ink)">
+              <span style="letter-spacing:.18em">••••••••</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-dimmer)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            </span>
+          </div>
+          <button class="btn btn--primary btn--lg" style="width:100%">Sign in</button>
+        </div>
+
+        <div style="margin-top:22px;display:flex;align-items:center;gap:12px">
+          <span class="rule--soft rule" style="flex:1"></span>
+          <span style="font-size:12px;color:var(--ink-dimmer)">or continue with</span>
+          <span class="rule--soft rule" style="flex:1"></span>
+        </div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <button class="btn btn--lg">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82Z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.1A12 12 0 0 0 12 24Z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.26A12 12 0 0 0 0 12c0 1.94.46 3.77 1.26 5.38l4.01-3.1Z"/><path fill="#EA4335" d="M12 4.76c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.62l4.01 3.1c.95-2.85 3.6-4.96 6.73-4.96Z"/></svg>
+            Google
+          </button>
+          <button class="btn btn--lg">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18.6 4.3 19.6 4.6 19.6 4.6c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>
+            GitHub
+          </button>
+        </div>
+
+        <p style="margin-top:24px;text-align:center;font-size:14px;color:var(--ink-dim)">
+          Don't have an account?
+          <span style="color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:4px">Sign up</span>
+        </p>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+  </div>
+  <div class="pair">
+    <div class="shot" style="margin-top:0">
+      <div class="shot__cap"><span class="t">Mobile</span><span class="d">390 × 844</span></div>
+      <div class="frame" data-w="390" style="--ar:390/844"><div class="screen screen--mobile dark" id="login-m">
+  <div class="amb"></div>
+  <div class="stage" style="padding:26px 16px 0;overflow:hidden">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between">
+      <p class="serif" style="font-size:40px;line-height:.95">Cognit</p>
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <i style="display:block;width:13px;height:13px;border-radius:50%;border:1.4px solid var(--ink-dim);background:linear-gradient(90deg,var(--ink-dim) 50%,transparent 50%)"></i>
+      </span>
+    </div>
+
+    <div class="panel" style="margin-top:22px;padding:22px 20px">
+      <h1 class="serif d-sm" style="font-size:30px">Welcome back</h1>
+      <p style="margin-top:6px;font-size:13px;color:var(--ink-dim)">Sign in to access your study decks</p>
+
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:15px">
+        <div>
+          <label class="dim" style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Email</label>
+          <span class="input" style="display:flex;align-items:center;color:var(--ink-dimmer);font-size:16px">you@example.com</span>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label class="dim" style="font-size:13px;font-weight:500">Password</label>
+            <span style="font-size:12px;font-weight:500;color:var(--ink-dim)">Forgot password?</span>
+          </div>
+          <span class="input" style="display:flex;align-items:center;justify-content:space-between;color:var(--ink);font-size:16px">
+            <span style="letter-spacing:.18em">••••••••</span>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ink-dimmer)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          </span>
+        </div>
+        <button class="btn btn--primary" style="width:100%;height:46px;font-size:15px">Sign in</button>
+      </div>
+
+      <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+        <span class="rule rule--soft" style="flex:1"></span>
+        <span style="font-size:12px;color:var(--ink-dimmer)">or continue with</span>
+        <span class="rule rule--soft" style="flex:1"></span>
+      </div>
+      <div style="margin-top:13px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="btn" style="height:44px"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82Z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.1A12 12 0 0 0 12 24Z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.26A12 12 0 0 0 0 12c0 1.94.46 3.77 1.26 5.38l4.01-3.1Z"/><path fill="#EA4335" d="M12 4.76c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.62l4.01 3.1c.95-2.85 3.6-4.96 6.73-4.96Z"/></svg>Google</button>
+        <button class="btn" style="height:44px"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18.6 4.3 19.6 4.6 19.6 4.6c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>GitHub</button>
+      </div>
+
+      <p style="margin-top:18px;text-align:center;font-size:14px;color:var(--ink-dim)">
+        Don't have an account? <span style="color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:4px">Sign up</span>
+      </p>
+    </div>
+
+    <!-- the specimen survives on mobile, reduced to its most honest part -->
+    <p class="lbl" style="margin-top:22px">What is waiting on the other side</p>
+    <ul style="margin-top:9px">
+      <li style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <i class="tick" style="background:var(--state-learning)"></i>
+        <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Explain Big-O notation</span>
+        <span class="mono" style="font-size:13px;color:var(--state-learning)">11h</span>
+      </li>
+      <li style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <i class="tick" style="background:var(--state-due)"></i>
+        <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Define polymorphism</span>
+        <span class="mono" style="font-size:13px;color:var(--state-due)">due</span>
+      </li>
+      <li style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <i class="tick" style="background:var(--state-mastered)"></i>
+        <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">What is a monad?</span>
+        <span class="mono" style="font-size:13px;color:var(--state-mastered)">4d</span>
+      </li>
+    </ul>
+  </div>
+</div>
+</div>
+    </div>
+    <div class="shot" style="margin-top:0">
+      <div class="shot__cap"><span class="t">Light mode</span><span class="d">same layout, own composition</span></div>
+      <div class="frame frame--light" data-w="1440" style="--ar:1440/900"><div class="screen screen--desktop" id="login-d-light">
+  <div class="amb"></div>
+  <div class="stage" style="flex-direction:row">
+
+    <!-- ═══ LEFT · a still life of the product, not a description of it ═══
+         The three specimen rows were the one genuinely good element on the
+         old page and they were a footnote. They are now the base of a
+         column whose subject is the object the product is built around:
+         a card, and the four intervals the scheduler will offer for it. -->
+    <section style="width:58%;flex:none;display:flex;flex-direction:column;justify-content:center;padding:0 0 0 88px">
+      <div style="width:100%;max-width:470px">
+
+        <p class="serif d-xl" style="line-height:.92">Cognit</p>
+        <p style="margin-top:14px;font-size:17px;line-height:1.5;color:var(--ink-dim);max-width:30ch">
+          The universal active recall engine.
+          <span style="color:var(--ink)">Study smarter, remember forever.</span>
+        </p>
+
+        <!-- the card: corner brackets on the flat ground, no fill (§7.6) -->
+        <div style="position:relative;margin-top:42px;padding:30px 26px;display:grid;place-items:center;min-height:118px">
+          <span class="brk brk--tl"></span><span class="brk brk--tr"></span>
+          <span class="brk brk--bl"></span><span class="brk brk--br"></span>
+          <p class="serif" style="font-size:31px;line-height:1.24;text-align:center;max-width:21ch">What is a closure, and what does it capture?</p>
+        </div>
+
+        <!-- the grade deck, inert. Real SM-2 intervals; Easy stays colourless. -->
+        <div style="margin-top:20px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;opacity:.62">
+          <div class="key" style="--key-state:var(--state-lapsed)"><span class="kk">1</span><span class="kn">Again</span><span class="ki">1m</span></div>
+          <div class="key" style="--key-state:var(--state-due)"><span class="kk">2</span><span class="kn">Hard</span><span class="ki">10m</span></div>
+          <div class="key" style="--key-state:var(--state-mastered)"><span class="kk">3</span><span class="kn">Good</span><span class="ki">4d</span></div>
+          <div class="key" style="--key-state:var(--state-neutral)"><span class="kk">4</span><span class="kn">Easy</span><span class="ki">9d</span></div>
+        </div>
+        <p class="lbl" style="margin-top:12px">Every key shows the interval before you commit</p>
+
+        <div class="rule" style="margin-top:34px"></div>
+        <ul>
+          <li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <i class="tick" style="background:var(--state-learning)"></i>
+            <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Explain Big-O notation</span>
+            <span class="mono" style="font-size:13px;color:var(--state-learning)">11h</span>
+          </li>
+          <li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <i class="tick" style="background:var(--state-due)"></i>
+            <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Define polymorphism</span>
+            <span class="mono" style="font-size:13px;color:var(--state-due)">due</span>
+          </li>
+          <li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+            <i class="tick" style="background:var(--state-mastered)"></i>
+            <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">What is a monad?</span>
+            <span class="mono" style="font-size:13px;color:var(--state-mastered)">4d</span>
+          </li>
+        </ul>
+        <p class="lbl" style="margin-top:14px">Next review, scheduled by SM-2</p>
+      </div>
+    </section>
+
+    <!-- the divider fades at both ends — a hard border-r is what made the
+         old page read as two pasted rectangles -->
+    <div class="rule--v" style="height:100%"></div>
+
+    <!-- ═══ RIGHT · the one lifted object on the page ═══════════════════ -->
+    <section style="flex:1;min-width:0;position:relative;display:flex;align-items:center;justify-content:center;padding:0 40px">
+      <span style="position:absolute;top:24px;right:28px;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <i style="display:block;width:13px;height:13px;border-radius:50%;border:1.4px solid var(--ink-dim);background:linear-gradient(90deg,var(--ink-dim) 50%,transparent 50%)"></i>
+      </span>
+
+      <div class="panel" style="width:100%;max-width:420px;padding:32px">
+        <h1 class="serif d">Welcome back</h1>
+        <p style="margin-top:8px;font-size:14px;color:var(--ink-dim)">Sign in to access your study decks</p>
+
+        <div style="margin-top:26px;display:flex;flex-direction:column;gap:18px">
+          <div>
+            <label class="dim" style="display:block;font-size:13px;font-weight:500;margin-bottom:7px">Email</label>
+            <span class="input" style="display:flex;align-items:center;color:var(--ink-dimmer)">you@example.com</span>
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+              <label class="dim" style="font-size:13px;font-weight:500">Password</label>
+              <span style="font-size:12px;font-weight:500;color:var(--ink-dim)">Forgot password?</span>
+            </div>
+            <span class="input" style="display:flex;align-items:center;justify-content:space-between;color:var(--ink)">
+              <span style="letter-spacing:.18em">••••••••</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-dimmer)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+            </span>
+          </div>
+          <button class="btn btn--primary btn--lg" style="width:100%">Sign in</button>
+        </div>
+
+        <div style="margin-top:22px;display:flex;align-items:center;gap:12px">
+          <span class="rule--soft rule" style="flex:1"></span>
+          <span style="font-size:12px;color:var(--ink-dimmer)">or continue with</span>
+          <span class="rule--soft rule" style="flex:1"></span>
+        </div>
+        <div style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <button class="btn btn--lg">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82Z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.1A12 12 0 0 0 12 24Z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.26A12 12 0 0 0 0 12c0 1.94.46 3.77 1.26 5.38l4.01-3.1Z"/><path fill="#EA4335" d="M12 4.76c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.62l4.01 3.1c.95-2.85 3.6-4.96 6.73-4.96Z"/></svg>
+            Google
+          </button>
+          <button class="btn btn--lg">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18.6 4.3 19.6 4.6 19.6 4.6c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>
+            GitHub
+          </button>
+        </div>
+
+        <p style="margin-top:24px;text-align:center;font-size:14px;color:var(--ink-dim)">
+          Don't have an account?
+          <span style="color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:4px">Sign up</span>
+        </p>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+    </div>
+  </div>
+
+  <h3 class="h">What changed and why</h3>
+  <div class="prose">
+    <p><strong>The left half stops describing the product and starts being it.</strong> A tagline plus three
+      sample rows is a marketing panel; every SaaS login has one. In its place: the card, bracket-framed on the
+      flat ground exactly as the study canvas renders it, and beneath it the <strong>grade deck, inert</strong>,
+      showing four real SM-2 intervals. The three specimen rows — the one genuinely good element on the old page —
+      move from footnote to the base of that column.</p>
+    <p>This is the one real risk in the set. It is justified: the grade deck is the product's signature object and
+      the single place the flat system yields to tactility. Nobody else's sign-in page has one, because nobody
+      else's product does. It also does something a tagline cannot — it tells a returning user what the session
+      waiting for them looks like.</p>
+    <p><strong>The hard <code>border-r</code> becomes a gradient hairline</strong> that fades at top and bottom.
+      That single change is most of why the page no longer reads as two rectangles pasted together.</p>
+    <p><strong>The heading steps down from 48px to 36px.</strong> In a 420px panel, <code>--type-display-lg</code>
+      was competing with the wordmark rather than sitting under it. 36px is still on the scale and still well above
+      the 24px serif floor.</p>
+    <p><strong>What I did not change:</strong> the 55/45 split (it earns its keep once the left half carries
+      information), the contained <code>.panel</code> at <code>--elevate-2</code>, the control geometry from
+      Fix&nbsp;Pack&nbsp;1, the OAuth row, or any copy in the form itself.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="dashboard">
+  <p class="eyebrow">05 · Surface two</p>
+  <h2 class="dserif">Dashboard</h2>
+  <p class="sub">Five stated requirements, all satisfied. Mocked at the real numbers — 12 decks, 519 due, four-digit
+    counts, long deck names — not an idealised dataset.</p>
+
+  <div class="shot">
+    <div class="shot__cap"><span class="t">Dashboard · desktop</span><span class="d">1440 × 900 · dark · nothing below this line is scrolled</span></div>
+    <div class="frame" data-w="1440" style="--ar:1440/900"><div class="screen screen--desktop dark" id="dash-d">
+  <div class="amb"></div>
+  <div class="stage" style="flex-direction:row">
+
+    <!-- 48px rail (existing chrome, shown for context) -->
+    <nav style="width:48px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:10px">
+      <span class="serif" style="font-size:22px;line-height:1">C</span>
+      <span style="display:block;width:20px;height:1px;background:var(--border);margin:4px 0"></span>
+      <span style="display:flex;flex-direction:column;gap:3px;width:15px;height:15px;justify-content:center">
+        <i style="display:block;height:1.5px;width:100%;background:var(--ink);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:72%;background:var(--ink);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:86%;background:var(--ink);border-radius:1px"></i>
+      </span>
+      <span style="width:15px;height:15px;border:1.5px solid var(--ink-dimmer);border-radius:3px;margin-top:8px"></span>
+      <span style="margin-top:auto;width:24px;height:24px;border-radius:var(--radius-pill);background:var(--surface-raised);border:1px solid var(--border-strong);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)">M</span>
+    </nav>
+
+    <main style="flex:1;min-width:0;padding:24px 32px 0;display:flex;flex-direction:column;gap:16px">
+
+      <!-- ═══ A · greeting left · telemetry right ═══════════════════════ -->
+      <header>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:40px;padding-bottom:13px">
+          <div style="min-width:0">
+            <h1 class="serif d">Good evening, Marc</h1>
+            <p style="margin-top:7px;font-size:13px;color:var(--ink-dim)">
+              Thursday, 10 September · <span class="mono" style="color:var(--ink)">9</span> of
+              <span class="mono" style="color:var(--ink)">12</span> decks need you today
+            </p>
+          </div>
+          <div class="tele-row" style="flex:none;padding-bottom:4px">
+            <span class="tele"><span class="lbl">Due</span><span class="tele__v" style="color:var(--state-due)">519</span></span>
+            <span class="tele"><span class="lbl">Retention</span><span class="tele__v">71%</span></span>
+            <span class="tele"><span class="lbl">Streak</span><span class="tele__v" style="color:var(--state-streak)">14d</span></span>
+            <span class="tele"><span class="lbl">Reviewed today</span><span class="tele__v">62</span></span>
+            <span style="display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--ink-dimmer);font-size:12px">Search <span class="kbd">⌘K</span></span>
+          </div>
+        </div>
+        <div class="rule"></div>
+      </header>
+
+      <!-- ═══ B · due band (raised) + create deck (its own container) ═══ -->
+      <section style="display:flex;gap:16px;align-items:stretch">
+
+        <div class="raised spec" style="flex:1;min-width:0;padding:16px 22px 14px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:24px">
+            <div style="display:flex;align-items:center;gap:18px;min-width:0">
+              <p class="mono" style="font-size:52px;font-weight:600;line-height:.86;letter-spacing:-.045em;color:var(--state-due)">519</p>
+              <div style="min-width:0">
+                <p style="font-size:14px;font-weight:500">cards due across <span class="mono">9</span> decks</p>
+                <p style="margin-top:3px;font-size:12px;color:var(--ink-dim)">
+                  oldest is <span class="mono">12</span> days overdue · est. <span class="mono">69</span> min
+                </p>
+              </div>
+            </div>
+            <button class="btn btn--primary btn--lg" style="flex:none">Start session <span class="kbd">S</span></button>
+          </div>
+
+          <div class="rule rule--soft" style="margin:14px 0 12px"></div>
+
+          <!-- Two paired readings: when the rest arrives, and where it is.
+               The forecast starts TOMORROW — today's count is already the
+               hero figure above, and at 519 it would be 4.6x the tallest
+               projected column and flatten every other bar to a stub. -->
+          <div style="display:flex;align-items:flex-start;gap:28px;flex:1">
+            <div style="flex:none;width:400px">
+              <p class="lbl">Next 7 days · <span class="mono" style="color:var(--ink)">417</span> cards</p>
+              <div class="bars" style="margin-top:9px">
+                <div class="bars__col"><span class="dnum" style="width:auto">88</span><span class="bars__track"><i class="bars__b" style="height:79%"></i></span><span class="lbl">Fri</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">41</span><span class="bars__track"><i class="bars__b" style="height:37%"></i></span><span class="lbl">Sat</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">64</span><span class="bars__track"><i class="bars__b" style="height:57%"></i></span><span class="lbl">Sun</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">112</span><span class="bars__track"><i class="bars__b" style="height:100%"></i></span><span class="lbl">Mon</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">33</span><span class="bars__track"><i class="bars__b" style="height:29%"></i></span><span class="lbl">Tue</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">52</span><span class="bars__track"><i class="bars__b" style="height:46%"></i></span><span class="lbl">Wed</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">27</span><span class="bars__track"><i class="bars__b" style="height:24%"></i></span><span class="lbl">Thu</span></div>
+              </div>
+            </div>
+
+            <div class="rule--v" style="align-self:stretch"></div>
+
+            <div style="flex:1;min-width:0">
+              <p class="lbl">Due now, by deck</p>
+              <ul style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dim" style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">TECHNO</span><span class="mono" style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--state-due)">334</span></li>
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dim" style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">RIZAL MIDTERMS</span><span class="mono" style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--state-due)">48</span></li>
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dim" style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Cloud Computing</span><span class="mono" style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--state-due)">40</span></li>
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dimmer" style="flex:1;font-size:12px">+ 6 more decks</span><span class="mono dimmer" style="font-size:12px;font-variant-numeric:tabular-nums">97</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Create deck: prominence by container mass + position, not by a
+             second filled button (§7.2 allows exactly one per screen). -->
+        <a class="surface spec" href="#" style="width:340px;flex:none;padding:16px 20px;display:flex;flex-direction:column;text-decoration:none;border-color:var(--border-control)">
+          <span style="position:relative;display:grid;place-items:center;width:42px;height:42px">
+            <span class="brk brk--tl"></span><span class="brk brk--tr"></span>
+            <span class="brk brk--bl"></span><span class="brk brk--br"></span>
+            <span style="position:relative;width:17px;height:17px"><i style="position:absolute;top:8px;left:0;width:17px;height:1.5px;background:var(--ink)"></i><i style="position:absolute;left:8px;top:0;height:17px;width:1.5px;background:var(--ink)"></i></span>
+          </span>
+          <p style="margin-top:14px;font-size:16px;font-weight:600;color:var(--ink)">Create deck</p>
+          <p style="margin-top:4px;font-size:13px;color:var(--ink-dim);line-height:1.45">
+            Start blank, paste notes, or generate cards from a PDF.
+          </p>
+          <span style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding-top:12px">
+            <span class="lbl">New deck</span>
+            <span class="kbd">⌘N</span>
+          </span>
+        </a>
+      </section>
+
+      <!-- ═══ C · one instrument panel, three cells, above the fold ═════ -->
+      <section class="surface spec" style="display:flex;align-items:stretch;padding:14px 20px 12px">
+
+        <div style="flex:1;min-width:0;padding-right:22px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+            <h2 class="lbl">Activity · 6 months</h2>
+            <p class="lbl"><span class="mono" style="color:var(--ink)">1,647</span> reviews all time</p>
+          </div>
+          <div class="heat" style="--cell:10px;--cellgap:2.5px;margin-top:10px;align-self:flex-start"><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="3"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i></div></div>
+          <div style="margin-top:auto;padding-top:10px;display:flex;align-items:center;gap:8px">
+            <span style="width:337px;display:flex;justify-content:space-between">
+              <span class="lbl">Apr</span><span class="lbl">May</span><span class="lbl">Jun</span>
+              <span class="lbl">Jul</span><span class="lbl">Aug</span><span class="lbl">Sep</span>
+            </span>
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px">
+              <span class="lbl">Less</span>
+              <i class="heat__c" data-i="0" style="--cell:9px;box-shadow:inset 0 0 0 1px var(--border)"></i><i class="heat__c" data-i="1" style="--cell:9px"></i>
+              <i class="heat__c" data-i="2" style="--cell:9px"></i><i class="heat__c" data-i="3" style="--cell:9px"></i>
+              <i class="heat__c" data-i="4" style="--cell:9px"></i>
+              <span class="lbl">More</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="rule--v"></div>
+
+        <div style="width:238px;flex:none;padding:0 22px;display:flex;flex-direction:column">
+          <h2 class="lbl">Recall accuracy · 30d</h2>
+          <div style="margin-top:10px;display:flex;align-items:baseline;gap:8px">
+            <p class="mono" style="font-size:32px;font-weight:600;line-height:1;letter-spacing:-.03em">71%</p>
+            <span class="mono" style="font-size:12px;color:var(--state-mastered)">▲ 4.2</span>
+          </div>
+          <div class="spark" style="margin-top:12px"><span style="height:41%"></span><span data-zero></span><span style="height:42%"></span><span style="height:66%"></span><span style="height:39%"></span><span style="height:24%"></span><span style="height:53%"></span><span style="height:76%"></span><span style="height:53%"></span><span style="height:32%"></span><span style="height:100%"></span><span style="height:41%"></span><span style="height:70%"></span><span style="height:93%"></span><span style="height:28%"></span><span style="height:65%"></span><span style="height:43%"></span><span style="height:70%"></span><span style="height:62%"></span><span style="height:32%"></span></div>
+          <div style="margin-top:auto;padding-top:11px;display:flex;justify-content:space-between">
+            <span style="display:inline-flex;align-items:center;gap:5px"><i class="tick" style="height:9px;background:var(--state-due)"></i><span class="lbl">Due</span></span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><i class="tick" style="height:9px;background:var(--state-learning)"></i><span class="lbl">Learning</span></span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><i class="tick" style="height:9px;background:var(--state-mastered)"></i><span class="lbl">Mastered</span></span>
+          </div>
+        </div>
+
+        <div class="rule--v"></div>
+
+        <div style="width:238px;flex:none;padding-left:22px;display:flex;flex-direction:column">
+          <h2 class="lbl">Session streak</h2>
+          <div style="margin-top:10px;display:flex;align-items:baseline;gap:8px">
+            <p class="mono" style="font-size:32px;font-weight:600;line-height:1;letter-spacing:-.03em;color:var(--state-streak)">14</p>
+            <span class="mono" style="font-size:12px;color:var(--ink-dimmer)">days · best <span style="color:var(--ink-dim)">31</span></span>
+          </div>
+          <div class="dayrow" style="margin-top:14px;gap:3px"><i></i><i></i><i data-on></i><i></i><i data-on></i><i></i><i></i><i data-on></i><i></i><i data-on></i><i></i><i></i><i></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-today></i></div>
+          <p class="lbl" style="margin-top:auto;padding-top:11px">Logged today · 28-day window</p>
+        </div>
+      </section>
+
+      <!-- ═══ D · deck index in a recessed well ════════════════════════ -->
+      <section style="flex:1;min-height:0;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:14px;padding-bottom:10px">
+          <h2 class="lbl" style="flex:none">All decks</h2>
+          <span class="rule" style="flex:1"></span>
+          <span class="mono dimmer" style="font-size:11px;flex:none">12 decks · 1,647 cards</span>
+          <span style="flex:none;display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;color:var(--ink-dimmer)">Filter decks</span>
+          <span style="flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:12px;color:var(--ink)">Most due ▾</span>
+        </div>
+
+        <div class="well" style="flex:1;min-height:0;overflow:hidden">
+          <div class="legend">
+            <span style="width:2px"></span>
+            <span class="lbl" style="flex:1">Deck</span>
+            <span class="lbl" style="width:48px;text-align:right">Cards</span>
+            <span class="lbl" style="width:44px;text-align:right">Due</span>
+            <span class="lbl" style="width:44px;text-align:right">Ease</span>
+            <span class="lbl" style="width:152px;text-align:right">Mastery</span>
+            <span class="lbl" style="width:56px;text-align:right">Quizzed</span>
+          </div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">TECHNO</span></span><span class="dnum" style="width:48px">412</span><span class="dnum" style="width:44px;color:var(--state-due)">334</span><span class="dnum" style="width:44px">2.18</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:34%"></i></span><span class="dnum" style="width:34px">34%</span></span><span class="dnum dimmer" style="width:56px">2h</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">RIZAL MIDTERMS</span><span class="lbl">HIST</span></span><span class="dnum" style="width:48px">186</span><span class="dnum" style="width:44px;color:var(--state-due)">48</span><span class="dnum" style="width:44px">2.41</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:61%"></i></span><span class="dnum" style="width:34px">61%</span></span><span class="dnum dimmer" style="width:56px">1d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Cloud Computing</span></span><span class="dnum" style="width:48px">154</span><span class="dnum" style="width:44px;color:var(--state-due)">40</span><span class="dnum" style="width:44px">2.35</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:58%"></i></span><span class="dnum" style="width:34px">58%</span></span><span class="dnum dimmer" style="width:56px">3d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">PND MIDTERMS</span></span><span class="dnum" style="width:48px">143</span><span class="dnum" style="width:44px;color:var(--state-due)">38</span><span class="dnum" style="width:44px">2.29</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:47%"></i></span><span class="dnum" style="width:34px">47%</span></span><span class="dnum dimmer" style="width:56px">1d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">pl quiz 2</span></span><span class="dnum" style="width:48px">62</span><span class="dnum" style="width:44px;color:var(--state-due)">15</span><span class="dnum" style="width:44px">2.52</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:72%"></i></span><span class="dnum" style="width:34px">72%</span></span><span class="dnum dimmer" style="width:56px">5d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">COMARCH</span></span><span class="dnum" style="width:48px">88</span><span class="dnum" style="width:44px;color:var(--state-due)">15</span><span class="dnum" style="width:44px">2.44</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:66%"></i></span><span class="dnum" style="width:34px">66%</span></span><span class="dnum dimmer" style="width:56px">4d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Data Structures &amp; Algorithms</span></span><span class="dnum" style="width:48px">137</span><span class="dnum" style="width:44px;color:var(--state-due)">12</span><span class="dnum" style="width:44px">2.61</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:78%"></i></span><span class="dnum" style="width:34px">78%</span></span><span class="dnum dimmer" style="width:56px">6d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Ethics &amp; Society</span></span><span class="dnum" style="width:48px">71</span><span class="dnum" style="width:44px;color:var(--state-due)">9</span><span class="dnum" style="width:44px">2.55</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:74%"></i></span><span class="dnum" style="width:34px">74%</span></span><span class="dnum dimmer" style="width:56px">1w</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Networking Lab</span></span><span class="dnum" style="width:48px">96</span><span class="dnum" style="width:44px;color:var(--state-due)">8</span><span class="dnum" style="width:44px">2.48</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:69%"></i></span><span class="dnum" style="width:34px">69%</span></span><span class="dnum dimmer" style="width:56px">8d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-mastered)"></i><span class="drow__n"><span class="drow__t">Discrete Math</span></span><span class="dnum" style="width:48px">118</span><span class="dnum dimmer" style="width:44px">0</span><span class="dnum" style="width:44px">2.70</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:83%"></i></span><span class="dnum" style="width:34px">83%</span></span><span class="dnum dimmer" style="width:56px">2w</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</div>
+  </div>
+  <div class="pair">
+    <div class="shot" style="margin-top:0">
+      <div class="shot__cap"><span class="t">Mobile</span><span class="d">390 × 844</span></div>
+      <div class="frame" data-w="390" style="--ar:390/844"><div class="screen screen--mobile dark" id="dash-m">
+  <div class="amb"></div>
+  <div class="stage" style="padding:20px 16px 0;gap:13px;overflow:hidden">
+
+    <!-- greeting and telemetry cannot sit side by side at 390px, so the
+         row becomes two rows in the same order: identity, then state -->
+    <header style="flex:none">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="min-width:0">
+          <h1 class="serif" style="font-size:29px;line-height:1.1">Good evening, Marc</h1>
+          <p style="margin-top:5px;font-size:12px;color:var(--ink-dim)">Thu 10 Sep · <span class="mono" style="color:var(--ink)">9</span> of <span class="mono" style="color:var(--ink)">12</span> decks need you</p>
+        </div>
+        <span style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font-mono);font-size:12px;color:var(--ink-dimmer)">⌘K</span>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:space-between;gap:8px">
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Due</span><span class="mono" style="font-size:15px;line-height:1;color:var(--state-due)">519</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Retention</span><span class="mono" style="font-size:15px;line-height:1">71%</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Streak</span><span class="mono" style="font-size:15px;line-height:1;color:var(--state-streak)">14d</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Today</span><span class="mono" style="font-size:15px;line-height:1">62</span></span>
+      </div>
+      <div class="rule" style="margin-top:12px"></div>
+    </header>
+
+    <section class="raised spec" style="flex:none;padding:14px 16px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <p class="mono" style="font-size:42px;font-weight:600;line-height:.86;letter-spacing:-.045em;color:var(--state-due)">519</p>
+        <div style="min-width:0">
+          <p style="font-size:13px;font-weight:500">cards due · <span class="mono">9</span> decks</p>
+          <p style="margin-top:2px;font-size:11px;color:var(--ink-dim)">oldest <span class="mono">12d</span> overdue · est. <span class="mono">69</span> min</p>
+        </div>
+      </div>
+      <button class="btn btn--primary" style="margin-top:13px;width:100%;height:44px;font-size:15px">Start session</button>
+      <div class="rule rule--soft" style="margin:13px 0 10px"></div>
+      <div style="display:flex;align-items:flex-end;gap:14px">
+        <div style="flex:none">
+          <p class="lbl">Next 7d</p>
+          <p class="mono" style="margin-top:4px;font-size:13px;color:var(--ink-dim)">417</p>
+        </div>
+        <div class="bars" style="flex:1;min-width:0;gap:5px">
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:79%"></i></span><span class="lbl">F</span></div>
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:37%"></i></span><span class="lbl">S</span></div>
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:57%"></i></span><span class="lbl">S</span></div>
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:100%"></i></span><span class="lbl">M</span></div>
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:29%"></i></span><span class="lbl">T</span></div>
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:46%"></i></span><span class="lbl">W</span></div>
+          <div class="bars__col" style="gap:4px"><span class="bars__track" style="height:30px;max-width:18px"><i class="bars__b" style="height:24%"></i></span><span class="lbl">T</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- no container mass available at 390px, so Create deck takes
+         prominence from position: directly under the primary action -->
+    <a class="surface" href="#" style="flex:none;display:flex;align-items:center;gap:13px;padding:0 16px;height:54px;text-decoration:none;border-color:var(--border-control)">
+      <span style="position:relative;width:16px;height:16px;flex:none">
+        <i style="position:absolute;top:7px;left:0;width:16px;height:1.5px;background:var(--ink)"></i>
+        <i style="position:absolute;left:7px;top:0;height:16px;width:1.5px;background:var(--ink)"></i>
+      </span>
+      <span style="min-width:0">
+        <span style="display:block;font-size:14px;font-weight:600">Create deck</span>
+        <span style="display:block;font-size:11px;color:var(--ink-dim)">Blank, notes, or from a PDF</span>
+      </span>
+      <span class="dimmer" style="margin-left:auto;font-size:15px">›</span>
+    </a>
+
+    <section class="surface spec" style="flex:none;padding:13px 16px">
+      <div style="display:flex;align-items:baseline;justify-content:space-between">
+        <h2 class="lbl">Activity · 3 months</h2>
+        <span class="lbl"><span class="mono" style="color:var(--ink)">1,647</span> all time</span>
+      </div>
+      <div class="heat" style="--cell:9px;--cellgap:2.5px;margin-top:9px"><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i></div></div>
+      <div class="rule rule--soft" style="margin:12px 0 11px"></div>
+      <div style="display:flex;gap:18px">
+        <div style="flex:1;min-width:0">
+          <p class="lbl">Recall · 30d</p>
+          <p class="mono" style="margin-top:5px;font-size:22px;font-weight:600;line-height:1;letter-spacing:-.03em">71% <span style="font-size:11px;color:var(--state-mastered);font-weight:400">▲4.2</span></p>
+        </div>
+        <div class="rule--v" style="align-self:stretch"></div>
+        <div style="flex:1;min-width:0">
+          <p class="lbl">Streak</p>
+          <p class="mono" style="margin-top:5px;font-size:22px;font-weight:600;line-height:1;letter-spacing:-.03em;color:var(--state-streak)">14 <span style="font-size:11px;color:var(--ink-dimmer);font-weight:400">days · best 31</span></p>
+        </div>
+      </div>
+      <div class="dayrow" style="margin-top:11px;gap:3px"><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-today></i></div>
+    </section>
+
+    <section style="flex:1;min-height:0;display:flex;flex-direction:column">
+      <div style="flex:none;display:flex;align-items:center;gap:10px;padding-bottom:8px">
+        <h2 class="lbl" style="flex:none">All decks</h2>
+        <span class="rule" style="flex:1"></span>
+        <span class="mono dimmer" style="font-size:11px">12 · most due</span>
+      </div>
+      <div class="well" style="flex:1;min-height:0;overflow:hidden">
+        <div class="drow" style="height:40px;padding:0 12px;gap:10px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">TECHNO</span></span><span class="dnum" style="width:38px">412</span><span class="dnum" style="width:38px;color:var(--state-due)">334</span></div>
+        <div class="drow" style="height:40px;padding:0 12px;gap:10px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">RIZAL MIDTERMS</span></span><span class="dnum" style="width:38px">186</span><span class="dnum" style="width:38px;color:var(--state-due)">48</span></div>
+        <div class="drow" style="height:40px;padding:0 12px;gap:10px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Cloud Computing</span></span><span class="dnum" style="width:38px">154</span><span class="dnum" style="width:38px;color:var(--state-due)">40</span></div>
+        <div class="drow" style="height:40px;padding:0 12px;gap:10px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">PND MIDTERMS</span></span><span class="dnum" style="width:38px">143</span><span class="dnum" style="width:38px;color:var(--state-due)">38</span></div>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+    </div>
+    <div class="shot" style="margin-top:0">
+      <div class="shot__cap"><span class="t">Light mode</span><span class="d">1440 × 900</span></div>
+      <div class="frame frame--light" data-w="1440" style="--ar:1440/900"><div class="screen screen--desktop" id="dash-d-light">
+  <div class="amb"></div>
+  <div class="stage" style="flex-direction:row">
+
+    <!-- 48px rail (existing chrome, shown for context) -->
+    <nav style="width:48px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:10px">
+      <span class="serif" style="font-size:22px;line-height:1">C</span>
+      <span style="display:block;width:20px;height:1px;background:var(--border);margin:4px 0"></span>
+      <span style="display:flex;flex-direction:column;gap:3px;width:15px;height:15px;justify-content:center">
+        <i style="display:block;height:1.5px;width:100%;background:var(--ink);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:72%;background:var(--ink);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:86%;background:var(--ink);border-radius:1px"></i>
+      </span>
+      <span style="width:15px;height:15px;border:1.5px solid var(--ink-dimmer);border-radius:3px;margin-top:8px"></span>
+      <span style="margin-top:auto;width:24px;height:24px;border-radius:var(--radius-pill);background:var(--surface-raised);border:1px solid var(--border-strong);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)">M</span>
+    </nav>
+
+    <main style="flex:1;min-width:0;padding:24px 32px 0;display:flex;flex-direction:column;gap:16px">
+
+      <!-- ═══ A · greeting left · telemetry right ═══════════════════════ -->
+      <header>
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:40px;padding-bottom:13px">
+          <div style="min-width:0">
+            <h1 class="serif d">Good evening, Marc</h1>
+            <p style="margin-top:7px;font-size:13px;color:var(--ink-dim)">
+              Thursday, 10 September · <span class="mono" style="color:var(--ink)">9</span> of
+              <span class="mono" style="color:var(--ink)">12</span> decks need you today
+            </p>
+          </div>
+          <div class="tele-row" style="flex:none;padding-bottom:4px">
+            <span class="tele"><span class="lbl">Due</span><span class="tele__v" style="color:var(--state-due)">519</span></span>
+            <span class="tele"><span class="lbl">Retention</span><span class="tele__v">71%</span></span>
+            <span class="tele"><span class="lbl">Streak</span><span class="tele__v" style="color:var(--state-streak)">14d</span></span>
+            <span class="tele"><span class="lbl">Reviewed today</span><span class="tele__v">62</span></span>
+            <span style="display:inline-flex;align-items:center;gap:8px;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--ink-dimmer);font-size:12px">Search <span class="kbd">⌘K</span></span>
+          </div>
+        </div>
+        <div class="rule"></div>
+      </header>
+
+      <!-- ═══ B · due band (raised) + create deck (its own container) ═══ -->
+      <section style="display:flex;gap:16px;align-items:stretch">
+
+        <div class="raised spec" style="flex:1;min-width:0;padding:16px 22px 14px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:24px">
+            <div style="display:flex;align-items:center;gap:18px;min-width:0">
+              <p class="mono" style="font-size:52px;font-weight:600;line-height:.86;letter-spacing:-.045em;color:var(--state-due)">519</p>
+              <div style="min-width:0">
+                <p style="font-size:14px;font-weight:500">cards due across <span class="mono">9</span> decks</p>
+                <p style="margin-top:3px;font-size:12px;color:var(--ink-dim)">
+                  oldest is <span class="mono">12</span> days overdue · est. <span class="mono">69</span> min
+                </p>
+              </div>
+            </div>
+            <button class="btn btn--primary btn--lg" style="flex:none">Start session <span class="kbd">S</span></button>
+          </div>
+
+          <div class="rule rule--soft" style="margin:14px 0 12px"></div>
+
+          <!-- Two paired readings: when the rest arrives, and where it is.
+               The forecast starts TOMORROW — today's count is already the
+               hero figure above, and at 519 it would be 4.6x the tallest
+               projected column and flatten every other bar to a stub. -->
+          <div style="display:flex;align-items:flex-start;gap:28px;flex:1">
+            <div style="flex:none;width:400px">
+              <p class="lbl">Next 7 days · <span class="mono" style="color:var(--ink)">417</span> cards</p>
+              <div class="bars" style="margin-top:9px">
+                <div class="bars__col"><span class="dnum" style="width:auto">88</span><span class="bars__track"><i class="bars__b" style="height:79%"></i></span><span class="lbl">Fri</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">41</span><span class="bars__track"><i class="bars__b" style="height:37%"></i></span><span class="lbl">Sat</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">64</span><span class="bars__track"><i class="bars__b" style="height:57%"></i></span><span class="lbl">Sun</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">112</span><span class="bars__track"><i class="bars__b" style="height:100%"></i></span><span class="lbl">Mon</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">33</span><span class="bars__track"><i class="bars__b" style="height:29%"></i></span><span class="lbl">Tue</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">52</span><span class="bars__track"><i class="bars__b" style="height:46%"></i></span><span class="lbl">Wed</span></div>
+                <div class="bars__col"><span class="dnum" style="width:auto">27</span><span class="bars__track"><i class="bars__b" style="height:24%"></i></span><span class="lbl">Thu</span></div>
+              </div>
+            </div>
+
+            <div class="rule--v" style="align-self:stretch"></div>
+
+            <div style="flex:1;min-width:0">
+              <p class="lbl">Due now, by deck</p>
+              <ul style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dim" style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">TECHNO</span><span class="mono" style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--state-due)">334</span></li>
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dim" style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">RIZAL MIDTERMS</span><span class="mono" style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--state-due)">48</span></li>
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dim" style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Cloud Computing</span><span class="mono" style="font-size:13px;font-variant-numeric:tabular-nums;color:var(--state-due)">40</span></li>
+                <li style="display:flex;align-items:baseline;gap:12px"><span class="dimmer" style="flex:1;font-size:12px">+ 6 more decks</span><span class="mono dimmer" style="font-size:12px;font-variant-numeric:tabular-nums">97</span></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Create deck: prominence by container mass + position, not by a
+             second filled button (§7.2 allows exactly one per screen). -->
+        <a class="surface spec" href="#" style="width:340px;flex:none;padding:16px 20px;display:flex;flex-direction:column;text-decoration:none;border-color:var(--border-control)">
+          <span style="position:relative;display:grid;place-items:center;width:42px;height:42px">
+            <span class="brk brk--tl"></span><span class="brk brk--tr"></span>
+            <span class="brk brk--bl"></span><span class="brk brk--br"></span>
+            <span style="position:relative;width:17px;height:17px"><i style="position:absolute;top:8px;left:0;width:17px;height:1.5px;background:var(--ink)"></i><i style="position:absolute;left:8px;top:0;height:17px;width:1.5px;background:var(--ink)"></i></span>
+          </span>
+          <p style="margin-top:14px;font-size:16px;font-weight:600;color:var(--ink)">Create deck</p>
+          <p style="margin-top:4px;font-size:13px;color:var(--ink-dim);line-height:1.45">
+            Start blank, paste notes, or generate cards from a PDF.
+          </p>
+          <span style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding-top:12px">
+            <span class="lbl">New deck</span>
+            <span class="kbd">⌘N</span>
+          </span>
+        </a>
+      </section>
+
+      <!-- ═══ C · one instrument panel, three cells, above the fold ═════ -->
+      <section class="surface spec" style="display:flex;align-items:stretch;padding:14px 20px 12px">
+
+        <div style="flex:1;min-width:0;padding-right:22px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;gap:16px">
+            <h2 class="lbl">Activity · 6 months</h2>
+            <p class="lbl"><span class="mono" style="color:var(--ink)">1,647</span> reviews all time</p>
+          </div>
+          <div class="heat" style="--cell:10px;--cellgap:2.5px;margin-top:10px;align-self:flex-start"><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="3"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="0"></i></div><div class="heat__wk"><i class="heat__c" data-i="0"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i></div><div class="heat__wk"><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="1"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i></div><div class="heat__wk"><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="4"></i><i class="heat__c" data-i="3"></i><i class="heat__c" data-i="2"></i><i class="heat__c" data-i="2"></i></div></div>
+          <div style="margin-top:auto;padding-top:10px;display:flex;align-items:center;gap:8px">
+            <span style="width:337px;display:flex;justify-content:space-between">
+              <span class="lbl">Apr</span><span class="lbl">May</span><span class="lbl">Jun</span>
+              <span class="lbl">Jul</span><span class="lbl">Aug</span><span class="lbl">Sep</span>
+            </span>
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px">
+              <span class="lbl">Less</span>
+              <i class="heat__c" data-i="0" style="--cell:9px;box-shadow:inset 0 0 0 1px var(--border)"></i><i class="heat__c" data-i="1" style="--cell:9px"></i>
+              <i class="heat__c" data-i="2" style="--cell:9px"></i><i class="heat__c" data-i="3" style="--cell:9px"></i>
+              <i class="heat__c" data-i="4" style="--cell:9px"></i>
+              <span class="lbl">More</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="rule--v"></div>
+
+        <div style="width:238px;flex:none;padding:0 22px;display:flex;flex-direction:column">
+          <h2 class="lbl">Recall accuracy · 30d</h2>
+          <div style="margin-top:10px;display:flex;align-items:baseline;gap:8px">
+            <p class="mono" style="font-size:32px;font-weight:600;line-height:1;letter-spacing:-.03em">71%</p>
+            <span class="mono" style="font-size:12px;color:var(--state-mastered)">▲ 4.2</span>
+          </div>
+          <div class="spark" style="margin-top:12px"><span style="height:41%"></span><span data-zero></span><span style="height:42%"></span><span style="height:66%"></span><span style="height:39%"></span><span style="height:24%"></span><span style="height:53%"></span><span style="height:76%"></span><span style="height:53%"></span><span style="height:32%"></span><span style="height:100%"></span><span style="height:41%"></span><span style="height:70%"></span><span style="height:93%"></span><span style="height:28%"></span><span style="height:65%"></span><span style="height:43%"></span><span style="height:70%"></span><span style="height:62%"></span><span style="height:32%"></span></div>
+          <div style="margin-top:auto;padding-top:11px;display:flex;justify-content:space-between">
+            <span style="display:inline-flex;align-items:center;gap:5px"><i class="tick" style="height:9px;background:var(--state-due)"></i><span class="lbl">Due</span></span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><i class="tick" style="height:9px;background:var(--state-learning)"></i><span class="lbl">Learning</span></span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><i class="tick" style="height:9px;background:var(--state-mastered)"></i><span class="lbl">Mastered</span></span>
+          </div>
+        </div>
+
+        <div class="rule--v"></div>
+
+        <div style="width:238px;flex:none;padding-left:22px;display:flex;flex-direction:column">
+          <h2 class="lbl">Session streak</h2>
+          <div style="margin-top:10px;display:flex;align-items:baseline;gap:8px">
+            <p class="mono" style="font-size:32px;font-weight:600;line-height:1;letter-spacing:-.03em;color:var(--state-streak)">14</p>
+            <span class="mono" style="font-size:12px;color:var(--ink-dimmer)">days · best <span style="color:var(--ink-dim)">31</span></span>
+          </div>
+          <div class="dayrow" style="margin-top:14px;gap:3px"><i></i><i></i><i data-on></i><i></i><i data-on></i><i></i><i></i><i data-on></i><i></i><i data-on></i><i></i><i></i><i></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-on></i><i data-today></i></div>
+          <p class="lbl" style="margin-top:auto;padding-top:11px">Logged today · 28-day window</p>
+        </div>
+      </section>
+
+      <!-- ═══ D · deck index in a recessed well ════════════════════════ -->
+      <section style="flex:1;min-height:0;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:center;gap:14px;padding-bottom:10px">
+          <h2 class="lbl" style="flex:none">All decks</h2>
+          <span class="rule" style="flex:1"></span>
+          <span class="mono dimmer" style="font-size:11px;flex:none">12 decks · 1,647 cards</span>
+          <span style="flex:none;display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;color:var(--ink-dimmer)">Filter decks</span>
+          <span style="flex:none;display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:12px;color:var(--ink)">Most due ▾</span>
+        </div>
+
+        <div class="well" style="flex:1;min-height:0;overflow:hidden">
+          <div class="legend">
+            <span style="width:2px"></span>
+            <span class="lbl" style="flex:1">Deck</span>
+            <span class="lbl" style="width:48px;text-align:right">Cards</span>
+            <span class="lbl" style="width:44px;text-align:right">Due</span>
+            <span class="lbl" style="width:44px;text-align:right">Ease</span>
+            <span class="lbl" style="width:152px;text-align:right">Mastery</span>
+            <span class="lbl" style="width:56px;text-align:right">Quizzed</span>
+          </div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">TECHNO</span></span><span class="dnum" style="width:48px">412</span><span class="dnum" style="width:44px;color:var(--state-due)">334</span><span class="dnum" style="width:44px">2.18</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:34%"></i></span><span class="dnum" style="width:34px">34%</span></span><span class="dnum dimmer" style="width:56px">2h</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">RIZAL MIDTERMS</span><span class="lbl">HIST</span></span><span class="dnum" style="width:48px">186</span><span class="dnum" style="width:44px;color:var(--state-due)">48</span><span class="dnum" style="width:44px">2.41</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:61%"></i></span><span class="dnum" style="width:34px">61%</span></span><span class="dnum dimmer" style="width:56px">1d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Cloud Computing</span></span><span class="dnum" style="width:48px">154</span><span class="dnum" style="width:44px;color:var(--state-due)">40</span><span class="dnum" style="width:44px">2.35</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:58%"></i></span><span class="dnum" style="width:34px">58%</span></span><span class="dnum dimmer" style="width:56px">3d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">PND MIDTERMS</span></span><span class="dnum" style="width:48px">143</span><span class="dnum" style="width:44px;color:var(--state-due)">38</span><span class="dnum" style="width:44px">2.29</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:47%"></i></span><span class="dnum" style="width:34px">47%</span></span><span class="dnum dimmer" style="width:56px">1d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">pl quiz 2</span></span><span class="dnum" style="width:48px">62</span><span class="dnum" style="width:44px;color:var(--state-due)">15</span><span class="dnum" style="width:44px">2.52</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:72%"></i></span><span class="dnum" style="width:34px">72%</span></span><span class="dnum dimmer" style="width:56px">5d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">COMARCH</span></span><span class="dnum" style="width:48px">88</span><span class="dnum" style="width:44px;color:var(--state-due)">15</span><span class="dnum" style="width:44px">2.44</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:66%"></i></span><span class="dnum" style="width:34px">66%</span></span><span class="dnum dimmer" style="width:56px">4d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Data Structures &amp; Algorithms</span></span><span class="dnum" style="width:48px">137</span><span class="dnum" style="width:44px;color:var(--state-due)">12</span><span class="dnum" style="width:44px">2.61</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:78%"></i></span><span class="dnum" style="width:34px">78%</span></span><span class="dnum dimmer" style="width:56px">6d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Ethics &amp; Society</span></span><span class="dnum" style="width:48px">71</span><span class="dnum" style="width:44px;color:var(--state-due)">9</span><span class="dnum" style="width:44px">2.55</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:74%"></i></span><span class="dnum" style="width:34px">74%</span></span><span class="dnum dimmer" style="width:56px">1w</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n"><span class="drow__t">Networking Lab</span></span><span class="dnum" style="width:48px">96</span><span class="dnum" style="width:44px;color:var(--state-due)">8</span><span class="dnum" style="width:44px">2.48</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i style="width:69%"></i></span><span class="dnum" style="width:34px">69%</span></span><span class="dnum dimmer" style="width:56px">8d</span></div>
+          <div class="drow"><i class="tick" style="background:var(--state-mastered)"></i><span class="drow__n"><span class="drow__t">Discrete Math</span></span><span class="dnum" style="width:48px">118</span><span class="dnum dimmer" style="width:44px">0</span><span class="dnum" style="width:44px">2.70</span><span style="width:152px;display:flex;align-items:center;justify-content:flex-end;gap:8px"><span class="meter"><i data-mastered style="width:83%"></i></span><span class="dnum" style="width:34px">83%</span></span><span class="dnum dimmer" style="width:56px">2w</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</div>
+    </div>
+  </div>
+
+  <h3 class="h">The five requirements</h3>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>#</th><th>Requirement</th><th>How it is met</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Heatmap and activity visible at first paint, 1440×900, no scrolling</td>
+        <td>The signal band sits <strong>third of four</strong>, at ~460px. Six months of activity, retention and
+          streak are all above the fold — and so are <strong>nine deck rows</strong>, against the Rev. B
+          acceptance bar of six.</td></tr>
+      <tr><td>2</td><td>Create Deck becomes its own prominent container</td>
+        <td>A full-height 340px panel beside the due band, with a bracket-framed <code>+</code>, a 16px/600 title,
+          a description and <code>⌘N</code>. Prominence comes from <strong>container mass and position</strong>,
+          not fill — see the trade-off below.</td></tr>
+      <tr><td>3</td><td>Import PDF removed from this page entirely</td>
+        <td>Gone. &ldquo;Generate cards from a PDF&rdquo; survives only as a way to <em>create</em> a deck, inside
+          the Create Deck panel — which is a different action from importing into an existing deck.</td></tr>
+      <tr><td>4</td><td>Telemetry cluster moves right</td>
+        <td>Top row, right-aligned, baseline-aligned to the greeting, with the <code>⌘K</code> affordance at the
+          end. Unchanged <code>Telemetry</code> component.</td></tr>
+      <tr><td>5</td><td>Greeting header on the left</td>
+        <td><code>Good evening, Marc</code> in Instrument Serif at 36px, with a dated sub-line that carries real
+          information rather than filler: <em>9 of 12 decks need you today</em>.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 class="h">Structural changes beyond the five</h3>
+  <div class="prose">
+    <ul>
+      <li><strong>The right rail is gone; the page is four full-width bands.</strong> A 320px rail cost the deck
+        table a fifth of its width, and with names like <em>Data Structures &amp; Algorithms</em> that width is
+        not spare. Retention and streak lose nothing by sitting in a divided panel instead of stacked cards.</li>
+      <li><strong>Retention, streak and the heatmap are one container split by two gradient rules</strong>, not
+        three cards. Three cards read as three unrelated things; one divided instrument panel reads as one
+        reading of the same subject, which is what they are.</li>
+      <li><strong>The 7-day forecast moves inside the due band.</strong> It is the same measure as the hero
+        figure, one step into the future, and the pairing makes both more readable than either alone. It also
+        removed a section and the dead space in the band at the same time.</li>
+      <li><strong>The forecast starts tomorrow, not today.</strong> This one came straight out of using your real
+        numbers. At 519 due, today's column is <strong>4.6× the tallest projected day</strong> and flattens the
+        other six to stubs — the chart becomes unreadable at exactly the data volume you have. Today's count is
+        already the hero figure two inches away, so plotting it twice bought nothing and cost the chart.</li>
+      <li><strong>The deck index sits in the recessed plane</strong> and is clipped by the viewport bottom, which
+        is how a list says &ldquo;there is more&rdquo; without a control.</li>
+      <li><strong>Default sort becomes <em>Most due</em>.</strong> With 519 due across 9 decks, newest-first
+        answers a question nobody is asking.</li>
+    </ul>
+  </div>
+
+  <div class="callout">
+    <p class="eyebrow">Trade-off you should weigh</p>
+    <p>Requirement 2 asks for Create Deck to be &ldquo;visibly a priority feature&rdquo;. §7.2 allows
+      <strong>at most one filled button per screen</strong>, and the dashboard's is <em>Start session</em>. I
+      resolved it with mass rather than fill: Create Deck is the second-largest object on the screen and sits at
+      the top right of the primary row, but stays unfilled. If you would rather it were filled, that is a
+      deliberate exception to §7.2 and worth writing down as one — not something to let drift in.</p>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="deck">
+  <p class="eyebrow">06 · Surface three</p>
+  <h2 class="dserif">Deck page</h2>
+  <p class="sub">&ldquo;Too messy… so many numbers, so many card containers.&rdquo; You are right that all of it
+    matters, so nothing here is deleted. Two defensible structures, both built.</p>
+
+  <div class="opt">
+    <p><span class="badge badge--rec">Option A · recommended</span></p>
+    <h3 class="h" style="margin-top:14px">Workspace — a persistent header and four segments</h3>
+    <div class="prose">
+      <p>Identity, telemetry and the mastery bar stay pinned at the top on every segment. Below them:
+        <em>Overview · Cards · Insights · Chat</em>. Ingestion demotes from three stacked surfaces to two buttons
+        in the segment bar.</p>
+      <p><strong>Why this one.</strong> &ldquo;Overwhelming&rdquo; is a statement about <em>quantity on
+        screen</em>, and segmentation is the only device here that actually reduces it. Ten components at equal
+        weight become four zones at three elevations. The Overview segment keeps a window onto every other
+        segment — a card preview, the weakest concept, the scheduler split — so the tabs organise rather than
+        hide.</p>
+    </div>
+    <div class="shot">
+      <div class="shot__cap"><span class="t">Deck A · desktop</span><span class="d">1440 × 900 · dark</span></div>
+      <div class="frame" data-w="1440" style="--ar:1440/900"><div class="screen screen--desktop dark" id="deck-a">
+  <div class="amb"></div>
+  <div class="stage" style="flex-direction:row">
+
+    <nav style="width:48px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:10px">
+      <span class="serif" style="font-size:22px;line-height:1">C</span>
+      <span style="display:block;width:20px;height:1px;background:var(--border);margin:4px 0"></span>
+      <span style="display:flex;flex-direction:column;gap:3px;width:15px;height:15px;justify-content:center">
+        <i style="display:block;height:1.5px;width:100%;background:var(--ink-dimmer);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:72%;background:var(--ink-dimmer);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:86%;background:var(--ink-dimmer);border-radius:1px"></i>
+      </span>
+      <span style="width:15px;height:15px;border:1.5px solid var(--ink);border-radius:3px;margin-top:8px"></span>
+      <span style="margin-top:auto;width:24px;height:24px;border-radius:var(--radius-pill);background:var(--surface-raised);border:1px solid var(--border-strong);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)">M</span>
+    </nav>
+
+    <main style="flex:1;min-width:0;padding:20px 32px 0;display:flex;flex-direction:column;min-height:0">
+
+      <!-- ═══ persistent deck header · identity + state + progress ═══════ -->
+      <header style="flex:none">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-dimmer)">
+          <span>Decks</span><span>/</span><span style="color:var(--ink-dim)">TECHNO</span>
+          <span style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn" style="height:30px">Share</button>
+            <button class="btn" style="height:30px;width:32px;padding:0">···</button>
+          </span>
+        </div>
+
+        <div style="margin-top:12px;display:flex;align-items:flex-end;justify-content:space-between;gap:40px">
+          <div style="min-width:0">
+            <h1 class="serif d" style="display:flex;align-items:baseline;gap:12px">TECHNO
+              <span class="lbl" style="letter-spacing:.16em">CS-ARCH</span>
+            </h1>
+            <p style="margin-top:6px;font-size:13px;color:var(--ink-dim)">Generated from 3 PDFs · created 14 Aug · last edited 2h ago</p>
+          </div>
+          <div class="tele-row" style="flex:none;padding-bottom:3px">
+            <span class="tele"><span class="lbl">Cards</span><span class="tele__v">412</span></span>
+            <span class="tele"><span class="lbl">Due</span><span class="tele__v" style="color:var(--state-due)">334</span></span>
+            <span class="tele"><span class="lbl">Mastery</span><span class="tele__v">34%</span></span>
+            <span class="tele"><span class="lbl">Proven</span><span class="tele__v">140/412</span></span>
+            <span class="tele"><span class="lbl">Quiz-ready</span><span class="tele__v">298/412</span></span>
+            <span class="tele"><span class="lbl">Last quiz</span><span class="tele__v">2h</span></span>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;height:3px;width:100%;background:var(--border);border-radius:1px;overflow:hidden">
+          <div style="height:100%;width:34%;background:var(--ink-dim)"></div>
+        </div>
+      </header>
+
+      <!-- ═══ segments · the only device that reduces quantity on screen ══ -->
+      <nav style="flex:none;margin-top:18px;display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--border)">
+        <span style="position:relative;padding:0 14px 11px;font-size:13px;font-weight:600;color:var(--ink)">Overview
+          <i style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--ink)"></i></span>
+        <span style="padding:0 14px 11px;font-size:13px;color:var(--ink-dimmer);display:inline-flex;align-items:baseline;gap:7px">Cards <span class="mono" style="font-size:12px">412</span></span>
+        <span style="padding:0 14px 11px;font-size:13px;color:var(--ink-dimmer)">Insights</span>
+        <span style="padding:0 14px 11px;font-size:13px;color:var(--ink-dimmer)">Chat</span>
+        <span style="margin-left:auto;padding-bottom:11px;display:flex;gap:8px">
+          <button class="btn" style="height:30px">Add cards</button>
+          <button class="btn" style="height:30px">Import PDF</button>
+        </span>
+      </nav>
+
+      <div style="flex:1;min-height:0;padding-top:18px;display:flex;flex-direction:column;gap:16px">
+
+        <!-- ── the primary action zone: ONE raised object ── -->
+        <section style="display:flex;gap:16px;align-items:stretch;flex:none">
+          <div class="raised spec" style="flex:1;min-width:0;padding:18px 22px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:24px">
+              <div style="display:flex;align-items:center;gap:16px">
+                <p class="mono" style="font-size:44px;font-weight:600;line-height:.86;letter-spacing:-.045em;color:var(--state-due)">334</p>
+                <div>
+                  <p style="font-size:15px;font-weight:600">Review flashcards</p>
+                  <p style="margin-top:3px;font-size:12px;color:var(--ink-dim)">Spaced repetition · advances your streak and heatmap · est. <span class="mono">45</span> min</p>
+                </div>
+              </div>
+              <button class="btn btn--primary btn--lg" style="flex:none">Review 20 cards <span class="kbd">R</span></button>
+            </div>
+            <div class="rule rule--soft" style="margin:15px 0 13px"></div>
+            <div style="display:flex;align-items:center;gap:26px;flex-wrap:wrap">
+              <span style="display:inline-flex;align-items:center;gap:9px">
+                <span class="lbl">Session</span>
+                <span style="display:inline-flex;align-items:center;height:30px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--radius-sm)"><span class="mono" style="font-size:13px">20</span></span>
+              </span>
+              <span style="display:inline-flex;align-items:center;gap:9px">
+                <span class="lbl">Scope</span>
+                <span style="display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:13px"><i style="width:9px;height:9px;border-radius:50%;border:1px solid var(--ink);background:var(--ink);box-shadow:inset 0 0 0 2px var(--surface-raised)"></i>Due only</span>
+                <span style="display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--ink-dim)"><i style="width:9px;height:9px;border-radius:50%;border:1px solid var(--border-control)"></i>Include reviewed</span>
+                <span style="display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--ink-dim)"><i style="width:9px;height:9px;border-radius:50%;border:1px solid var(--border-control)"></i>Unmastered</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="surface" style="width:322px;flex:none;padding:18px 20px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 class="lbl">Take quiz</h2>
+              <span class="mono lbl"><span style="color:var(--ink)">298</span>/412 ready</span>
+            </div>
+            <p style="margin-top:9px;font-size:12px;color:var(--ink-dim);line-height:1.5">Assessment mode. Results update this deck's mastery score.</p>
+            <div style="margin-top:auto;padding-top:13px;display:flex;gap:7px;align-items:center">
+              <span style="flex:1;display:inline-flex;align-items:center;justify-content:center;height:34px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:13px">MCQ</span>
+              <span style="flex:1;display:inline-flex;align-items:center;justify-content:center;height:34px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--ink-dim)">Identify</span>
+              <button class="btn" style="flex:1.2;height:34px">Start quiz</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── two readings, in a divided panel rather than two more cards ── -->
+        <section class="surface spec" style="flex:none;display:flex;align-items:stretch;padding:16px 20px 14px">
+          <div style="flex:1;min-width:0;padding-right:22px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 class="lbl">Scheduler state · 412 cards</h2>
+              <span class="lbl">Live from the scheduler</span>
+            </div>
+            <!-- part-to-whole: a single stacked bar, 2px surface gaps, every
+                 segment labelled. Colour is never the only carrier. -->
+            <div style="margin-top:16px;display:flex;gap:2px;height:22px">
+              <i style="width:81.1%;background:var(--state-due);border-radius:3px 0 0 3px"></i>
+              <i style="width:9.7%;background:var(--state-learning)"></i>
+              <i style="width:9.2%;background:var(--ink-dim);border-radius:0 3px 3px 0"></i>
+            </div>
+            <div style="margin-top:13px;display:flex;gap:26px;flex-wrap:wrap">
+              <span style="display:inline-flex;align-items:center;gap:7px"><i class="tick" style="height:10px;background:var(--state-due)"></i><span style="font-size:12px;color:var(--ink-dim)">Due</span><span class="mono" style="font-size:12px;color:var(--ink)">334</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px"><i class="tick" style="height:10px;background:var(--state-learning)"></i><span style="font-size:12px;color:var(--ink-dim)">Learning</span><span class="mono" style="font-size:12px;color:var(--ink)">40</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px"><i class="tick" style="height:10px;background:var(--ink-dim)"></i><span style="font-size:12px;color:var(--ink-dim)">Scheduled</span><span class="mono" style="font-size:12px;color:var(--ink)">38</span></span>
+              <span style="display:inline-flex;align-items:center;gap:7px"><span style="font-size:12px;color:var(--ink-dimmer)">Proven in quiz</span><span class="mono" style="font-size:12px;color:var(--ink)">140</span></span>
+            </div>
+            <div style="margin-top:auto;padding-top:14px;display:flex;align-items:baseline;gap:8px">
+              <span class="lbl">Mastery trend · 30d</span>
+              <span class="mono" style="font-size:12px;color:var(--state-mastered)">▲ 6 pts</span>
+            </div>
+            <div class="spark" style="margin-top:8px;height:26px;width:340px"><span style="height:41%"></span><span data-zero></span><span style="height:42%"></span><span style="height:66%"></span><span style="height:39%"></span><span style="height:24%"></span><span style="height:53%"></span><span style="height:76%"></span><span style="height:53%"></span><span style="height:32%"></span><span style="height:100%"></span><span style="height:41%"></span><span style="height:70%"></span><span style="height:93%"></span><span style="height:28%"></span><span style="height:65%"></span><span style="height:43%"></span><span style="height:70%"></span><span style="height:62%"></span><span style="height:32%"></span></div>
+          </div>
+
+          <div class="rule--v"></div>
+
+          <div style="width:390px;flex:none;padding-left:22px;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 class="lbl">Weakest concepts</h2>
+              <span class="lbl">Last 6 quizzes</span>
+            </div>
+            <ul style="margin-top:12px;display:flex;flex-direction:column;gap:9px">
+              <li style="display:flex;align-items:center;gap:12px">
+                <span class="mono dimmer" style="font-size:11px;width:12px">1</span>
+                <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Cache coherence protocols</span>
+                <span class="meter" style="width:64px"><i style="width:82%;background:var(--state-lapsed)"></i></span>
+                <span class="mono" style="font-size:12px;color:var(--state-lapsed);width:74px;text-align:right;white-space:nowrap">14 missed</span>
+              </li>
+              <li style="display:flex;align-items:center;gap:12px">
+                <span class="mono dimmer" style="font-size:11px;width:12px">2</span>
+                <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pipeline hazards</span>
+                <span class="meter" style="width:64px"><i style="width:64%;background:var(--state-lapsed)"></i></span>
+                <span class="mono" style="font-size:12px;color:var(--state-lapsed);width:74px;text-align:right;white-space:nowrap">11 missed</span>
+              </li>
+              <li style="display:flex;align-items:center;gap:12px">
+                <span class="mono dimmer" style="font-size:11px;width:12px">3</span>
+                <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Virtual memory translation</span>
+                <span class="meter" style="width:64px"><i style="width:47%;background:var(--state-due)"></i></span>
+                <span class="mono" style="font-size:12px;color:var(--state-due);width:74px;text-align:right;white-space:nowrap">8 missed</span>
+              </li>
+              <li style="display:flex;align-items:center;gap:12px">
+                <span class="mono dimmer" style="font-size:11px;width:12px">4</span>
+                <span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Branch prediction</span>
+                <span class="meter" style="width:64px"><i style="width:29%;background:var(--state-due)"></i></span>
+                <span class="mono" style="font-size:12px;color:var(--state-due);width:74px;text-align:right;white-space:nowrap">5 missed</span>
+              </li>
+            </ul>
+            <div style="margin-top:auto;padding-top:12px;display:flex;align-items:center;justify-content:space-between">
+              <span class="lbl">Quiz history · 6 sessions</span>
+              <span style="display:flex;align-items:flex-end;gap:3px;height:20px">
+                <i style="width:5px;height:44%;background:var(--border-strong);border-radius:1px"></i>
+                <i style="width:5px;height:58%;background:var(--border-strong);border-radius:1px"></i>
+                <i style="width:5px;height:50%;background:var(--border-strong);border-radius:1px"></i>
+                <i style="width:5px;height:72%;background:var(--border-strong);border-radius:1px"></i>
+                <i style="width:5px;height:66%;background:var(--border-strong);border-radius:1px"></i>
+                <i style="width:5px;height:88%;background:var(--ink-dim);border-radius:1px"></i>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section style="flex:1;min-height:0;display:flex;flex-direction:column">
+          <div style="flex:none;display:flex;align-items:center;gap:14px;padding-bottom:9px">
+            <h2 class="lbl" style="flex:none">Recent cards</h2>
+            <span class="rule" style="flex:1"></span>
+            <span class="mono dimmer" style="font-size:11px">412 in this deck</span>
+            <span style="font-size:12px;color:var(--ink);text-decoration:underline;text-underline-offset:3px">View all</span>
+          </div>
+          <div class="well" style="flex:1;min-height:0;overflow:hidden">
+            <div class="drow" style="height:46px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is the purpose of a cache line?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">The unit of transfer between cache and main memory, typically 64 bytes…</span></span><span class="lbl" style="width:70px;text-align:right">PDF</span><span class="dnum" style="width:52px;color:var(--state-due)">due</span></div>
+            <div class="drow" style="height:46px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">Define a pipeline hazard</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">A condition where the next instruction cannot execute in the following clock cycle…</span></span><span class="lbl" style="width:70px;text-align:right">PDF</span><span class="dnum" style="width:52px;color:var(--state-due)">due</span></div>
+            <div class="drow" style="height:46px"><i class="tick" style="background:var(--state-mastered)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What does MESI stand for?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Modified, Exclusive, Shared, Invalid — the four cache-line states…</span></span><span class="lbl" style="width:70px;text-align:right">Manual</span><span class="dnum" style="width:52px;color:var(--state-mastered)">9d</span></div>
+            <div class="drow" style="height:46px"><i class="tick" style="background:var(--state-learning)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is the TLB and what does it cache?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Translation Lookaside Buffer — caches recent virtual-to-physical page…</span></span><span class="lbl" style="width:70px;text-align:right">PDF</span><span class="dnum" style="width:52px;color:var(--state-learning)">11h</span></div>
+            <div class="drow" style="height:46px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">Explain write-back versus write-through caching</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Write-back defers the memory update until eviction; write-through commits…</span></span><span class="lbl" style="width:70px;text-align:right">PDF</span><span class="dnum" style="width:52px;color:var(--state-due)">due</span></div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+</div>
+    </div>
+    <div class="pair">
+      <div class="shot" style="margin-top:0">
+        <div class="shot__cap"><span class="t">Mobile</span><span class="d">390 × 844</span></div>
+        <div class="frame" data-w="390" style="--ar:390/844"><div class="screen screen--mobile dark" id="deck-a-m">
+  <div class="amb"></div>
+  <div class="stage" style="padding:18px 16px 0;overflow:hidden">
+
+    <div style="flex:none;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-dimmer)">
+      <span>‹</span><span>Decks</span>
+      <span style="margin-left:auto;display:flex;gap:7px">
+        <span class="btn" style="height:28px;padding:0 10px;font-size:12px">Share</span>
+        <span class="btn" style="height:28px;width:28px;padding:0">···</span>
+      </span>
+    </div>
+
+    <header style="flex:none;margin-top:11px">
+      <h1 class="serif" style="font-size:31px;line-height:1.06;display:flex;align-items:baseline;gap:10px">TECHNO <span class="lbl">CS-ARCH</span></h1>
+      <p style="margin-top:5px;font-size:12px;color:var(--ink-dim)">3 PDFs · created 14 Aug</p>
+      <div style="margin-top:11px;display:flex;justify-content:space-between;gap:6px">
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Cards</span><span class="mono" style="font-size:14px;line-height:1">412</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Due</span><span class="mono" style="font-size:14px;line-height:1;color:var(--state-due)">334</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Mastery</span><span class="mono" style="font-size:14px;line-height:1">34%</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Ready</span><span class="mono" style="font-size:14px;line-height:1">298</span></span>
+        <span style="display:flex;flex-direction:column;gap:4px"><span class="lbl">Quiz</span><span class="mono" style="font-size:14px;line-height:1">2h</span></span>
+      </div>
+      <div style="margin-top:11px;height:3px;width:100%;background:var(--border);border-radius:1px;overflow:hidden">
+        <div style="height:100%;width:34%;background:var(--ink-dim)"></div>
+      </div>
+    </header>
+
+    <nav style="flex:none;margin-top:15px;display:flex;align-items:center;gap:2px;border-bottom:1px solid var(--border)">
+      <span style="position:relative;padding:0 12px 10px;font-size:13px;font-weight:600;color:var(--ink)">Overview
+        <i style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--ink)"></i></span>
+      <span style="padding:0 12px 10px;font-size:13px;color:var(--ink-dimmer);display:inline-flex;align-items:baseline;gap:6px">Cards <span class="mono" style="font-size:11px">412</span></span>
+      <span style="padding:0 12px 10px;font-size:13px;color:var(--ink-dimmer)">Insights</span>
+      <span style="padding:0 12px 10px;font-size:13px;color:var(--ink-dimmer)">Chat</span>
+    </nav>
+
+    <div style="flex:1;min-height:0;padding-top:14px;display:flex;flex-direction:column;gap:11px">
+
+      <section class="raised spec" style="flex:none;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:14px">
+          <p class="mono" style="font-size:38px;font-weight:600;line-height:.86;letter-spacing:-.045em;color:var(--state-due)">334</p>
+          <div style="min-width:0">
+            <p style="font-size:14px;font-weight:600">Review flashcards</p>
+            <p style="margin-top:2px;font-size:11px;color:var(--ink-dim)">Session <span class="mono">20</span> · Due only · est. <span class="mono">45</span> min</p>
+          </div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:9px">
+          <button class="btn" style="flex:1;height:44px">Start quiz</button>
+          <button class="btn btn--primary" style="flex:1.35;height:44px;font-size:14px">Review</button>
+        </div>
+      </section>
+
+      <a class="surface" href="#" style="flex:none;display:flex;align-items:center;gap:12px;padding:0 16px;height:50px;border-style:dashed;border-color:var(--border-strong)">
+        <span style="position:relative;width:15px;height:15px;flex:none">
+          <i style="position:absolute;top:7px;left:0;width:15px;height:1.5px;background:var(--ink-dim)"></i>
+          <i style="position:absolute;left:7px;top:0;height:15px;width:1.5px;background:var(--ink-dim)"></i>
+        </span>
+        <span style="font-size:14px;font-weight:500">Add content</span>
+        <span style="font-size:12px;color:var(--ink-dimmer)">card · notes · PDF</span>
+        <span class="dimmer" style="margin-left:auto;font-size:14px">⌄</span>
+      </a>
+
+      <section class="surface" style="flex:none;padding:13px 16px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between">
+          <h2 class="lbl">Scheduler state</h2><span class="lbl">412 cards</span>
+        </div>
+        <div style="margin-top:11px;display:flex;gap:2px;height:18px">
+          <i style="width:81.1%;background:var(--state-due);border-radius:3px 0 0 3px"></i>
+          <i style="width:9.7%;background:var(--state-learning)"></i>
+          <i style="width:9.2%;background:var(--ink-dim);border-radius:0 3px 3px 0"></i>
+        </div>
+        <div style="margin-top:11px;display:flex;justify-content:space-between;gap:8px">
+          <span style="display:inline-flex;align-items:center;gap:6px"><i class="tick" style="height:9px;background:var(--state-due)"></i><span style="font-size:11px;color:var(--ink-dim)">Due</span><span class="mono" style="font-size:11px">334</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i class="tick" style="height:9px;background:var(--state-learning)"></i><span style="font-size:11px;color:var(--ink-dim)">Learning</span><span class="mono" style="font-size:11px">40</span></span>
+          <span style="display:inline-flex;align-items:center;gap:6px"><i class="tick" style="height:9px;background:var(--ink-dim)"></i><span style="font-size:11px;color:var(--ink-dim)">Sched.</span><span class="mono" style="font-size:11px">38</span></span>
+        </div>
+      </section>
+
+      <section style="flex:1;min-height:0;display:flex;flex-direction:column">
+        <div style="flex:none;display:flex;align-items:center;gap:10px;padding-bottom:8px">
+          <h2 class="lbl" style="flex:none">Weakest concepts</h2>
+          <span class="rule" style="flex:1"></span>
+          <span class="lbl">6 quizzes</span>
+        </div>
+        <div class="well" style="flex:1;min-height:0;overflow:hidden;padding:4px 0">
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px"><span class="mono dimmer" style="font-size:11px;width:10px">1</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Cache coherence protocols</span><span class="mono" style="font-size:12px;color:var(--state-lapsed);white-space:nowrap">14 missed</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px"><span class="mono dimmer" style="font-size:11px;width:10px">2</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pipeline hazards</span><span class="mono" style="font-size:12px;color:var(--state-lapsed);white-space:nowrap">11 missed</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px"><span class="mono dimmer" style="font-size:11px;width:10px">3</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Virtual memory translation</span><span class="mono" style="font-size:12px;color:var(--state-due);white-space:nowrap">8 missed</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px"><span class="mono dimmer" style="font-size:11px;width:10px">4</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Branch prediction</span><span class="mono" style="font-size:12px;color:var(--state-due);white-space:nowrap">5 missed</span></div>
+          <div style="display:flex;align-items:center;gap:10px;padding:9px 14px"><span class="mono dimmer" style="font-size:11px;width:10px">5</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Write-back caching</span><span class="mono" style="font-size:12px;color:var(--state-due);white-space:nowrap">4 missed</span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</div>
+      </div>
+      <div class="shot" style="margin-top:0">
+        <div class="shot__cap"><span class="t">The three planes</span><span class="d">what carries the hierarchy</span></div>
+        <div class="prose" style="margin-top:0">
+          <ul>
+            <li><strong>Raised</strong> — the review launcher. One object, one filled button, the deck's due count
+              as the hero figure. This is what the page is for.</li>
+            <li><strong>Surface</strong> — the readings panel: scheduler state as a labelled stacked bar, mastery
+              trend, weakest concepts. Divided by a gradient rule, not split into cards.</li>
+            <li><strong>Recessed</strong> — the card list, in a well, clipped by the fold.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="opt">
+    <p><span class="badge">Option B · alternative</span></p>
+    <h3 class="h" style="margin-top:14px">Console — one scroll, three planes, a quiet rail</h3>
+    <div class="prose">
+      <p>No tabs. The main column runs raised launcher → a single collapsed <em>Add content</em> bar → the card
+        well. Retrospective readings — weakest concepts, top concepts, quiz history — move to a 318px rail where
+        they are present but subordinate.</p>
+      <p><strong>When to prefer it.</strong> It hides nothing, it is the smaller build (no segment state, no
+        routing), and it shows all three planes at once, so it answers &ldquo;flat&rdquo; slightly harder than A
+        does. The cost is that it is still a long page: it fixes the <em>weight</em> problem without reducing the
+        <em>count</em>.</p>
+    </div>
+    <div class="shot">
+      <div class="shot__cap"><span class="t">Deck B · desktop</span><span class="d">1440 × 900 · dark</span></div>
+      <div class="frame" data-w="1440" style="--ar:1440/900"><div class="screen screen--desktop dark" id="deck-b">
+  <div class="amb"></div>
+  <div class="stage" style="flex-direction:row">
+
+    <nav style="width:48px;flex:none;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:10px">
+      <span class="serif" style="font-size:22px;line-height:1">C</span>
+      <span style="display:block;width:20px;height:1px;background:var(--border);margin:4px 0"></span>
+      <span style="display:flex;flex-direction:column;gap:3px;width:15px;height:15px;justify-content:center">
+        <i style="display:block;height:1.5px;width:100%;background:var(--ink-dimmer);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:72%;background:var(--ink-dimmer);border-radius:1px"></i>
+        <i style="display:block;height:1.5px;width:86%;background:var(--ink-dimmer);border-radius:1px"></i>
+      </span>
+      <span style="width:15px;height:15px;border:1.5px solid var(--ink);border-radius:3px;margin-top:8px"></span>
+      <span style="margin-top:auto;width:24px;height:24px;border-radius:var(--radius-pill);background:var(--surface-raised);border:1px solid var(--border-strong);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)">M</span>
+    </nav>
+
+    <main style="flex:1;min-width:0;padding:20px 32px 0;display:flex;flex-direction:column;min-height:0">
+
+      <header style="flex:none">
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-dimmer)">
+          <span>Decks</span><span>/</span><span style="color:var(--ink-dim)">TECHNO</span>
+          <span style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn" style="height:30px">Share</button>
+            <button class="btn" style="height:30px;width:32px;padding:0">···</button>
+          </span>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:flex-end;justify-content:space-between;gap:40px">
+          <div style="min-width:0">
+            <h1 class="serif d" style="display:flex;align-items:baseline;gap:12px">TECHNO
+              <span class="lbl" style="letter-spacing:.16em">CS-ARCH</span>
+            </h1>
+            <p style="margin-top:6px;font-size:13px;color:var(--ink-dim)">Generated from 3 PDFs · created 14 Aug · last edited 2h ago</p>
+          </div>
+          <div class="tele-row" style="flex:none;padding-bottom:3px">
+            <span class="tele"><span class="lbl">Cards</span><span class="tele__v">412</span></span>
+            <span class="tele"><span class="lbl">Due</span><span class="tele__v" style="color:var(--state-due)">334</span></span>
+            <span class="tele"><span class="lbl">Mastery</span><span class="tele__v">34%</span></span>
+            <span class="tele"><span class="lbl">Proven</span><span class="tele__v">140/412</span></span>
+            <span class="tele"><span class="lbl">Quiz-ready</span><span class="tele__v">298/412</span></span>
+            <span class="tele"><span class="lbl">Last quiz</span><span class="tele__v">2h</span></span>
+          </div>
+        </div>
+        <div style="margin-top:14px;height:3px;width:100%;background:var(--border);border-radius:1px;overflow:hidden">
+          <div style="height:100%;width:34%;background:var(--ink-dim)"></div>
+        </div>
+        <div class="rule" style="margin-top:16px"></div>
+      </header>
+
+      <div style="flex:1;min-height:0;display:flex;gap:22px;padding-top:16px">
+
+        <!-- ═══ main column · three planes, top to bottom ═══════════════ -->
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:12px">
+
+          <!-- PLANE 1 · raised. The thing the page is for. -->
+          <section class="raised spec" style="flex:none;padding:16px 20px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:20px">
+              <div style="display:flex;align-items:center;gap:16px">
+                <p class="mono" style="font-size:42px;font-weight:600;line-height:.86;letter-spacing:-.045em;color:var(--state-due)">334</p>
+                <div>
+                  <p style="font-size:15px;font-weight:600">cards due · est. <span class="mono">45</span> min</p>
+                  <p style="margin-top:3px;font-size:12px;color:var(--ink-dim)">Session <span class="mono" style="color:var(--ink)">20</span> · scope <span style="color:var(--ink)">Due only</span> · <span class="mono" style="color:var(--ink)">298</span>/412 quiz-ready</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:9px;flex:none">
+                <button class="btn btn--lg">Start quiz</button>
+                <button class="btn btn--primary btn--lg">Review flashcards <span class="kbd">R</span></button>
+              </div>
+            </div>
+            <div class="rule rule--soft" style="margin:14px 0 12px"></div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span class="lbl" style="margin-right:6px">Scope</span>
+              <span style="display:inline-flex;align-items:center;gap:7px;height:29px;padding:0 11px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:13px"><i style="width:9px;height:9px;border-radius:50%;background:var(--ink);box-shadow:inset 0 0 0 2px var(--surface-raised)"></i>Due only</span>
+              <span style="display:inline-flex;align-items:center;gap:7px;height:29px;padding:0 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--ink-dim)"><i style="width:9px;height:9px;border-radius:50%;border:1px solid var(--border-control)"></i>Include reviewed</span>
+              <span style="display:inline-flex;align-items:center;gap:7px;height:29px;padding:0 11px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--ink-dim)"><i style="width:9px;height:9px;border-radius:50%;border:1px solid var(--border-control)"></i>Unmastered</span>
+              <span style="margin-left:auto;display:inline-flex;align-items:center;gap:8px">
+                <span class="lbl">Mode</span>
+                <span style="display:inline-flex;align-items:center;height:29px;padding:0 11px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:13px">Multiple choice</span>
+              </span>
+            </div>
+          </section>
+
+          <!-- PLANE 2 · a single bar. Three ingestion surfaces collapse to one. -->
+          <section class="surface" style="flex:none;display:flex;align-items:center;gap:14px;padding:0 18px;height:48px;border-style:dashed;border-color:var(--border-strong)">
+            <span style="position:relative;width:15px;height:15px;flex:none">
+              <i style="position:absolute;top:7px;left:0;width:15px;height:1.5px;background:var(--ink-dim)"></i>
+              <i style="position:absolute;left:7px;top:0;height:15px;width:1.5px;background:var(--ink-dim)"></i>
+            </span>
+            <span style="font-size:14px;font-weight:500">Add content</span>
+            <span style="font-size:13px;color:var(--ink-dimmer)">Write a card · paste notes · drop a PDF · ask the deck</span>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:9px">
+              <span class="kbd">A</span>
+              <span class="dimmer" style="font-size:16px;line-height:1">⌄</span>
+            </span>
+          </section>
+
+          <!-- PLANE 3 · recessed. The deck's body, in a well. -->
+          <section style="flex:1;min-height:0;display:flex;flex-direction:column">
+            <div style="flex:none;display:flex;align-items:center;gap:12px;padding-bottom:9px">
+              <h2 class="lbl" style="flex:none">Cards</h2>
+              <span class="mono dimmer" style="font-size:11px">412</span>
+              <span class="rule" style="flex:1"></span>
+              <span style="display:inline-flex;align-items:center;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;color:var(--ink-dimmer)">Search cards</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--border-control);border-radius:var(--radius-sm);font-size:12px">Due first ▾</span>
+            </div>
+            <div class="well" style="flex:1;min-height:0;overflow:hidden">
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is the purpose of a cache line?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">The unit of transfer between cache and main memory, typically 64 bytes…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-due)">due</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">Define a pipeline hazard</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">A condition where the next instruction cannot execute in the following clock cycle…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-due)">due</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-mastered)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What does MESI stand for?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Modified, Exclusive, Shared, Invalid — the four cache-line states…</span></span><span class="lbl" style="width:62px;text-align:right">Manual</span><span class="dnum" style="width:48px;color:var(--state-mastered)">9d</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-learning)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is the TLB and what does it cache?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Translation Lookaside Buffer — caches recent virtual-to-physical page…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-learning)">11h</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">Explain write-back versus write-through caching</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Write-back defers the memory update until eviction; write-through commits…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-due)">due</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-lapsed)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is cache coherence?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">The guarantee that all cores observe a consistent view of shared memory…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-lapsed)">lapsed</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is branch prediction, and why does it matter?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Speculating the outcome of a conditional branch so the pipeline need not stall…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-due)">due</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-mastered)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">Define instruction-level parallelism</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">The degree to which instructions in a stream can be executed simultaneously…</span></span><span class="lbl" style="width:62px;text-align:right">Manual</span><span class="dnum" style="width:48px;color:var(--state-mastered)">21d</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-due)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">What is the memory hierarchy?</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">Registers, L1/L2/L3 cache, main memory, and secondary storage, ordered by…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-due)">due</span></div>
+              <div class="drow" style="height:47px"><i class="tick" style="background:var(--state-learning)"></i><span class="drow__n" style="gap:0;flex-direction:column;align-items:flex-start"><span class="drow__t">Compare SRAM and DRAM</span><span class="dimmer" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">SRAM uses a six-transistor cell and needs no refresh; DRAM stores charge…</span></span><span class="lbl" style="width:62px;text-align:right">PDF</span><span class="dnum" style="width:48px;color:var(--state-learning)">4h</span></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- ═══ rail · retrospective readings, deliberately quiet ═══════ -->
+        <aside style="width:318px;flex:none;display:flex;flex-direction:column;gap:12px;min-height:0">
+          <section class="surface" style="padding:14px 16px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 class="lbl">Weakest concepts</h2><span class="lbl">6 quizzes</span>
+            </div>
+            <ul style="margin-top:11px;display:flex;flex-direction:column;gap:9px">
+              <li style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:10px">1</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Cache coherence protocols</span><span class="mono" style="font-size:12px;color:var(--state-lapsed);white-space:nowrap">14 missed</span></li>
+              <li style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:10px">2</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Pipeline hazards</span><span class="mono" style="font-size:12px;color:var(--state-lapsed);white-space:nowrap">11 missed</span></li>
+              <li style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:10px">3</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Virtual memory translation</span><span class="mono" style="font-size:12px;color:var(--state-due);white-space:nowrap">8 missed</span></li>
+              <li style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:10px">4</span><span style="flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Branch prediction</span><span class="mono" style="font-size:12px;color:var(--state-due);white-space:nowrap">5 missed</span></li>
+            </ul>
+          </section>
+
+          <section class="surface" style="padding:14px 16px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 class="lbl">Top concepts</h2><span class="lbl">AI topic tags</span>
+            </div>
+            <ul style="margin-top:11px;display:flex;flex-wrap:wrap;gap:8px 16px">
+              <li style="display:flex;align-items:baseline;gap:7px;font-size:13px"><span>Caching</span><span class="mono dimmer" style="font-size:12px">86</span></li>
+              <li style="display:flex;align-items:baseline;gap:7px;font-size:13px"><span>Pipelining</span><span class="mono dimmer" style="font-size:12px">71</span></li>
+              <li style="display:flex;align-items:baseline;gap:7px;font-size:13px"><span>Memory</span><span class="mono dimmer" style="font-size:12px">64</span></li>
+              <li style="display:flex;align-items:baseline;gap:7px;font-size:13px"><span>ISA</span><span class="mono dimmer" style="font-size:12px">52</span></li>
+              <li style="display:flex;align-items:baseline;gap:7px;font-size:13px"><span>Parallelism</span><span class="mono dimmer" style="font-size:12px">44</span></li>
+              <li style="display:flex;align-items:baseline;gap:7px;font-size:13px"><span>I/O</span><span class="mono dimmer" style="font-size:12px">31</span></li>
+            </ul>
+          </section>
+
+          <section class="surface" style="padding:14px 16px;flex:none;display:flex;flex-direction:column">
+            <div style="display:flex;align-items:baseline;justify-content:space-between">
+              <h2 class="lbl">Quiz history</h2><span class="lbl">6 sessions</span>
+            </div>
+            <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:34px">2h</span><span class="meter" style="flex:1;width:auto"><i data-mastered style="width:88%"></i></span><span class="mono" style="font-size:12px;width:34px;text-align:right">88%</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:34px">3d</span><span class="meter" style="flex:1;width:auto"><i style="width:66%"></i></span><span class="mono" style="font-size:12px;width:34px;text-align:right">66%</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:34px">6d</span><span class="meter" style="flex:1;width:auto"><i data-mastered style="width:72%"></i></span><span class="mono" style="font-size:12px;width:34px;text-align:right">72%</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:34px">9d</span><span class="meter" style="flex:1;width:auto"><i style="width:50%"></i></span><span class="mono" style="font-size:12px;width:34px;text-align:right">50%</span></div>
+              <div style="display:flex;align-items:center;gap:10px"><span class="mono dimmer" style="font-size:11px;width:34px">2w</span><span class="meter" style="flex:1;width:auto"><i style="width:58%"></i></span><span class="mono" style="font-size:12px;width:34px;text-align:right">58%</span></div>
+            </div>
+            <div style="margin-top:13px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+              <span class="lbl">Mastery trend · 30d</span>
+              <span class="mono" style="font-size:12px;color:var(--state-mastered)">▲ 6 pts</span>
+            </div>
+            <div class="spark" style="margin-top:9px;height:24px"><span style="height:41%"></span><span data-zero></span><span style="height:42%"></span><span style="height:66%"></span><span style="height:39%"></span><span style="height:24%"></span><span style="height:53%"></span><span style="height:76%"></span><span style="height:53%"></span><span style="height:32%"></span><span style="height:100%"></span><span style="height:41%"></span><span style="height:70%"></span><span style="height:93%"></span><span style="height:28%"></span><span style="height:65%"></span><span style="height:43%"></span><span style="height:70%"></span><span style="height:62%"></span><span style="height:32%"></span></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+</div>
+</div>
+    </div>
+  </div>
+
+  <h3 class="h">What both options do</h3>
+  <div class="prose">
+    <ul>
+      <li><strong>Six same-weight <code>.surface</code> blocks become three planes.</strong> This is the whole
+        fix. Nothing was deleted — <code>AddCardForm</code>, <code>PDFUploadZone</code>,
+        <code>BulkImportModal</code> and <code>DeckChatWidget</code> all still exist, behind one
+        <em>Add content</em> affordance instead of three stacked containers competing with the card list.</li>
+      <li><strong>The deck's due count becomes a hero figure.</strong> 334 in <code>--state-due</code> at 42–44px
+        mono, next to the one filled button. The old page had a telemetry strip where every reading was the same
+        13px, so the one actionable number was buried among five descriptive ones.</li>
+      <li><strong>Scheduler state gets a form, not a list.</strong> A single stacked bar with 2px surface gaps,
+        every segment labelled with its count. Zero-value segments do not render at all.</li>
+      <li><strong>Top concepts stops being a full-width section.</strong> It is a tag list; it never needed a
+        band of its own.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="build">
+  <p class="eyebrow">07 · Handover</p>
+  <h2 class="dserif">Implementation notes</h2>
+  <p class="sub">Enough for a separate session to build this. No production code was written here.</p>
+
+  <h3 class="h">Token additions — three, all in <code>globals.css</code></h3>
+<pre>/* dark */
+--raised-bg:     #1f1f23;
+--recess:        #0b0b0d;
+--elevate-inset: inset 0 1px 3px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .012);
+
+/* light — a raised plane must go LIGHTER than the ground, so it cannot
+   reuse --surface-raised (#f4f4f5), which is a hover fill on white */
+--raised-bg:     #ffffff;
+--recess:        #f4f4f5;
+--elevate-inset: inset 0 1px 3px rgb(24 24 27 / .07);</pre>
+  <div class="prose">
+    <p>Plus three utility classes — <code>.well</code>, <code>.raised</code>, <code>.spec</code> — and two rule
+      helpers, <code>.rule</code> / <code>.rule--v</code>. That is the entire CSS surface area of this proposal.
+      <code>.surface</code>, <code>.panel</code>, <code>.key</code>, <code>.kbd</code>, <code>.brk</code> and
+      <code>.opt</code> are untouched.</p>
+  </div>
+
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Component</th><th>Verdict</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Telemetry</td><td>Reuse as-is</td><td>Moves to the right of the greeting row. No prop changes.</td></tr>
+      <tr><td>DeckRow · DeckRowLegend</td><td>Reuse as-is</td><td>Row height 41→38px and the parent becomes <code>.well</code>. Column geometry untouched.</td></tr>
+      <tr><td>StateTick · Kbd · Button · Input</td><td>Reuse as-is</td><td>—</td></tr>
+      <tr><td>DueNowBand</td><td>Rebuild</td><td>Gains the forecast strip and a due-by-deck list; loses the Import PDF button and the chip run. Takes <code>forecastDays</code> as a new prop.</td></tr>
+      <tr><td>ReviewForecast</td><td>Rebuild as a child</td><td>Becomes a compact strip rendered <em>inside</em> DueNowBand. Drop today's column; the seven days start tomorrow.</td></tr>
+      <tr><td>RecallAccuracyPanel · StreakPanel</td><td>Rebuild as cells</td><td>Stop being <code>.surface</code> sections; become two cells of the shared signal panel. The internals — sparkline, day strip, legend — carry over.</td></tr>
+      <tr><td>ActivityHeatmap</td><td>Restyle</td><td>Ramp moves off <code>bg-primary/25…</code> Tailwind opacities onto five explicit <code>--heat-ramp-*</code> tokens. Top step drops from ~0.88 to 0.64 white — at 0.88 a 6-month grid was the brightest object on the page.</td></tr>
+      <tr><td>DeckGrid</td><td>Light edit</td><td>Default sort → <code>most-due</code>. Header already matches.</td></tr>
+      <tr><td>DashboardTelemetry</td><td>Light edit</td><td>Loses its own rule; the greeting row owns the divider.</td></tr>
+      <tr><td>GreetingHeader</td><td><strong>New</strong></td><td>See the name-resolution note below.</td></tr>
+      <tr><td>CreateDeckPanel</td><td><strong>New</strong></td><td>Wraps the existing <code>requestOpenCreateDeck()</code> event. No new modal.</td></tr>
+      <tr><td>SignalPanel</td><td><strong>New</strong></td><td>The divided three-cell container.</td></tr>
+      <tr><td>DeckWorkspace (Option A)</td><td><strong>New</strong></td><td>Segment state. See the routing note.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 class="h">The greeting name — do not reintroduce F-06</h3>
+  <div class="prose">
+    <p>There is <strong>no profiles table</strong> in <code>supabase/migrations/</code>, and
+      <code>user_metadata</code> is referenced nowhere in <code>src/</code> today. So the chain is:</p>
+    <ul>
+      <li><code>user.user_metadata.full_name</code> — populated by the Google and GitHub OAuth providers.</li>
+      <li><code>user.user_metadata.name</code> — the GitHub fallback.</li>
+      <li>The email local-part, title-cased and stripped of separators
+        (<code>santiagomarcstephen</code> → <code>Santiago</code>), <strong>never the address itself</strong>.</li>
+      <li>No name at all → <em>Good evening</em>, with no name. The greeting must read correctly with the name
+        removed, which is why the sub-line carries the information and the greeting carries none.</li>
+    </ul>
+    <p>Email/password signups have no <code>full_name</code>, so the local-part branch is the <em>common</em> path
+      today, not the edge case. Worth building a real profile field if the greeting is going to be permanent.</p>
+  </div>
+
+  <h3 class="h">Structural, not cosmetic</h3>
+  <div class="prose">
+    <ul>
+      <li><strong>Option A needs segment state.</strong> Make it a URL param (<code>?tab=cards</code>) rather than
+        <code>useState</code> — the deck page is deep-linked from the dashboard, the due band and share links, and
+        a tab that resets on back-navigation will be reported as a bug.</li>
+      <li><strong>The deck page's data loading changes shape.</strong> Today it fetches cards, mastery, topics and
+        quiz-ready counts in one server pass for a single scroll. Under A, only Overview needs all of it at first
+        paint; Cards and Insights can stream behind <code>Suspense</code> as they already partly do.</li>
+      <li><strong>The dashboard's fold budget is now load-bearing.</strong> Requirement 1 holds at 1440×900 with
+        the band heights in these mockups. Anything added to bands A–C pushes the heatmap down. Worth a comment in
+        the page file saying so.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════ -->
+<section id="drift">
+  <p class="eyebrow">08 · Findings</p>
+  <h2 class="dserif">Drift found while reading the repo</h2>
+  <p class="sub">Not part of the design proposal. Flagged because §7 asked me to verify the current state and
+    report what did not match.</p>
+
+  <div class="tbl">
+  <table>
+    <thead><tr><th>Finding</th><th>Where</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr><td>Serif is being faux-bolded</td><td><code>Wordmark.tsx</code>, <code>LoginClient.tsx</code>,
+        <code>[deckId]/page.tsx</code>, <code>globals.css .flip__body</code></td>
+        <td>All apply <code>font-medium</code> / <code>font-weight:500</code> to Instrument Serif, which ships at
+          400 only. The browser synthesises the weight. This is the &ldquo;No Bold Serif Rule&rdquo; in §3.2 —
+          the mockups here use 400 throughout.</td></tr>
+      <tr><td>Type tokens are stale</td><td><code>globals.css</code> vs <code>COGNIT_DESIGN_SYSTEM.md</code> §3.3</td>
+        <td>The CSS still holds the Rev. B corrections values (<code>--type-display-lg: 2.75rem</code>); the spec
+          was later updated to the 1.5× scale (<code>3rem</code>, plus a new <code>--type-display-xl: 4.125rem</code>).
+          Components hardcode <code>text-[3rem]</code> and <code>text-[66px]</code>, i.e. they follow the spec and
+          bypass the tokens. Three sources, two of them disagreeing.</td></tr>
+      <tr><td>Section order differs from the brief</td><td><code>[deckId]/page.tsx</code></td>
+        <td>§4.3 describes the 143-line <code>lg:grid-cols-2</code> block as content ingestion followed by a
+          study/quiz row. It is the reverse: the grid <em>is</em> the study/quiz pair (lines 436–578), and
+          ingestion follows it. The diagnosis is unaffected.</td></tr>
+      <tr><td>Landing vignette is hardcoded black</td><td><code>LandingBackground.tsx</code> line 436</td>
+        <td><code>rgba(0,0,0,0.45)</code> is applied in both themes, so light mode gets a heavy dark vignette on a
+          <code>#fbfbfc</code> ground. Every other layer in that file is correctly themed via <code>--blob</code>.</td></tr>
+      <tr><td>Unstyled anchors inherit indigo</td><td>general</td>
+        <td>Hit this while building: an <code>&lt;a&gt;</code> with <code>text-decoration:none</code> but no
+          <code>color</code> renders in the UA's default indigo — the exact hue the system bans. A global
+          <code>a { color: inherit }</code> makes it impossible to reintroduce by omission.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<footer>
+  <p>Live HTML and CSS at native resolution — every frame above is the real rendering, not an image. Built on the
+    approved Rev. B chassis: neutral obsidian palette, the SM-2 state channel as the only hue, Geist Mono with
+    <code>tabular-nums</code> for data, Instrument Serif at 400 for display type ≥24px. No sparkles, no glow, no
+    orbs, no <code>backdrop-blur</code> outside a modal scrim, no indigo.</p>
+</footer>
+
+</div>
+
+<script>
+/* Frames hold real 1440×900 and 390×844 markup; scale each to its column. */
+(function () {
+  var frames = Array.prototype.slice.call(document.querySelectorAll('.frame'));
+  function fit() {
+    frames.forEach(function (f) {
+      var screen = f.firstElementChild;
+      if (!screen) return;
+      /* aspect-ratio already gave the frame its height, so this only ever
+         sets a transform — layout never moves, and the scroll position
+         never jumps out from under the reader. */
+      screen.style.transform = 'scale(' + (f.clientWidth / +f.dataset.w) + ')';
+    });
+  }
+  fit();
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(fit);
+    frames.forEach(function (f) { ro.observe(f); });
+  }
+  window.addEventListener('resize', fit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+})();
+</script>

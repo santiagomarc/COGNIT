@@ -129,7 +129,7 @@ export function Flashcard({ question, answer }: FlashcardProps) {
               <p className="mb-2 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 Question
               </p>
-              <p className="min-h-0 flex-1 overflow-y-auto overscroll-contain font-serif text-[27px] font-medium leading-[1.25] tracking-[-0.02em] [scrollbar-width:thin]">
+              <p className="min-h-0 flex-1 overflow-y-auto overscroll-contain font-serif text-[27px] leading-[1.25] tracking-[-0.02em] [scrollbar-width:thin]">
                 {question}
               </p>
             </div>
@@ -139,7 +139,7 @@ export function Flashcard({ question, answer }: FlashcardProps) {
               <p className="mb-2 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 Answer
               </p>
-              <p className="min-h-0 flex-1 overflow-y-auto overscroll-contain font-serif text-[27px] font-medium leading-[1.25] tracking-[-0.02em] text-ink-dim [scrollbar-width:thin]">
+              <p className="min-h-0 flex-1 overflow-y-auto overscroll-contain font-serif text-[27px] leading-[1.25] tracking-[-0.02em] text-ink-dim [scrollbar-width:thin]">
                 {answer}
               </p>
             </div>

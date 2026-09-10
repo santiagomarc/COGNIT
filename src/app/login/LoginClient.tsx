@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PasswordStrength } from '@/components/ui/shared/PasswordStrength';
 import { Wordmark } from '@/components/ui/shared/Wordmark';
+import { AmbientField } from '@/components/ui/shared/AmbientField';
+import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { login, signup, resetPassword, loginWithOAuth } from '@/app/auth/actions';
 import { loginSchema, signupSchema, resetPasswordSchema } from '@/lib/schemas';
 import { motionTransitions } from '@/lib/motion-configs';
@@ -28,18 +30,37 @@ function GoogleIcon() {
 import { toast } from 'sonner';
 
 /*
- * The left panel's illustration. It used to be three cards bobbing on an
- * infinite loop, each with a tinted icon box — two of them `<BookOpen/>` and
- * `<Brain/>`. What a prospective user actually needs to see is what the product
- * *is*: a prompt, and the interval the scheduler assigns once you answer it.
+ * The left half is a still life of the product, not a description of it.
  *
- * So the illustration is now a specimen of the real deck row (§7.5) — a state
- * tick, a prompt, and a mono interval — which is both honest and free.
+ * It used to be a tagline plus three sample rows — which is the panel every
+ * SaaS sign-in page has, and it read exactly that generic. What sits here now
+ * is the object the product is built around: a card framed the way the study
+ * canvas frames it, and the four intervals the scheduler will offer for it.
+ * The three specimen rows were the one genuinely good element on the old page
+ * and they were a footnote; they are now the base of that column.
+ *
+ * It also does something a tagline cannot — it tells a returning user what the
+ * session waiting for them looks like.
  */
+const SPECIMEN_PROMPT = 'What is a closure, and what does it capture?';
+
+/*
+ * Real SM-2 intervals for that card, using the grade→state mapping from §2.2.
+ * Note the deliberate asymmetry: Easy is `--state-neutral`, not a fourth hue.
+ * "No friction" is signalled by the absence of a signal.
+ */
+const SPECIMEN_GRADES = [
+  { key: '1', name: 'Again', interval: '1m', state: 'var(--state-lapsed)' },
+  { key: '2', name: 'Hard', interval: '10m', state: 'var(--state-due)' },
+  { key: '3', name: 'Good', interval: '4d', state: 'var(--state-mastered)' },
+  { key: '4', name: 'Easy', interval: '9d', state: 'var(--state-neutral)' },
+];
+
+/** A specimen of the real deck row (§7.5) — state tick, prompt, mono interval. */
 const SPECIMEN_CARDS = [
-  { prompt: 'What is a closure?', interval: '4d', state: 'var(--state-mastered)' },
   { prompt: 'Explain Big-O notation', interval: '11h', state: 'var(--state-learning)' },
   { prompt: 'Define polymorphism', interval: 'due', state: 'var(--state-due)' },
+  { prompt: 'What is a monad?', interval: '4d', state: 'var(--state-mastered)' },
 ];
 
 type AuthMode = 'login' | 'signup' | 'forgot';
@@ -206,23 +227,63 @@ export default function LoginClient() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* ═══════════ Left panel (branding) ═══════════ */}
-      <div className="relative hidden w-[55%] flex-col justify-center border-r border-border px-12 lg:flex">
-        <div className="mx-auto w-full max-w-md">
+    <div className="relative flex min-h-screen">
+      <AmbientField />
+
+      {/* ═══════════ Left panel (the product, at rest) ═══════════ */}
+      <div className="relative z-[1] hidden w-[58%] flex-col justify-center px-12 lg:flex xl:px-[88px]">
+        <div className="w-full max-w-[470px]">
           <Wordmark href="/" size="lg" />
 
-          <p className="mt-4 max-w-sm text-lg leading-relaxed text-muted-foreground">
+          <p className="mt-3.5 max-w-[30ch] text-[17px] leading-relaxed text-ink-dim">
             The universal active recall engine.{' '}
             <span className="text-ink">Study smarter, remember forever.</span>
           </p>
 
-          {/* A specimen of the real deck row (§7.5), not an illustration of one. */}
-          <div className="mt-10 border-t border-border">
-            {SPECIMEN_CARDS.map((card) => (
+          {/* The card: corner brackets on the flat ground — no fill, no border,
+              no shadow. The same treatment the study canvas uses (§7.6). */}
+          <div className="relative mt-[42px] grid min-h-[118px] place-items-center px-[26px] py-[30px]">
+            <CornerBrackets />
+            <p className="max-w-[21ch] text-balance text-center font-serif text-[31px] leading-[1.24] tracking-[-0.02em] text-ink">
+              {SPECIMEN_PROMPT}
+            </p>
+          </div>
+
+          {/*
+            The grade deck, inert. It is the product's signature object and the
+            one place the flat system yields to tactility — so it is what the
+            page shows rather than tells.
+
+            Decorative, therefore `div`s and not `button`s, and hidden from the
+            accessibility tree entirely: a screen-reader user must not land on
+            four unusable grade keys on a sign-in form.
+          */}
+          <div
+            aria-hidden="true"
+            className="mt-5 grid grid-cols-4 gap-2 opacity-[0.62]"
+          >
+            {SPECIMEN_GRADES.map((grade) => (
               <div
+                key={grade.key}
+                className="key"
+                style={{ ['--key-state' as string]: grade.state }}
+              >
+                <span className="kk">{grade.key}</span>
+                <span className="kn">{grade.name}</span>
+                <span className="ki">{grade.interval}</span>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            Every key shows the interval before you commit
+          </p>
+
+          <div className="rule mt-[34px]" />
+          <ul>
+            {SPECIMEN_CARDS.map((card) => (
+              <li
                 key={card.prompt}
-                className="flex items-center gap-3 border-b border-border py-3"
+                className="flex items-center gap-3 border-b border-border py-2.5"
               >
                 <span
                   aria-hidden="true"
@@ -232,24 +293,25 @@ export default function LoginClient() {
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-dim">
                   {card.prompt}
                 </span>
-                <span
-                  className="font-mono text-[13px] tnum"
-                  style={{ color: card.state }}
-                >
+                <span className="font-mono text-[13px] tnum" style={{ color: card.state }}>
                   {card.interval}
                 </span>
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          <p className="mt-4 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="mt-3.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Next review, scheduled by SM-2
           </p>
         </div>
       </div>
 
+      {/* A hard `border-r` is what made this page read as two rectangles pasted
+          together. The divider fades out at both ends instead. */}
+      <div className="rule--v relative z-[1] hidden lg:block" aria-hidden="true" />
+
       {/* ═══════════ Right panel (auth form) ═══════════ */}
-      <div className="relative flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <div className="relative z-[1] flex flex-1 flex-col items-center justify-center px-6 py-12">
         {/* Theme toggle */}
         <div className="absolute right-4 top-4">
           <ThemeToggle />
@@ -267,7 +329,7 @@ export default function LoginClient() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
             transition={reduced ? { duration: 0 } : motionTransitions.panel}
-            className="panel w-full max-w-[420px] p-8"
+            className="panel w-full max-w-[420px] p-5 sm:p-8"
           >
             {/* ── Email sent confirmation ── */}
             {emailSent ? (
@@ -275,7 +337,7 @@ export default function LoginClient() {
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Check your email
                 </p>
-                <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">
+                <h1 className="font-serif type-display leading-[1.08] tracking-[-0.02em] text-balance">
                   {mode === 'signup' ? 'Confirm your address' : 'Reset link sent'}
                 </h1>
                 <p className="text-sm leading-relaxed text-ink-dim">
@@ -315,7 +377,7 @@ export default function LoginClient() {
                       Back to sign in
                     </button>
                   )}
-                  <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance">
+                  <h1 className="font-serif type-display leading-[1.08] tracking-[-0.02em] text-balance">
                     {headings[mode].title}
                   </h1>
                   <p className="mt-1.5 text-sm text-ink-dim">

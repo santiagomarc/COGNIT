@@ -1,9 +1,11 @@
 # Cognit — Design System
 
 **Codename:** Obsidian Telemetry
-**Status:** Approved 2026-09-09 · Rev. B (corrected via `COGNIT_UI_CORRECTIONS_PLAN.md`)
+**Status:** Approved 2026-09-10 · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`)
 **Applies to:** Next.js 16 (App Router) · React 19 · Tailwind v4 (CSS-first) · Framer Motion 12
 
+> **Changelog (Rev. C):** Added the plane system — `.raised`, `.well` and the recessed `--elevate-inset` step — plus the monochromatic ambient field, gradient-masked rules, and display-type utilities that finally consume the type tokens. Scoped the anti-pattern ban on orbs and grain to *chromatic* decoration. Recorded the state channel's measured CVD separation. Source: `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`.
+>
 > **Changelog (Rev. B):** Refined 5-step radius scale, 3-step elevation scale, widened Instrument Serif to display headings ≥24px, added `.panel` for sparse surfaces, confirmed unfilled bracketed card canvas, and adjusted button primary budget.
 
 ---
@@ -42,6 +44,11 @@ Three principles:
 **1. Almost nothing is filled on dense surfaces; sparse surfaces get contained, elevated panels.**
 On dense operational screens (dashboard, tables), structure is carried by 1px rules on a single flat ground with `--elevate-flat`. On sparse screens (login, modals, empty states), the focal object is enclosed in a `.panel` with `--radius-xl` and `--elevate-2` so it has tangible subject/figure presence. Fill remains a disciplined resource.
 
+**1b. Spend the whole ladder. Depth is light and elevation, never colour.** (Rev. C)
+The system has five planes and a screen should use three of them. Exactly one object per screen is `.raised` — the thing the screen is *for*. Content that is contained but subordinate goes *below* the surface in a `.well`. Everything else stays flat. Behind all of it, a monochromatic ambient field.
+
+This is the correction Rev. C exists for: the palette was never the problem. Every container on every screen sat on `--surface` with `--elevate-flat`, so six blocks on the deck page read at identical weight and nothing was primary. A screen that reads flat is almost always a screen spending one step of a three-step ladder — reach for the plane, not for a hue.
+
 **2. Colour is a state channel, not decoration.**
 The accent is white (dark theme) / near-black (light theme). Hue is reserved *exclusively* for SM-2
 card state: due, learning, mastered, lapsed, streak. If a colour on screen does not encode a fact
@@ -59,8 +66,8 @@ These were removed deliberately. Adding any of them back is a regression, not a 
 |---|---|---|
 | `backdrop-blur` on content surfaces | Degrades text contrast, costs compositing on the study canvas | Opaque `--surface` + `--elevate` |
 | Glow / neon `box-shadow` / `text-shadow` | Reads as a game HUD | Weight, tracking, and a 1px rule |
-| Decorative blurred "orbs" / gradient blobs | The single loudest AI-template tell | Nothing. Flat ground. |
-| Grain / noise overlays | Fixed full-viewport blend layer for 3.5% opacity | Nothing |
+| **Chromatic** blurred "orbs" / gradient blobs | The single loudest AI-template tell | Monochromatic ambient light only — see below |
+| Grain at a blend mode, or on a study surface | `mix-blend-mode` forces a compositing pass behind every paint | A flat low-opacity tile (§7.10) |
 | Indigo-tinted borders (`border-primary/10`) | Leaves the app with no true neutral | `--border` (real zinc) |
 | Gradient text or gradient headings | — | `--ink`, weight 600 |
 | `<Sparkles/>`, `<Brain/>`, `<Wand2/>`, robot/AI glyphs | 17 sparkle instances is why this redesign exists | A count, a label, or nothing |
@@ -68,6 +75,15 @@ These were removed deliberately. Adding any of them back is a regression, not a 
 | Cursor-tracking 3D tilt on readable content | Text plane is never square to the eye | Static card |
 | Four+ competing radii | Radius carried no meaning | Three steps, by role (§5) |
 | Emoji as section markers or status | — | A 2px state tick |
+| Any per-frame loop on an authenticated surface | 30-60 minute sessions on laptops | CSS-only, static (§7.10) |
+
+> **Rev. C scopes the orb and grain bans.** They were written against *chromatic*
+> AI-template decoration — purple and cyan blobs on navy — and that ban stands
+> absolutely. What is now **permitted** is monochromatic ambient lighting:
+> low-opacity white/zinc radial fields, fine grain, vignettes, specular
+> hairlines, subtle neutral gradients, used to create **planes and depth**. The
+> test is not "is it a gradient", it is "does it carry a hue, and does it cost a
+> frame". If it does either, it is still banned. See §7.10.
 
 ---
 
@@ -156,6 +172,27 @@ They are safe for text, for 2px ticks, and for bar fills.
 signal. Four saturated keys would compete with the card the user is trying to read. Do not "fix"
 this by giving Easy a colour.
 
+### 2.2b Measured CVD separation — why §2.3's last rule is load-bearing (Rev. C)
+
+Run through a palette validator rather than eyeballed (OKLab ΔE × 100):
+
+```
+LIGHT  --state-learning #a16207  ↔  --state-due #c2410c
+       ΔE 0.6  (deuteranopia)   ·   ΔE 8.8  (normal vision)
+
+DARK   --state-learning #facc15  ↔  --state-due #fb923c     ΔE 14.6 (normal vision)
+       --state-mastered #4ade80  ↔  --state-learning #facc15  ΔE 6.8 (protanopia)
+```
+
+**In light mode, due and learning are effectively the same colour to a deuteranope**, and they are
+hard to separate even with full colour vision. The channel is not being changed — each value is a
+deliberate semantic choice and the ramp is AA as text throughout — but this makes §2.3's
+"a colour is never the only carrier of meaning" the *load-bearing* rule of the whole channel rather
+than a courtesy.
+
+Concretely: a legend of bare ticks is a defect. Every state swatch ships with a word, a count or a
+position beside it. If you are about to simplify a legend down to colour alone, don't.
+
 ### 2.3 Rules
 
 - Never introduce a hue outside §2.2. No brand purple, no indigo, no cyan.
@@ -195,7 +232,7 @@ delete the imports, the `--font-orbitron` / `--font-poppins` variables and the `
 Base is **14px** for application chrome. Instrument Serif display headings and study text use an enlarged 1.5x scale:
 
 ```css
-/* display steps — Instrument Serif (1.5x enlarged scale, medium weight) */
+/* display steps — Instrument Serif (1.5x enlarged scale, weight 400 only) */
 --type-display-xl: 4.125rem;  /* 66px — page hero, login brand      */
 --type-display-lg: 3rem;      /* 48px — page title (h1), modal head */
 --type-display:    2.25rem;   /* 36px — section heading (h2)        */
@@ -208,6 +245,12 @@ Base is **14px** for application chrome. Instrument Serif display headings and s
 --type-cap:  0.75rem;   /* 12px              */
 --type-label:0.625rem;  /* 10px, mono, uppercase, 0.16em */
 ```
+
+**These tokens are live in `globals.css` and components consume them through the
+`type-display-xl` / `-lg` / `type-display` / `-sm` utilities** (Rev. C). Before Rev. C the tokens
+held a different scale from this document and had *zero* consumers — every heading hardcoded
+`text-[3rem]`. Three sources, two of them disagreeing. Do not reintroduce a hardcoded display size;
+if a heading needs a size that is not on the scale, add a step here first.
 
 Rules:
 - Display type gets `letter-spacing: -0.02em` and `text-wrap: balance`. Never set Instrument Serif below 24px.
@@ -252,9 +295,19 @@ There are no colored shadows, no glows, and no backdrop blurs behind content. De
 | `--elevate-flat` | `inset 0 1px 0 rgb(255 255 255 / 0.05)` | `0 1px 2px rgb(24 24 27 / 0.05)` | Dense surfaces — deck table, telemetry, forecast |
 | `--elevate-1` | `inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5)` | `0 1px 3px rgb(24 24 27 / 0.08)` | Interactive raised things — grade keys, buttons at rest, options, due-now band |
 | `--elevate-2` | `inset 0 1px 0 rgb(255 255 255 / 0.08), 0 8px 28px -8px rgb(0 0 0 / 0.7)` | `0 8px 28px -8px rgb(24 24 27 / 0.16)` | **Sparse-screen panels and modals** — login card, command palette, dialogs |
+| `--elevate-inset` | `inset 0 1px 3px rgb(0 0 0 / 0.5), inset 0 0 0 1px rgb(255 255 255 / 0.012)` | `inset 0 1px 3px rgb(24 24 27 / 0.07)` | **Recessed** — the `.well` (Rev. C) |
 
 Aliases:
 - `--elevate: var(--elevate-flat)` (backward-compatibility alias)
+
+**Plane background tokens (Rev. C).** Elevation alone does not make a plane; the surface under it
+has to move too.
+
+| Token | Dark | Light | Note |
+|---|---|---|---|
+| `--raised-bg` | `#1f1f23` | `#ffffff` | **Not** `--surface-raised`. In light mode that token is a hover fill on white (`#f4f4f5`) and renders *darker* than the `#fbfbfc` ground — the inverse of what "raised" means. Light is its own composition. |
+| `--recess` | `#0b0b0d` | `#f4f4f5` | The well's ground. |
+| `--spec` | `rgb(255 255 255 / .085)` | `transparent` | Masked specular top edge. Deliberately inert in light, where a white edge on a white card has no job. |
 
 ### 4.4 Z-index scale
 
@@ -334,7 +387,43 @@ The structural container classes:
 .surface--raised {
   box-shadow: var(--elevate-1);
 }
+
+/* ── Rev. C planes ──────────────────────────────────────────────────── */
+
+/* The one object per screen that the screen is FOR. */
+.raised {
+  background: var(--raised-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-1);
+}
+
+/* A well: contained but subordinate — the deck index, the card list. */
+.well {
+  background: var(--recess);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-inset);
+}
+
+/* Masked specular top edge. Unmasked, a 1px highlight across a 1300px panel
+   reads as a drawn rectangle; faded at the corners it reads as light. */
+.spec::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: linear-gradient(90deg, transparent, var(--spec) 18%, var(--spec) 82%, transparent);
+}
+
+/* Gradient-masked rules. A rule that stops short of the gutter reads as
+   structure; one that butts into it reads as a container edge. */
+.rule    { height: 1px; background: linear-gradient(90deg, transparent, var(--border-strong) 6%, var(--border-strong) 94%, transparent); }
+.rule--soft { background: linear-gradient(90deg, transparent, var(--border) 4%, var(--border) 96%, transparent); }
+.rule--v { width: 1px; align-self: stretch; background: linear-gradient(180deg, transparent, var(--border-strong) 10%, var(--border-strong) 90%, transparent); }
 ```
+
+**Assigning a plane.** One `.raised` per screen, and only for the primary object. `.well` for
+content that is contained and subordinate. `.surface` for everything else dense. If a screen has
+three `.surface` blocks and no `.raised`, the hierarchy is missing, not subtle.
 
 Only interactive surfaces get a hover state. A static panel that lights up on hover is noise.
 
@@ -603,6 +692,38 @@ DUE 47   RETENTION 87%   STREAK 14d   REVIEWED TODAY 62        [ Search  ⌘K ]
 Values take a state colour only when the value *is* a state (`due` orange, `streak` amber).
 Everything else is `--ink`.
 
+On the dashboard the strip is **right-aligned opposite a greeting** rather than run full-width above
+the page (Rev. C): the row gains a subject, and the readings land where a scan ends rather than
+where it starts. `GreetingHeader` owns the divider under that row, and it is a `.rule`.
+
+### 7.10 Ambient field (Rev. C)
+
+The authenticated surfaces' background layer, and the resolution of the orb/grain question in §1.1.
+
+```
+AmbientField  →  <div aria-hidden class="amb" />     — one element, two paints
+   .amb::before   var(--amb-field)     layered radial gradients, white/ink only
+   .amb::after    an SVG fractal-noise tile at 2.0% (light) / 3.2% (dark)
+```
+
+Three rules, all non-negotiable:
+
+1. **Monochromatic.** White on dark, ink on light. No hue reaches this layer, ever.
+2. **Static.** No canvas, no `requestAnimationFrame`, no cursor tracking, no `mix-blend-mode`.
+   `LandingBackground` runs ~5,500 distance checks per frame plus three canvas ribbons; that is
+   fine for twenty seconds of marketing and is not fine on a surface someone sits on for forty
+   minutes. Nothing here animates, so there is nothing for `prefers-reduced-motion` to disable —
+   which is a stronger guarantee than respecting it.
+3. **Not on the study or quiz canvas.** Those routes are a single card on a flat ground (§8) and the
+   field would compete with the one thing the user is reading.
+
+Light is not an inversion of dark. On a dark ground, "light from above" means the top glows; on a
+light ground it means the periphery recedes. Same role, opposite implementation — see `--amb-field`.
+
+`.amb` is `position: fixed; z-index: 0`, so the route's content wrapper needs `position: relative`
+and a z-index above it. Never give `.amb` a negative z-index: that puts it behind the `body`
+background and it vanishes.
+
 ---
 
 ## 8. Navigation architecture
@@ -677,11 +798,17 @@ Non-negotiable. Verify before calling any UI task done.
 
 1. Does every colour on screen either come from `--ink*` or report SM-2 state?
 2. Is there any `backdrop-blur` outside a modal scrim?
-3. Any `glow-*`, `neon`, orb, grain, sparkle or brain left in the file?
+3. Any `glow-*`, `neon`, **chromatic** orb, sparkle or brain left in the file? (Monochromatic
+   ambient light is permitted — §7.10. Hue and per-frame cost are the tests, not "gradient".)
 4. Are all numbers Geist Mono with `tabular-nums`?
-5. Is the serif used *only* for a card prompt/answer?
-6. Exactly three radii, assigned by role?
-7. Does every keyboard binding show a `.kbd`?
+5. Is the serif used only for display type ≥24px and the card prompt/answer — and **never above
+   weight 400**? It has no bold; anything heavier is a synthetic smear.
+6. Five radii, assigned by role and keyed to element height (§4.2)?
+7. Does every keyboard binding show a `.kbd` — **and is the binding actually implemented**? A
+   keycap the product does not honour is a lie.
 8. Does it work — and was it *looked at* — in **both** themes?
 9. Focus visible everywhere; nothing relies on colour alone?
 10. Any raw `z-50`, or a page adding its own bottom padding?
+11. Does the screen use three planes, and exactly one `.raised`? Three `.surface` blocks and no
+    `.raised` means the hierarchy is missing (§1, §7.1).
+12. Do display sizes read the `type-display*` utilities rather than restating a value?

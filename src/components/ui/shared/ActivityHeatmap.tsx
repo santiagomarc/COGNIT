@@ -1,7 +1,3 @@
-'use client';
-
-import { cn } from '@/lib/utils';
-
 type ActivityPoint = {
   date: string; // YYYY-MM-DD
   count: number;
@@ -17,6 +13,8 @@ type HeatmapCell = {
   date: string;
   count: number;
 };
+
+const MONTH = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
 
 function toISODateUTC(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -68,65 +66,92 @@ function getIntensity(count: number): 0 | 1 | 2 | 3 | 4 {
   return 4;
 }
 
-function getCellClass(intensity: 0 | 1 | 2 | 3 | 4): string {
-  switch (intensity) {
-    case 1:
-      return 'bg-primary/25 border-border-strong';
-    case 2:
-      return 'bg-primary/45 border-border-strong';
-    case 3:
-      return 'bg-primary/65 border-border-strong';
-    case 4:
-      return 'bg-primary border-border-strong';
-    default:
-      return 'bg-muted/40 border-border/60';
-  }
-}
-
+/**
+ * Six months of review activity (design system §2.2, Run 6 Task 2.4).
+ *
+ * A sequential **one-hue** ramp — ink on the surface, five steps, monotonic.
+ * It carries no state colour on purpose: activity is a count, not an SM-2
+ * state, and spending the state channel on it would put hue on the screen that
+ * reports nothing about the user's memory.
+ *
+ * The ramp used to be Tailwind opacity utilities topping out at full
+ * `bg-primary`, which made a six-month grid the brightest object on the
+ * dashboard — a retrospective reading outshouting the actionable one. The top
+ * step is now capped at 0.64 white / 0.72 ink and the steps live in tokens, so
+ * both themes are tuned rather than inverted.
+ *
+ * Cells carry no border: a stroke around every cell is data-weight ink that is
+ * not data. The 2.5px gap is the separator.
+ *
+ * A server component — it renders a static grid of numbers already computed.
+ */
 export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: ActivityHeatmapProps) {
   const weeks = buildHeatmapWeeks(activity, monthsToShow, anchorDate);
 
-  return (
-    <div className="space-y-3">
-      <div className="overflow-x-auto pb-1">
-        <div className="inline-flex gap-1 min-w-max">
-          {weeks.map((week, weekIndex) => (
-            <div key={`${week[0]?.date ?? weekIndex}`} className="grid grid-rows-7 gap-1">
-              {week.map((cell) => {
-                const intensity = getIntensity(cell.count);
-                const studiedLabel =
-                  cell.count === 0
-                    ? 'No activity'
-                    : `${cell.count} card${cell.count === 1 ? '' : 's'} studied`;
+  /*
+   * A month label sits above the first week that starts a new month, so the
+   * labels land in register with the columns instead of being spaced by hand —
+   * which drifts as soon as the window length changes.
+   */
+  const monthLabels = weeks.map((week, index) => {
+    const first = week[0];
+    if (!first) return null;
+    const date = new Date(`${first.date}T00:00:00Z`);
+    if (Number.isNaN(date.getTime())) return null;
+    if (index === 0) return null;
+    const previous = weeks[index - 1]?.[0];
+    if (!previous) return null;
+    const previousMonth = new Date(`${previous.date}T00:00:00Z`).getUTCMonth();
+    return date.getUTCMonth() === previousMonth ? null : MONTH.format(date);
+  });
 
-                return (
-                  <div
-                    key={cell.date}
-                    title={`${studiedLabel} on ${cell.date}`}
-                    aria-label={`${studiedLabel} on ${cell.date}`}
-                    className={cn(
-                      'h-3 w-3 rounded-[3px] border transition-transform duration-150 hover:scale-125',
-                      getCellClass(intensity),
-                    )}
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </div>
+  return (
+    <div className="inline-flex min-w-max flex-col gap-1.5">
+      <div className="flex gap-[2.5px]">
+        {weeks.map((week, weekIndex) => (
+          <div key={week[0]?.date ?? weekIndex} className="flex w-[10px] flex-col gap-[2.5px]">
+            {week.map((cell) => {
+              const studiedLabel =
+                cell.count === 0
+                  ? 'No activity'
+                  : `${cell.count} card${cell.count === 1 ? '' : 's'} studied`;
+
+              return (
+                <div
+                  key={cell.date}
+                  title={`${studiedLabel} on ${cell.date}`}
+                  aria-label={`${studiedLabel} on ${cell.date}`}
+                  className="h-[10px] w-[10px] rounded-[2px]"
+                  style={{ backgroundColor: `var(--heat-ramp-${getIntensity(cell.count)})` }}
+                />
+              );
+            })}
+          </div>
+        ))}
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{monthsToShow} month activity</span>
-        <div className="flex items-center gap-1.5">
-          <span>Less</span>
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-border/60 bg-muted/40" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary/25" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary/45" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary/65" />
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-border-strong bg-primary" />
-          <span>More</span>
-        </div>
+      <div className="flex items-center gap-[2.5px]">
+        {monthLabels.map((label, index) => (
+          <span
+            key={weeks[index]?.[0]?.date ?? index}
+            className="w-[10px] shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+          >
+            {label ? <span className="relative whitespace-nowrap">{label}</span> : null}
+          </span>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-1.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <span>Less</span>
+        {([0, 1, 2, 3, 4] as const).map((step) => (
+          <span
+            key={step}
+            aria-hidden="true"
+            className="h-[9px] w-[9px] rounded-[2px]"
+            style={{ backgroundColor: `var(--heat-ramp-${step})` }}
+          />
+        ))}
+        <span>More</span>
       </div>
     </div>
   );

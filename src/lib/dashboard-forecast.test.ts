@@ -15,45 +15,54 @@ function card(next: string | null, deck = 'd1', ease: number | null = 2.5): Card
 }
 
 describe('buildSevenDayForecast', () => {
-  it('returns seven consecutive days starting today', () => {
+  it('returns seven consecutive days starting tomorrow', () => {
     const days = buildSevenDayForecast([], NOW);
     expect(days).toHaveLength(7);
     expect(days.map((d) => d.date)).toEqual([
-      '2026-09-09',
       '2026-09-10',
       '2026-09-11',
       '2026-09-12',
       '2026-09-13',
       '2026-09-14',
       '2026-09-15',
+      '2026-09-16',
     ]);
-    expect(days[0].isToday).toBe(true);
-    expect(days.slice(1).every((d) => !d.isToday)).toBe(true);
+  });
+
+  it('never includes today', () => {
+    const days = buildSevenDayForecast([], NOW);
+    expect(days.map((d) => d.date)).not.toContain('2026-09-09');
   });
 
   it('buckets each card into the day it falls due', () => {
     const days = buildSevenDayForecast(
       [
-        card('2026-09-09T23:00:00Z'),
         card('2026-09-10T01:00:00Z'),
         card('2026-09-10T22:00:00Z'),
-        card('2026-09-15T09:00:00Z'),
+        card('2026-09-11T09:00:00Z'),
+        card('2026-09-16T09:00:00Z'),
       ],
       NOW
     );
-    expect(days.map((d) => d.count)).toEqual([1, 2, 0, 0, 0, 0, 1]);
+    expect(days.map((d) => d.count)).toEqual([2, 1, 0, 0, 0, 0, 1]);
   });
 
-  it('folds everything overdue into today rather than dropping it', () => {
+  /*
+   * The change this test guards: at 519 due, folding overdue into column 0 made
+   * that column ~4.6x the tallest projected day and flattened the rest. Today's
+   * work is the due-now band's hero figure; the forecast answers a different
+   * question and must not restate it.
+   */
+  it('excludes overdue and due-today cards from the window entirely', () => {
     const days = buildSevenDayForecast(
       [card('2026-08-01T00:00:00Z'), card('2026-09-08T23:59:00Z'), card('2026-09-09T06:00:00Z')],
       NOW
     );
-    expect(days[0].count).toBe(3);
+    expect(days.reduce((sum, d) => sum + d.count, 0)).toBe(0);
   });
 
   it('ignores cards scheduled beyond the window', () => {
-    const days = buildSevenDayForecast([card('2026-09-16T00:00:00Z')], NOW);
+    const days = buildSevenDayForecast([card('2026-09-17T00:00:00Z')], NOW);
     expect(days.reduce((sum, d) => sum + d.count, 0)).toBe(0);
   });
 

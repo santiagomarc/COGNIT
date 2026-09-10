@@ -2,22 +2,45 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import { AddCardForm } from '@/components/ui/shared/AddCardForm';
-import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
-import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
+import { AddContentPanel } from '@/components/ui/shared/AddContentPanel';
 import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
 import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
+import { DeckReadings } from '@/components/ui/shared/DeckReadings';
+import { DeckSegments, resolveDeckTab } from '@/components/ui/shared/DeckSegments';
+import { DeckSessionLauncher } from '@/components/ui/shared/DeckSessionLauncher';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
-import { Button } from '@/components/ui/button';
+import { StateTick, type TickState } from '@/components/ui/shared/StateTick';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
-import { Input } from '@/components/ui/input';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
+import { estimateSessionMinutes } from '@/lib/dashboard-forecast';
 import { getSessionCardBounds } from '@/lib/study';
 import { logger } from '@/lib/logger';
 import type { CardSource } from '@/index';
+
+type DeckCardRow = {
+  id: string;
+  deck_id: string;
+  front: string;
+  back: string;
+  created_at: string;
+  source: CardSource | null;
+  imported_by: string | null;
+  mcq_distractors: string[] | null;
+  id_question: string | null;
+  topic_tags: string[] | null;
+  state: string | null;
+  next_review_at: string | null;
+};
+
+type ScheduleBreakdown = {
+  due: number;
+  learning: number;
+  scheduled: number;
+  fresh: number;
+};
 
 type DeckDetailSnapshot = {
   deck: {
@@ -28,18 +51,7 @@ type DeckDetailSnapshot = {
     share_token: string | null;
   } | null;
   deckErrorMessage: string | null;
-  cards: Array<{
-    id: string;
-    deck_id: string;
-    front: string;
-    back: string;
-    created_at: string;
-    source: CardSource | null;
-    imported_by: string | null;
-    mcq_distractors: string[] | null;
-    id_question: string | null;
-    topic_tags: string[] | null;
-  }>;
+  cards: DeckCardRow[];
   totalCards: number;
   /** Deck-wide, not derived from the paginated `cards` slice above. */
   quizReadyCards: number;
@@ -51,17 +63,8 @@ type DeckDetailSnapshot = {
     last_quiz_at: string;
   }>;
   masteryRowsErrorMessage: string | null;
+  schedule: ScheduleBreakdown;
 };
-
-/**
- * Mastery is the one thing on this page that reports SM-2 state, so it is the
- * one thing that gets a hue — and only at the threshold that means something.
- * The four-step sky/emerald/amber/red ramp this replaces invented three
- * boundaries the scheduler does not have (§2.2).
- */
-function masteryBarColor(masteryPercentage: number) {
-  return masteryPercentage >= 70 ? 'var(--state-mastered)' : 'var(--ink-dim)';
-}
 
 /** Compact age for the telemetry strip: `today`, `2d`, `3mo`. */
 function formatLastQuizAge(lastQuizAt: string | null) {
@@ -78,6 +81,24 @@ function formatLastQuizAge(lastQuizAt: string | null) {
   if (dayDiff < 30) return `${dayDiff}d`;
   if (dayDiff < 365) return `${Math.round(dayDiff / 30)}mo`;
   return `${Math.round(dayDiff / 365)}y`;
+}
+
+/** When a card next comes up: `due` now, or `11h` / `4d` / `3mo` ahead. */
+function formatNextReview(nextReviewAt: string | null): { label: string; state: TickState } {
+  if (!nextReviewAt) return { label: '—', state: 'neutral' };
+
+  const at = Date.parse(nextReviewAt);
+  if (Number.isNaN(at)) return { label: '—', state: 'neutral' };
+
+  const seconds = Math.round((at - Date.now()) / 1000);
+  if (seconds <= 0) return { label: 'due', state: 'due' };
+  if (seconds < 3600) return { label: `${Math.max(1, Math.round(seconds / 60))}m`, state: 'learning' };
+  if (seconds < 86_400) return { label: `${Math.round(seconds / 3600)}h`, state: 'learning' };
+
+  const days = Math.round(seconds / 86_400);
+  if (days < 30) return { label: `${days}d`, state: days >= 21 ? 'mastered' : 'neutral' };
+  if (days < 365) return { label: `${Math.round(days / 30)}mo`, state: 'mastered' };
+  return { label: `${Math.round(days / 365)}y`, state: 'mastered' };
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -159,6 +180,61 @@ async function loadTopTopics(
   }
 }
 
+/**
+ * The deck's SM-2 state, deck-wide (Run 6, Task 3.4).
+ *
+ * Two narrow columns and a bounded row count, bucketed in Node — the same
+ * trade the dashboard's card projection makes, and for the same reason: there
+ * is no RPC that reports this shape, and four HEAD counts would be four
+ * round-trips for one bar.
+ *
+ * `new` is a real bucket rather than a leftover: the schema defaults
+ * `next_review_at` to `now()`, so a never-studied card looks due unless its
+ * `state` is read alongside.
+ */
+const SCHEDULE_ROW_CAP = 20_000;
+
+async function loadScheduleBreakdown(
+  supabase: SupabaseServerClient,
+  deckId: string,
+): Promise<ScheduleBreakdown> {
+  const empty: ScheduleBreakdown = { due: 0, learning: 0, scheduled: 0, fresh: 0 };
+
+  const { data, error } = await supabase
+    .from('cards')
+    .select('state, next_review_at')
+    .eq('deck_id', deckId)
+    .limit(SCHEDULE_ROW_CAP);
+
+  if (error) {
+    logger.warn('deck-page', 'schedule breakdown query failed', { message: error.message });
+    return empty;
+  }
+
+  const now = Date.now();
+  const breakdown = { ...empty };
+
+  for (const row of data ?? []) {
+    const state = typeof row.state === 'string' ? row.state : 'new';
+
+    if (state === 'new') {
+      breakdown.fresh += 1;
+      continue;
+    }
+
+    const dueMs = row.next_review_at ? Date.parse(row.next_review_at) : NaN;
+    if (!Number.isNaN(dueMs) && dueMs <= now) {
+      breakdown.due += 1;
+    } else if (state === 'learning' || state === 'relearning') {
+      breakdown.learning += 1;
+    } else {
+      breakdown.scheduled += 1;
+    }
+  }
+
+  return breakdown;
+}
+
 async function loadDeckDetailSnapshot(
   supabase: SupabaseServerClient,
   userId: string,
@@ -173,7 +249,10 @@ async function loadDeckDetailSnapshot(
         .single(),
       supabase
         .from('cards')
-        .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags', { count: 'exact' })
+        .select(
+          'id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags, state, next_review_at',
+          { count: 'exact' }
+        )
         .eq('deck_id', deckId)
         .order('created_at', { ascending: false })
         .range(0, 59),
@@ -182,15 +261,16 @@ async function loadDeckDetailSnapshot(
         .select('correct, last_quiz_at')
         .eq('user_id', userId)
         .eq('deck_id', deckId),
+      loadScheduleBreakdown(supabase, deckId),
     ]);
   };
 
-  let [deckRes, cardsRes, masteryRes] = await fetchSnapshot();
+  let [deckRes, cardsRes, masteryRes, schedule] = await fetchSnapshot();
 
   // Retry once if there was a transient network/fetch failure
   if ((deckRes.error?.message?.includes('fetch failed') || cardsRes.error?.message?.includes('fetch failed')) && !deckRes.data) {
     await new Promise((r) => setTimeout(r, 250));
-    [deckRes, cardsRes, masteryRes] = await fetchSnapshot();
+    [deckRes, cardsRes, masteryRes, schedule] = await fetchSnapshot();
   }
 
   const { data: deck, error: deckError } = deckRes;
@@ -201,7 +281,7 @@ async function loadDeckDetailSnapshot(
     ...card,
     created_at: card.created_at ?? new Date().toISOString(),
     source: card.source as CardSource,
-  }));
+  })) as DeckCardRow[];
   const totalCards = cardsCount ?? cards.length;
 
   let quizReadyCards = 0;
@@ -250,22 +330,36 @@ async function loadDeckDetailSnapshot(
     cardsErrorCode: cardsError?.code ?? null,
     masteryRows: masteryRows ?? [],
     masteryRowsErrorMessage: masteryRowsError?.message ?? null,
+    schedule,
   };
 }
 
 type DeckDetailPageProps = {
-  params: Promise<{
-    deckId: string;
-  }>;
+  params: Promise<{ deckId: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
+/**
+ * The deck workspace (Run 6, Phase 3 — Option A).
+ *
+ * This page used to be 617 lines rendering six `.surface` containers and about
+ * ten major components in one column at near-equal visual weight — the owner's
+ * words were "so many card containers, too overwhelming to see". Nothing has
+ * been deleted. What changed is that the components are now organised in two
+ * dimensions instead of one:
+ *
+ *  · across, by segment — overview / cards / insights / chat, in the URL, so
+ *    only the active one renders and only its data loads;
+ *  · down, by plane — a `.raised` launcher, a flat `.surface` readings panel,
+ *    and a recessed `.well` for the card list.
+ *
+ * The two together take ten same-weight blocks down to three or four objects
+ * per view, at three different elevations.
+ */
+export default async function DeckDetailPage({ params, searchParams }: DeckDetailPageProps) {
   const { deckId } = await params;
+  const activeTab = resolveDeckTab((await searchParams)?.tab);
 
-  // Data fetching logic:
-  // 1) authenticate user on the server
-  // 2) fetch the deck by id
-  // 3) fetch all cards linked to this deck
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -284,6 +378,7 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
     cardsErrorCode,
     masteryRows,
     masteryRowsErrorMessage,
+    schedule,
   } = await loadDeckDetailSnapshot(supabase, user.id, deckId);
 
   if (deckErrorMessage || !deck) {
@@ -316,302 +411,182 @@ export default async function DeckDetailPage({ params }: DeckDetailPageProps) {
   const masteryPercentage = totalCards > 0 ? Math.round((masteredCards / totalCards) * 100) : 0;
   const unprovenCards = Math.max(totalCards - masteredCards, 0);
   const hasCards = totalCards > 0;
-
-  const scopeOptions = [
-    { value: 'due', label: 'Due only', defaultChecked: true },
-    { value: 'include_reviewed', label: 'Include reviewed', defaultChecked: false },
-    { value: 'unmastered_only', label: 'Unmastered only', defaultChecked: false },
-  ];
-
-  const modeOptions = [
-    { value: 'mcq', label: 'Multiple choice', defaultChecked: true },
-    { value: 'identification', label: 'Identification', defaultChecked: false },
-  ];
-
-  const addContentSection = (
-    <>
-      <div id="add-content" className="flex flex-wrap items-end justify-between gap-3 scroll-mt-28">
-        <div>
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            {hasCards ? 'Add content' : 'Start here'}
-          </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {hasCards
-              ? 'Add individual cards, bulk-import structured notes, or generate cards from a PDF.'
-              : 'Add cards, bulk-import notes, or generate from a PDF to unlock study and quiz modes.'}
-          </p>
-        </div>
-        <BulkImportModal deckId={deckId} />
-      </div>
-
-      <AddCardForm deckId={deckId} />
-      <PDFUploadZone deckId={deckId} />
-      <DeckChatWidget deckId={deckId} />
-    </>
-  );
+  const recentCards = cards.slice(0, 5);
 
   return (
-    <div className="container mx-auto space-y-8 p-6 md:p-8">
-      <header className="space-y-4">
-        {/* No back link and no theme toggle here: the shell's breadcrumb and
-            account sheet own both, on every chromed route rather than on the
-            two pages that happened to draw them (§8). Share stays — it is a
-            property of this deck, not of the chrome. */}
+    <div className="container mx-auto flex flex-col gap-4 p-4 md:px-8 md:py-6">
+      {/* ═══ Persistent header — identity, state, progress ═══════════════ */}
+      <header>
         <div className="flex items-center justify-end gap-2">
           <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
         </div>
 
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <h1 className="font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance text-ink">
-              {deckTitleMeta.cleanTitle}
-            </h1>
-            {deckTitleMeta.tag ? (
-              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                {deckTitleMeta.tag}
-              </span>
+        <div className="mt-3 flex flex-col gap-y-4 lg:flex-row lg:items-end lg:justify-between lg:gap-x-10">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 className="font-serif text-[1.8125rem] leading-[1.08] tracking-[-0.02em] text-balance text-ink sm:type-display">
+                {deckTitleMeta.cleanTitle}
+              </h1>
+              {deckTitleMeta.tag ? (
+                <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  {deckTitleMeta.tag}
+                </span>
+              ) : null}
+            </div>
+            {deck.description ? (
+              <p className="mt-1.5 max-w-2xl text-[13px] text-ink-dim">{deck.description}</p>
             ) : null}
           </div>
 
-          {deck.description ? (
-            <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
-          ) : null}
+          {/* Mastery is the one reading here that is a state, so it is the only
+              one that can take a hue (§2.2). */}
+          <div className="flex shrink-0 flex-wrap items-baseline gap-x-6 gap-y-3 lg:pb-1">
+            <Telemetry label="Cards" value={totalCards} />
+            <Telemetry label="Due" value={schedule.due} tone={schedule.due > 0 ? 'due' : 'ink'} />
+            <Telemetry
+              label="Mastery"
+              value={`${masteryPercentage}%`}
+              tone={masteryPercentage >= 70 ? 'mastered' : 'ink'}
+            />
+            <Telemetry label="Proven" value={`${masteredCards}/${totalCards}`} />
+            <Telemetry label="Quiz-ready" value={`${quizReadyCards}/${totalCards}`} />
+            <Telemetry label="Last quiz" value={formatLastQuizAge(lastQuizAt)} />
+          </div>
         </div>
-
-        {/* Deck telemetry (§7.9). Mastery is the only reading here that is a
-            state, so it is the only one that can take a hue. */}
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <Telemetry label="Cards" value={totalCards} />
-          <Telemetry label="Quiz-ready" value={`${quizReadyCards}/${totalCards}`} />
-          <Telemetry
-            label="Mastery"
-            value={`${masteryPercentage}%`}
-            tone={masteryPercentage >= 70 ? 'mastered' : 'ink'}
-          />
-          <Telemetry label="Proven" value={`${masteredCards}/${totalCards}`} />
-          <Telemetry label="Last quiz" value={formatLastQuizAge(lastQuizAt)} />
-        </div>
-
-        <div className="h-[3px] w-full bg-border" aria-hidden="true">
-          <div
-            className="h-full"
-            style={{
-              width: `${Math.min(masteryPercentage, 100)}%`,
-              backgroundColor: masteryBarColor(masteryPercentage),
-            }}
-          />
-        </div>
-
-        {lastQuizAt === null ? (
-          <p className="text-sm text-muted-foreground">
-            Take your first quiz to start measuring mastery.
-          </p>
-        ) : null}
       </header>
 
-      {topTopics.length > 0 ? (
-        <section className="surface p-5">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Top concepts
-            </h2>
-            <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              From AI topic tags
-            </p>
-          </div>
-          {/* A count is a better badge than a tint (§6), and a topic is not an
-              SM-2 state, so it gets no colour at all. */}
-          <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
-            {topTopics.map(([topic, count]) => (
-              <li key={topic} className="flex items-baseline gap-2 text-sm">
-                <span className="text-ink">{topic}</span>
-                <span className="font-mono text-[13px] tnum text-ink-dimmer">{count}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <DeckSegments deckId={deckId} active={activeTab} cardCount={totalCards} />
 
-      {hasCards ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* ── Review ── */}
-          <form action={`/dashboard/${deckId}/study`} method="get" className="surface flex flex-col p-5">
-            <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Review flashcards
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Spaced repetition. This is the flow that advances your daily review count, streak and
-              heatmap.
-            </p>
+      <AddContentPanel deckId={deckId} hasCards={hasCards} />
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
-              <label className="space-y-1.5 text-left">
-                <span className="block font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                  Session cards
-                </span>
-                <Input
-                  name="count"
-                  type="number"
-                  min={sessionBounds.min || undefined}
-                  max={sessionBounds.max || undefined}
-                  step={1}
-                  defaultValue={sessionBounds.defaultCount || undefined}
-                  className="w-28"
-                  aria-label="Number of flashcards to review"
-                />
-              </label>
-
-              <fieldset className="space-y-1.5">
-                <legend className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                  Card scope
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {scopeOptions.map((option) => (
-                    <label
-                      key={option.value}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1.5 text-[13px] text-ink transition-colors hover:bg-surface-raised has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]"
-                    >
-                      <input
-                        type="radio"
-                        name="scope"
-                        value={option.value}
-                        defaultChecked={option.defaultChecked}
-                        className="accent-[var(--accent)]"
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            </div>
-
-            <p className="mt-4 border-l-2 border-border-strong pl-3 text-xs leading-relaxed text-muted-foreground">
-              Due mode keeps normal SM-2 scheduling. Include reviewed fills the session with
-              scheduled cards even when they are not due yet. Unmastered covers cards still in new,
-              learning or relearning states.
-            </p>
-
-            <div className="mt-5 flex justify-end pt-1">
-              {/* The deck page's one filled button (§7.2): review is the flow
-                  the whole product is built around. */}
-              <Button type="submit" variant="primary">
-                Review flashcards
-              </Button>
-            </div>
-          </form>
-
-          {/* ── Quiz ── */}
-          <form action={`/dashboard/${deckId}/quiz`} method="get" className="surface flex flex-col p-5">
-            <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Take quiz
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Test what you know in a dedicated assessment. Quiz results update this deck&apos;s
-              mastery score.
-            </p>
-
-            <div className="mt-5 grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
-              <label className="space-y-1.5 text-left">
-                <span className="block font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                  Quiz cards
-                </span>
-                <Input
-                  name="count"
-                  type="number"
-                  min={sessionBounds.min || undefined}
-                  max={sessionBounds.max || undefined}
-                  step={1}
-                  defaultValue={sessionBounds.defaultCount || undefined}
-                  className="w-28"
-                  aria-label="Number of quiz cards"
-                />
-              </label>
-
-              <fieldset className="space-y-1.5">
-                <legend className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                  Mode
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {modeOptions.map((option) => (
-                    <label
-                      key={option.value}
-                      className="inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-[var(--border-control)] px-3 py-1.5 text-[13px] text-ink transition-colors hover:bg-surface-raised has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]"
-                    >
-                      <input
-                        type="radio"
-                        name="mode"
-                        value={option.value}
-                        defaultChecked={option.defaultChecked}
-                        className="accent-[var(--accent)]"
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-            </div>
-
-            <div className="mt-4 space-y-1.5">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink">
-                <input
-                  type="checkbox"
-                  name="focus_unproven"
-                  value="1"
-                  className="accent-[var(--accent)]"
-                />
-                Include all unproven cards (<span className="font-mono tnum">{unprovenCards}</span>)
-              </label>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Expands the quiz to cover every card not yet proven in quiz mastery.
-              </p>
-            </div>
-
-            <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-5">
-              <p className="text-xs text-muted-foreground">
-                {quizReadyCards < totalCards
-                  ? 'Some cards still need AI enrichment. The quiz route prepares missing prompts automatically.'
-                  : 'All cards are ready for both quiz modes.'}
-              </p>
-              <Button type="submit">Start quiz</Button>
-            </div>
-          </form>
-        </div>
-      ) : (
-        <section className="surface flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              This deck is empty. Add your first cards to unlock study and quiz.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Write one card, bulk-import your notes, or generate cards from a PDF.
-            </p>
-          </div>
-          <Button asChild variant="primary">
-            <Link href="#add-content">Add cards now</Link>
-          </Button>
-        </section>
-      )}
-
-      {addContentSection}
-
-      <DeckCardsManager
-        deckId={deckId}
-        cards={cards}
-        totalCards={totalCards}
-        errorMessage={cardsErrorMessage}
-      />
-
-      {hasCards ? (
+      {/* ═══ Overview ═══════════════════════════════════════════════════ */}
+      {activeTab === 'overview' ? (
         <>
-          <Suspense fallback={<WeakestConceptsSkeleton />}>
-            <WeakestConcepts deckId={deckId} />
-          </Suspense>
+          {hasCards ? (
+            <DeckSessionLauncher
+              deckId={deckId}
+              dueCount={schedule.due}
+              totalCards={totalCards}
+              quizReadyCards={quizReadyCards}
+              unprovenCards={unprovenCards}
+              estimatedMinutes={estimateSessionMinutes(schedule.due)}
+              sessionBounds={sessionBounds}
+            />
+          ) : null}
 
-          <Suspense fallback={<QuizHistorySkeleton />}>
-            <QuizHistorySection deckId={deckId} />
-          </Suspense>
+          <DeckReadings
+            totalCards={totalCards}
+            dueCount={schedule.due}
+            learningCount={schedule.learning}
+            scheduledCount={schedule.scheduled}
+            newCount={schedule.fresh}
+            masteredCards={masteredCards}
+            masteryPercentage={masteryPercentage}
+            topTopics={topTopics}
+          />
+
+          {recentCards.length > 0 ? (
+            <section>
+              <div className="flex items-center gap-3.5 pb-2.5">
+                <h2 className="shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Recent cards
+                </h2>
+                <span className="rule flex-1" aria-hidden="true" />
+                <span className="shrink-0 font-mono text-[11px] tnum text-ink-dimmer">
+                  {totalCards} in this deck
+                </span>
+                <Link
+                  href={`/dashboard/${deckId}?tab=cards`}
+                  scroll={false}
+                  className="shrink-0 rounded-[var(--radius-sm)] text-xs text-ink underline underline-offset-[3px] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                >
+                  View all
+                </Link>
+              </div>
+
+              {/*
+                The card list is the deck's body and it is subordinate to the
+                launcher above it, so it sits in the recessed plane. Overview
+                keeps a window onto every other segment — this list, the
+                scheduler split, the top concepts — so the segments organise
+                rather than hide.
+              */}
+              <ul className="well overflow-hidden px-3.5">
+                {recentCards.map((card) => {
+                  const next = formatNextReview(card.next_review_at);
+                  // `front` is the answer and `back` is the question in this
+                  // schema; the component boundary is where that stops leaking.
+                  const prompt = card.id_question ?? card.back;
+                  const answer = card.front;
+
+                  return (
+                    <li
+                      key={card.id}
+                      className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0"
+                    >
+                      <StateTick state={next.state} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-ink">{prompt}</span>
+                        <span className="block truncate text-xs text-ink-dimmer">{answer}</span>
+                      </span>
+                      <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer sm:block">
+                        {card.source === 'ai_pdf' ? 'PDF' : card.source === 'bulk_import' ? 'Bulk' : 'Manual'}
+                      </span>
+                      <span
+                        className="w-12 shrink-0 text-right font-mono text-[13px] tnum"
+                        style={{
+                          color:
+                            next.state === 'due'
+                              ? 'var(--state-due)'
+                              : next.state === 'learning'
+                                ? 'var(--state-learning)'
+                                : next.state === 'mastered'
+                                  ? 'var(--state-mastered)'
+                                  : 'var(--ink-dim)',
+                        }}
+                      >
+                        {next.label}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
         </>
       ) : null}
+
+      {/* ═══ Cards ══════════════════════════════════════════════════════ */}
+      {activeTab === 'cards' ? (
+        <DeckCardsManager
+          deckId={deckId}
+          cards={cards}
+          totalCards={totalCards}
+          errorMessage={cardsErrorMessage}
+        />
+      ) : null}
+
+      {/* ═══ Insights ═══════════════════════════════════════════════════ */}
+      {activeTab === 'insights' ? (
+        hasCards ? (
+          <>
+            <Suspense fallback={<WeakestConceptsSkeleton />}>
+              <WeakestConcepts deckId={deckId} />
+            </Suspense>
+
+            <Suspense fallback={<QuizHistorySkeleton />}>
+              <QuizHistorySection deckId={deckId} />
+            </Suspense>
+          </>
+        ) : (
+          <p className="surface p-5 text-sm text-ink-dim">
+            Insights appear once this deck has cards and at least one quiz.
+          </p>
+        )
+      ) : null}
+
+      {/* ═══ Chat ═══════════════════════════════════════════════════════ */}
+      {activeTab === 'chat' ? <DeckChatWidget deckId={deckId} /> : null}
     </div>
   );
 }

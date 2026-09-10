@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cognit — login-m</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   Cognit — Obsidian Telemetry · mockup stylesheet
+   Tokens mirror src/app/globals.css exactly, except where marked  ★ NEW.
+   Theme is a `.dark` ANCESTOR class (same mechanism as the app), so a
+   screen frame can carry it as well as <html>.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+:root {
+  --radius-xs: 4px;  --radius-sm: 6px;  --radius-md: 8px;
+  --radius-lg: 12px; --radius-xl: 16px; --radius-pill: 999px;
+  --radius-control: var(--radius-sm);
+  --radius-container: var(--radius-lg);
+
+  /* Display steps — Instrument Serif. Values from COGNIT_DESIGN_SYSTEM.md
+     §3.3 (Rev. B, 1.5x enlarged scale), which is what the components
+     actually render today. globals.css still holds the older 44/32/24 set. */
+  --type-display-xl: 4.125rem;  /* 66px */
+  --type-display-lg: 3rem;      /* 48px */
+  --type-display:    2.25rem;   /* 36px */
+  --type-display-sm: 1.5rem;    /* 24px */
+
+  --type-h3: 1rem; --type-body: .875rem; --type-sm: .8125rem;
+  --type-cap: .75rem; --type-label: .625rem;
+
+  --ease-out: cubic-bezier(.2,.8,.2,1);
+  --dur-hover: 120ms;
+
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', ui-monospace, Menlo, monospace;
+  --font-serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+}
+
+/* ─── LIGHT — its own composition, not an inversion ─── */
+:root {
+  color-scheme: light;
+  --bg: #fbfbfc;
+  --surface: #ffffff;
+  --surface-raised: #f4f4f5;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
+  --border-control: #8a8a93;
+  --ink: #18181b;
+  --ink-dim: #52525b;
+  --ink-dimmer: #71717a;
+  --ink-faint: #a1a1aa;
+  --accent: #18181b;
+  --accent-ink: #ffffff;
+
+  --elevate-flat: 0 1px 2px rgb(24 24 27 / .05);
+  --elevate-1:    0 1px 3px rgb(24 24 27 / .08);
+  --elevate-2:    0 8px 28px -8px rgb(24 24 27 / .16), 0 1px 3px rgb(24 24 27 / .06);
+  --key-face: linear-gradient(180deg, #ffffff, #f4f4f5);
+  --key-edge: 0 1px 0 #d4d4d8;
+
+  --state-due: #c2410c;
+  --state-learning: #a16207;
+  --state-mastered: #15803d;
+  --state-lapsed: #b91c1c;
+  --state-streak: #b45309;
+  --state-neutral: var(--ink);
+
+  /* ★ NEW — the recessed plane. The step the system does not have. */
+  --raised-bg: #ffffff;
+  --recess: #f4f4f5;
+  --elevate-inset: inset 0 1px 3px rgb(24 24 27 / .07);
+  /* ★ NEW — specular top edge. No job on a white card; the drop shadow
+     already separates it from the ground, so this is deliberately off. */
+  --spec: transparent;
+  /* ★ NEW — ambient. On a light ground, light-from-above means the
+     PERIPHERY recedes; on dark it means the top glows. Same role,
+     opposite implementation — this is what "not an inversion" means. */
+  --amb-field:
+    radial-gradient(ellipse 110% 75% at 50% -5%, rgb(255 255 255 / .85), transparent 55%),
+    radial-gradient(ellipse 100% 90% at 50% 8%, transparent 42%, rgb(24 24 27 / .038) 100%);
+  --amb-grain-opacity: .020;
+  --heat-ramp-0: rgb(24 24 27 / .055);
+  --heat-ramp-1: rgb(24 24 27 / .15);
+  --heat-ramp-2: rgb(24 24 27 / .29);
+  --heat-ramp-3: rgb(24 24 27 / .48);
+  --heat-ramp-4: rgb(24 24 27 / .72);
+}
+
+/* ─── DARK — the default and the design's home ─── */
+.dark {
+  color-scheme: dark;
+  --bg: #09090b;
+  --surface: #131316;
+  --surface-raised: #1f1f23;
+  --border: #27272a;
+  --border-strong: #3f3f46;
+  --border-control: #63636d;
+  --ink: #fafafa;
+  --ink-dim: #a1a1aa;
+  --ink-dimmer: #82828b;
+  --ink-faint: #52525b;
+  --accent: #fafafa;
+  --accent-ink: #09090b;
+
+  --elevate-flat: inset 0 1px 0 rgb(255 255 255 / .05);
+  --elevate-1:    inset 0 1px 0 rgb(255 255 255 / .06), 0 1px 3px rgb(0 0 0 / .5);
+  --elevate-2:    inset 0 1px 0 rgb(255 255 255 / .08), 0 8px 28px -8px rgb(0 0 0 / .7);
+  --key-face: linear-gradient(180deg, #1f1f23, #131316);
+  --key-edge: 0 1px 0 #000;
+
+  --state-due: #fb923c;
+  --state-learning: #facc15;
+  --state-mastered: #4ade80;
+  --state-lapsed: #f87171;
+  --state-streak: #ffb020;
+  --state-neutral: var(--ink);
+
+  --raised-bg: #1f1f23;
+  --recess: #0b0b0d;
+  --elevate-inset: inset 0 1px 3px rgb(0 0 0 / .5), inset 0 0 0 1px rgb(255 255 255 / .012);
+  --spec: rgb(255 255 255 / .085);
+  --amb-field:
+    radial-gradient(ellipse 115% 62% at 50% -8%, rgb(255 255 255 / .050), rgb(255 255 255 / .014) 42%, transparent 70%),
+    radial-gradient(ellipse 70% 55% at 88% 68%, rgb(255 255 255 / .022), transparent 62%),
+    radial-gradient(ellipse 90% 70% at 50% 45%, transparent 46%, rgb(0 0 0 / .30) 100%);
+  --amb-grain-opacity: .032;
+  --heat-ramp-0: rgb(250 250 250 / .05);
+  --heat-ramp-1: rgb(250 250 250 / .14);
+  --heat-ramp-2: rgb(250 250 250 / .25);
+  --heat-ramp-3: rgb(250 250 250 / .42);
+  --heat-ramp-4: rgb(250 250 250 / .64);
+}
+
+/* ═══ SCREEN FRAME ═════════════════════════════════════════════════════ */
+.screen {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.screen--desktop { width: 1440px; height: 900px; }
+.screen--mobile  { width: 390px;  height: 844px; }
+
+/* ═══ AMBIENT — paint only. No canvas, no rAF, no per-frame work. ═══════
+   Two layers: one radial light field, one static grain tile. Both are
+   background-images on a single pointer-events:none element. Nothing here
+   animates, so there is nothing for prefers-reduced-motion to disable. */
+.amb { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.amb::before {
+  content: ''; position: absolute; inset: 0;
+  background: var(--amb-field);
+}
+.amb::after {
+  content: ''; position: absolute; inset: 0;
+  opacity: var(--amb-grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+}
+.stage { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; }
+
+/* ═══ PLANES ═══════════════════════════════════════════════════════════ */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-flat);
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--elevate-2);
+}
+.raised {
+  background: var(--raised-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-1);
+}
+/* ★ NEW — the well. Content that is contained but subordinate. */
+.well {
+  background: var(--recess);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-inset);
+}
+/* ★ NEW — masked specular top edge. Fades at the corners so a 1300px
+   panel does not read as a drawn rectangle. */
+.spec { position: relative; }
+.spec::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: linear-gradient(90deg, transparent, var(--spec) 18%, var(--spec) 82%, transparent);
+  pointer-events: none;
+}
+
+/* ★ NEW — gradient-masked hairline. Structure, not decoration. */
+.rule { height: 1px; background: linear-gradient(90deg, transparent, var(--border-strong) 6%, var(--border-strong) 94%, transparent); }
+.rule--soft { background: linear-gradient(90deg, transparent, var(--border) 4%, var(--border) 96%, transparent); }
+.rule--v { width: 1px; align-self: stretch; background: linear-gradient(180deg, transparent, var(--border-strong) 10%, var(--border-strong) 90%, transparent); }
+
+/* ═══ TYPE ═════════════════════════════════════════════════════════════ */
+/* Instrument Serif ships at 400 only. Never a weight above it — there is
+   no bold, so anything higher is a synthetic smear. */
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -.02em;
+  line-height: 1.08;
+  text-wrap: balance;
+  color: var(--ink);
+}
+.d-xl { font-size: var(--type-display-xl); }
+.d-lg { font-size: var(--type-display-lg); }
+.d    { font-size: var(--type-display); }
+.d-sm { font-size: var(--type-display-sm); }
+
+.lbl {
+  font-family: var(--font-mono);
+  font-size: 10px; line-height: 1.5;
+  text-transform: uppercase; letter-spacing: .16em;
+  color: var(--ink-dimmer);
+}
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dim { color: var(--ink-dim); }
+.dimmer { color: var(--ink-dimmer); }
+h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
+/* An unstyled <a> inherits the UA's indigo. On a system whose first rule is
+   "no hue outside the state channel", that is a live regression waiting on
+   any link that forgets a colour — so links inherit by default. */
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; padding: 0; }
+
+/* ═══ CONTROLS ═════════════════════════════════════════════════════════ */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 34px; padding: 0 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-control);
+  font-family: var(--font-sans); font-size: 13px; font-weight: 500;
+  color: var(--ink); background: transparent; cursor: pointer;
+  transition: border-color var(--dur-hover) ease, background var(--dur-hover) ease;
+}
+.btn:hover { background: var(--surface-raised); }
+.btn--primary {
+  background: var(--accent); color: var(--accent-ink);
+  border-color: var(--accent); font-weight: 600;
+  box-shadow: var(--elevate-1);
+}
+.btn--lg { height: 40px; padding: 0 18px; font-size: 14px; }
+.btn--ghost { border-color: transparent; }
+
+.kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px; line-height: 1.5;
+  padding: 1px 4px; min-width: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface); color: var(--ink-dim);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.dark .btn--primary .kbd { background: rgb(0 0 0 / .12); border-color: rgb(0 0 0 / .2); color: rgb(9 9 11 / .7); }
+.btn--primary .kbd { background: rgb(255 255 255 / .16); border-color: rgb(255 255 255 / .28); color: rgb(255 255 255 / .85); }
+
+.input {
+  display: block; width: 100%; height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: var(--font-sans); font-size: 14px; color: var(--ink);
+}
+.input::placeholder { color: var(--ink-dimmer); }
+
+/* Corner brackets — the system's focus & bounds idiom. */
+.brk { position: absolute; width: 14px; height: 14px; border: 1px solid var(--border-strong); pointer-events: none; }
+.brk--tl { top:0; left:0;     border-right:0; border-bottom:0; }
+.brk--tr { top:0; right:0;    border-left:0;  border-bottom:0; }
+.brk--bl { bottom:0; left:0;  border-right:0; border-top:0; }
+.brk--br { bottom:0; right:0; border-left:0;  border-top:0; }
+
+/* Grade key — the one tactile exception. */
+.key {
+  position: relative; overflow: hidden;
+  background: var(--key-face);
+  border: 1px solid var(--border-control);
+  border-top-color: var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevate-1), var(--key-edge);
+  padding: 11px 12px 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.key::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background: var(--key-state); }
+.key .kn { font-size: 13px; font-weight: 600; color: var(--ink); }
+.key .ki { font-family: var(--font-mono); font-size: 11px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.key .kk { position:absolute; top:8px; left:9px; font-family: var(--font-mono); font-size:10px; color: var(--ink-dimmer); }
+
+/* State tick — 2px × 16px, the deck row's only hue. */
+.tick { display:block; width:2px; height:16px; border-radius:1px; flex: none; }
+
+/* ═══ TELEMETRY ════════════════════════════════════════════════════════ */
+.tele { display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); }
+.tele__v { font-size: 13px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tele-row { display: flex; align-items: baseline; gap: 24px; }
+
+/* ═══ CHART MARKS ══════════════════════════════════════════════════════
+   Per dataviz: thin marks, hairline recessive axes, 2px surface gaps,
+   sequential = ONE hue light→dark, no value-ramp on nominal categories. */
+.heat { display: grid; grid-auto-flow: column; gap: var(--cellgap, 2px); }
+.heat__wk { display: grid; grid-template-rows: repeat(7, var(--cell, 10px)); gap: var(--cellgap, 2px); }
+.heat__c { width: var(--cell, 10px); height: var(--cell, 10px); border-radius: 2px; background: var(--heat-ramp-0); }
+.heat__c[data-i="1"] { background: var(--heat-ramp-1); }
+.heat__c[data-i="2"] { background: var(--heat-ramp-2); }
+.heat__c[data-i="3"] { background: var(--heat-ramp-3); }
+.heat__c[data-i="4"] { background: var(--heat-ramp-4); }
+
+.spark { display: flex; align-items: flex-end; gap: 2px; height: 34px; }
+.spark span { flex: 1; border-radius: 2px 2px 0 0; background: var(--ink-dim); min-height: 2px; }
+.spark span[data-zero] { background: var(--border); height: 2px !important; border-radius: 1px; }
+
+.bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end; }
+.bars__col { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bars__track { display: flex; align-items: flex-end; height: 52px; width: 100%; max-width: 30px; }
+.bars__b { width: 100%; border-radius: 3px 3px 0 0; background: var(--border-strong); }
+.bars__b[data-today] { background: var(--state-due); }
+
+.meter { display:block; height: 3px; width: 104px; background: var(--border-strong); overflow: hidden; border-radius: 1px; }
+.meter > i { display:block; height:100%; background: var(--ink-dim); }
+.meter > i[data-mastered] { background: var(--state-mastered); }
+
+.dayrow { display: flex; gap: 4px; }
+.dayrow i { flex: 1; height: 20px; border-radius: 2px; background: var(--surface-raised); border: 1px solid var(--border); }
+.dayrow i[data-on] { background: var(--border-strong); border-color: transparent; }
+.dayrow i[data-today] { background: var(--state-streak); border-color: transparent; }
+
+/* ═══ DECK ROWS ════════════════════════════════════════════════════════ */
+.drow {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px; height: 38px;
+  border-bottom: 1px solid var(--border);
+}
+.drow:last-child { border-bottom: 0; }
+.drow__n { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.drow__t { font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dnum { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink-dim); }
+.legend { display: flex; align-items: center; gap: 12px; padding: 0 14px; height: 26px; border-bottom: 1px solid var(--border); }
+
+body { margin: 0; background: #52525b; display: flex; align-items: flex-start; justify-content: center; }
+</style>
+</head>
+<body>
+<div class="screen screen--mobile dark" id="login-m">
+  <div class="amb"></div>
+  <div class="stage" style="padding:26px 16px 0;overflow:hidden">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between">
+      <p class="serif" style="font-size:40px;line-height:.95">Cognit</p>
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <i style="display:block;width:13px;height:13px;border-radius:50%;border:1.4px solid var(--ink-dim);background:linear-gradient(90deg,var(--ink-dim) 50%,transparent 50%)"></i>
+      </span>
+    </div>
+
+    <div class="panel" style="margin-top:22px;padding:22px 20px">
+      <h1 class="serif d-sm" style="font-size:30px">Welcome back</h1>
+      <p style="margin-top:6px;font-size:13px;color:var(--ink-dim)">Sign in to access your study decks</p>
+
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:15px">
+        <div>
+          <label class="dim" style="display:block;font-size:13px;font-weight:500;margin-bottom:6px">Email</label>
+          <span class="input" style="display:flex;align-items:center;color:var(--ink-dimmer);font-size:16px">you@example.com</span>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label class="dim" style="font-size:13px;font-weight:500">Password</label>
+            <span style="font-size:12px;font-weight:500;color:var(--ink-dim)">Forgot password?</span>
+          </div>
+          <span class="input" style="display:flex;align-items:center;justify-content:space-between;color:var(--ink);font-size:16px">
+            <span style="letter-spacing:.18em">••••••••</span>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--ink-dimmer)" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="2.8"/></svg>
+          </span>
+        </div>
+        <button class="btn btn--primary" style="width:100%;height:46px;font-size:15px">Sign in</button>
+      </div>
+
+      <div style="margin-top:18px;display:flex;align-items:center;gap:10px">
+        <span class="rule rule--soft" style="flex:1"></span>
+        <span style="font-size:12px;color:var(--ink-dimmer)">or continue with</span>
+        <span class="rule rule--soft" style="flex:1"></span>
+      </div>
+      <div style="margin-top:13px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <button class="btn" style="height:44px"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82Z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.1A12 12 0 0 0 12 24Z"/><path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.26A12 12 0 0 0 0 12c0 1.94.46 3.77 1.26 5.38l4.01-3.1Z"/><path fill="#EA4335" d="M12 4.76c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.26 6.62l4.01 3.1c.95-2.85 3.6-4.96 6.73-4.96Z"/></svg>Google</button>
+        <button class="btn" style="height:44px"><svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1.1-.7.1-.7.1-.7 1.2.1 1.9 1.2 1.9 1.2 1.1 1.9 2.9 1.3 3.6 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C18.6 4.3 19.6 4.6 19.6 4.6c.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3Z"/></svg>GitHub</button>
+      </div>
+
+      <p style="margin-top:18px;text-align:center;font-size:14px;color:var(--ink-dim)">
+        Don't have an account? <span style="color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:4px">Sign up</span>
+      </p>
+    </div>
+
+    <!-- the specimen survives on mobile, reduced to its most honest part -->
+    <p class="lbl" style="margin-top:22px">What is waiting on the other side</p>
+    <ul style="margin-top:9px">
+      <li style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <i class="tick" style="background:var(--state-learning)"></i>
+        <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Explain Big-O notation</span>
+        <span class="mono" style="font-size:13px;color:var(--state-learning)">11h</span>
+      </li>
+      <li style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <i class="tick" style="background:var(--state-due)"></i>
+        <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Define polymorphism</span>
+        <span class="mono" style="font-size:13px;color:var(--state-due)">due</span>
+      </li>
+      <li style="display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--border)">
+        <i class="tick" style="background:var(--state-mastered)"></i>
+        <span style="flex:1;min-width:0;font-size:14px;color:var(--ink-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">What is a monad?</span>
+        <span class="mono" style="font-size:13px;color:var(--state-mastered)">4d</span>
+      </li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

@@ -98,7 +98,12 @@ function sortDecks(items: DeckWithCount[], sortMode: DeckSortMode) {
  */
 export function DeckGrid({ decks }: DeckGridProps) {
   const [search, setSearch] = useState('');
-  const [sortMode, setSortMode] = useState<DeckSortMode>('newest');
+  /*
+   * Most-due by default (Run 6, Task 2.6). Newest-first is the right order for
+   * an account with three decks and the wrong one for an account with twelve and
+   * a backlog — the index exists to answer "what do I open now".
+   */
+  const [sortMode, setSortMode] = useState<DeckSortMode>('most-due');
   const [localDecks, setLocalDecks] = useState(() => decks);
 
   useEffect(() => {
@@ -160,13 +165,13 @@ export function DeckGrid({ decks }: DeckGridProps) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="border-t border-border py-8 text-center text-sm text-muted-foreground">
+        <p className="well px-4 py-8 text-center text-sm text-muted-foreground">
           {localDecks.length === 0
             ? 'No decks yet. Create one to get started.'
             : `No decks match “${search}”.`}
         </p>
       ) : (
-        <div className="border-t border-border">
+        <div className="well overflow-hidden px-3.5">
           <DeckRowLegend />
 
           {filtered.map((deck) => {

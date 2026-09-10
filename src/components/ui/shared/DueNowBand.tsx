@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
-import { requestOpenCreateDeck } from '@/lib/dashboard-events';
+import type { ForecastDay } from '@/lib/dashboard-forecast';
+
+const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' });
 
 type DueNowBandProps = {
   totalDue: number;
@@ -17,18 +19,24 @@ type DueNowBandProps = {
   estimatedMinutes: number;
   /** Where "start session" goes. Null when the account has no decks at all. */
   sessionHref: string | null;
-  /** Most recently updated deck, for the PDF import shortcut. */
-  importHref: string | null;
+  /** The seven days after today. See `buildSevenDayForecast`. */
+  forecastDays: ForecastDay[];
 };
 
+/** How many decks the by-deck list names before it summarises. */
+const NAMED_DECKS = 3;
+
 /**
- * The dashboard's top band (defect F-06).
+ * The dashboard's primary band — the one `.raised` object on the screen
+ * (Run 6, Task 2.2).
  *
- * The layout this replaces sized "create a deck" — the single most important
- * entry point for a new user — as five-twelfths of a stats column, while the
- * retrospective streak card took two-thirds of the band. The weight is now
- * inverted: what is due takes the full width, gets the one big number in the
- * product (§3.3 `metric`), and carries the screen's only filled button.
+ * Three readings, in the order a user actually asks for them: how much is due
+ * now, when the rest arrives, and where it is. The middle one used to be a
+ * full-width section of its own two scroll-lengths further down, and the third
+ * was a horizontally-scrolling chip run that was unreadable at nine due decks.
+ *
+ * "Import PDF" is gone from this page entirely — it belongs to a deck, and the
+ * deck page already has it.
  */
 export function DueNowBand({
   totalDue,
@@ -36,7 +44,7 @@ export function DueNowBand({
   oldestOverdueDays,
   estimatedMinutes,
   sessionHref,
-  importHref,
+  forecastDays,
 }: DueNowBandProps) {
   const router = useRouter();
   const hasWork = totalDue > 0;
@@ -71,35 +79,43 @@ export function DueNowBand({
   }, [router, sessionHref]);
 
   const deckWord = dueDecks.length === 1 ? 'deck' : 'decks';
+  const named = dueDecks.slice(0, NAMED_DECKS);
+  const remaining = dueDecks.slice(NAMED_DECKS);
+  const remainingDue = remaining.reduce((sum, deck) => sum + deck.dueCount, 0);
+
+  const forecastTotal = forecastDays.reduce((sum, day) => sum + day.count, 0);
+  const forecastPeak = Math.max(1, ...forecastDays.map((day) => day.count));
 
   return (
-    <section className="surface surface--raised p-5 md:px-6 md:py-5">
+    <section className="raised spec flex flex-col p-4 md:px-[22px] md:py-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4 min-w-0">
-          {/* The metric step (§3.3) */}
+        <div className="flex min-w-0 items-center gap-4">
+          {/* The one hero figure on the screen. */}
           <p
-            className="font-mono text-[44px] font-semibold leading-none tracking-[-0.04em] tnum shrink-0"
+            className="shrink-0 font-mono text-[44px] font-semibold leading-[0.86] tracking-[-0.045em] tnum md:text-[52px]"
             style={{ color: hasWork ? 'var(--state-due)' : 'var(--ink)' }}
           >
             {totalDue}
           </p>
 
           <div className="min-w-0">
-            <p className="text-sm font-medium text-ink truncate">
+            <p className="truncate text-sm font-medium text-ink">
               {hasWork ? (
                 <>
-                  cards due across <span className="font-mono tnum">{dueDecks.length}</span> {deckWord}
+                  cards due across <span className="font-mono tnum">{dueDecks.length}</span>{' '}
+                  {deckWord}
                 </>
               ) : (
                 'All caught up'
               )}
             </p>
-            <p className="mt-0.5 text-xs text-ink-dim truncate">
+            <p className="mt-0.5 truncate text-xs text-ink-dim">
               {hasWork ? (
                 <>
                   {oldestOverdueDays !== null && oldestOverdueDays > 0 ? (
                     <>
-                      oldest is <span className="font-mono tnum">{oldestOverdueDays} days</span> overdue ·{' '}
+                      oldest is <span className="font-mono tnum">{oldestOverdueDays}</span> days
+                      overdue ·{' '}
                     </>
                   ) : null}
                   est. <span className="font-mono tnum">{estimatedMinutes}</span> min
@@ -111,51 +127,107 @@ export function DueNowBand({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button type="button" onClick={requestOpenCreateDeck} aria-haspopup="dialog">
-            New deck
+        {/* The dashboard's one filled button (§7.2). */}
+        {sessionHref ? (
+          <Button asChild variant="primary" size="lg" className="shrink-0 gap-2 max-sm:w-full">
+            <Link href={sessionHref}>
+              {hasWork ? 'Start session' : 'Study ahead'}
+              <Kbd>S</Kbd>
+            </Link>
           </Button>
-
-          {importHref ? (
-            <Button asChild>
-              <Link href={importHref}>Import PDF</Link>
-            </Button>
-          ) : null}
-
-          {/* The dashboard's one filled button (§7.2). */}
-          {sessionHref ? (
-            <Button asChild variant="primary" className="gap-2">
-              <Link href={sessionHref}>
-                {hasWork ? 'Start session' : 'Study ahead'}
-                <Kbd>S</Kbd>
-              </Link>
-            </Button>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
-      {hasWork && dueDecks.length > 0 ? (
-        <div className="mt-4 flex items-center gap-x-4 overflow-x-auto border-t border-border pt-3 text-xs whitespace-nowrap scrollbar-none">
-          {dueDecks.slice(0, 5).map((deck) => (
-            <Link
-              key={deck.deckId}
-              href={`/dashboard/${deck.deckId}/study`}
-              className="group inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-            >
-              <span className="max-w-[13rem] truncate text-ink-dim group-hover:text-ink">
-                {deck.deckTitle}
-              </span>
-              <span className="font-mono text-[12px] tnum" style={{ color: 'var(--state-due)' }}>
-                {deck.dueCount}
-              </span>
-            </Link>
-          ))}
-          {dueDecks.length > 5 ? (
-            <span className="font-mono text-[11px] text-ink-dimmer">
-              +{dueDecks.length - 5} more
-            </span>
-          ) : null}
-        </div>
+      {forecastDays.length > 0 || dueDecks.length > 0 ? (
+        <>
+          <div className="rule rule--soft my-3.5" />
+
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:gap-7">
+            {/*
+              The seven days AFTER today. Today is the hero figure two inches
+              above; at 519 due it would be ~4.6x the tallest projected column
+              and flatten every other bar to a stub (see buildSevenDayForecast).
+            */}
+            {forecastDays.length > 0 ? (
+              <div className="w-full lg:w-[400px] lg:shrink-0">
+                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Next 7 days · <span className="tnum text-ink">{forecastTotal}</span> cards
+                </p>
+                <div className="mt-2 grid grid-flow-col auto-cols-fr items-end gap-2">
+                  {forecastDays.map((day) => {
+                    const heightPercent =
+                      day.count === 0 ? 0 : Math.max(6, (day.count / forecastPeak) * 100);
+
+                    return (
+                      <div key={day.date} className="flex flex-col items-center gap-[5px]">
+                        <span className="font-mono text-[13px] leading-none tnum text-ink-dim max-sm:hidden">
+                          {day.count}
+                        </span>
+                        {/* Capped width: a bar stretched across a seventh of the
+                            band stops reading as a bar and starts reading as a slab. */}
+                        <span
+                          className="flex h-[52px] w-full max-w-[30px] items-end"
+                          aria-hidden="true"
+                        >
+                          <span
+                            className="block w-full rounded-t-[3px] bg-border-strong"
+                            style={{ height: `${heightPercent}%` }}
+                          />
+                        </span>
+                        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                          <span className="sr-only">
+                            {day.count} cards on{' '}
+                          </span>
+                          {WEEKDAY.format(new Date(`${day.date}T00:00:00Z`))}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
+            {forecastDays.length > 0 && dueDecks.length > 0 ? (
+              <div className="rule--v max-lg:hidden" aria-hidden="true" />
+            ) : null}
+
+            {dueDecks.length > 0 ? (
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  Due now, by deck
+                </p>
+                <ul className="mt-2 flex flex-col gap-[5px]">
+                  {named.map((deck) => (
+                    <li key={deck.deckId}>
+                      <Link
+                        href={`/dashboard/${deck.deckId}/study`}
+                        className="group flex items-baseline gap-3 rounded-[var(--radius-sm)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-ink-dim group-hover:text-ink">
+                          {deck.deckTitle}
+                        </span>
+                        <span
+                          className="font-mono text-[13px] tnum"
+                          style={{ color: 'var(--state-due)' }}
+                        >
+                          {deck.dueCount}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                  {remaining.length > 0 ? (
+                    <li className="flex items-baseline gap-3">
+                      <span className="flex-1 text-xs text-ink-dimmer">
+                        + {remaining.length} more {remaining.length === 1 ? 'deck' : 'decks'}
+                      </span>
+                      <span className="font-mono text-xs tnum text-ink-dimmer">{remainingDue}</span>
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        </>
       ) : null}
     </section>
   );

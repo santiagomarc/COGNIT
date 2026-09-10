@@ -38,7 +38,7 @@ export default function NotFound() {
           404
         </p>
 
-        <h1 className="mt-5 font-serif text-[3rem] font-medium leading-[1.08] tracking-[-0.02em] text-balance text-ink">
+        <h1 className="mt-5 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">
           This page does not exist
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">

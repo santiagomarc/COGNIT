@@ -102,10 +102,18 @@
   --radius-container: var(--radius-lg);
   --radius: var(--radius-container);
 
-  /* Display steps — Instrument Serif (§2.2) */
-  --type-display-lg: 2.75rem;   /* 44px — page hero, login brand      */
-  --type-display:    2rem;      /* 32px — page title (h1)             */
-  --type-display-sm: 1.5rem;    /* 24px — section heading (h2)        */
+  /*
+   * Display steps — Instrument Serif (§3.3, the 1.5x enlarged scale).
+   *
+   * These used to hold the older 44/32/24 set while every component hardcoded
+   * `text-[3rem]` and `text-[66px]` — three sources, two of them disagreeing,
+   * and zero consumers of the tokens. The values below match the spec, and the
+   * @utility classes at the foot of this file are how components read them.
+   */
+  --type-display-xl: 4.125rem;  /* 66px — landing hero, login wordmark */
+  --type-display-lg: 3rem;      /* 48px — page hero                    */
+  --type-display:    2.25rem;   /* 36px — page title (h1)              */
+  --type-display-sm: 1.5rem;    /* 24px — section heading (h2)         */
 
   /* Chrome steps — Geist Sans (§2.2) */
   --type-h3:   1rem;      /* 16px, weight 600  */
@@ -152,6 +160,9 @@
   color-scheme: light;
 
   --bg: #fbfbfc;
+  /* Landing ambient-halo tint (RGB triplet — consumed via rgba(var(--blob), a)).
+     Ink on the light ground; white halos are invisible on #fbfbfc. */
+  --blob: 24, 24, 27;
   --surface: #ffffff;
   --surface-raised: #f4f4f5;
 
@@ -171,6 +182,48 @@
   --elevate-1:    0 1px 3px rgb(24 24 27 / 0.08);
   --elevate-2:    0 8px 28px -8px rgb(24 24 27 / 0.16), 0 1px 3px rgb(24 24 27 / 0.06);
   --elevate: var(--elevate-flat);   /* back-compat alias */
+
+  /*
+   * ─── Plane tokens (Run 6) ───
+   * The system had ground / surface / surface-raised and one elevation, and
+   * spent exactly one step of it: every container on every screen sat on
+   * --surface with --elevate-flat, so nothing was primary because nothing was
+   * anywhere. These add the two ends of the ladder — a genuinely raised plane
+   * and a recessed one. Depth is neutral light only: no colour, no glow.
+   *
+   * --raised-bg is NOT --surface-raised. In light mode --surface-raised
+   * (#f4f4f5) is a hover fill on a white surface; used as the raised plane on
+   * a #fbfbfc ground it renders *darker* than the ground, which is the exact
+   * inverse of what "raised" means. Light is its own composition, not an
+   * inversion: a raised plane goes lighter and takes a shadow.
+   */
+  --raised-bg: #ffffff;
+  --recess: #f4f4f5;
+  --elevate-inset: inset 0 1px 3px rgb(24 24 27 / 0.07);
+  /* A white specular edge on a white card has no job — the drop shadow already
+     separates it from the ground. Deliberately transparent, not omitted. */
+  --spec: transparent;
+
+  /* Activity heatmap — a sequential ONE-hue ramp, ink on surface. The top step
+     is capped well below full ink: at ~0.88 a six-month grid became the
+     brightest object on the dashboard, which inverts the hierarchy. */
+  --heat-ramp-0: rgb(24 24 27 / 0.055);
+  --heat-ramp-1: rgb(24 24 27 / 0.15);
+  --heat-ramp-2: rgb(24 24 27 / 0.29);
+  --heat-ramp-3: rgb(24 24 27 / 0.48);
+  --heat-ramp-4: rgb(24 24 27 / 0.72);
+
+  /* Ambient light. On a LIGHT ground, "light from above" means the periphery
+     recedes; on dark it means the top glows. Same role, opposite
+     implementation — this is what "light is not an inversion" means. */
+  --amb-field:
+    radial-gradient(ellipse 110% 75% at 50% -5%, rgb(255 255 255 / 0.85), transparent 55%),
+    radial-gradient(ellipse 100% 90% at 50% 8%, transparent 42%, rgb(24 24 27 / 0.038) 100%);
+  --amb-grain-opacity: 0.020;
+  /* Edge vignette for the landing background. On a light ground this is a
+     whisper; the hardcoded rgba(0,0,0,.45) it replaces was a dark frame
+     painted over #fbfbfc in both themes. */
+  --landing-vignette: rgb(24 24 27 / 0.10);
   --key-face: linear-gradient(180deg, #ffffff, #f4f4f5);
   --key-edge: 0 1px 0 #d4d4d8;
 
@@ -214,6 +267,7 @@
   color-scheme: dark;
 
   --bg: #09090b;
+  --blob: 255, 255, 255;
   --surface: #131316;
   --surface-raised: #1f1f23;
 
@@ -233,6 +287,25 @@
   --elevate-1:    inset 0 1px 0 rgb(255 255 255 / 0.06), 0 1px 3px rgb(0 0 0 / 0.5);
   --elevate-2:    inset 0 1px 0 rgb(255 255 255 / 0.08), 0 8px 28px -8px rgb(0 0 0 / 0.7);
   --elevate: var(--elevate-flat);   /* back-compat alias */
+
+  /* ─── Plane tokens (Run 6) — see the light block for the rationale ─── */
+  --raised-bg: #1f1f23;
+  --recess: #0b0b0d;
+  --elevate-inset: inset 0 1px 3px rgb(0 0 0 / 0.5), inset 0 0 0 1px rgb(255 255 255 / 0.012);
+  --spec: rgb(255 255 255 / 0.085);
+
+  --heat-ramp-0: rgb(250 250 250 / 0.05);
+  --heat-ramp-1: rgb(250 250 250 / 0.14);
+  --heat-ramp-2: rgb(250 250 250 / 0.25);
+  --heat-ramp-3: rgb(250 250 250 / 0.42);
+  --heat-ramp-4: rgb(250 250 250 / 0.64);
+
+  --amb-field:
+    radial-gradient(ellipse 115% 62% at 50% -8%, rgb(255 255 255 / 0.050), rgb(255 255 255 / 0.014) 42%, transparent 70%),
+    radial-gradient(ellipse 70% 55% at 88% 68%, rgb(255 255 255 / 0.022), transparent 62%),
+    radial-gradient(ellipse 90% 70% at 50% 45%, transparent 46%, rgb(0 0 0 / 0.30) 100%);
+  --amb-grain-opacity: 0.032;
+  --landing-vignette: rgb(0 0 0 / 0.45);
   --key-face: linear-gradient(180deg, #1f1f23, #131316);
   --key-edge: 0 1px 0 #000;
 
@@ -391,6 +464,104 @@
 }
 .surface--interactive:hover {
   border-color: var(--border-strong);
+}
+
+/*
+ * ─── Planes (Run 6) ───
+ *
+ * The structural containers, assigned by role rather than stamped uniformly.
+ * Exactly one `.raised` object per screen: the thing the screen is for.
+ */
+.raised {
+  background: var(--raised-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-1);
+}
+
+/* A well. Contained but subordinate — the deck index, the card list. */
+.well {
+  background: var(--recess);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevate-inset);
+}
+
+/*
+ * Masked specular top edge. An unmasked 1px highlight across a 1300px panel
+ * reads as a drawn rectangle; fading it at the corners reads as light falling
+ * on one. `--spec` is transparent in light mode, so this is inert there rather
+ * than conditionally applied.
+ */
+.spec {
+  position: relative;
+}
+.spec::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: linear-gradient(90deg, transparent, var(--spec) 18%, var(--spec) 82%, transparent);
+  pointer-events: none;
+}
+
+/*
+ * ─── Gradient-masked rules (Run 6) ───
+ *
+ * A hairline that fades at both ends. This is the cheapest single fix for
+ * "everything looks like a box": a rule that stops short of the gutter reads
+ * as structure, a rule that butts into it reads as a container edge.
+ */
+.rule {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong) 6%, var(--border-strong) 94%, transparent);
+}
+.rule--soft {
+  background: linear-gradient(90deg, transparent, var(--border) 4%, var(--border) 96%, transparent);
+}
+.rule--v {
+  width: 1px;
+  align-self: stretch;
+  background: linear-gradient(180deg, transparent, var(--border-strong) 10%, var(--border-strong) 90%, transparent);
+}
+
+/*
+ * ─── Ambient field (Run 6) ───
+ *
+ * The CSS-only descendant of `LandingBackground`: same monochromatic
+ * vocabulary — a radial light field and a fine grain — with everything that
+ * costs a frame removed. Two background-image paints on one element. No
+ * canvas, no rAF, no cursor tracking, and no `mix-blend-mode`, which would
+ * force a compositing pass on every paint behind it.
+ *
+ * Nothing here animates, so there is nothing for `prefers-reduced-motion` to
+ * disable — a stronger guarantee than respecting it. See AmbientField.tsx.
+ */
+.amb {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.amb::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--amb-field);
+}
+
+.amb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: var(--amb-grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
 }
 
 /*
@@ -683,7 +854,9 @@ button.flip {
   max-width: 36ch;
   font-family: var(--font-serif);
   font-size: clamp(2.35rem, 3.6vw, 3.25rem);
-  font-weight: 500;
+  /* 400, never higher. Instrument Serif has no bold weight, so 500 was a
+     browser-synthesised smear on the single largest text in the product. */
+  font-weight: 400;
   line-height: 1.25;
   letter-spacing: -0.02em;
   text-wrap: balance;
@@ -970,6 +1143,50 @@ button.flip {
   }
 }
 
+@keyframes ambient-breath {
+  0%, 100% {
+    opacity: 0.65;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translateX(-50%) scale(1.08);
+  }
+}
+
+@keyframes float-orb-1 {
+  0%, 100% {
+    transform: translate(-30%, -20%) scale(1);
+  }
+  33% {
+    transform: translate(15%, -8%) scale(1.15);
+  }
+  66% {
+    transform: translate(-10%, 20%) scale(0.92);
+  }
+}
+
+@keyframes float-orb-2 {
+  0%, 100% {
+    transform: translate(25%, 15%) scale(0.95);
+  }
+  40% {
+    transform: translate(-20%, -15%) scale(1.18);
+  }
+  75% {
+    transform: translate(10%, -5%) scale(1.05);
+  }
+}
+
+@keyframes float-orb-3 {
+  0%, 100% {
+    transform: translate(-50%, 0) scale(1);
+  }
+  50% {
+    transform: translate(-45%, -15%) scale(1.12);
+  }
+}
+
 .sonner-toast {
   background: var(--surface) !important;
   color: var(--ink) !important;
@@ -1022,6 +1239,16 @@ button.flip {
   content-visibility: auto;
   contain-intrinsic-size: auto 600px;
 }
+
+/*
+ * Display type steps as utilities, so a heading reads its size from the token
+ * rather than restating it. `type-display` and friends compose with variants
+ * the same way any utility does: `text-[1.8125rem] sm:type-display`.
+ */
+@utility type-display-xl { font-size: var(--type-display-xl); }
+@utility type-display-lg { font-size: var(--type-display-lg); }
+@utility type-display    { font-size: var(--type-display); }
+@utility type-display-sm { font-size: var(--type-display-sm); }
 
 /* Every column of digits gets tabular figures — no exceptions (§3.3). */
 @utility tnum {
