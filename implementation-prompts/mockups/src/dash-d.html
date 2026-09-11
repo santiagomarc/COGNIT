@@ -206,6 +206,28 @@
   pointer-events: none;
 }
 
+.create-deck-panel {
+  border-color: var(--border-control);
+  transition: background-color var(--dur-hover) ease, border-color var(--dur-hover) ease, box-shadow var(--dur-hover) ease, transform var(--dur-hover) ease;
+}
+.create-deck-panel:hover,
+.create-deck-panel[data-hover="true"] {
+  background: var(--surface-raised) !important;
+  border-color: var(--ink) !important;
+  box-shadow: var(--elevate-2) !important;
+}
+.create-deck-panel:hover .brk,
+.create-deck-panel[data-hover="true"] .brk {
+  border-color: var(--ink) !important;
+}
+.create-deck-panel:hover .spec-hairline,
+.create-deck-panel[data-hover="true"] .spec-hairline {
+  opacity: 1 !important;
+}
+.create-deck-panel:active {
+  transform: translateY(1px);
+}
+
 /* ★ NEW — gradient-masked hairline. Structure, not decoration. */
 .rule { height: 1px; background: linear-gradient(90deg, transparent, var(--border-strong) 6%, var(--border-strong) 94%, transparent); }
 .rule--soft { background: linear-gradient(90deg, transparent, var(--border) 4%, var(--border) 96%, transparent); }
@@ -454,10 +476,11 @@ body { margin: 0; background: #52525b; display: flex; align-items: flex-start; j
 
         <!-- Create deck: prominence by container mass + position, not by a
              second filled button (§7.2 allows exactly one per screen). -->
-        <a class="surface spec" href="#" style="width:340px;flex:none;padding:16px 20px;display:flex;flex-direction:column;text-decoration:none;border-color:var(--border-control)">
+        <a class="surface spec create-deck-panel" href="#" style="width:340px;flex:none;padding:16px 20px;display:flex;flex-direction:column;text-decoration:none;position:relative">
+          <span class="spec-hairline" style="position:absolute;inset:0 0 auto 0;height:1px;border-radius:var(--radius-lg) var(--radius-lg) 0 0;background:linear-gradient(90deg, transparent, var(--ink) 25%, var(--ink) 75%, transparent);opacity:0;transition:opacity var(--dur-hover) ease;pointer-events:none"></span>
           <span style="position:relative;display:grid;place-items:center;width:42px;height:42px">
-            <span class="brk brk--tl"></span><span class="brk brk--tr"></span>
-            <span class="brk brk--bl"></span><span class="brk brk--br"></span>
+            <span class="brk brk--tl" style="transition:border-color var(--dur-hover) ease"></span><span class="brk brk--tr" style="transition:border-color var(--dur-hover) ease"></span>
+            <span class="brk brk--bl" style="transition:border-color var(--dur-hover) ease"></span><span class="brk brk--br" style="transition:border-color var(--dur-hover) ease"></span>
             <span style="position:relative;width:17px;height:17px"><i style="position:absolute;top:8px;left:0;width:17px;height:1.5px;background:var(--ink)"></i><i style="position:absolute;left:8px;top:0;height:17px;width:1.5px;background:var(--ink)"></i></span>
           </span>
           <p style="margin-top:14px;font-size:16px;font-weight:600;color:var(--ink)">Create deck</p>

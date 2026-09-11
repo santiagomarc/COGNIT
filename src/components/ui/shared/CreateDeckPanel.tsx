@@ -57,16 +57,19 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
       onClick={requestOpenCreateDeck}
       aria-haspopup="dialog"
       aria-keyshortcuts="Meta+N Control+N"
-      className="surface spec group flex w-full flex-col items-start border-[var(--border-control)] p-4 text-left transition-colors duration-[120ms] hover:bg-surface-raised lg:w-[340px] lg:p-5"
+      className="surface spec group relative flex w-full cursor-pointer flex-col items-start border-[var(--border-control)] p-4 text-left outline-hidden transition-[background-color,border-color,box-shadow,transform] duration-[120ms] hover:border-ink hover:bg-surface-raised hover:shadow-[var(--elevate-2)] active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] lg:w-[340px] lg:p-5"
     >
+      {/* Specular hairline highlight that illuminates on hover */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-[var(--radius-lg)] bg-gradient-to-r from-transparent via-ink/40 to-transparent opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100" />
+
       {/* A geometric plus drawn in CSS. §6's allowlist has a plus in it, but a
           14px stroke pair reads cleaner at this size than a 42px glyph and
           costs no import. */}
       <span className="relative grid size-[42px] shrink-0 place-items-center">
-        <span aria-hidden="true" className="brk brk--tl" />
-        <span aria-hidden="true" className="brk brk--tr" />
-        <span aria-hidden="true" className="brk brk--bl" />
-        <span aria-hidden="true" className="brk brk--br" />
+        <span aria-hidden="true" className="brk brk--tl transition-colors duration-[120ms] group-hover:border-ink" />
+        <span aria-hidden="true" className="brk brk--tr transition-colors duration-[120ms] group-hover:border-ink" />
+        <span aria-hidden="true" className="brk brk--bl transition-colors duration-[120ms] group-hover:border-ink" />
+        <span aria-hidden="true" className="brk brk--br transition-colors duration-[120ms] group-hover:border-ink" />
         <span aria-hidden="true" className="relative block size-[17px]">
           <span className="absolute left-0 top-[8px] block h-[1.5px] w-[17px] bg-ink" />
           <span className="absolute left-[8px] top-0 block h-[17px] w-[1.5px] bg-ink" />
@@ -79,10 +82,12 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
       </span>
 
       <span className="mt-auto flex w-full items-center justify-between pt-3">
-        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer transition-colors duration-[120ms] group-hover:text-ink-dim">
           {deckCount === 1 ? '1 deck' : `${deckCount} decks`} so far
         </span>
-        <Kbd>⌘N</Kbd>
+        <Kbd className="transition-colors duration-[120ms] group-hover:border-ink-dim group-hover:text-ink">
+          ⌘N
+        </Kbd>
       </span>
     </button>
   );
