@@ -16,6 +16,7 @@ import {
   isDrillVerdict,
   isSynthesisFormat,
   type AnchorCard,
+  type CapstoneDrillCandidate,
   type DrillHistoryRow,
   type LastAttemptSummary,
   type LinkCoverage,
@@ -26,9 +27,10 @@ import {
 } from '@/lib/synthesis/types';
 
 /**
- * Server-side readers for the drill canvas, the launcher and the Insights
- * panels (spec §9.3). Not Server Actions: they take the caller's Supabase
- * client and never become POST endpoints. Every read is bounded.
+ * Server-side readers for the drill canvas, the launcher, the Insights
+ * panels, the study capstone and the dashboard reading (spec §9.3). Not
+ * Server Actions: they take the caller's Supabase client and never become
+ * POST endpoints. Every read is bounded.
  */
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -37,6 +39,8 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 const MAX_DRILLS_READ = 60;
 const MAX_ATTEMPTS_READ = 300;
 const HISTORY_ROWS = 20;
+/** Cross-deck due read for the dashboard: 25 decks at the per-deck cap. */
+const MAX_DUE_DRILLS_READ = 1000;
 
 const requiredLinksSchema = z.array(z.object({
   id: z.string().min(1),
@@ -340,5 +344,85 @@ export async function loadSynthesisInsights(
     history,
     outsideClaims30d: outsideClaimsSince(attempts, new Date(now.getTime() - 30 * 24 * 60 * 60_000)),
     attemptCount: attempts.length,
+  };
+}
+
+/**
+ * The active drills of one deck, as the study completion screen needs them
+ * to offer a capstone (spec §8.3): no links, no exemplar. The choice itself
+ * is `pickCapstoneDrill`, run on the client against the session's grades.
+ */
+export async function loadCapstoneCandidates(
+  supabase: SupabaseServerClient,
+  input: { deckId: string; userId: string },
+): Promise<CapstoneDrillCandidate[]> {
+  const { data, error } = await supabase
+    .from('synthesis_drills')
+    .select('id, prompt_text, card_ids, next_due_at, attempt_count')
+    .eq('deck_id', input.deckId)
+    .eq('user_id', input.userId)
+    .eq('status', 'active')
+    .order('next_due_at', { ascending: true })
+    .limit(MAX_DRILLS_READ);
+
+  if (error) {
+    logger.error('synthesis', 'capstone read failed', { message: error.message });
+    return [];
+  }
+
+  return (data ?? []).flatMap((row) => {
+    if (!Array.isArray(row.card_ids) || row.card_ids.length < 2) return [];
+    return [{
+      id: row.id,
+      promptText: row.prompt_text,
+      cardIds: row.card_ids,
+      status: 'active' as const,
+      nextDueAt: row.next_due_at,
+      attemptCount: row.attempt_count,
+    }];
+  });
+}
+
+export type DueDrillsByDeck = {
+  /** Decks with at least one drill due, most due first. */
+  decks: { deckId: string; dueCount: number }[];
+  total: number;
+  /** The read hit its row cap; `total` is a floor. */
+  truncated: boolean;
+};
+
+/**
+ * Drills due now across every deck, for the dashboard band's `drills due`
+ * reading (spec §4.1). One bounded read of `deck_id` grouped here — the
+ * per-deck total is at most 40 and there is no RPC to add for it.
+ */
+export async function loadDueDrillsByDeck(
+  supabase: SupabaseServerClient,
+  input: { userId: string; now?: Date },
+): Promise<DueDrillsByDeck> {
+  const now = input.now ?? new Date();
+  const { data, error } = await supabase
+    .from('synthesis_drills')
+    .select('deck_id')
+    .eq('user_id', input.userId)
+    .eq('status', 'active')
+    .lte('next_due_at', now.toISOString())
+    .limit(MAX_DUE_DRILLS_READ);
+
+  if (error) {
+    logger.error('synthesis', 'due drills read failed', { message: error.message });
+    return { decks: [], total: 0, truncated: false };
+  }
+
+  const rows = data ?? [];
+  const byDeck = new Map<string, number>();
+  for (const row of rows) byDeck.set(row.deck_id, (byDeck.get(row.deck_id) ?? 0) + 1);
+
+  return {
+    decks: [...byDeck.entries()]
+      .map(([deckId, dueCount]) => ({ deckId, dueCount }))
+      .sort((a, b) => b.dueCount - a.dueCount || a.deckId.localeCompare(b.deckId)),
+    total: rows.length,
+    truncated: rows.length >= MAX_DUE_DRILLS_READ,
   };
 }

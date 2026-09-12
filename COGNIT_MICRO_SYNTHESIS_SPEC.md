@@ -1,7 +1,7 @@
 # Cognit — Micro-Synthesis & Argument Outlining
 
 **Technical specification · Rev. B.1 — supersedes `COGNIT_ESSAY_ENGINE_SPEC.md` (Rev. A)**
-**Status:** Approved for Phase 0–1 implementation (B.1 adjustments of 2026-09-12: no readiness gate, exam-sprint ladder, AI-verified outside claims) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`
+**Status:** Phases 0–2 implemented (B.1 adjustments of 2026-09-12: no readiness gate, exam-sprint ladder, AI-verified outside claims; Phase 2 capstone and dashboard reading landed the same day) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`, Phase 2 on `983830d`
 **Applies to:** Next.js 16 (App Router) · React 19 · TypeScript strict · Supabase Postgres + pgvector · Gemini 2.5 Flash via `@google/generative-ai` 0.24 · Tailwind v4 · Vitest 4
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C), `COGNIT_HANDOFF.md`
 
@@ -247,9 +247,9 @@ schema leaves room for it (one column) without needing it now.
 |---|---|---|---|
 | Launcher block | Deck overview, right column of `DeckSessionLauncher` under the quiz form | `DUE 2 · LINKS 12/18 · LAST 3d`, count chips 1 / 3 / 5, *Pull contradicted cards forward* checkbox, *Start drills* | `/dashboard/[deckId]/synthesis?count=3&pull=1` |
 | Empty launcher | Same block, no drills yet | *Generate 3 drills* (AI; needs ≥ 6 cards) | in place, then the above |
-| Capstone | `FlashcardReviewClient` completed state | *Cap this session · 1 drill · ≈ 2 min* — only when a relevant drill exists (§8.3) | `/dashboard/[deckId]/synthesis?drill=<id>&from=study` |
+| Capstone | `FlashcardReviewClient` completed state | *Cap this session · ≈ 2 min*, the prompt, *Uses the 3 cards you just reviewed.* — only when a relevant drill exists (§8.3); *Skip* closes it and records nothing | `/dashboard/[deckId]/synthesis?drill=<id>&from=study` — serves exactly that drill, header reads `CAPSTONE 1/1` |
 | Insights | Deck `?tab=insights` | *Weak links* and *Drill history* panels; history rows reopen a drill | `…/synthesis?drill=<id>` |
-| Dashboard (P2) | `DueNowBand` | `DRILLS 2` reading beside the due count | deck launcher |
+| Dashboard | `DueNowBand` | `2 drills due` (`in 3 decks`) on the band's sub-line beside the due count; cards stay the hero figure | the launcher of the deck with the most due drills |
 
 ### 4.2 The drill loop
 
@@ -782,8 +782,23 @@ serves that drill first regardless of its due date.
 
 Inputs: the deck's active drills and the session's `gradeLog` (`{ cardId, grade }`, already
 held by `FlashcardReviewClient`). Choose, in order: a due drill whose anchors were all graded
-`good`/`easy` this session → a never-attempted drill meeting the same condition → a due,
-ready drill → nothing. At most one is offered; *Skip* records nothing.
+`good`/`easy` this session → a never-attempted drill meeting the same condition → a due
+drill → nothing. At most one is offered; *Skip* records nothing.
+
+Two rules the implementation adds to that order, both from the same premise (the offer exists
+because retrieval is *warm*, §8.1 item 5):
+
+- A card counts by its **last** grade in the session. The study client requeues an `again`
+  card and grades it again minutes later; `again → good` ended warm, `good → again` ended cold.
+- A drill with any anchor whose last grade was `again` is **never offered**, at any tier, due
+  or not. A drill on a card the student just failed is not a capstone, it is a second failure —
+  and UAT J7 (*graded again → not offered*) would otherwise be false for a due drill. The queue
+  (§8.2) is unaffected: it still moves a lapse-affected drill to the front on the next launch.
+
+The study page loads the deck's active drills as a lean projection (`CapstoneDrillCandidate`:
+id, prompt, card ids, due, attempt count — never the answer key) and the client picks after
+the session is complete, against the frozen completion clock, so the choice is pure and
+stable across re-renders.
 
 ### 8.4 Card effects — the non-destructive policy
 
@@ -1112,7 +1127,13 @@ client, `useTransition`, toast) and, under 6 cards, with the one-line refusal.
 
 Rendered by `StudyCapstoneOffer` beneath the session summary, only when `pickCapstoneDrill`
 returns a drill (the completed state already has `gradeLog`; the page passes the deck's
-active drills as a prop). It never delays or replaces the summary.
+active drills as a prop). It never delays or replaces the summary. The second line is
+computed, not assumed: *Uses the 3 cards you just reviewed.* when every anchor was graded
+this session, *Uses 2 of its 3 cards from this session.* when some were, *Due now · 3 cards
+from this deck.* when none were (the third tier of §8.3). *Start drill* is the `default`
+button — *Back to deck* keeps the screen's one `primary` — and opens
+`…/synthesis?drill=<id>&from=study`, which serves that one drill with the header reading
+`CAPSTONE 1/1`. *Skip* is `ghost` and closes the offer for that completion only.
 
 Insights adds two `.surface` panels in the shape of `WeakestConcepts`:
 
@@ -1130,9 +1151,9 @@ DRILL HISTORY                                    12 attempts
 ```
 SynthesisLauncher (server)        props: deckId, readings: { due, linksCovered, linksTotal, lastAgeLabel }, cardCount, activeDrills
 └─ GenerateSynthesisDrillsButton (client)   props: deckId
-StudyCapstoneOffer (client)       props: deckId, drill: { id, promptText, anchorCount } | null
+StudyCapstoneOffer (client)       props: deckId, drill: { id, promptText, anchorCount, reviewedAnchorCount } | null
 
-SynthesisDrillClient (client)     props: deckId, deckTitle, drills: SynthesisDrill[], anchorsByDrill, lastAttemptByDrill, pullForward, from?: 'study'
+SynthesisDrillClient (client)     props: deckId, deckTitle, drills: SynthesisDrill[], anchorsByDrill, lastAttemptByDrill, pullForward, activeDrillCount, from?: 'study'
 ├─ DrillHeader                    props: deckTitle, index, total, format, words, elapsedMs, phase, linksCovered?, unready
 │  └─ Telemetry ×n, Kbd
 ├─ DrillPrompt                    props: promptText, anchors: AnchorCard[], onInsertTerm
@@ -1253,7 +1274,7 @@ with *Pull forward* off → card untouched · J5 introduce a true fact not in th
 *AI verified · outside deck*, no contradiction; a planted falsehood → *Unverified* · J6 *+ Add
 as card* → card appears with the AI assessment as its description · J5b drill a never-reviewed
 cluster → served immediately, no lock · J7 finish a study
-session with a drill's anchors graded good → capstone offered; graded again → not offered · J8
+session with a drill's anchors graded good → capstone offered; graded again → not offered, even when the drill is due; again then good on the requeue → offered · J8
 two accounts: no drill data crosses · J9 share the deck; `/s/[token]` shows no drills · J10
 time ten checks; p50 under 3.5 s.
 
@@ -1263,9 +1284,15 @@ time ten checks; p50 under 3.5 s.
 
 ### 12.0 Implementation status (2026-09-12)
 
-Phase 0 and Phase 1 are implemented in the working tree; gate at hand-off: `npx tsc --noEmit`
-clean · `npm run lint` clean · `npm test` **306 passed / 30 files** (60 new library tests,
-13 new action tests) · `npm run build` **16 routes** (adds `/dashboard/[deckId]/synthesis`).
+Phase 0 and Phase 1 are implemented and committed (`983830d`); gate at hand-off: `npx tsc
+--noEmit` clean · `npm run lint` clean · `npm test` **306 passed / 30 files** (60 new library
+tests, 13 new action tests) · `npm run build` **16 routes** (adds `/dashboard/[deckId]/synthesis`).
+
+Phase 2 is implemented on top of that commit; gate: `npx tsc --noEmit` clean · `npm run lint`
+clean · `npm test` **313 passed / 31 files** (+3 `pickCapstoneDrill` tests, +4 in the new
+`loaders.test.ts`) · `npm run build` **16 routes**, no new route. No migration, no new AI
+call, no schema change: both readings are bounded selects on `synthesis_drills` through the
+existing RLS and index.
 
 Two things this document said that the code does differently, deliberately:
 
@@ -1307,8 +1334,18 @@ hand-added in the generated format until then.
 | 1.6 | `synthesis.test.ts` (actions, Supabase mock) | ownership, word count, pull-forward filter, off_target → no card update |
 | Gate | Phase 0 gate + calibration §11.3 + UAT J1–J10 | Phase 0 gate **passed**; calibration and UAT need the migration applied |
 
-Phase 2 (capstone offer on the study completion screen, `DueNowBand` reading) follows
-unchanged from Rev. B. Deploy order as the README mandates: `supabase db push`, then the app.
+Deploy order as the README mandates: `supabase db push`, then the app.
+
+### 12.2b Phase 2 — the capstone and the dashboard reading
+
+| # | Task | Notes |
+|---|---|---|
+| 2.1 | `src/lib/synthesis/schedule.ts` — `pickCapstoneDrill` generic over `CapstoneDrillCandidate`; last-grade semantics; cold-anchor exclusion (§8.3) | `types.ts` gains `CapstoneDrillCandidate`; 3 new tests |
+| 2.2 | `src/lib/synthesis/loaders.ts` — `loadCapstoneCandidates` (one deck, lean columns, never the answer key) and `loadDueDrillsByDeck` (cross-deck, `deck_id` only, capped at 1,000 rows) | `loaders.test.ts` (4) on the shared Supabase mock |
+| 2.3 | `components/ui/shared/synthesis/StudyCapstoneOffer.tsx`; `FlashcardReviewClient` takes `capstoneDrills` and picks on completion against the frozen clock; `(focus)/[deckId]/study/page.tsx` loads candidates in the same `Promise.all` as the session cards | `.surface` beneath the summary; *Start drill* `default`, *Skip* `ghost`; nothing recorded |
+| 2.4 | `(focus)/[deckId]/synthesis/page.tsx` — `?from=study` serves exactly the pinned drill; `SynthesisDrillClient` `from` prop labels the header `CAPSTONE 1/1` | |
+| 2.5 | `DueNowBand` `dueDrills` prop and sub-line reading; `(shell)/page.tsx` loads it in the dashboard `Promise.all` and links the deck with the most due | the hue is `--state-due` on the count, paired with *drills due* |
+| Gate | Phase 0 gate · UAT J7 | Phase 0 gate **passed**; J7 needs the migration applied |
 
 ### 12.3 Decisions resolved by B.1
 

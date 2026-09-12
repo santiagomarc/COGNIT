@@ -10,6 +10,7 @@ type SynthesisPageProps = {
     count?: string | string[];
     drill?: string | string[];
     pull?: string | string[];
+    from?: string | string[];
   }>;
 };
 
@@ -36,6 +37,8 @@ function normaliseBoolean(value: string | string[] | undefined, fallback: boolea
 /**
  * The drill canvas route (spec §4.1). Chromeless like study and quiz. Serves
  * `count` drills, due first — never locking — and pins `?drill=` first.
+ * `?from=study` is the capstone entry (§8.3): the offer promised one drill,
+ * so it serves exactly the pinned one.
  */
 export default async function DeckSynthesisPage({ params, searchParams }: SynthesisPageProps) {
   const { deckId } = await params;
@@ -59,10 +62,11 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
   }
 
   const pinned = first(resolved?.drill);
+  const fromStudy = first(resolved?.from) === 'study';
   const queue = await loadSynthesisQueue(supabase, {
     deckId,
     userId: user.id,
-    count: normaliseCount(resolved?.count),
+    count: fromStudy ? 1 : normaliseCount(resolved?.count),
     drillId: pinned && UUID_PATTERN.test(pinned) ? pinned : null,
   });
 
@@ -75,6 +79,7 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
       lastAttemptByDrill={queue.lastAttemptByDrill}
       pullForward={normaliseBoolean(resolved?.pull, true)}
       activeDrillCount={queue.activeDrillCount}
+      from={fromStudy ? 'study' : undefined}
     />
   );
 }

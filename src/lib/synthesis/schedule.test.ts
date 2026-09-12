@@ -174,4 +174,33 @@ describe('pickCapstoneDrill', () => {
     const cold = drill('cold', { nextDueAt: new Date(NOW.getTime() + HOUR).toISOString() });
     expect(pickCapstoneDrill({ drills: [cold], gradeLog: [{ cardId: 'cold-a', grade: 'again' }], now: NOW })).toBeNull();
   });
+
+  it('never offers a drill whose anchor was last graded again, even when it is due (J7)', () => {
+    const drills = [drill('due')];
+    expect(pickCapstoneDrill({ drills, gradeLog: [good('due-a'), { cardId: 'due-b', grade: 'again' }], now: NOW })).toBeNull();
+    // A card not seen this session does not make the drill cold.
+    expect(pickCapstoneDrill({ drills, gradeLog: [good('due-a')], now: NOW })?.id).toBe('due');
+  });
+
+  it('counts a card by its last grade in the session, so again → good ends warm', () => {
+    const drills = [drill('anyDue'), drill('requeued', { attemptCount: 1 })];
+    const gradeLog = [
+      { cardId: 'requeued-a', grade: 'again' as const },
+      good('requeued-b'),
+      good('requeued-a'),
+    ];
+    expect(pickCapstoneDrill({ drills, gradeLog, now: NOW })?.id).toBe('requeued');
+    // …and good → again ends cold.
+    expect(pickCapstoneDrill({ drills, gradeLog: [good('requeued-a'), { cardId: 'requeued-a', grade: 'again' }], now: NOW })?.id).toBe('anyDue');
+  });
+
+  it('accepts the lean candidate projection the study page passes', () => {
+    const candidates = [
+      { id: 'lean', promptText: 'p', cardIds: ['x', 'y'], status: 'active' as const, nextDueAt: NOW.toISOString(), attemptCount: 0 },
+      { id: 'archived', promptText: 'p', cardIds: ['x', 'y'], status: 'archived' as const, nextDueAt: NOW.toISOString(), attemptCount: 0 },
+    ];
+    const picked = pickCapstoneDrill({ drills: candidates, gradeLog: [good('x'), good('y')], now: NOW });
+    expect(picked?.id).toBe('lean');
+    expect(picked?.promptText).toBe('p');
+  });
 });

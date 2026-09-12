@@ -16,6 +16,7 @@ import {
   type CardScheduleRow,
 } from '@/lib/dashboard-forecast';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { loadDueDrillsByDeck, type DueDrillsByDeck } from '@/lib/synthesis/loaders';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type DashboardDeckRow = {
@@ -40,6 +41,7 @@ type DashboardSnapshot = {
   masterySummaryRows: DeckMasterySummaryRow[];
   cardSchedule: CardScheduleRow[];
   cardScheduleTruncated: boolean;
+  dueDrills: DueDrillsByDeck;
 };
 
 // One row per distinct day ever studied, with that day's review count —
@@ -190,7 +192,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     errorMessage: deckQueryErrorMessage,
   } = await loadDeckRowsWithFallback(supabase);
 
-  const [dueByDeckRows, activityDays, { count: totalStudiedCards }, masterySummary, cardSchedule] =
+  const [dueByDeckRows, activityDays, { count: totalStudiedCards }, masterySummary, cardSchedule, dueDrills] =
     await Promise.all([
       loadDueByDeckRows(supabase, userId, nowIso),
       loadActivityDays(supabase, userId),
@@ -200,6 +202,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
         .eq('user_id', userId),
       loadMasterySummary(supabase, userId),
       loadCardSchedule(supabase),
+      loadDueDrillsByDeck(supabase, { userId, now: new Date(nowIso) }),
     ]);
 
   return {
@@ -212,6 +215,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     masterySummaryRows: masterySummary,
     cardSchedule: cardSchedule.rows,
     cardScheduleTruncated: cardSchedule.truncated,
+    dueDrills,
   };
 }
 
@@ -233,6 +237,7 @@ export default async function Dashboard() {
     masterySummaryRows,
     cardSchedule,
     cardScheduleTruncated,
+    dueDrills,
   } = await loadDashboardSnapshot(user.id);
 
   if (cardScheduleTruncated) {
@@ -358,6 +363,16 @@ export default async function Dashboard() {
       ? `/dashboard/${mostRecentDeck.id}/study?scope=include_reviewed`
       : null;
 
+  // The drills reading leads to a deck launcher (micro-synthesis spec §4.1):
+  // the deck with the most due, restricted to decks this page knows about.
+  const knownDeckIds = new Set(deckRows.map((deck) => deck.id));
+  const topDrillDeck = dueDrills.decks.find((deck) => knownDeckIds.has(deck.deckId));
+  const dueDrillsReading = {
+    total: dueDrills.total,
+    deckCount: dueDrills.decks.length,
+    href: topDrillDeck ? `/dashboard/${topDrillDeck.deckId}` : null,
+  };
+
   return (
     /*
      * No bottom padding here, and none in any other page under /dashboard:
@@ -397,6 +412,7 @@ export default async function Dashboard() {
                 estimatedMinutes={estimatedMinutes}
                 sessionHref={sessionHref}
                 forecastDays={forecastDays}
+                dueDrills={dueDrillsReading}
               />
             </div>
 

@@ -34,6 +34,8 @@ type SynthesisDrillClientProps = {
   lastAttemptByDrill: Record<string, LastAttemptSummary>;
   pullForward: boolean;
   activeDrillCount: number;
+  /** Set when the study completion screen's capstone offer opened this drill (spec §8.3). */
+  from?: 'study';
 };
 
 type Phase = 'answering' | 'checking' | 'diagnosed';
@@ -86,6 +88,7 @@ export function SynthesisDrillClient({
   lastAttemptByDrill,
   pullForward,
   activeDrillCount,
+  from,
 }: SynthesisDrillClientProps) {
   const router = useRouter();
   const [index, setIndex] = useState(0);
@@ -352,7 +355,7 @@ export function SynthesisDrillClient({
               <span className={LABEL}>Deck</span>
               <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">{deckTitle}</span>
             </div>
-            <Telemetry label="Drill" value={`${index + 1}/${drills.length}`} />
+            <Telemetry label={from === 'study' ? 'Capstone' : 'Drill'} value={`${index + 1}/${drills.length}`} />
             <div className="flex items-baseline gap-2">
               <span className={LABEL}>Format</span>
               <span className="text-[13px] leading-none text-ink">{FORMAT_LABEL[drill.format]}</span>

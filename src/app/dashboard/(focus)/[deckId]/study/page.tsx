@@ -4,6 +4,7 @@ import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewCli
 import { normalizeSessionCardCount, normalizeStudyScope, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { loadCapstoneCandidates } from '@/lib/synthesis/loaders';
 
 type StudyPageProps = {
   params: Promise<{
@@ -68,9 +69,15 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     cardQuery = cardQuery.or('state.is.null,state.eq.new,state.eq.learning,state.eq.relearning');
   }
 
-  const { data: dueCards } = await cardQuery
-    .order('next_review_at', { ascending: true, nullsFirst: true })
-    .limit(sessionCardCount);
+  // The deck's drills ride along for the completion screen's capstone offer
+  // (spec §8.3); an empty result — no drills, or the table not yet migrated —
+  // simply means no offer.
+  const [{ data: dueCards }, capstoneDrills] = await Promise.all([
+    cardQuery
+      .order('next_review_at', { ascending: true, nullsFirst: true })
+      .limit(sessionCardCount),
+    loadCapstoneCandidates(supabase, { deckId, userId: user.id }),
+  ]);
 
   const cards: StudySessionCard[] = (dueCards ?? []).map((c) => ({
     id: c.id,
@@ -93,6 +100,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
       cards={cards}
       totalInDeck={totalInDeck ?? 0}
       studyScope={studyScope}
+      capstoneDrills={capstoneDrills}
     />
   );
 }

@@ -35,6 +35,13 @@ export type SynthesisDrill = {
   lastAttemptAt: string | null;
 };
 
+/**
+ * The projection the study completion screen needs to offer a capstone
+ * (spec §8.3): identity, the prompt to show, and the three fields
+ * `pickCapstoneDrill` reads. Never the answer key.
+ */
+export type CapstoneDrillCandidate = Pick<SynthesisDrill, 'id' | 'promptText' | 'cardIds' | 'status' | 'nextDueAt' | 'attemptCount'>;
+
 /** What the canvas and the check need per anchor. */
 export type AnchorCard = {
   id: string;

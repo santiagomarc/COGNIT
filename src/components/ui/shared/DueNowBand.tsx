@@ -21,6 +21,11 @@ type DueNowBandProps = {
   sessionHref: string | null;
   /** The seven days after today. See `buildSevenDayForecast`. */
   forecastDays: ForecastDay[];
+  /**
+   * Synthesis drills due now across the account (spec §4.1). `href` is the
+   * launcher of the deck with the most due; null when none are due.
+   */
+  dueDrills: { total: number; deckCount: number; href: string | null };
 };
 
 /** How many decks the by-deck list names before it summarises. */
@@ -37,6 +42,9 @@ const NAMED_DECKS = 3;
  *
  * "Import PDF" is gone from this page entirely — it belongs to a deck, and the
  * deck page already has it.
+ *
+ * Drills due (micro-synthesis spec §4.1) are a fourth reading, kept to the
+ * sub-line: cards remain the hero figure, and a drill is never a lock.
  */
 export function DueNowBand({
   totalDue,
@@ -45,9 +53,11 @@ export function DueNowBand({
   estimatedMinutes,
   sessionHref,
   forecastDays,
+  dueDrills,
 }: DueNowBandProps) {
   const router = useRouter();
   const hasWork = totalDue > 0;
+  const showDrills = dueDrills.total > 0 && dueDrills.href !== null;
 
   /*
    * `S` starts a session (§7.3). The keycap beside the button is only honest if
@@ -120,9 +130,30 @@ export function DueNowBand({
                   ) : null}
                   est. <span className="font-mono tnum">{estimatedMinutes}</span> min
                 </>
+              ) : showDrills ? (
+                'No cards due'
               ) : (
                 'No reviews scheduled. Study ahead or add new material.'
               )}
+              {showDrills && dueDrills.href ? (
+                <>
+                  {' · '}
+                  <Link
+                    href={dueDrills.href}
+                    className="rounded-[var(--radius-sm)] underline-offset-[3px] outline-hidden hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  >
+                    <span className="font-mono tnum" style={{ color: 'var(--state-due)' }}>
+                      {dueDrills.total}
+                    </span>{' '}
+                    {dueDrills.total === 1 ? 'drill' : 'drills'} due
+                    {dueDrills.deckCount > 1 ? (
+                      <>
+                        {' '}in <span className="font-mono tnum">{dueDrills.deckCount}</span> decks
+                      </>
+                    ) : null}
+                  </Link>
+                </>
+              ) : null}
             </p>
           </div>
         </div>

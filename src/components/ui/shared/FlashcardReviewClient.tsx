@@ -10,10 +10,13 @@ import { Kbd } from '@/components/ui/Kbd';
 import { FlipCard, type FlipState } from '@/components/ui/shared/FlipCard';
 import { GradeKey } from '@/components/ui/shared/GradeKey';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
+import { StudyCapstoneOffer, type CapstoneOffer } from '@/components/ui/shared/synthesis/StudyCapstoneOffer';
 import { gradeCard, finishStudySession } from '@/app/actions/study';
 import { cardLeaveSpring, motionTransitions } from '@/lib/motion-configs';
 import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
 import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/lib/study';
+import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
+import type { CapstoneDrillCandidate } from '@/lib/synthesis/types';
 import { toast } from 'sonner';
 
 type FlashcardReviewClientProps = {
@@ -22,7 +25,14 @@ type FlashcardReviewClientProps = {
   cards: StudySessionCard[];
   totalInDeck: number;
   studyScope: StudyScope;
+  /**
+   * The deck's active synthesis drills, lean. The completed state offers one
+   * of them as a capstone when the session warmed its anchors (spec §8.3).
+   */
+  capstoneDrills?: CapstoneDrillCandidate[];
 };
+
+const NO_DRILLS: CapstoneDrillCandidate[] = [];
 
 type GradeLogEntry = {
   cardId: string;
@@ -86,6 +96,7 @@ export function FlashcardReviewClient({
   cards,
   totalInDeck,
   studyScope,
+  capstoneDrills = NO_DRILLS,
 }: FlashcardReviewClientProps) {
   const router = useRouter();
   const sessionCardIds = useMemo(() => cards.map((card) => card.id), [cards]);
@@ -268,6 +279,24 @@ export function FlashcardReviewClient({
     () => summariseNextReviews(scheduledReviews),
     [scheduledReviews],
   );
+
+  /*
+   * The capstone (spec §8.3): chosen once the session is complete, against
+   * the grades it produced. `nowMs` is frozen at completion, so the choice is
+   * stable across re-renders and pure — no clock read during render.
+   */
+  const capstoneOffer = useMemo<CapstoneOffer | null>(() => {
+    if (!completed || capstoneDrills.length === 0) return null;
+    const drill = pickCapstoneDrill({ drills: capstoneDrills, gradeLog, now: new Date(nowMs) });
+    if (!drill) return null;
+    const reviewed = new Set(gradeLog.map((entry) => entry.cardId));
+    return {
+      id: drill.id,
+      promptText: drill.promptText,
+      anchorCount: drill.cardIds.length,
+      reviewedAnchorCount: drill.cardIds.filter((id) => reviewed.has(id)).length,
+    };
+  }, [capstoneDrills, completed, gradeLog, nowMs]);
 
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-220, 220], [-14, 14]);
@@ -825,6 +854,9 @@ export function FlashcardReviewClient({
                     </div>
                   ) : null}
                 </div>
+
+                {/* One drill on the concepts just retrieved, or nothing (§8.3). */}
+                <StudyCapstoneOffer deckId={deckId} drill={capstoneOffer} />
 
                 <div className="flex justify-center gap-3">
                   <Button onClick={restart} className="gap-2">

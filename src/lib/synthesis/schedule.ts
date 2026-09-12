@@ -7,7 +7,7 @@
  * the action, as one filtered update).
  */
 
-import type { DrillVerdict, Step, SynthesisDrill } from '@/lib/synthesis/types';
+import type { CapstoneDrillCandidate, DrillVerdict, Step, SynthesisDrill } from '@/lib/synthesis/types';
 
 /** index = step, value = days until the next due after a `sound` verdict. */
 export const LADDER_DAYS = [0, 1, 2] as const;
@@ -103,28 +103,44 @@ export function orderQueue(input: {
   return chosen;
 }
 
+export type CapstoneGrade = 'again' | 'hard' | 'good' | 'easy';
+
 /**
  * Capstone after a study session (spec §8.3): a due drill whose anchors were
  * all just graded good/easy, else a never-attempted one meeting the same
  * condition, else a due drill, else nothing.
+ *
+ * A card's *last* grade in the session is the one that counts — a requeued
+ * card that went again → good ended warm. Any anchor whose last grade was
+ * `again` rules its drills out at every tier: the offer exists because
+ * retrieval is warm (§8.1), and a drill on a card the student just failed is
+ * not a capstone, it is a second failure (UAT J7).
+ *
+ * Generic over the drill shape so the study page can pass the lean
+ * `CapstoneDrillCandidate` projection instead of the full drill.
  */
-export function pickCapstoneDrill(input: {
-  drills: SynthesisDrill[];
-  gradeLog: { cardId: string; grade: 'again' | 'hard' | 'good' | 'easy' }[];
+export function pickCapstoneDrill<T extends CapstoneDrillCandidate>(input: {
+  drills: T[];
+  gradeLog: { cardId: string; grade: CapstoneGrade }[];
   now: Date;
-}): SynthesisDrill | null {
+}): T | null {
   const nowMs = input.now.getTime();
-  const wellGraded = new Set(
-    input.gradeLog.filter((entry) => entry.grade === 'good' || entry.grade === 'easy').map((entry) => entry.cardId),
-  );
-  const active = input.drills.filter((drill) => drill.status === 'active' && drill.cardIds.length >= 2);
-  const isDue = (drill: SynthesisDrill) => new Date(drill.nextDueAt).getTime() <= nowMs;
-  const warm = (drill: SynthesisDrill) => drill.cardIds.every((id) => wellGraded.has(id));
+  const lastGrade = new Map<string, CapstoneGrade>();
+  for (const entry of input.gradeLog) lastGrade.set(entry.cardId, entry.grade);
 
+  const active = input.drills.filter((drill) => drill.status === 'active' && drill.cardIds.length >= 2);
+  const isDue = (drill: T) => new Date(drill.nextDueAt).getTime() <= nowMs;
+  const cold = (drill: T) => drill.cardIds.some((id) => lastGrade.get(id) === 'again');
+  const warm = (drill: T) => drill.cardIds.every((id) => {
+    const grade = lastGrade.get(id);
+    return grade === 'good' || grade === 'easy';
+  });
+
+  const eligible = active.filter((drill) => !cold(drill));
   return (
-    active.find((drill) => isDue(drill) && warm(drill))
-    ?? active.find((drill) => drill.attemptCount === 0 && warm(drill))
-    ?? active.find(isDue)
+    eligible.find((drill) => isDue(drill) && warm(drill))
+    ?? eligible.find((drill) => drill.attemptCount === 0 && warm(drill))
+    ?? eligible.find(isDue)
     ?? null
   );
 }
