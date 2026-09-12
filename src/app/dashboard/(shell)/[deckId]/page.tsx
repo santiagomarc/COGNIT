@@ -8,6 +8,7 @@ import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
 import { DeckReadings } from '@/components/ui/shared/DeckReadings';
 import { DeckSegments, resolveDeckTab } from '@/components/ui/shared/DeckSegments';
 import { DeckSessionLauncher } from '@/components/ui/shared/DeckSessionLauncher';
+import { DrillHistory, SynthesisInsightsSkeleton, WeakLinks } from '@/components/ui/shared/synthesis/SynthesisInsights';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
@@ -17,6 +18,7 @@ import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { estimateSessionMinutes } from '@/lib/dashboard-forecast';
 import { getSessionCardBounds } from '@/lib/study';
+import { loadSynthesisReadings } from '@/lib/synthesis/loaders';
 import { logger } from '@/lib/logger';
 import type { CardSource } from '@/index';
 
@@ -413,6 +415,11 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
   const hasCards = totalCards > 0;
   const recentCards = cards.slice(0, 5);
 
+  // Two bounded reads for the launcher's synthesis block; only the overview renders it.
+  const synthesisReadings = activeTab === 'overview' && hasCards
+    ? await loadSynthesisReadings(supabase, { deckId, userId: user.id })
+    : { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null };
+
   return (
     <div className="container mx-auto flex flex-col gap-4 p-4 md:px-8 md:py-6">
       {/* ═══ Persistent header — identity, state, progress ═══════════════ */}
@@ -471,6 +478,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
               unprovenCards={unprovenCards}
               estimatedMinutes={estimateSessionMinutes(schedule.due)}
               sessionBounds={sessionBounds}
+              synthesisReadings={synthesisReadings}
             />
           ) : null}
 
@@ -576,6 +584,14 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
 
             <Suspense fallback={<QuizHistorySkeleton />}>
               <QuizHistorySection deckId={deckId} />
+            </Suspense>
+
+            <Suspense fallback={<SynthesisInsightsSkeleton />}>
+              <WeakLinks deckId={deckId} />
+            </Suspense>
+
+            <Suspense fallback={<SynthesisInsightsSkeleton />}>
+              <DrillHistory deckId={deckId} />
             </Suspense>
           </>
         ) : (

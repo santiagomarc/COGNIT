@@ -51,6 +51,22 @@ console.log(cols.error
   ? `❌ decks sharing columns — ${cols.error.message.slice(0,90)}`
   : `✅ decks sharing columns readable; anon sees ${cols.data.length} row(s) (expect 0 unless a deck is shared)`);
 
+// Micro-synthesis tables (202609120900) are owner-scoped with no shared
+// policy: an anonymous caller must see zero rows, and a missing table shows up
+// here as the same "does not exist" text an unapplied migration produces.
+for (const table of ['synthesis_drills', 'synthesis_attempts']) {
+  const probe = await supabase.from(table).select('id').limit(1);
+  const msg = probe.error?.message ?? '';
+  if (/does not exist|schema cache|could not find/i.test(msg)) {
+    missing += 1;
+    console.log(`❌ MISSING   table ${table}  — ${msg.slice(0, 90)}`);
+  } else if (probe.error) {
+    console.log(`✅ EXISTS    table ${table}  (guarded: ${msg.slice(0, 55)})`);
+  } else {
+    console.log(`✅ EXISTS    table ${table}; anon sees ${probe.data.length} row(s) (expect 0)`);
+  }
+}
+
 if (missing > 0) {
   console.error(`\n${missing} RPC(s) missing — apply migrations with \`supabase db push\`.`);
   process.exit(1);

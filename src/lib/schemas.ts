@@ -1,5 +1,6 @@
 import {z} from "zod";
 import { DECK_TAG_VALUES } from '@/lib/deck-tags';
+import { MAX_ANSWER_WORDS, countWords, responseText } from '@/lib/synthesis/text';
 
 export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned']);
 
@@ -210,3 +211,54 @@ export const logQuizResultSchema = z.object({
 
 export type LogQuizResultInput = z.infer<typeof logQuizResultSchema>;
 
+/* ═══════════ Micro-synthesis (COGNIT_MICRO_SYNTHESIS_SPEC.md §9.1) ═══════════ */
+
+export const synthesisFormatSchema = z.enum(['causal', 'counterfactual', 'comparative']);
+
+export const generateSynthesisDrillsSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  count: z.number().int().min(1).max(5).default(3),
+  formats: z.array(synthesisFormatSchema).min(1).max(3).default(['causal', 'counterfactual', 'comparative']),
+  /** Restrict clustering to one topic tag; omitted = whole deck. */
+  focus_topic: z.string().trim().min(2).max(80).optional(),
+});
+
+/** Input shape: defaults (`count`, `formats`) are optional for callers. */
+export type GenerateSynthesisDrillsInput = z.input<typeof generateSynthesisDrillsSchema>;
+
+const synthesisOutlineResponseSchema = z.object({
+  claim: z.string().trim().min(1, { message: 'State your claim' }).max(200),
+  mechanisms: z.tuple([z.string().trim().max(220), z.string().trim().max(220)]),
+  tradeoff: z.string().trim().max(220),
+});
+
+const synthesisFreeResponseSchema = z.object({
+  text: z.string().trim().min(1, { message: 'Write an answer' }).max(1_500),
+});
+
+export const checkSynthesisAttemptSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  drill_id: z.uuid({ message: 'Invalid drill id' }),
+  mode: z.enum(['outline', 'free']),
+  response: z.union([synthesisOutlineResponseSchema, synthesisFreeResponseSchema]),
+  duration_ms: z.number().int().min(0).default(0),
+  /** Pull contradicted cards forward to tomorrow's queue (spec §8.4). */
+  pull_forward: z.boolean().default(true),
+}).superRefine((value, ctx) => {
+  const isOutline = 'claim' in value.response;
+  if (isOutline !== (value.mode === 'outline')) {
+    ctx.addIssue({ code: 'custom', path: ['mode'], message: 'Mode does not match the answer shape' });
+  }
+  if (countWords(responseText(value.response)) > MAX_ANSWER_WORDS) {
+    ctx.addIssue({ code: 'custom', path: ['response'], message: `Keep it under ${MAX_ANSWER_WORDS} words` });
+  }
+});
+
+export type CheckSynthesisAttemptInput = z.input<typeof checkSynthesisAttemptSchema>;
+
+export const archiveSynthesisDrillSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  drill_id: z.uuid({ message: 'Invalid drill id' }),
+});
+
+export type ArchiveSynthesisDrillInput = z.infer<typeof archiveSynthesisDrillSchema>;

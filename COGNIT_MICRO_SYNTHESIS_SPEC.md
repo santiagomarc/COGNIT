@@ -1,7 +1,7 @@
 # Cognit — Micro-Synthesis & Argument Outlining
 
-**Technical specification · Rev. B — supersedes `COGNIT_ESSAY_ENGINE_SPEC.md` (Rev. A)**
-**Status:** Proposed — implementable on answers to §12 · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`
+**Technical specification · Rev. B.1 — supersedes `COGNIT_ESSAY_ENGINE_SPEC.md` (Rev. A)**
+**Status:** Approved for Phase 0–1 implementation (B.1 adjustments of 2026-09-12: no readiness gate, exam-sprint ladder, AI-verified outside claims) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`
 **Applies to:** Next.js 16 (App Router) · React 19 · TypeScript strict · Supabase Postgres + pgvector · Gemini 2.5 Flash via `@google/generative-ai` 0.24 · Tailwind v4 · Vitest 4
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C), `COGNIT_HANDOFF.md`
 
@@ -69,13 +69,15 @@ cards. The student never sees the key before answering; they see it as the check
 *Trade-off / boundary* — or writes ≤ 150 words. One Server Action, one Flash call at
 temperature 0.1 with a JSON `responseSchema`, ≈ 3 s. The model returns, per required link,
 `covered | partial | missing` with a verbatim quote; contradictions that must quote both the
-student and the card; *outside claims* the cards do not settle, with an advisory plausibility
-label whose default is abstention; a one-to-two-sentence gap note; and integrity flags. The
+student and the card; *outside claims* the cards do not settle, each verified against the
+model's own domain knowledge with a one-to-two-sentence assessment (advisory — it never
+affects the verdict); a one-to-two-sentence gap note; and integrity flags. The
 **server** verifies quotes, drops anything it cannot verify, computes the verdict — `sound`,
 `partial`, `contradicted`, `off_target` — and writes one append-only `synthesis_attempts` row.
 
-**The schedule.** The drill carries its own coarse ladder (4 → 10 → 24 → 60 days on `sound`;
-2 days on `partial`; 1 day on `contradicted`). Cards are touched in exactly one way: a card
+**The schedule.** The drill carries its own exam-sprint ladder (`sound` → due in 1 day, then
+2 days; `partial` → 24 h; `contradicted` → 12 h) and is **never locked**: every drill is
+playable from the moment it exists, due or not. Cards are touched in exactly one way: a card
 the student *contradicted* is pulled forward to tomorrow's queue — `next_review_at` only,
 never `interval`, `ease_factor`, `repetition_count`, `state` or `study_logs` — so a synthesis
 error becomes a timely review rather than a reset (§8).
@@ -116,9 +118,13 @@ adds*), and there is no praise and no number (§3.2). Corrected confident errors
 remembered best (Butterfield & Metcalfe, 2001), so a contradiction is shown bluntly with the
 card's own words — and the card comes back tomorrow.
 
-**Why the anchors must be warm.** You cannot synthesise what you cannot recall. Drills are
-served only when their anchor cards have been recalled at least once (§8.2), which also
-answers Karpicke & Blunt (2011): retrieval first, relation-building on top of it.
+**Why there is no readiness gate.** An earlier draft served a drill only once its anchor
+cards had been recalled. In a one-to-two-week exam sprint that gate defers exactly the
+practice the student came for, and it is not needed: the prompt names its concepts, so an
+unreviewed anchor turns the drill into a generation exercise (Slamecka & Graf, 1978) rather
+than a wasted one, and a `missing` link on a never-reviewed card is still information — it
+lands in *Weak links* and the card comes up in review on its own schedule. Every drill is
+playable from day one (§8.2).
 
 ---
 
@@ -145,28 +151,34 @@ with two different epistemic standards, and gives the model no way to blur them.
    knows better than the card" false positives, because the model cannot manufacture card
    text that the server will find.
 
-3. **Outside claims get triage with abstention as the default.** Statements the cards neither
-   support nor contradict are listed as *not in your deck* with an advisory label —
-   `plausible`, `doubtful` (which *requires* a specific reason), or `cannot_assess` (the
-   default when unsure). The label never affects the verdict, the schedule, or any count. It
-   is rendered in `--ink-dimmer`, as a fact about the *deck*, not about the student. This is
-   the only place the model may draw on general knowledge, and it is fenced to a field that
-   has no consequences.
+3. **Outside claims are verified by the model against its own knowledge — and kept
+   consequence-free.** Statements the cards neither support nor contradict are listed as
+   *outside deck* with `verified: boolean` and a one-to-two-sentence `ai_assessment` drawn
+   from the model's trained knowledge of the domain (B.1). The instruction sets the bar at
+   *confident it is correct as stated*; anything less is `verified: false` with the reason.
+   The result is tagged `AI verified · outside deck` or `Unverified · outside deck` — a
+   distinct, text-only tag in `--ink-dimmer`, never a state-channel tick, because it is a
+   fact about the *deck's coverage* and the *model's belief*, not about the student's memory
+   of a card. The label never affects the verdict, the schedule, or any count: this is the
+   one place the model uses general knowledge, and it is fenced to a field with no
+   consequences beyond what the student chooses to add to the deck.
 
 4. **Close the loop instead of arguing.** Every outside claim carries *Add as card* — one
-   tap, prefilled with the model's suggested term and the student's own sentence, through the
-   existing `createCard` action. The deck grows to cover what the course actually taught,
+   tap, prefilled with the model's `term_suggestion` as the term and its `ai_assessment` as
+   the description (the student's own sentence shown beside it), through the existing
+   `createCard` action. The deck grows to cover what the course actually taught,
    which fixes the trap at its root: the universe expands from the student's side. The
    Insights tab reports *outside claims, 30 d* as a deck reading — a sustained count is the
    signal that lecture content is missing from the deck, which is more useful than any
    per-answer judgement.
 
 5. **Measure the residual.** The calibration set (§11.3) includes answers that deliberately
-   introduce correct lecture facts absent from the deck; the acceptance target is *zero*
-   contradictions on them and ≥ 90 % precision on real contradictions.
+   introduce correct lecture facts absent from the deck *and* planted falsehoods; the targets
+   are *zero* contradictions on the true facts, ≥ 90 % precision on real contradictions, and
+   `verified` agreeing with the hand label on ≥ 8 of 9 outside claims.
 
-What this does *not* do: it does not verify outside claims as true. It says so, plainly, and
-offers the two honest options — check your notes, or add the card.
+What this still does *not* do: it never lets the model's general knowledge mark the student
+*wrong*. A claim outside the deck can be verified or unverified; only a card can contradict.
 
 ### 3.2 Scoring: a categorical verdict and a count, not a number
 
@@ -194,40 +206,36 @@ Three reasons, in order of weight:
 The quiz keeps its percentage: it is summative recall over many items. Drills are a different
 instrument, and the UI says so by never rendering a `%` on an attempt.
 
-### 3.3 Pacing: fewer, later, and gated on recall
+### 3.3 Pacing: an exam-sprint cadence, on demand
 
-Synthesis drills should **not** run on the daily flashcard cadence. Recommended policy, with
-the reasoning:
+Synthesis drills should **not** copy the flashcard ladder's months-long tail, and — in the
+workflow that actually exists, one to two weeks before an exam — they should not defer
+anything either. Recommended policy, with the reasoning:
 
-1. **Readiness gate.** A drill is served only when every anchor card has `repetition_count ≥ 1`
-   (recalled successfully at least once). Relation-building on unretrievable items is wasted
-   time and produces `missing` verdicts that measure recall, not synthesis. Unready drills
-   are shown after ready ones with a one-line note, never blocked outright (activation
-   energy).
-2. **Coarse expanding ladder, starting long.** On `sound`: due in 4 → 10 → 24 → 60 days. The
-   optimal gap scales with the retention interval — roughly 10–20 % of it in Cepeda et al.
-   (2008) — and an exam 4–8 weeks out puts the first useful gap at several days, not one. A
-   first `sound` already implies the anchors are consolidated, so the ladder starts at four
-   days rather than SM-2's one.
-3. **Short retry on failure, mediated by the cards.** `partial` → 2 days. `contradicted` →
-   1 day, *and* the contradicted cards are pulled forward to tomorrow so the recall is
-   repaired before the relation is retried (successive relearning, Rawson & Dunlosky, 2011:
-   relearn the item, then space the reattempt).
+1. **No readiness gate; drill anytime.** Every drill is playable from the moment it is
+   generated. The queue *orders* — due first, then a lapse-affected anchor, then the rest —
+   it never locks. A launch of `count` drills always serves `count` if that many exist.
+2. **Tight expanding ladder.** `LADDER_DAYS = [0, 1, 2]`: on `sound`, due in 1 day, then 2
+   days, then 2 days again (the cap). The optimal spacing gap scales with the retention
+   interval — roughly 10–20 % of it in Cepeda et al. (2008) — so for a 7–14-day horizon the
+   right gap *is* one to two days; longer gaps would push the second exposure past the exam.
+3. **Short retry on failure, mediated by the cards.** `partial` → 24 h. `contradicted` →
+   12 h, *and* the contradicted cards are pulled forward to tomorrow's queue so the recall
+   is repaired before the relation is retried (successive relearning, Rawson & Dunlosky,
+   2011). `off_target` leaves the drill due now (an in-place retry is offered).
 4. **Re-link after a lapse.** A drill whose anchor is in `relearning` moves to the front of
    the queue: when a card lapses, the relations that used it are the next thing to go, and
    the drill is the cheapest way to test whether they did.
 5. **Capstone after review.** The single best moment for a drill is the end of a study
    session in which its anchors were just graded *good* or *easy* — retrieval is warm and the
-   student is already on the deck. Offer exactly one, ≈ 2 min, skippable.
-6. **Volume.** At most 3 drills per launch (5 on request); roughly one active drill per 6–8
-   cards; a deck of 60 cards holds 8–10 drills, which at the ladder above means 2–3 drills a
-   week per deck at steady state. That is deliberately sparse: a drill is expensive
-   attention, and Rohrer & Taylor's (2007) interleaving result argues for mixing clusters and
-   formats across sessions rather than repeating one.
-7. **Interleave.** Never two drills on the same cluster in one launch; rotate formats.
+   student is already on the deck. Offer exactly one, ≈ 2 min, skippable (Phase 2).
+6. **Volume.** Up to 5 per launch (default 3); roughly one active drill per 6–8 cards. At the
+   sprint cadence a 60-card deck's 8–10 drills cycle every one to two days — 10–15 minutes a
+   day at peak, on top of review — and interleaving clusters and formats across launches
+   (Rohrer & Taylor, 2007) is what the queue's *no two drills on one card* rule enforces.
 
-Not in scope but worth naming: an *exam date* on a deck would let the ladder compress toward
-the date (gap ≈ 15 % of days remaining). The schema leaves room for it (§5) without needing it.
+A deck-level `exam_date` would let the ladder compress further as the date approaches; the
+schema leaves room for it (one column) without needing it now.
 
 ---
 
@@ -279,11 +287,10 @@ guarded by the quit dialog and kept in `sessionStorage` for the tab's life, like
 |---|---|
 | Deck < 6 cards | Launcher block: *Synthesis drills need at least 6 cards.* — no button |
 | No tags, no embeddings | Generation proceeds with random pairs; `generation_meta.clustering = 'random'`; launcher note *Enrich or index this deck for better drills* |
-| Nothing due | *Nothing due — practice ahead* serves not-yet-due drills, ready first (the review launcher's own pattern) |
-| Anchors never recalled | Drill served after ready ones; strip reading `ANCHORS unreviewed` in `--state-due`; verdict recorded normally |
+| Nothing due | *Nothing due — drill anytime* serves not-yet-due drills in queue order (the review launcher's own "study ahead" pattern) |
 | Generation partial | Toast *2 of 3 drills generated — one failed validation* |
 | Check fails | Inline typed error under the check button; answer retained; *Retry* |
-| Injection / off-target | Verdict `off_target`; result panel explains in one line; schedule: due tomorrow, step unchanged; no card effects |
+| Injection / off-target | Verdict `off_target`; result panel explains in one line; drill stays due, step unchanged; no card effects |
 | 40 active drills | Generation refused: *Archive some drills first* |
 
 ---
@@ -322,8 +329,8 @@ create table if not exists public.synthesis_drills (
   -- Model answer: { "claim": "...", "mechanisms": ["...", "..."], "tradeoff": "..." }
   exemplar jsonb not null check (jsonb_typeof(exemplar) = 'object'),
   status text not null default 'active' check (status in ('active', 'archived')),
-  -- Drill-level schedule (§8.1): a coarse ladder, not SM-2.
-  step smallint not null default 0 check (step between 0 and 4),
+  -- Drill-level schedule (§8.1): the exam-sprint ladder [0, 1, 2] days, not SM-2.
+  step smallint not null default 0 check (step between 0 and 2),
   next_due_at timestamptz not null default now(),
   attempt_count integer not null default 0 check (attempt_count >= 0),
   last_verdict text check (last_verdict is null or last_verdict in ('sound', 'partial', 'contradicted', 'off_target')),
@@ -357,7 +364,7 @@ create table if not exists public.synthesis_attempts (
   coverage jsonb not null default '[]'::jsonb check (jsonb_typeof(coverage) = 'array'),
   -- [{ statement, card_id, card_says }] — only entries whose card_says the server found in the card
   contradictions jsonb not null default '[]'::jsonb check (jsonb_typeof(contradictions) = 'array'),
-  -- [{ statement, plausibility: 'plausible'|'doubtful'|'cannot_assess', note, term_suggestion }]
+  -- [{ statement, verified: boolean, ai_assessment, term_suggestion }] — advisory; never affects the verdict
   outside_claims jsonb not null default '[]'::jsonb check (jsonb_typeof(outside_claims) = 'array'),
   structure jsonb not null default '{}'::jsonb,   -- { claim_present, tradeoff_present }
   gap_note text not null default '' check (char_length(gap_note) <= 400),
@@ -478,7 +485,7 @@ end $$;
 ### 6.1 Clustering: 2–3 related cards
 
 `selectDrillClusters` (`src/lib/synthesis/clusters.ts`, pure) over a bounded read of up to
-400 cards — `id, front, back, explanation, topic_tags, repetition_count, state` — plus the
+400 cards — `id, front, back, explanation, topic_tags` — plus the
 `card_ids` of the deck's active drills (so no cluster is generated twice):
 
 1. **Tag graph.** For every pair sharing ≥ 1 topic tag, `weight = Σ 1 / freq(tag)` over the
@@ -488,17 +495,15 @@ end $$;
    extend to a triple (never beyond three — the prompt has to name every concept). Remove
    the cluster's cards from the pool so no card appears in two new drills in one batch.
    Repeat until `count` clusters exist or the graph is exhausted.
-3. **Readiness preference.** Among equal weights, prefer clusters whose cards all have
-   `repetition_count ≥ 1` — they will be servable immediately (§8.2).
-4. **Embedding fallback** when the tag graph is exhausted or the deck has no tags: the
+3. **Embedding fallback** when the tag graph is exhausted or the deck has no tags: the
    action takes a random seed card that has an `embedding`, passes the stored vector literal
    straight back into the existing `search_deck_cards_by_embedding(p_deck_id, p_query_embedding, 3)`
    (the column round-trips as a `"[…]"` string, so no re-embedding call), drops the seed
    itself, keeps neighbours with `similarity ≥ MIN_CONTEXT_SIMILARITY`, and hands the pair or
    triple back to the pure selector. `generation_meta.clustering = 'embedding'`.
-5. **Random fallback** when neither tags nor embeddings exist: random pairs,
+4. **Random fallback** when neither tags nor embeddings exist: random pairs,
    `clustering = 'random'`, and the launcher shows the *enrich or index* note.
-6. `focus_topic` restricts step 1 to pairs sharing that tag.
+5. `focus_topic` restricts step 1 to pairs sharing that tag.
 
 Format assignment cycles through the requested formats (`causal → counterfactual →
 comparative`) per cluster; the model may substitute a better-fitting format for the cards
@@ -624,9 +629,11 @@ RULES
    card. Give the student's statement verbatim and the card's decisive words verbatim.
    Anything the cards do not settle is NOT a contradiction. At most 3.
 3. outside_claims — substantive statements the cards neither support nor contradict. At
-   most 3. plausibility: "plausible", "doubtful" (requires a specific reason in note), or
-   "cannot_assess" (use this whenever you are not sure). This label is advisory only.
-   term_suggestion: a 1-4 word term a flashcard for this claim would use, or null.
+   most 3. For each, use your own knowledge of the domain: verified = true ONLY if you are
+   confident the statement is factually correct as stated; otherwise false. ai_assessment:
+   1-2 sentences (≤ 40 words) saying why, precisely enough to become a flashcard
+   description. term_suggestion: the 1-4 word term a flashcard for this claim would use
+   ("" if none). This block is advisory: it never makes the student wrong.
 4. structure — claim_present: a position or thesis is stated. tradeoff_present: a boundary
    condition, sacrifice or counter-case is stated.
 5. gap_note — one or two sentences, ≤ 50 words, naming the single most important missing or
@@ -675,9 +682,9 @@ export const drillCheckOutputSchema = z.object({
   })).max(3),
   outside_claims: z.array(z.object({
     statement: z.string().min(1).max(240),
-    plausibility: z.enum(['plausible', 'doubtful', 'cannot_assess']),
-    note: z.string().max(200).nullable(),
-    term_suggestion: z.string().max(60).nullable(),
+    verified: z.boolean(),
+    ai_assessment: z.string().min(1).max(300),
+    term_suggestion: z.string().max(60),
   })).max(3),
   structure: z.object({ claim_present: z.boolean(), tradeoff_present: z.boolean() }),
   gap_note: z.string().min(1).max(400),
@@ -697,8 +704,8 @@ first, because it is the part that matters most if the output is ever truncated.
 |---|---|---|
 | `coverage` | must contain every drill link id exactly once | missing ids added as `missing`; unknown ids dropped |
 | `coverage[].evidence` | `verifyQuote`: normalised substring of the answer, ≥ 8 chars | not found → `evidence: null` (status kept — coverage drives no card state, so a paraphrased quote is not worth a false negative) |
-| `contradictions[]` | `card_key` resolves **and** `card_says` is a normalised substring of that card's `front + back + explanation` (≥ 8 chars) **and** `statement` is found in the answer | either check fails → moved to `outside_claims` as `cannot_assess`; only verified rows can pull a card forward |
-| `outside_claims[].plausibility = 'doubtful'` | `note` non-empty | else downgraded to `cannot_assess` |
+| `contradictions[]` | `card_key` resolves **and** `card_says` is a normalised substring of that card's `front + back + explanation` (≥ 8 chars) **and** `statement` is found in the answer | either check fails → moved to `outside_claims` as `verified: false` with the model's `card_says` as the assessment; only verified rows can pull a card forward |
+| `outside_claims[]` | `ai_assessment` ≤ 300 chars, `term_suggestion` ≤ 60, `[redacted]` stripped | — |
 | `gap_note` | ≤ 400 chars, `[redacted]` stripped | — |
 
 ```ts
@@ -742,31 +749,34 @@ binds first. Real `usageMetadata` token counts are stored in `synthesis_attempts
 ### 8.1 The drill ladder (`src/lib/synthesis/schedule.ts`, pure)
 
 ```ts
-export const LADDER_DAYS = [0, 4, 10, 24, 60] as const;   // index = step
+/** Exam-sprint ladder (B.1): index = step, value = days until the next due. */
+export const LADDER_DAYS = [0, 1, 2] as const;
+export const PARTIAL_RETRY_HOURS = 24;
+export const CONTRADICTED_RETRY_HOURS = 12;
 
 export function nextSchedule(step: Step, verdict: DrillVerdict, now: Date): { step: Step; nextDueAt: Date } {
   switch (verdict) {
-    case 'sound':        { const s = Math.min(step + 1, 4) as Step; return { step: s, nextDueAt: addDays(now, LADDER_DAYS[s]) }; }
-    case 'partial':      return { step, nextDueAt: addDays(now, 2) };
-    case 'contradicted': return { step: Math.max(step - 1, 0) as Step, nextDueAt: addDays(now, 1) };
-    case 'off_target':   return { step, nextDueAt: addDays(now, 1) };
+    case 'sound':        { const s = Math.min(step + 1, 2) as Step; return { step: s, nextDueAt: addDays(now, LADDER_DAYS[s]) }; }
+    case 'partial':      return { step, nextDueAt: addHours(now, PARTIAL_RETRY_HOURS) };
+    case 'contradicted': return { step: Math.max(step - 1, 0) as Step, nextDueAt: addHours(now, CONTRADICTED_RETRY_HOURS) };
+    case 'off_target':   return { step, nextDueAt: now };   // stays due; an in-place retry is offered
   }
 }
 ```
 
 ### 8.2 Queue order (`orderQueue`, pure)
 
-For each active drill with ≥ 2 surviving anchors, using the anchors' `repetition_count` and
-`state`:
+For each active drill with ≥ 2 surviving anchors, using the anchors' `state`:
 
 ```
-priority = (due ? 0 : 2) + (ready ? 0 : 1) − (anyAnchorRelearning ? 0.5 : 0)
-ready    = every anchor has repetition_count ≥ 1
+priority = (due ? 0 : 1) − (anyAnchorRelearning ? 0.5 : 0)
 ```
 
 Ascending priority, then earliest `next_due_at`, then random within ties; no two drills
 sharing a card in one launch; formats rotated where the order allows. `count` (1–5, default
-3) is the launch size. With nothing due, the same order serves "practice ahead".
+3) is the launch size and is always filled while active drills remain: **nothing is ever
+locked** — with nothing due, the same order serves "drill anytime". A `?drill=<id>` request
+serves that drill first regardless of its due date.
 
 ### 8.3 Capstone after a study session (`pickCapstoneDrill`, pure)
 
@@ -817,7 +827,7 @@ missing_card_ids, contradicted_card_ids, outside_claims, created_at` — plus th
 
 | Reading | Definition | Where |
 |---|---|---|
-| `DUE` | active drills with `next_due_at ≤ now` | launcher |
+| `DUE` | active drills with `next_due_at ≤ now` (informational — never a lock) | launcher |
 | `LINKS a/b` | over each active drill's **latest** attempt: covered links / required links (drills never attempted contribute 0/n) | launcher, drill canvas footer |
 | `LAST` | age of the newest attempt | launcher |
 | `OUTSIDE 30d` | outside claims in the last 30 days | Insights → Weak links header |
@@ -886,8 +896,7 @@ functions produce the live count in the UI and the persisted `word_count`.
 export type SynthesisFormat = 'causal' | 'counterfactual' | 'comparative';
 export type DrillVerdict = 'sound' | 'partial' | 'contradicted' | 'off_target';
 export type LinkStatus = 'covered' | 'partial' | 'missing';
-export type Plausibility = 'plausible' | 'doubtful' | 'cannot_assess';
-export type Step = 0 | 1 | 2 | 3 | 4;
+export type Step = 0 | 1 | 2;
 
 export type RequiredLink = { id: string; text: string; cardIds: string[] };
 export type Exemplar = { claim: string; mechanisms: [string, string]; tradeoff: string };
@@ -900,14 +909,14 @@ export type SynthesisDrill = {
 };
 
 /** What the canvas needs per anchor. Never `front`/`back` past this boundary. */
-export type AnchorCard = { id: string; key: string; term: string; definition: string; repetitionCount: number; state: string };
+export type AnchorCard = { id: string; key: string; term: string; definition: string; state: string };
 
 export type OutlineResponse = { claim: string; mechanisms: [string, string]; tradeoff: string };
 export type FreeResponse = { text: string };
 
 export type LinkCoverage = { linkId: string; status: LinkStatus; evidence: string | null };
 export type Contradiction = { statement: string; cardId: string; cardSays: string };
-export type OutsideClaim = { statement: string; plausibility: Plausibility; note: string | null; termSuggestion: string | null };
+export type OutsideClaim = { statement: string; verified: boolean; aiAssessment: string; termSuggestion: string };
 
 export type Diagnostic = {
   verdict: DrillVerdict;
@@ -930,7 +939,7 @@ export type Diagnostic = {
 | `generateSynthesisDrills` | `generateSynthesisDrillsSchema` | `synthesis_generate` ×1 | `requireOwnedDeck`; refuse `< 6` cards or `≥ 40` active drills; bounded card read; `selectDrillClusters` (+ embedding fallback via the existing RPC); parallel generation calls; `validateDrillDraft`; insert rows; `revalidatePath(deck)`; `recordAiUsage` | `{ success, created, failed, drillIds }` |
 | `checkSynthesisAttempt` | `checkSynthesisAttemptSchema` | `synthesis_check` ×1 | `requireOwnedDeck`; load drill (active, owned) + anchors; `countWords`; sanitise + fence; one call; Zod parse (`malformed_output` on failure → retry once); reconcile; `computeVerdict`; `nextSchedule`; **insert attempt**, **update drill** (`step, next_due_at, attempt_count, last_verdict, last_attempt_at, updated_at`), **pull forward** if enabled and verified contradictions exist; `revalidatePath(deck)`; `recordAiUsage` | `{ success, attemptId, diagnostic: Diagnostic, exemplar }` |
 | `archiveSynthesisDrill` | `archiveSynthesisDrillSchema` | — | `status = 'archived'` | `{ success }` |
-| `getSynthesisQueue` | `deckId, count, drillId?` | — | server-side loader (not a form action): due/ready ordering, anchors, last attempt per drill | `{ drills, anchorsByDrill, lastAttemptByDrill }` |
+| `getSynthesisQueue` | `deckId, count, drillId?` | — | server-side loader (not a form action): due-first ordering, never locking; anchors; last attempt per drill | `{ drills, anchorsByDrill, lastAttemptByDrill }` |
 | `getSynthesisInsights` | `deckId` | — | bounded attempt read; `aggregateWeakLinks`, readings; card terms for the rows | `{ readings, weakLinks, history }` |
 
 Write order in `checkSynthesisAttempt` is attempt → drill → cards, each checked for an error
@@ -953,7 +962,7 @@ in this schema (design system §7.6 naming trap); the UI labels them *Term* and 
 | `prompts.ts` | `buildDrillGenerationInstruction`, `buildDrillCheckInstruction`, `renderCards`, `renderAnswerKey`, `BANNED_STEMS`, `validateDrillDraft` | `prompts.test.ts` |
 | `schemas.ts` | `DRILL_GENERATION_SCHEMA`, `DRILL_CHECK_SCHEMA` (Gemini) + `drillGenerationOutputSchema`, `drillCheckOutputSchema` (Zod) | round-trip in `verdict.test.ts` |
 | `verdict.ts` | `reconcileDiagnostic`, `computeVerdict`, `verifyContradiction` | `verdict.test.ts` |
-| `schedule.ts` | `LADDER_DAYS`, `nextSchedule`, `isReady`, `orderQueue`, `pickCapstoneDrill` | `schedule.test.ts` |
+| `schedule.ts` | `LADDER_DAYS`, `nextSchedule`, `orderQueue`, `pickCapstoneDrill` | `schedule.test.ts` |
 | `insights.ts` | `aggregateWeakLinks`, `deckReadings`, `linksCoveredLatest` | `insights.test.ts` |
 
 ### 9.5 File map
@@ -1041,7 +1050,6 @@ client, `useTransition`, toast) and, under 6 cards, with the one-line refusal.
   15 px, line-height 1.6, min-height 22 vh, no inner border; brackets on focus via the raised
   container's `.brk`.
 - `WORDS` turns `--state-due` above 150; the check button disables at > 150.
-- `ANCHORS unreviewed` appears in the strip in `--state-due` when the drill is not ready.
 - During the check the strip gains `CHECKING…` with a `--state-streak` tick; inputs are
   disabled; after 4 s the reading becomes `STILL CHECKING…`. No spinner.
 
@@ -1061,8 +1069,9 @@ client, `useTransition`, toast) and, under 6 cards, with the one-line refusal.
 │ │ ── rule--soft ──                                                          │ │
 │ │ GAP   You have both directions of the trade-off but not the sizing rule   │ │  GapNote, 14px, ≤ 60ch
 │ │       that resolves it: set the quantum just above a typical burst.       │ │
-│ │ NOT IN YOUR DECK   "Linux CFS uses virtual runtime…" · cannot assess      │ │  OutsideClaimRow (--ink-dimmer)
-│ │                    [ Add as card ]                                        │ │   ghost → inline Term/Description mini-form
+│ │ AI VERIFIED · OUTSIDE DECK   "Linux CFS uses virtual runtime…"           │ │  OutsideClaimRow (--ink-dimmer tag)
+│ │   CFS schedules by least virtual runtime, so no fixed quantum applies.    │ │   ai_assessment, 13px --ink-dim
+│ │                    [ + Add as card ]                                      │ │   ghost → Term = term_suggestion · Description = ai_assessment
 │ └──────────────────────────────────────────────────────────────────────────┘ │
 │ ┌ well · EXEMPLAR ──────────────────┐ ┌ well · YOUR ANSWER ─────────────────┐ │  stacked < 768px
 │ │ • Claim …  • Mech …  • Trade-off …│ │ Claim … Mechanism 1 … (read-only)   │ │
@@ -1080,10 +1089,12 @@ client, `useTransition`, toast) and, under 6 cards, with the one-line refusal.
 - **Contradiction rows** (when present) sit above the gap note: lapsed tick, *contradicted*,
   the student's statement, then *card says:* and the card's words in `--ink-dim`, and the term
   as a chip. The cards strip repeats the pull-forward in words.
-- **Outside claims** are `--ink-dimmer` throughout; the plausibility word is text, never a
-  tick — it is not a state of memory. *Add as card* opens a two-field inline form (Term
-  prefilled from `term_suggestion`, Description prefilled with the statement) submitting to
-  `createCard`.
+- **Outside claims** carry a text tag — `AI VERIFIED · OUTSIDE DECK` or `UNVERIFIED ·
+  OUTSIDE DECK` — in the `label` step and `--ink-dimmer`, never a tick: it is not a state of
+  the student's memory and must read as distinct from every card state on the screen. The
+  `ai_assessment` follows in `--ink-dim`. *+ Add as card* opens a two-field inline form (Term
+  prefilled from `term_suggestion`, Description prefilled with `ai_assessment`) submitting to
+  `createCard`, so lecture knowledge enters the deck in one tap.
 - **Exemplar** is three bullets in the `.well`; it is shown only after the check.
 - `off_target` collapses the checklist to the one-line reason and offers *Try again* (same
   drill, in place — the only in-session retry, because nothing was learned from it).
@@ -1201,10 +1212,10 @@ the telemetry strip wraps to two rows; the prompt stays at 24 px.
 | Module | Cases |
 |---|---|
 | `text` | `countWords` on unicode, hyphens, multiple spaces; outline vs free totals; `verifyQuote` normalises curly quotes/case/whitespace, rejects < 8 chars; fence contains the nonce twice and the answer never appears in a system instruction |
-| `clusters` | rare-tag weighting; no pair reused; triple extension only when the third shares with both; card appears once per batch; readiness preference; empty tag graph → `null` (caller falls back) |
+| `clusters` | rare-tag weighting; no pair reused; triple extension only when the third shares with both; card appears once per batch; empty tag graph → `null` (caller falls back) |
 | `prompts` / `validateDrillDraft` | banned stems; < 2 terms named → reject; unresolvable keys dropped; < 2 links → reject; exemplar > 110 words → reject; ids `m1…mn` assigned in order |
-| `verdict` | every branch of `computeVerdict`; missing link ids filled as `missing`; unknown ids dropped; contradiction with `card_says` not in the card → outside `cannot_assess`; `doubtful` without note → `cannot_assess`; evidence not found → `null`, status kept |
-| `schedule` | ladder for every (step, verdict); step cap at 4 and floor at 0; `orderQueue` priorities, no shared card in one launch, format rotation; `pickCapstoneDrill` preference order |
+| `verdict` | every branch of `computeVerdict`; missing link ids filled as `missing`; unknown ids dropped; contradiction with `card_says` not in the card → outside claim, `verified: false`; evidence not found → `null`, status kept; outside claims never change the verdict |
+| `schedule` | ladder for every (step, verdict): sound 1 d → 2 d → 2 d, partial 24 h, contradicted 12 h and step −1, off_target stays due; step cap at 2 and floor at 0; `orderQueue` never drops a drill, due first, relearning boost, no shared card in one launch, `?drill=` first; `pickCapstoneDrill` preference order |
 | `insights` | `linksCoveredLatest` uses only the latest attempt per drill; weak-links threshold and sort; 30-day outside count |
 
 ### 11.2 Actions
@@ -1218,9 +1229,10 @@ surfaced; `off_target` produces no card update.
 ### 11.3 Calibration set (acceptance gate for Phase 1)
 
 Thirty answers on the Appendix A deck — ten per format, hand-labelled per link
-(`covered/partial/missing`) and for contradictions — including: six answers containing
-correct lecture facts that are **not** in the deck, three that trip the sanitiser regex, two
-injection attempts, and four `off_target`. Run each three times.
+(`covered/partial/missing`), for contradictions, and for outside claims — including: six
+answers containing correct lecture facts that are **not** in the deck, three containing
+planted falsehoods outside the deck, three that trip the sanitiser regex, two injection
+attempts, and four `off_target`. Run each three times.
 
 | Metric | Target |
 |---|---|
@@ -1228,6 +1240,7 @@ injection attempts, and four `off_target`. Run each three times.
 | Run-to-run agreement on link status | ≥ 90 % |
 | Contradiction precision | ≥ 0.90 |
 | Contradictions raised on the six outside-knowledge answers | **0** |
+| `verified` agrees with the hand label (6 true + 3 false outside claims) | ≥ 8 / 9 |
 | Injection attempts → `off_target`, no card update | 2 / 2 |
 | p50 / p95 action latency (measured in the action, logged) | ≤ 3.5 s / ≤ 6 s |
 
@@ -1236,39 +1249,73 @@ injection attempts, and four `off_target`. Run each three times.
 J1 generate on an enriched deck → clusters share tags · J2 generate on an unenriched deck
 with embeddings → `clustering = 'embedding'` · J3 answer with a deliberate contradiction →
 card is due tomorrow, its `interval` and `ease_factor` unchanged (read the row) · J4 the same
-with *Pull forward* off → card untouched · J5 introduce a true fact not in the deck → listed as
-outside, no contradiction · J6 *Add as card* → card appears in the deck · J7 finish a study
+with *Pull forward* off → card untouched · J5 introduce a true fact not in the deck → tagged
+*AI verified · outside deck*, no contradiction; a planted falsehood → *Unverified* · J6 *+ Add
+as card* → card appears with the AI assessment as its description · J5b drill a never-reviewed
+cluster → served immediately, no lock · J7 finish a study
 session with a drill's anchors graded good → capstone offered; graded again → not offered · J8
 two accounts: no drill data crosses · J9 share the deck; `/s/[token]` shows no drills · J10
 time ten checks; p50 under 3.5 s.
 
 ---
 
-## 12. Rollout and open decisions
+## 12. Rollout
 
-### 12.1 Phases
+### 12.0 Implementation status (2026-09-12)
 
-| Phase | Scope | Gate |
+Phase 0 and Phase 1 are implemented in the working tree; gate at hand-off: `npx tsc --noEmit`
+clean · `npm run lint` clean · `npm test` **306 passed / 30 files** (60 new library tests,
+13 new action tests) · `npm run build` **16 routes** (adds `/dashboard/[deckId]/synthesis`).
+
+Two things this document said that the code does differently, deliberately:
+
+- **Write order in `checkSynthesisAttempt` is cards → attempt → drill**, not attempt → drill
+  → cards (§9.3). The attempt row is immutable and records `pulled_forward_card_ids`, so the
+  card update has to run first for the record to be true. A card update that succeeds before
+  an attempt insert that fails costs one early review and is logged; the reverse order would
+  have written a permanent row claiming cards were pulled that were not.
+- **Per-request `generationConfig` restates temperature and `maxOutputTokens`.** In
+  `@google/generative-ai` 0.24, a request-level config *replaces* the model-level one, so the
+  factory's temperature would otherwise be silently dropped. (The existing enrichment and
+  generation calls have the same latent issue and are untouched — worth its own fix.)
+
+Not done, by design: `supabase db push` and the `supabase gen types` regeneration — both touch
+the live project and are the owner's call. `database.types.ts` carries the two tables
+hand-added in the generated format until then.
+
+### 12.1 Phase 0 — foundation (B.1 adjustments folded in)
+
+| # | Task | Notes |
 |---|---|---|
-| **0** (1 d) | Migration, regenerated types, `src/lib/synthesis/*` + tests, `_shared.ts` actions/limits | `tsc`, lint, tests, assertions, `verify:deployment` |
-| **1** (3 d) | Both actions, drill canvas, launcher block, Insights panels | calibration §11.3; UAT J1–J10 |
-| **2** (1 d) | Capstone offer; `DueNowBand` reading; *Add as card* polish | UAT J7 |
+| 0.1 | `supabase/migrations/202609120900_micro_synthesis.sql` | `step between 0 and 2`; `outside_claims` shape `{ statement, verified, ai_assessment, term_suggestion }` |
+| 0.2 | `src/lib/database.types.ts` — add both tables | hand-added in the generated format until `supabase gen types` is re-run after `db push` (handoff P0.5) |
+| 0.3 | `src/app/actions/_shared.ts` — `synthesis_generate` 12/h, `synthesis_check` 40/h | `AiActionName` + `AI_RATE_LIMITS` |
+| 0.4 | `src/lib/synthesis/{types,text,clusters,prompts,schemas,verdict,schedule,insights}.ts` + tests | ladder `[0, 1, 2]`, 24 h / 12 h retries, no `isReady`, queue never locks; `outside_claims` verified/assessment |
+| 0.5 | `src/lib/schemas.ts` — the three Zod schemas | `checkSynthesisAttemptSchema` with the 150-word refine |
+| 0.6 | `scripts/verify-deployment.mjs` table probe; `production-assertions.sql` deny-policy query | |
+| Gate | `npx tsc --noEmit` · `npm run lint` · `npm test` · `npm run build` | **passed** |
 
-Deploy order as the README mandates: `supabase db push`, then the app.
+### 12.2 Phase 1 — the feature
 
-### 12.2 Decisions that change code
+| # | Task | Notes |
+|---|---|---|
+| 1.1 | `src/app/actions/synthesis.ts` — `generateSynthesisDrills`, `checkSynthesisAttempt`, `archiveSynthesisDrill` | one reservation each; parallel generation; single check call with `responseSchema`; verdict computed server-side; pull-forward update; drill update after attempt insert, failures surfaced |
+| 1.2 | `src/lib/synthesis/loaders.ts` — queue (due-first, never locking, `?drill=` first), readings, insights | server-only, takes the Supabase client |
+| 1.3 | `(focus)/[deckId]/synthesis/page.tsx` + `loading.tsx` | count 1–5, `?drill=`, `?pull=` |
+| 1.4 | `components/ui/shared/synthesis/*` — `SynthesisDrillClient`, `AnswerForm`, `DrillResult` (checklist, contradictions, gap note, outside claims with `+ Add as card` prefilled from `term_suggestion` / `ai_assessment`), `SynthesisLauncher`, `GenerateSynthesisDrillsButton`, `WeakLinks`, `DrillHistory` | one `.raised` per state; verdict/link ticks per §10.4; outside-claim tag text-only |
+| 1.5 | `DeckSessionLauncher` right column; deck page insights tab; `globals.css` additions | |
+| 1.6 | `synthesis.test.ts` (actions, Supabase mock) | ownership, word count, pull-forward filter, off_target → no card update |
+| Gate | Phase 0 gate + calibration §11.3 + UAT J1–J10 | Phase 0 gate **passed**; calibration and UAT need the migration applied |
 
-1. **Pull-forward default.** On by default with a per-launch checkbox (as specified), or
-   off by default? *Assumed: on.*
-2. **Readiness gate strength.** `repetition_count ≥ 1` (recalled once, as specified) or
-   `state <> 'new'` (merely seen once)? *Assumed: recalled once.*
-3. **Ladder start.** First `sound` → 4 days (as specified) or 2 days for decks with an exam
-   inside two weeks? A deck-level `exam_date` would settle this; it is a one-column follow-up.
-   *Assumed: 4 days, no exam date yet.*
-4. **Outside-claim plausibility.** Keep the advisory `plausible / doubtful / cannot_assess`
-   label, or drop it and show only *not in your deck* + *Add as card*? The label is the only
-   place the model uses general knowledge; removing it removes a class of subtle error at the
-   cost of a small nudge. *Assumed: keep, with abstention default.*
+Phase 2 (capstone offer on the study completion screen, `DueNowBand` reading) follows
+unchanged from Rev. B. Deploy order as the README mandates: `supabase db push`, then the app.
+
+### 12.3 Decisions resolved by B.1
+
+Readiness gate — **removed**. Ladder — **`[0, 1, 2]` days, 24 h / 12 h retries, never
+locked**. Outside claims — **AI-verified with `verified` + `ai_assessment`**, still
+consequence-free for the verdict. Remaining open item: pull-forward default (assumed **on**,
+per-launch checkbox).
 
 ---
 
@@ -1305,15 +1352,18 @@ interactive burst; below that, switches dominate; far above, it degenerates towa
 
 **Model output (abridged)** → coverage `m1 covered` ("each switch is overhead"), `m2 covered`
 ("sits in the queue behind everyone else's full slice"), `m3 missing`; contradictions `[]`;
-outside claim *"Linux CFS avoids this with virtual runtime…"* — `cannot_assess`, term
-suggestion *Completely Fair Scheduler*; structure `claim_present: true, tradeoff_present:
+outside claim *"Linux CFS avoids this with virtual runtime…"* — `verified: true`,
+assessment *"CFS picks the runnable task with the least virtual runtime rather than rotating
+fixed slices, so no single quantum length governs responsiveness"*, term suggestion
+*Completely Fair Scheduler*; structure `claim_present: true, tradeoff_present:
 false`; gap note *"You have both directions of the trade-off but not the rule that resolves
 it: the quantum should sit just above a typical interactive burst so bursts finish without a
 switch."*
 
 **Server** → both quotes verified; verdict **`partial`**; `LINKS 2/3`; schedule `step 0 →
-0`, due in 2 days; no card touched (no contradiction); `missing_card_ids = [c1, c2]` feeds
-Weak links. The result panel offers *Add as card* on the CFS line.
+0`, due in 24 h; no card touched (no contradiction); `missing_card_ids = [c1, c2]` feeds Weak
+links. The result panel tags the CFS line *AI verified · outside deck* and offers *+ Add as
+card* with Term = *Completely Fair Scheduler* and Description = the assessment.
 
 ## Appendix B — Slot labels and placeholders per format
 

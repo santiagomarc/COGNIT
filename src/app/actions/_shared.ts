@@ -13,7 +13,9 @@ export type AiActionName =
   | 'generate_mnemonic'
   | 'chat_with_deck'
   | 'sync_embeddings'
-  | 'semantic_search';
+  | 'semantic_search'
+  | 'synthesis_generate'
+  | 'synthesis_check';
 
 const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests: number }> = {
   generate_cards: { windowMinutes: 60, maxRequests: 20 },
@@ -26,6 +28,10 @@ const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests:
   // so a large deck needs several calls per sync — this limit must accommodate that.
   sync_embeddings: { windowMinutes: 60, maxRequests: 40 },
   semantic_search: { windowMinutes: 60, maxRequests: 60 },
+  // One reservation generates up to 5 drills (≈ $0.007); one check is a single
+  // ≈ 1.2k-token call (≈ $0.001) — spec §6.4 / §7.6.
+  synthesis_generate: { windowMinutes: 60, maxRequests: 12 },
+  synthesis_check: { windowMinutes: 60, maxRequests: 40 },
 };
 
 function getGeminiClient() {

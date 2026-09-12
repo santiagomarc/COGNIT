@@ -481,6 +481,164 @@ export type Database = {
           },
         ]
       }
+      synthesis_attempts: {
+        Row: {
+          contradicted_card_ids: string[]
+          contradictions: Json
+          coverage: Json
+          created_at: string
+          deck_id: string
+          drill_id: string
+          duration_ms: number
+          gap_note: string
+          id: string
+          integrity: Json
+          missing_card_ids: string[]
+          mode: string
+          model: string
+          outside_claims: Json
+          pulled_forward_card_ids: string[]
+          response: Json
+          structure: Json
+          usage: Json
+          user_id: string
+          verdict: string
+          word_count: number
+        }
+        Insert: {
+          contradicted_card_ids?: string[]
+          contradictions?: Json
+          coverage?: Json
+          created_at?: string
+          deck_id: string
+          drill_id: string
+          duration_ms?: number
+          gap_note?: string
+          id?: string
+          integrity?: Json
+          missing_card_ids?: string[]
+          mode: string
+          model: string
+          outside_claims?: Json
+          pulled_forward_card_ids?: string[]
+          response: Json
+          structure?: Json
+          usage?: Json
+          user_id: string
+          verdict: string
+          word_count: number
+        }
+        Update: {
+          contradicted_card_ids?: string[]
+          contradictions?: Json
+          coverage?: Json
+          created_at?: string
+          deck_id?: string
+          drill_id?: string
+          duration_ms?: number
+          gap_note?: string
+          id?: string
+          integrity?: Json
+          missing_card_ids?: string[]
+          mode?: string
+          model?: string
+          outside_claims?: Json
+          pulled_forward_card_ids?: string[]
+          response?: Json
+          structure?: Json
+          usage?: Json
+          user_id?: string
+          verdict?: string
+          word_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synthesis_attempts_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "synthesis_attempts_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "synthesis_drills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      synthesis_drills: {
+        Row: {
+          attempt_count: number
+          card_ids: string[]
+          created_at: string
+          deck_id: string
+          exemplar: Json
+          format: string
+          generation_meta: Json
+          id: string
+          last_attempt_at: string | null
+          last_verdict: string | null
+          next_due_at: string
+          prompt_text: string
+          required_links: Json
+          status: string
+          step: number
+          topic_tag: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          card_ids: string[]
+          created_at?: string
+          deck_id: string
+          exemplar: Json
+          format: string
+          generation_meta?: Json
+          id?: string
+          last_attempt_at?: string | null
+          last_verdict?: string | null
+          next_due_at?: string
+          prompt_text: string
+          required_links: Json
+          status?: string
+          step?: number
+          topic_tag?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          card_ids?: string[]
+          created_at?: string
+          deck_id?: string
+          exemplar?: Json
+          format?: string
+          generation_meta?: Json
+          id?: string
+          last_attempt_at?: string | null
+          last_verdict?: string | null
+          next_due_at?: string
+          prompt_text?: string
+          required_links?: Json
+          status?: string
+          step?: number
+          topic_tag?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synthesis_drills_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

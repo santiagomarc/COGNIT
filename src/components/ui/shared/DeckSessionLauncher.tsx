@@ -2,7 +2,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Kbd } from '@/components/ui/Kbd';
 import { DeckReviewHotkey } from '@/components/ui/shared/DeckReviewHotkey';
+import { SynthesisLauncher } from '@/components/ui/shared/synthesis/SynthesisLauncher';
 import type { getSessionCardBounds } from '@/lib/study';
+import type { SynthesisReadings } from '@/lib/synthesis/types';
 
 type SessionBounds = ReturnType<typeof getSessionCardBounds>;
 
@@ -14,6 +16,8 @@ type DeckSessionLauncherProps = {
   unprovenCards: number;
   estimatedMinutes: number;
   sessionBounds: SessionBounds;
+  /** The synthesis block's readings (COGNIT_MICRO_SYNTHESIS_SPEC.md §10.2). */
+  synthesisReadings: SynthesisReadings;
 };
 
 const SCOPE_OPTIONS = [
@@ -55,6 +59,7 @@ export function DeckSessionLauncher({
   unprovenCards,
   estimatedMinutes,
   sessionBounds,
+  synthesisReadings,
 }: DeckSessionLauncherProps) {
   const hasDue = dueCount > 0;
 
@@ -141,11 +146,17 @@ export function DeckSessionLauncher({
         </div>
       </form>
 
+      {/*
+        The right column holds the two secondary destinations, quiz and
+        synthesis drills, stacked as flat `.surface` forms. The review form
+        stays the page's one `.raised` object.
+      */}
+      <div className="flex flex-col gap-4 lg:w-[322px] lg:shrink-0">
       {/* ── Quiz ── */}
       <form
         action={`/dashboard/${deckId}/quiz`}
         method="get"
-        className="surface flex flex-col p-4 lg:w-[322px] lg:shrink-0 lg:p-5"
+        className="surface flex flex-col p-4 lg:p-5"
       >
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
@@ -192,6 +203,10 @@ export function DeckSessionLauncher({
           </Button>
         </fieldset>
       </form>
+
+      {/* ── Synthesis drills ── */}
+      <SynthesisLauncher deckId={deckId} readings={synthesisReadings} cardCount={totalCards} />
+      </div>
     </section>
   );
 }

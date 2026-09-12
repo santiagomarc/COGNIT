@@ -62,9 +62,27 @@ from pg_policies
 where schemaname = 'public'
   and tablename in (
     'study_logs', 'quiz_results', 'quiz_card_results',
-    'card_mastery_state', 'deck_chat_messages', 'deck_chat_sessions'
+    'card_mastery_state', 'deck_chat_messages', 'deck_chat_sessions',
+    'synthesis_drills', 'synthesis_attempts'
   )
 order by tablename, cmd;
+
+-- 7. Micro-synthesis history is append-only: synthesis_attempts must carry
+--    BOTH deny policies. Expect exactly two rows, each with qual = false
+--    (and with_check = false on the UPDATE row).
+select tablename, policyname, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename = 'synthesis_attempts'
+  and cmd in ('UPDATE', 'DELETE')
+order by cmd;
+
+-- 8. No synthesis table may have a shared/public policy. Zero rows expected.
+select tablename, policyname
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('synthesis_drills', 'synthesis_attempts')
+  and (policyname ilike '%shared%' or policyname ilike '%public%');
 
 -- ── Query plans ────────────────────────────────────────────────────
 -- Substitute a real deck id. Expect "Index Scan using
