@@ -49,7 +49,7 @@ The codebase is healthy at the "does it compile and pass its own tests" level. E
                                        │                    │
                         ┌──────────────▼──────┐   ┌─────────▼───────────┐
                         │ Supabase Postgres   │   │ Google Generative AI│
-                        │  · RLS on 9 tables  │   │  · gemini-2.5-flash │
+                        │  · RLS on 9 tables  │   │  · gemini-3.5-flash │
                         │  · 10 RPCs (SECURITY│   │  · text-embedding-  │
                         │    INVOKER)         │   │    004  (768-dim)   │
                         │  · pgvector ivfflat │   └─────────────────────┘
@@ -1418,7 +1418,7 @@ Also drop generation temperature for extraction work. `_shared.ts:44` uses `0.4`
 export function getGeminiJsonModel(options?: { temperature?: number }) {
   const genai = getGeminiClient();
   return genai.getGenerativeModel({
-    model: process.env.GEMINI_MODEL ?? 'gemini-2.5-flash',
+    model: process.env.GEMINI_MODEL ?? 'gemini-3.5-flash-lite',
     generationConfig: {
       // 0.1 for extraction/enrichment: same PDF should yield the same cards.
       temperature: options?.temperature ?? 0.1,
@@ -2068,7 +2068,7 @@ NEXT_PUBLIC_SITE_URL=https://cognit.app
 
 # Google AI Studio — server-only, never NEXT_PUBLIC_*
 GEMINI_API_KEY=<key>
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.5-flash-lite
 GEMINI_EMBEDDING_MODEL=text-embedding-004
 GEMINI_MODEL_MAX_TOKENS=4096
 
@@ -2086,7 +2086,7 @@ import { z } from 'zod';
 
 const serverEnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required for AI features'),
-  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'),
   GEMINI_EMBEDDING_MODEL: z.string().default('text-embedding-004'),
   GEMINI_MODEL_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
   CRON_SECRET: z.string().min(16).optional(),
