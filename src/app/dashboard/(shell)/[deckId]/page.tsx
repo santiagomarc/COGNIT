@@ -185,10 +185,10 @@ async function loadTopTopics(
 /**
  * The deck's SM-2 state, deck-wide (Run 6, Task 3.4).
  *
- * Two narrow columns and a bounded row count, bucketed in Node — the same
- * trade the dashboard's card projection makes, and for the same reason: there
- * is no RPC that reports this shape, and four HEAD counts would be four
- * round-trips for one bar.
+ * `get_deck_schedule_breakdown` counts the four buckets in Postgres and
+ * returns one row. The row-based path below — every card's `state` and
+ * `next_review_at` shipped to Node and bucketed here — is kept only as the
+ * fallback for an environment where that migration has not been applied.
  *
  * `new` is a real bucket rather than a leftover: the schema defaults
  * `next_review_at` to `now()`, so a never-studied card looks due unless its
@@ -201,6 +201,22 @@ async function loadScheduleBreakdown(
   deckId: string,
 ): Promise<ScheduleBreakdown> {
   const empty: ScheduleBreakdown = { due: 0, learning: 0, scheduled: 0, fresh: 0 };
+
+  const rpcResult = await supabase.rpc('get_deck_schedule_breakdown', { p_deck_id: deckId });
+
+  if (!rpcResult.error) {
+    const row = rpcResult.data?.[0];
+    if (row) {
+      return { due: row.due, learning: row.learning, scheduled: row.scheduled, fresh: row.fresh };
+    }
+    return empty;
+  }
+
+  if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_deck_schedule_breakdown')) {
+    logger.warn('deck-page', 'get_deck_schedule_breakdown rpc failed, using fallback', {
+      message: rpcResult.error.message,
+    });
+  }
 
   const { data, error } = await supabase
     .from('cards')

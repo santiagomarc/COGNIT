@@ -655,6 +655,21 @@ export type Database = {
           topic_tag: string
         }[]
       }
+      // Hand-added to match supabase/migrations/202609141000_schedule_summary_rpcs.sql.
+      // `supabase gen types typescript --linked` regenerates these once it is applied.
+      get_deck_schedule_breakdown: {
+        Args: { p_deck_id: string; p_now?: string }
+        Returns: {
+          due: number
+          fresh: number
+          learning: number
+          scheduled: number
+        }[]
+      }
+      get_card_schedule_summary: {
+        Args: { p_days?: number; p_now?: string; p_user_id: string }
+        Returns: Json
+      }
       get_due_cards_by_deck: {
         Args: { p_now?: string; p_user_id: string }
         Returns: {

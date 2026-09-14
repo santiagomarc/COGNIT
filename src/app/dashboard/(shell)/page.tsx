@@ -11,11 +11,16 @@ import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
 import {
   buildSevenDayForecast,
   estimateSessionMinutes,
+  forecastFromDayCounts,
   meanEaseByDeck,
   oldestOverdueDays,
+  overdueDaysSince,
+  parseCardScheduleSummary,
   type CardScheduleRow,
+  type ForecastDay,
 } from '@/lib/dashboard-forecast';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { loadDueDrillsByDeck, type DueDrillsByDeck } from '@/lib/synthesis/loaders';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -31,6 +36,14 @@ type DashboardDeckRow = {
 type ActivityDayRow = { activity_date: string; review_count: number };
 type DeckMasterySummaryRow = { deck_id: string; assessed_cards: number; mastered_cards: number; last_quiz_at: string };
 
+type ScheduleSummary = {
+  forecastDays: ForecastDay[];
+  easeByDeck: Map<string, number>;
+  overdueDays: number | null;
+  /** Only the row-based fallback can be partial; the RPC aggregates every card. */
+  truncated: boolean;
+};
+
 type DashboardSnapshot = {
   deckRows: DashboardDeckRow[];
   deckQueryUsedFallback: boolean;
@@ -39,8 +52,7 @@ type DashboardSnapshot = {
   activityDays: ActivityDayRow[];
   totalStudiedCards: number;
   masterySummaryRows: DeckMasterySummaryRow[];
-  cardSchedule: CardScheduleRow[];
-  cardScheduleTruncated: boolean;
+  schedule: ScheduleSummary;
   dueDrills: DueDrillsByDeck;
 };
 
@@ -76,21 +88,42 @@ async function loadMasterySummary(
 
 
 /*
- * One projection of every card's schedule, used for two things: the seven-day
- * forecast and each deck's mean ease factor.
+ * The seven-day forecast, each deck's mean ease, and the oldest overdue card.
  *
- * There is no RPC for either — `get_due_cards_by_deck` reports a single "due
- * now" count per deck, `get_study_activity_days` is retrospective, and
- * `get_deck_mastery_summary` carries no scheduling state — so both are derived
- * here rather than added as two more round-trips. Three narrow columns and a
- * bounded row count keeps it cheap, and it runs inside the existing
- * `Promise.all` alongside the other dashboard reads.
+ * `get_card_schedule_summary` aggregates all three in Postgres and returns
+ * ~(7 + decks + 1) values. Before it existed this page fetched up to 20,000
+ * raw card rows on every load and bucketed them in Node — and silently
+ * truncated the forecast past that cap. The row-based path is kept only as the
+ * fallback for an environment where the migration has not been applied yet.
  */
 const CARD_SCHEDULE_ROW_CAP = 20_000;
 
-async function loadCardSchedule(
-  supabase: SupabaseServerClient
-): Promise<{ rows: CardScheduleRow[]; truncated: boolean }> {
+async function loadScheduleSummary(
+  supabase: SupabaseServerClient,
+  userId: string,
+  now: Date
+): Promise<ScheduleSummary> {
+  const rpcResult = await supabase.rpc('get_card_schedule_summary', {
+    p_user_id: userId,
+    p_now: now.toISOString(),
+    p_days: 7,
+  });
+
+  if (!rpcResult.error) {
+    const summary = parseCardScheduleSummary(rpcResult.data);
+    if (summary) {
+      return {
+        forecastDays: forecastFromDayCounts(summary.forecast, now),
+        easeByDeck: new Map(summary.ease_by_deck.map((row) => [row.deck_id, row.mean_ease])),
+        overdueDays: overdueDaysSince(summary.oldest_overdue_at, now),
+        truncated: false,
+      };
+    }
+    console.error('[dashboard] get_card_schedule_summary returned an unexpected shape; using fallback');
+  } else if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_card_schedule_summary')) {
+    console.error('[dashboard] get_card_schedule_summary rpc failed, using fallback:', rpcResult.error.message);
+  }
+
   const { data, error } = await supabase
     .from('cards')
     .select('deck_id, ease_factor, next_review_at')
@@ -98,11 +131,16 @@ async function loadCardSchedule(
 
   if (error) {
     console.error('[dashboard] card schedule query failed:', error.message);
-    return { rows: [], truncated: false };
+    return { forecastDays: buildSevenDayForecast([], now), easeByDeck: new Map(), overdueDays: null, truncated: false };
   }
 
   const rows = (data as CardScheduleRow[] | null) ?? [];
-  return { rows, truncated: rows.length >= CARD_SCHEDULE_ROW_CAP };
+  return {
+    forecastDays: buildSevenDayForecast(rows, now),
+    easeByDeck: meanEaseByDeck(rows),
+    overdueDays: oldestOverdueDays(rows, now),
+    truncated: rows.length >= CARD_SCHEDULE_ROW_CAP,
+  };
 }
 
 async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
@@ -184,26 +222,32 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
 
 async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot> {
   const supabase = await createClient();
-  const nowIso = new Date().toISOString();
+  const now = new Date();
+  const nowIso = now.toISOString();
 
-  const {
-    deckRows,
-    usedFallback: deckQueryUsedFallback,
-    errorMessage: deckQueryErrorMessage,
-  } = await loadDeckRowsWithFallback(supabase);
-
-  const [dueByDeckRows, activityDays, { count: totalStudiedCards }, masterySummary, cardSchedule, dueDrills] =
-    await Promise.all([
-      loadDueByDeckRows(supabase, userId, nowIso),
-      loadActivityDays(supabase, userId),
-      supabase
-        .from('study_logs')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId),
-      loadMasterySummary(supabase, userId),
-      loadCardSchedule(supabase),
-      loadDueDrillsByDeck(supabase, { userId, now: new Date(nowIso) }),
-    ]);
+  // Every read here is independent of the others, so they all run in one
+  // wave. The deck-rows query used to be awaited on its own first, which put a
+  // full extra round-trip in front of everything else on every dashboard load.
+  const [
+    { deckRows, usedFallback: deckQueryUsedFallback, errorMessage: deckQueryErrorMessage },
+    dueByDeckRows,
+    activityDays,
+    { count: totalStudiedCards },
+    masterySummary,
+    schedule,
+    dueDrills,
+  ] = await Promise.all([
+    loadDeckRowsWithFallback(supabase),
+    loadDueByDeckRows(supabase, userId, nowIso),
+    loadActivityDays(supabase, userId),
+    supabase
+      .from('study_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    loadMasterySummary(supabase, userId),
+    loadScheduleSummary(supabase, userId, now),
+    loadDueDrillsByDeck(supabase, { userId, now }),
+  ]);
 
   return {
     deckRows,
@@ -213,8 +257,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     activityDays,
     totalStudiedCards: totalStudiedCards ?? 0,
     masterySummaryRows: masterySummary,
-    cardSchedule: cardSchedule.rows,
-    cardScheduleTruncated: cardSchedule.truncated,
+    schedule,
     dueDrills,
   };
 }
@@ -235,14 +278,13 @@ export default async function Dashboard() {
     activityDays,
     totalStudiedCards,
     masterySummaryRows,
-    cardSchedule,
-    cardScheduleTruncated,
+    schedule,
     dueDrills,
   } = await loadDashboardSnapshot(user.id);
 
-  if (cardScheduleTruncated) {
+  if (schedule.truncated) {
     console.warn(
-      `[dashboard] card schedule hit the ${CARD_SCHEDULE_ROW_CAP}-row cap; forecast and per-deck ease are partial.`
+      `[dashboard] card schedule fallback hit the ${CARD_SCHEDULE_ROW_CAP}-row cap; forecast and per-deck ease are partial.`
     );
   }
 
@@ -264,9 +306,7 @@ export default async function Dashboard() {
 
   const totalDue = dueByDeckRows.reduce((total, row) => total + row.due_count, 0);
 
-  const forecastDays = buildSevenDayForecast(cardSchedule);
-  const easeByDeck = meanEaseByDeck(cardSchedule);
-  const overdueDays = oldestOverdueDays(cardSchedule);
+  const { forecastDays, easeByDeck, overdueDays } = schedule;
   const estimatedMinutes = estimateSessionMinutes(totalDue);
 
   const masteryByDeck = new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();

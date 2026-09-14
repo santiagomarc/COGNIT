@@ -46,8 +46,7 @@ export function buildSevenDayForecast(
   now: Date = new Date(),
   days = 7
 ): ForecastDay[] {
-  const todayStartMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const firstDayMs = todayStartMs + DAY_MS;
+  const firstDayMs = forecastWindowStartMs(now);
 
   const buckets = new Array<number>(days).fill(0);
 
@@ -75,6 +74,81 @@ export function buildSevenDayForecast(
     date: toIsoDate(firstDayMs + index * DAY_MS),
     count,
   }));
+}
+
+/** UTC midnight of the day after `now` — the forecast's first column. */
+function forecastWindowStartMs(now: Date): number {
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY_MS;
+}
+
+/**
+ * The shape `get_card_schedule_summary` returns: the same three derivations
+ * as above, already aggregated in Postgres, so the dashboard never has to
+ * ship every card row to compute them. Forecast entries are sparse — only
+ * days with at least one card — and `forecastFromDayCounts` fills the window.
+ */
+export type CardScheduleSummary = {
+  forecast: Array<{ date: string; count: number }>;
+  ease_by_deck: Array<{ deck_id: string; mean_ease: number }>;
+  oldest_overdue_at: string | null;
+};
+
+/**
+ * Narrows the RPC's `jsonb` payload. Anything malformed is rejected rather than
+ * half-read, so the caller falls back to the row-based path instead of
+ * rendering a forecast built from a partial object.
+ */
+export function parseCardScheduleSummary(value: unknown): CardScheduleSummary | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+
+  if (!Array.isArray(record.forecast) || !Array.isArray(record.ease_by_deck)) return null;
+  if (record.oldest_overdue_at !== null && typeof record.oldest_overdue_at !== 'string') return null;
+
+  const forecast: CardScheduleSummary['forecast'] = [];
+  for (const entry of record.forecast) {
+    if (!entry || typeof entry !== 'object') return null;
+    const { date, count } = entry as Record<string, unknown>;
+    if (typeof date !== 'string' || typeof count !== 'number') return null;
+    forecast.push({ date, count });
+  }
+
+  const easeByDeck: CardScheduleSummary['ease_by_deck'] = [];
+  for (const entry of record.ease_by_deck) {
+    if (!entry || typeof entry !== 'object') return null;
+    const { deck_id, mean_ease } = entry as Record<string, unknown>;
+    if (typeof deck_id !== 'string' || typeof mean_ease !== 'number') return null;
+    easeByDeck.push({ deck_id, mean_ease });
+  }
+
+  return { forecast, ease_by_deck: easeByDeck, oldest_overdue_at: record.oldest_overdue_at };
+}
+
+/**
+ * Expands sparse per-day counts into the full `days`-column window that
+ * `buildSevenDayForecast` produces, so both paths hand the chart the same
+ * shape. Dates outside the window are ignored, matching the row-based path.
+ */
+export function forecastFromDayCounts(
+  dayCounts: Array<{ date: string; count: number }>,
+  now: Date = new Date(),
+  days = 7
+): ForecastDay[] {
+  const firstDayMs = forecastWindowStartMs(now);
+  const countByDate = new Map(dayCounts.map((entry) => [entry.date, entry.count]));
+
+  return Array.from({ length: days }, (_, index) => {
+    const date = toIsoDate(firstDayMs + index * DAY_MS);
+    return { date, count: countByDate.get(date) ?? 0 };
+  });
+}
+
+/** `oldestOverdueDays` for an already-aggregated oldest timestamp. */
+export function overdueDaysSince(oldestOverdueAt: string | null, now: Date = new Date()): number | null {
+  if (!oldestOverdueAt) return null;
+  const oldestMs = Date.parse(oldestOverdueAt);
+  if (Number.isNaN(oldestMs) || oldestMs > now.getTime()) return null;
+  return Math.floor((now.getTime() - oldestMs) / DAY_MS);
 }
 
 /**

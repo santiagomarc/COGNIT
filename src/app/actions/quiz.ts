@@ -250,10 +250,16 @@ export async function getQuizHistory(deckId: string) {
     return { history: [] as QuizHistoryEntry[] };
   }
 
+  // Only the misses are ever rendered (`incorrect_answers`, `wrong_count`);
+  // totals come from the quiz_results row itself. Filtering here instead of
+  // in Node stops every correct answer's full prompt/answer text from being
+  // fetched only to be discarded — at a typical ~80% pass rate that is ~5x
+  // fewer rows on every history load.
   const { data: quizCardRows, error: quizCardRowsError } = await supabase
     .from('quiz_card_results')
     .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
     .in('quiz_result_id', quizResults.map((row) => row.id))
+    .eq('correct', false)
     .limit(20000);
 
   if (quizCardRowsError) {
