@@ -6,6 +6,7 @@ import type { Json } from '@/lib/database.types';
 import { logger } from '@/lib/logger';
 import {
   aggregateWeakLinks,
+  calibrationRate,
   deckReadings,
   outsideClaimsSince,
   type AttemptForInsights,
@@ -13,10 +14,13 @@ import {
 import { orderQueue } from '@/lib/synthesis/schedule';
 import { cardKey } from '@/lib/synthesis/prompts';
 import {
+  isConfidence,
   isDrillVerdict,
   isSynthesisFormat,
   type AnchorCard,
+  type CanvasDrill,
   type CapstoneDrillCandidate,
+  type Diagnostic,
   type DrillHistoryRow,
   type LastAttemptSummary,
   type LinkCoverage,
@@ -107,11 +111,85 @@ export function rowToDrill(row: DrillRow): SynthesisDrill | null {
   };
 }
 
+/** The drill without its answer key — what the canvas is allowed to hold before the check (audit P3). */
+export function toCanvasDrill(drill: SynthesisDrill): CanvasDrill {
+  return {
+    id: drill.id,
+    deckId: drill.deckId,
+    format: drill.format,
+    promptText: drill.promptText,
+    cardIds: drill.cardIds,
+    topicTag: drill.topicTag,
+    status: drill.status,
+    step: drill.step,
+    nextDueAt: drill.nextDueAt,
+    attemptCount: drill.attemptCount,
+    lastVerdict: drill.lastVerdict,
+    lastAttemptAt: drill.lastAttemptAt,
+    linkCount: drill.requiredLinks.length,
+  };
+}
+
 export function parseCoverage(value: Json): LinkCoverage[] {
   const parsed = coverageSchema.safeParse(value);
   return parsed.success
     ? parsed.data.map((entry) => ({ linkId: entry.link_id, status: entry.status, evidence: entry.evidence }))
     : [];
+}
+
+const storedContradictionsSchema = z.array(z.object({ statement: z.string(), card_id: z.string(), card_says: z.string() }));
+const storedOutsideClaimsSchema = z.array(z.object({
+  statement: z.string(),
+  verified: z.boolean(),
+  ai_assessment: z.string(),
+  term_suggestion: z.string().default(''),
+}));
+const storedStructureSchema = z.object({ claim_present: z.boolean().default(false), tradeoff_present: z.boolean().default(false) });
+const storedIntegritySchema = z.object({ injection_detected: z.boolean().default(false), off_target: z.boolean().default(false) });
+
+export type StoredAttemptRow = {
+  verdict: string;
+  coverage: Json;
+  contradictions: Json;
+  outside_claims: Json;
+  structure: Json;
+  gap_note: string;
+  integrity: Json;
+  pulled_forward_card_ids: string[];
+  confidence: number | null;
+};
+
+/**
+ * An attempt row back into the diagnostic the canvas renders — the replay
+ * path of `checkSynthesisAttempt` (audit R8). Null if the row's JSON no
+ * longer parses; the caller then runs a fresh check.
+ */
+export function parseStoredAttempt(
+  row: StoredAttemptRow,
+): Pick<Diagnostic, 'verdict' | 'coverage' | 'contradictions' | 'outsideClaims' | 'structure' | 'gapNote' | 'integrity' | 'pulledForwardCardIds' | 'confidence'> | null {
+  if (!isDrillVerdict(row.verdict)) return null;
+  const contradictions = storedContradictionsSchema.safeParse(row.contradictions);
+  const outsideClaims = storedOutsideClaimsSchema.safeParse(row.outside_claims);
+  const structure = storedStructureSchema.safeParse(row.structure ?? {});
+  const integrity = storedIntegritySchema.safeParse(row.integrity ?? {});
+  if (!contradictions.success || !outsideClaims.success || !structure.success || !integrity.success) return null;
+
+  return {
+    verdict: row.verdict,
+    coverage: parseCoverage(row.coverage),
+    contradictions: contradictions.data.map((entry) => ({ statement: entry.statement, cardId: entry.card_id, cardSays: entry.card_says })),
+    outsideClaims: outsideClaims.data.map((entry) => ({
+      statement: entry.statement,
+      verified: entry.verified,
+      aiAssessment: entry.ai_assessment,
+      termSuggestion: entry.term_suggestion,
+    })),
+    structure: { claimPresent: structure.data.claim_present, tradeoffPresent: structure.data.tradeoff_present },
+    gapNote: row.gap_note,
+    integrity: { injectionDetected: integrity.data.injection_detected, offTarget: integrity.data.off_target },
+    pulledForwardCardIds: row.pulled_forward_card_ids ?? [],
+    confidence: isConfidence(row.confidence) ? row.confidence : null,
+  };
 }
 
 type AnchorRow = { id: string; front: string; back: string; explanation: string | null; state: string | null };
@@ -236,13 +314,14 @@ type AttemptRow = {
   contradicted_card_ids: string[];
   outside_claims: Json;
   duration_ms: number;
+  confidence: number | null;
   created_at: string;
 };
 
 async function loadAttemptRows(supabase: SupabaseServerClient, deckId: string, userId: string): Promise<AttemptRow[]> {
   const { data, error } = await supabase
     .from('synthesis_attempts')
-    .select('id, drill_id, verdict, coverage, missing_card_ids, contradicted_card_ids, outside_claims, duration_ms, created_at')
+    .select('id, drill_id, verdict, coverage, missing_card_ids, contradicted_card_ids, outside_claims, duration_ms, confidence, created_at')
     .eq('deck_id', deckId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -280,16 +359,38 @@ async function loadDeckDrills(supabase: SupabaseServerClient, deckId: string, us
   return (data ?? []).map((row) => rowToDrill(row as DrillRow)).filter((drill): drill is SynthesisDrill => drill !== null);
 }
 
-/** The launcher block's strip: DUE · LINKS a/b · LAST. */
+/**
+ * The launcher block's strip: DUE · LINKS a/b · LAST. One narrow read of the
+ * active drill rows — the counts are denormalised there at check time
+ * (audit P1), so the deck overview never touches the attempts table.
+ */
 export async function loadSynthesisReadings(
   supabase: SupabaseServerClient,
   input: { deckId: string; userId: string; now?: Date },
 ): Promise<SynthesisReadings> {
-  const [drills, attemptRows] = await Promise.all([
-    loadDeckDrills(supabase, input.deckId, input.userId),
-    loadAttemptRows(supabase, input.deckId, input.userId),
-  ]);
-  return deckReadings({ drills, attempts: attemptRows.map(toInsightAttempt), now: input.now ?? new Date() });
+  const { data, error } = await supabase
+    .from('synthesis_drills')
+    .select('next_due_at, link_count, last_links_covered, last_attempt_at')
+    .eq('deck_id', input.deckId)
+    .eq('user_id', input.userId)
+    .eq('status', 'active')
+    .limit(MAX_DRILLS_READ);
+
+  if (error) {
+    logger.error('synthesis', 'readings read failed', { message: error.message });
+    return { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null };
+  }
+
+  return deckReadings({
+    rows: (data ?? []).map((row) => ({
+      status: 'active' as const,
+      nextDueAt: row.next_due_at,
+      linkCount: row.link_count,
+      lastLinksCovered: row.last_links_covered,
+      lastAttemptAt: row.last_attempt_at,
+    })),
+    now: input.now ?? new Date(),
+  });
 }
 
 export type SynthesisInsights = {
@@ -297,6 +398,8 @@ export type SynthesisInsights = {
   history: DrillHistoryRow[];
   outsideClaims30d: number;
   attemptCount: number;
+  /** Share of confidence-rated attempts in the last 30 days whose confidence matched the verdict; null when none. */
+  calibration30d: number | null;
 };
 
 export async function loadSynthesisInsights(
@@ -339,11 +442,18 @@ export async function loadSynthesisInsights(
     }];
   });
 
+  const since30d = new Date(now.getTime() - 30 * 24 * 60 * 60_000);
+  const sinceIso = since30d.toISOString();
+
   return {
     weakLinks: aggregateWeakLinks(attempts, termById),
     history,
-    outsideClaims30d: outsideClaimsSince(attempts, new Date(now.getTime() - 30 * 24 * 60 * 60_000)),
+    outsideClaims30d: outsideClaimsSince(attempts, since30d),
     attemptCount: attempts.length,
+    calibration30d: calibrationRate(attemptRows.flatMap((row) => {
+      if (row.created_at < sinceIso || !isDrillVerdict(row.verdict)) return [];
+      return [{ confidence: isConfidence(row.confidence) ? row.confidence : null, verdict: row.verdict }];
+    })),
   };
 }
 

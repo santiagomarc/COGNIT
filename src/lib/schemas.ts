@@ -244,6 +244,16 @@ export const checkSynthesisAttemptSchema = z.object({
   duration_ms: z.number().int().min(0).default(0),
   /** Pull contradicted cards forward to tomorrow's queue (spec §8.4). */
   pull_forward: z.boolean().default(true),
+  /** Judgement of learning before the check: 1 unsure · 2 fairly sure · 3 sure (audit F1). */
+  confidence: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
+  /**
+   * Client-generated key for this check. A retry after an ambiguous failure
+   * sends the same key and gets the existing attempt back instead of a
+   * second model call (audit R8).
+   */
+  client_attempt_id: z.uuid({ message: 'Invalid attempt key' }).optional(),
+  /** The attempt this one revises — the one in-place revise after a partial or contradicted verdict (audit F2). */
+  revision_of: z.uuid({ message: 'Invalid attempt id' }).optional(),
 }).superRefine((value, ctx) => {
   const isOutline = 'claim' in value.response;
   if (isOutline !== (value.mode === 'outline')) {
@@ -262,3 +272,12 @@ export const archiveSynthesisDrillSchema = z.object({
 });
 
 export type ArchiveSynthesisDrillInput = z.infer<typeof archiveSynthesisDrillSchema>;
+
+export const rateSynthesisAttemptSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  attempt_id: z.uuid({ message: 'Invalid attempt id' }),
+  rating: z.enum(['fair', 'unfair']),
+  note: z.string().trim().max(300).optional(),
+});
+
+export type RateSynthesisAttemptInput = z.infer<typeof rateSynthesisAttemptSchema>;

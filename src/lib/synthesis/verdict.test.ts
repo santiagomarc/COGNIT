@@ -69,13 +69,31 @@ describe('verifyContradiction', () => {
 });
 
 describe('reconcileDiagnostic — contradictions and outside claims', () => {
-  it('demotes an unverifiable contradiction to an unverified outside claim', () => {
+  it('drops a contradiction the card does not say and counts it, without inventing an outside claim', () => {
     const result = reconcileDiagnostic(
       raw({ contradictions: [{ statement: 'Each switch is overhead', card_key: 'c1', card_says: 'switches are free' }] }),
       { requiredLinks: LINKS, anchors: ANCHORS, answerText: ANSWER },
     );
     expect(result.contradictions).toEqual([]);
-    expect(result.outsideClaims).toEqual([{ statement: 'Each switch is overhead', verified: false, aiAssessment: 'switches are free', termSuggestion: '' }]);
+    expect(result.outsideClaims).toEqual([]);
+    expect(result.droppedContradictions).toBe(1);
+  });
+
+  it('accepts a contradiction quoted loosely and shows the located card and answer spans verbatim', () => {
+    const result = reconcileDiagnostic(
+      raw({ contradictions: [{
+        statement: 'large quantum keep round robin responsive as feedback queue',
+        card_key: 'c2',
+        card_says: 'short CPU burst; responsiveness matter more than throughput',
+      }] }),
+      { requiredLinks: LINKS, anchors: ANCHORS, answerText: ANSWER },
+    );
+    expect(result.contradictions).toEqual([{
+      statement: 'large quantum keeps round-robin as responsive as the feedback queue',
+      cardId: 'id-b',
+      cardSays: 'Short CPU bursts; responsiveness matters more than throughput',
+    }]);
+    expect(result.droppedContradictions).toBe(0);
   });
 
   it('passes AI-verified outside claims through, stripping redaction artefacts and capping at three', () => {
@@ -85,7 +103,15 @@ describe('reconcileDiagnostic — contradictions and outside claims', () => {
       { requiredLinks: LINKS, anchors: ANCHORS, answerText: ANSWER },
     );
     expect(result.outsideClaims).toHaveLength(3);
-    expect(result.outsideClaims[1]).toEqual({ statement: 'claim 1 here', verified: false, aiAssessment: 'Because so.', termSuggestion: 'Term' });
+    expect(result.outsideClaims[0]).toEqual({ statement: 'claim 1 here', verified: false, aiAssessment: 'Because so.', termSuggestion: 'Term' });
+  });
+
+  it('lets an empty outline slot override the model on claim and trade-off presence', () => {
+    const result = reconcileDiagnostic(
+      raw({ structure: { claim_present: true, tradeoff_present: true } }),
+      { requiredLinks: LINKS, anchors: ANCHORS, answerText: ANSWER, slots: { claim: false, tradeoff: true } },
+    );
+    expect(result.structure).toEqual({ claimPresent: false, tradeoffPresent: true });
   });
 });
 

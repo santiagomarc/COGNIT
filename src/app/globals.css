@@ -1270,6 +1270,11 @@ button.flip {
   border-color: var(--accent);
 }
 
+/* The active slot, not only the active form: the label takes ink (audit U2). */
+label:focus-within > .slot-label {
+  color: var(--ink);
+}
+
 /* The free-text slot. */
 .drill-editor {
   resize: none;

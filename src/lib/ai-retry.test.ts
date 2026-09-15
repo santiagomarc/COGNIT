@@ -35,6 +35,24 @@ describe('withGeminiRetry', () => {
     expect(op).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the kind of an AiServiceError thrown by the operation and does not retry it when non-retryable', async () => {
+    const op = vi.fn(async () => {
+      throw new AiServiceError('bad_request', 'response truncated at maxOutputTokens', 1);
+    });
+    await expect(withGeminiRetry(op, { label: 't', maxAttempts: 3 })).rejects.toMatchObject({ kind: 'bad_request' });
+    expect(op).toHaveBeenCalledTimes(1);
+  });
+
+  it('honours shouldRetry to narrow the retryable set', async () => {
+    const op = vi.fn(async () => {
+      throw new Error('deadline exceeded: timeout');
+    });
+    await expect(
+      withGeminiRetry(op, { label: 't', maxAttempts: 3, shouldRetry: (kind) => kind !== 'timeout' }),
+    ).rejects.toMatchObject({ kind: 'timeout' });
+    expect(op).toHaveBeenCalledTimes(1);
+  });
+
   it('gives up after maxAttempts', async () => {
     const op = vi.fn().mockRejectedValue(new Error('429'));
     await expect(withGeminiRetry(op, { label: 't', maxAttempts: 3, baseDelayMs: 1 }))

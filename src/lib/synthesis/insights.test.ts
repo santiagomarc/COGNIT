@@ -1,17 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateWeakLinks, deckReadings, latestAttemptByDrill, linksCoveredLatest, outsideClaimsSince, type AttemptForInsights } from './insights';
-import type { SynthesisDrill } from './types';
+import { aggregateWeakLinks, calibrationRate, deckReadings, outsideClaimsSince, type AttemptForInsights } from './insights';
+import type { DrillReadingRow } from './types';
 
 const NOW = new Date('2026-09-12T12:00:00Z');
 
-function drill(id: string, links: number, overrides: Partial<SynthesisDrill> = {}): SynthesisDrill {
-  return {
-    id, deckId: 'deck', format: 'causal', promptText: 'p', cardIds: ['a', 'b'], topicTag: null,
-    requiredLinks: Array.from({ length: links }, (_, i) => ({ id: `m${i + 1}`, text: 'l', cardIds: ['a'] })),
-    exemplar: { claim: 'c', mechanisms: ['m', 'm'], tradeoff: 't' },
-    status: 'active', step: 0, nextDueAt: NOW.toISOString(), attemptCount: 0, lastVerdict: null, lastAttemptAt: null,
-    ...overrides,
-  };
+function row(overrides: Partial<DrillReadingRow> = {}): DrillReadingRow {
+  return { status: 'active', nextDueAt: NOW.toISOString(), linkCount: 2, lastLinksCovered: null, lastAttemptAt: null, ...overrides };
 }
 
 function attempt(drillId: string, createdAt: string, covered: number, total: number, extra: Partial<AttemptForInsights> = {}): AttemptForInsights {
@@ -26,26 +20,33 @@ function attempt(drillId: string, createdAt: string, covered: number, total: num
   };
 }
 
-describe('latestAttemptByDrill / linksCoveredLatest', () => {
-  it('uses only the newest attempt per drill and counts unattempted drills as 0/n', () => {
-    const drills = [drill('d1', 3), drill('d2', 2), drill('archived', 4, { status: 'archived' })];
-    const latest = latestAttemptByDrill([
-      attempt('d1', '2026-09-10T00:00:00Z', 3, 3),
-      attempt('d1', '2026-09-11T00:00:00Z', 1, 3),   // newer, worse — this one counts
-    ]);
-    expect(linksCoveredLatest(drills, latest)).toEqual({ covered: 1, total: 5 });
+describe('deckReadings', () => {
+  it('reports active, due, links and the last attempt from the drill rows alone', () => {
+    const later = new Date(NOW.getTime() + 36 * 60 * 60_000).toISOString();
+    const readings = deckReadings({
+      rows: [
+        row({ linkCount: 2, lastLinksCovered: 2, lastAttemptAt: '2026-09-11T00:00:00Z' }),
+        row({ linkCount: 3, nextDueAt: later, lastLinksCovered: 1, lastAttemptAt: '2026-09-10T00:00:00Z' }),
+        row({ linkCount: 4 }),                                   // never attempted: 0 / 4
+        row({ status: 'archived', linkCount: 4, lastLinksCovered: 4, lastAttemptAt: '2026-09-12T00:00:00Z' }),
+      ],
+      now: NOW,
+    });
+    expect(readings).toEqual({ activeDrills: 3, due: 2, linksCovered: 3, linksTotal: 9, lastAttemptAt: '2026-09-11T00:00:00Z' });
   });
 });
 
-describe('deckReadings', () => {
-  it('reports active, due, links and the last attempt', () => {
-    const later = new Date(NOW.getTime() + 36 * 60 * 60_000).toISOString();
-    const readings = deckReadings({
-      drills: [drill('d1', 2), drill('d2', 2, { nextDueAt: later })],
-      attempts: [attempt('d1', '2026-09-11T00:00:00Z', 2, 2), attempt('d1', '2026-09-09T00:00:00Z', 0, 2)],
-      now: NOW,
-    });
-    expect(readings).toEqual({ activeDrills: 2, due: 1, linksCovered: 2, linksTotal: 4, lastAttemptAt: '2026-09-11T00:00:00Z' });
+describe('calibrationRate', () => {
+  it('matches sure with sound and unsure with not-sound, counts fairly-sure as matched, ignores unrated and off-target', () => {
+    expect(calibrationRate([])).toBeNull();
+    expect(calibrationRate([{ confidence: null, verdict: 'sound' }])).toBeNull();
+    expect(calibrationRate([
+      { confidence: 3, verdict: 'sound' },        // matched
+      { confidence: 3, verdict: 'partial' },      // overconfident
+      { confidence: 1, verdict: 'partial' },      // matched
+      { confidence: 2, verdict: 'contradicted' }, // matched
+      { confidence: 3, verdict: 'off_target' },   // ignored
+    ])).toBe(0.75);
   });
 });
 

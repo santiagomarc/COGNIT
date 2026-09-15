@@ -2,7 +2,16 @@ import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { SynthesisDrillClient } from '@/components/ui/shared/synthesis/SynthesisDrillClient';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
-import { loadSynthesisQueue } from '@/lib/synthesis/loaders';
+import { loadSynthesisQueue, toCanvasDrill } from '@/lib/synthesis/loaders';
+import type { CanvasAnchor, CanvasDrill } from '@/lib/synthesis/types';
+
+/**
+ * `checkSynthesisAttempt` is invoked from this page: one model call with an
+ * 8 s deadline plus the reads and writes around it. The platform default
+ * (10–15 s without Fluid compute) is below that worst case (audit R2); the
+ * streaming chat route sets the same figure.
+ */
+export const maxDuration = 60;
 
 type SynthesisPageProps = {
   params: Promise<{ deckId: string }>;
@@ -50,32 +59,46 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
     redirect('/login');
   }
 
-  const { data: deck } = await supabase
-    .from('decks')
-    .select('id, title')
-    .eq('id', deckId)
-    .eq('user_id', user.id)
-    .single();
+  const pinned = first(resolved?.drill);
+  const fromStudy = first(resolved?.from) === 'study';
+
+  // The ownership check and the queue read are independent (RLS already
+  // scopes the drills); the deck row only decides `notFound` (audit P2).
+  const [{ data: deck }, queue] = await Promise.all([
+    supabase
+      .from('decks')
+      .select('id, title')
+      .eq('id', deckId)
+      .eq('user_id', user.id)
+      .single(),
+    loadSynthesisQueue(supabase, {
+      deckId,
+      userId: user.id,
+      count: fromStudy ? 1 : normaliseCount(resolved?.count),
+      drillId: pinned && UUID_PATTERN.test(pinned) ? pinned : null,
+    }),
+  ]);
 
   if (!deck) {
     notFound();
   }
 
-  const pinned = first(resolved?.drill);
-  const fromStudy = first(resolved?.from) === 'study';
-  const queue = await loadSynthesisQueue(supabase, {
-    deckId,
-    userId: user.id,
-    count: fromStudy ? 1 : normaliseCount(resolved?.count),
-    drillId: pinned && UUID_PATTERN.test(pinned) ? pinned : null,
-  });
+  // The canvas never receives the answer key or the cards' definitions
+  // before the answer is given; they come back with the check (audit P3).
+  const drills: CanvasDrill[] = queue.drills.map(toCanvasDrill);
+  const anchorsByDrill: Record<string, CanvasAnchor[]> = Object.fromEntries(
+    Object.entries(queue.anchorsByDrill).map(([drillId, anchors]) => [
+      drillId,
+      anchors.map((anchor) => ({ id: anchor.id, key: anchor.key, term: anchor.term })),
+    ]),
+  );
 
   return (
     <SynthesisDrillClient
       deckId={deckId}
       deckTitle={removeDeckTagFromTitle(deck.title)}
-      drills={queue.drills}
-      anchorsByDrill={queue.anchorsByDrill}
+      drills={drills}
+      anchorsByDrill={anchorsByDrill}
       lastAttemptByDrill={queue.lastAttemptByDrill}
       pullForward={normaliseBoolean(resolved?.pull, true)}
       activeDrillCount={queue.activeDrillCount}

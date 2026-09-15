@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
-import { normalizeSessionCardCount, normalizeStudyScope, type StudyScope, type StudySessionCard } from '@/lib/study';
+import { normalizeSessionCardCount, normalizeStudyScope, parseSessionCardIds, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadCapstoneCandidates } from '@/lib/synthesis/loaders';
@@ -13,6 +13,8 @@ type StudyPageProps = {
   searchParams?: Promise<{
     count?: string | string[];
     scope?: string | string[];
+    /** Comma-separated card ids: an explicit session, e.g. the cards a drill pulled forward. */
+    cards?: string | string[];
   }>;
 };
 
@@ -46,8 +48,12 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     .select('id', { count: 'exact', head: true })
     .eq('deck_id', deckId);
 
-  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0);
-  const studyScope: StudyScope = normalizeStudyScope(resolvedSearchParams?.scope);
+  const explicitCardIds = parseSessionCardIds(resolvedSearchParams?.cards);
+  const sessionCardCount = explicitCardIds.length > 0
+    ? explicitCardIds.length
+    : normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0);
+  // An explicit card list is a review of exactly those cards, due or not.
+  const studyScope: StudyScope = explicitCardIds.length > 0 ? 'include_reviewed' : normalizeStudyScope(resolvedSearchParams?.scope);
 
   // Keep SM-2 ordering across all scopes: new (null next_review_at) first, then soonest review date.
   // Scope behavior:
@@ -60,6 +66,10 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     .from('cards')
     .select('id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question, topic_tags, mnemonic')
     .eq('deck_id', deckId);
+
+  if (explicitCardIds.length > 0) {
+    cardQuery = cardQuery.in('id', explicitCardIds);
+  }
 
   if (studyScope === 'due') {
     cardQuery = cardQuery.or(`next_review_at.is.null,next_review_at.lte.${now}`);

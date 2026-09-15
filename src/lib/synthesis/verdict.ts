@@ -6,7 +6,7 @@
  * is derived — never read — from what survives.
  */
 
-import { stripRedactions, verifyQuote } from '@/lib/synthesis/text';
+import { findQuote, stripRedactions } from '@/lib/synthesis/text';
 import type { DrillCheckOutput } from '@/lib/synthesis/schemas';
 import type {
   AnchorCard,
@@ -24,6 +24,8 @@ export type ReconciledDiagnostic = {
   structure: { claimPresent: boolean; tradeoffPresent: boolean };
   gapNote: string;
   integrity: { injectionDetected: boolean; offTarget: boolean };
+  /** Model contradictions whose quotes matched neither exactly nor closely — logged, never shown. */
+  droppedContradictions: number;
 };
 
 const MAX_OUTSIDE_CLAIMS = 3;
@@ -36,7 +38,9 @@ function cardText(card: AnchorCard): string {
  * A contradiction stands only if the model can point at card text the server
  * finds, and at student text the server finds. This is what stops "the model
  * thinks it knows better than the card" from ever reaching the student as an
- * error (spec §3.1).
+ * error (spec §3.1). "Finds" tolerates the way models quote — a dropped
+ * article, a changed tense (`locateQuote`) — and what is displayed is then
+ * the span the server located, verbatim, not the model's paraphrase.
  */
 export function verifyContradiction(
   raw: DrillCheckOutput['contradictions'][number],
@@ -45,37 +49,48 @@ export function verifyContradiction(
 ): Contradiction | null {
   const card = anchorsByKey.get(raw.card_key);
   if (!card) return null;
-  if (!verifyQuote(raw.card_says, cardText(card))) return null;
-  if (!verifyQuote(raw.statement, answerText)) return null;
+  const cardSays = findQuote(raw.card_says, cardText(card));
+  if (!cardSays) return null;
+  const statement = findQuote(raw.statement, answerText);
+  if (!statement) return null;
   return {
-    statement: stripRedactions(raw.statement),
+    statement: stripRedactions(statement),
     cardId: card.id,
-    cardSays: raw.card_says.trim(),
+    cardSays,
   };
 }
 
 export function reconcileDiagnostic(
   raw: DrillCheckOutput,
-  ctx: { requiredLinks: RequiredLink[]; anchors: AnchorCard[]; answerText: string },
+  ctx: {
+    requiredLinks: RequiredLink[];
+    anchors: AnchorCard[];
+    answerText: string;
+    /**
+     * Outline mode only: whether the Claim and Trade-off slots held any text.
+     * The model judges content; an empty slot cannot hold a claim whatever
+     * the model says, so the structural fact wins where it applies.
+     */
+    slots?: { claim: boolean; tradeoff: boolean };
+  },
 ): ReconciledDiagnostic {
   const anchorsByKey = new Map(ctx.anchors.map((card) => [card.key, card]));
 
   // Coverage: exactly the drill's links, in the drill's order. Unknown ids are
-  // dropped; absent ids are `missing`. A quote the server cannot find is
-  // nulled but the status stands — coverage drives no card state, so a
-  // paraphrased quote is not worth a false negative.
+  // dropped; absent ids are `missing`. A quote the server cannot find, even
+  // loosely, is nulled but the status stands — coverage drives no card
+  // state, so a paraphrased quote is not worth a false negative.
   const rawByLinkId = new Map(raw.coverage.map((entry) => [entry.link_id, entry]));
   const coverage: LinkCoverage[] = ctx.requiredLinks.map((link) => {
     const entry = rawByLinkId.get(link.id);
     if (!entry) return { linkId: link.id, status: 'missing', evidence: null };
-    const evidence = entry.status !== 'missing' && verifyQuote(entry.evidence, ctx.answerText)
-      ? stripRedactions(entry.evidence ?? '')
-      : null;
-    return { linkId: link.id, status: entry.status, evidence };
+    const located = entry.status !== 'missing' ? findQuote(entry.evidence, ctx.answerText) : null;
+    return { linkId: link.id, status: entry.status, evidence: located ? stripRedactions(located) : null };
   });
 
   const contradictions: Contradiction[] = [];
   const outsideClaims: OutsideClaim[] = [];
+  let droppedContradictions = 0;
 
   for (const entry of raw.contradictions) {
     const verified = verifyContradiction(entry, anchorsByKey, ctx.answerText);
@@ -83,15 +98,10 @@ export function reconcileDiagnostic(
       contradictions.push(verified);
       continue;
     }
-    // Could not be pinned to card text: it is an outside claim, and the model's
-    // own words about it are the best assessment available — but it is never
-    // presented as verified.
-    outsideClaims.push({
-      statement: stripRedactions(entry.statement),
-      verified: false,
-      aiAssessment: stripRedactions(entry.card_says),
-      termSuggestion: '',
-    });
+    // Neither verbatim nor close to any card text: the model is asserting
+    // something the card does not say. That never reaches the student — not
+    // as an error, and not dressed up as an "outside claim" either (audit R6).
+    droppedContradictions += 1;
   }
 
   for (const entry of raw.outside_claims) {
@@ -108,14 +118,15 @@ export function reconcileDiagnostic(
     contradictions,
     outsideClaims: outsideClaims.slice(0, MAX_OUTSIDE_CLAIMS),
     structure: {
-      claimPresent: raw.structure.claim_present,
-      tradeoffPresent: raw.structure.tradeoff_present,
+      claimPresent: raw.structure.claim_present && (ctx.slots?.claim ?? true),
+      tradeoffPresent: raw.structure.tradeoff_present && (ctx.slots?.tradeoff ?? true),
     },
     gapNote: stripRedactions(raw.gap_note).slice(0, 400),
     integrity: {
       injectionDetected: raw.injection_detected,
       offTarget: raw.off_target,
     },
+    droppedContradictions,
   };
 }
 

@@ -202,7 +202,7 @@ describe('checkSynthesisAttempt', () => {
     expect(inserted.contradicted_card_ids).toEqual([CARD_A]);
   });
 
-  it('demotes a contradiction the server cannot find in the card to an unverified outside claim', async () => {
+  it('drops a contradiction the server cannot find in the card: no verdict effect, no card effect, no invented outside claim', async () => {
     const client = buildClient();
     mocks.client = client;
     respondWith(modelOutput({
@@ -216,10 +216,116 @@ describe('checkSynthesisAttempt', () => {
     const result = await check();
     if (!('success' in result) || !result.success) throw new Error('expected success');
     expect(result.diagnostic.verdict).toBe('sound');
-    expect(result.diagnostic.outsideClaims).toEqual([
-      expect.objectContaining({ verified: false, aiAssessment: 'CFS uses virtual runtime' }),
-    ]);
+    expect(result.diagnostic.contradictions).toEqual([]);
+    expect(result.diagnostic.outsideClaims).toEqual([]);
     expect(chainsFor(client, 'cards').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
+
+    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, Record<string, unknown>>;
+    expect(inserted.usage.dropped_contradictions).toBe(1);
+  });
+
+  it('accepts a contradiction quoted loosely and displays the card\'s and the student\'s own words', async () => {
+    const client = buildClient();
+    mocks.client = client;
+    respondWith(modelOutput({
+      contradictions: [{
+        statement: 'long quantum make interactive burst wait behind full slice',   // tense and number changed
+        card_key: 'c1',
+        card_says: 'too large degenerate towards FCFS',
+      }],
+    }));
+
+    const result = await check();
+    if (!('success' in result) || !result.success) throw new Error('expected success');
+    expect(result.diagnostic.verdict).toBe('contradicted');
+    expect(result.diagnostic.contradictions).toEqual([{
+      statement: 'long quantum makes interactive bursts wait behind full slices',
+      cardId: CARD_A,
+      cardSays: 'too large degenerates toward FCFS',
+    }]);
+  });
+
+  it('returns the answer key and the cards only with the check, and echoes the confidence', async () => {
+    const client = buildClient();
+    mocks.client = client;
+    respondWith(modelOutput({
+      coverage: [
+        { link_id: 'm1', status: 'covered', evidence: 'more switches means overhead' },
+        { link_id: 'm2', status: 'partial', evidence: null },
+      ],
+    }));
+
+    const result = await check({ confidence: 3 });
+    if (!('success' in result) || !result.success) throw new Error('expected success');
+    expect(result.reveal.requiredLinks).toEqual([{ id: 'm1', text: expect.any(String) }, { id: 'm2', text: expect.any(String) }]);
+    expect(result.reveal.cards.map((card) => card.term)).toEqual(['Time quantum', 'Interactive process']);
+    expect(result.diagnostic.confidence).toBe(3);
+    // Sure × partial comes back in 12 h, not 24 h.
+    const dueInHours = (Date.parse(result.diagnostic.schedule.nextDueAt) - Date.now()) / 3_600_000;
+    expect(dueInHours).toBeGreaterThan(11.9);
+    expect(dueInHours).toBeLessThan(12.1);
+
+    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, unknown>;
+    expect(inserted.confidence).toBe(3);
+    const drillUpdate = chainsFor(client, 'synthesis_drills').find((chain) => chain.update.mock.calls.length > 0);
+    expect(drillUpdate?.update).toHaveBeenCalledWith(expect.objectContaining({ last_links_covered: 1 }));
+  });
+
+  it('replays an attempt with the same client key instead of calling the model again', async () => {
+    const client = buildClient({
+      synthesis_attempts: {
+        data: {
+          id: 'attempt-existing',
+          verdict: 'partial',
+          coverage: [{ link_id: 'm1', status: 'covered', evidence: 'x' }, { link_id: 'm2', status: 'missing', evidence: null }],
+          contradictions: [],
+          outside_claims: [],
+          structure: { claim_present: true, tradeoff_present: false },
+          gap_note: 'Say why.',
+          integrity: { injection_detected: false, off_target: false },
+          pulled_forward_card_ids: [],
+          confidence: 2,
+        },
+        error: null,
+      },
+    });
+    mocks.client = client;
+
+    const result = await check({ client_attempt_id: '00000000-0000-4000-8000-0000000000aa' });
+    expect(result).toMatchObject({ success: true, attemptId: 'attempt-existing', replayed: true });
+    if (!('success' in result) || !result.success) return;
+    expect(result.diagnostic.verdict).toBe('partial');
+    expect(result.diagnostic.linksCovered).toBe(1);
+    expect(result.diagnostic.confidence).toBe(2);
+    expect(mocks.reserveAiCall).not.toHaveBeenCalled();
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+    expect(client.__inserted.synthesis_attempts).toBeUndefined();
+  });
+
+  it('treats a response cut off at the output cap as a non-retryable failure', async () => {
+    mocks.client = buildClient();
+    mocks.generateContent.mockImplementation(async () => ({
+      response: {
+        text: () => '{"coverage":[{"link_id":"m1","status":"cov',
+        candidates: [{ finishReason: 'MAX_TOKENS' }],
+        usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 640, totalTokenCount: 1840, thoughtsTokenCount: 600 },
+      },
+    }));
+
+    const result = await check();
+    expect(result).toMatchObject({ error: expect.stringContaining('temporarily unavailable') });
+    expect(mocks.generateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses to revise an attempt that is not on this drill or is itself a revision', async () => {
+    mocks.client = buildClient({ synthesis_attempts: { data: null, error: null } });
+    const missing = await check({ revision_of: '00000000-0000-4000-8000-0000000000bb' });
+    expect(missing).toMatchObject({ error: 'That attempt cannot be revised.' });
+
+    mocks.client = buildClient({ synthesis_attempts: { data: { id: 'a1', revision_of: 'a0' }, error: null } });
+    const chained = await check({ revision_of: '00000000-0000-4000-8000-0000000000bb' });
+    expect(chained).toMatchObject({ error: 'That attempt cannot be revised.' });
+    expect(mocks.reserveAiCall).not.toHaveBeenCalled();
   });
 
   it('honours pull_forward = false even with a verified contradiction', async () => {
@@ -349,6 +455,28 @@ describe('generateSynthesisDrills', () => {
     ]);
     expect(rows[0].generation_meta).toMatchObject({ clustering: 'tags', model: 'gemini-test', requested_format: 'causal' });
     expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ created: 1 }), 'r1');
+  });
+
+  it('archives drills whose cards were deleted and excludes them from the active cap', async () => {
+    const zombie = { id: 'zombie', card_ids: ['00000000-0000-4000-8000-0000000000dd', '00000000-0000-4000-8000-0000000000ee'] };
+    const live = { id: 'live', card_ids: [CARD_A, CARD_B] };
+    const client = createSupabaseMock({
+      tables: {
+        decks: { data: { id: DECK_ID, title: 'OS' }, error: null },
+        cards: { data: taggedCards, error: null },
+        synthesis_drills: { data: [zombie, live], error: null },
+      },
+    });
+    mocks.client = client;
+    respondWith({ ...validDraft, required_links: validDraft.required_links.map((link) => ({ ...link, card_keys: ['c1', 'c2'] })) });
+
+    const { generateSynthesisDrills } = await import('./synthesis');
+    const result = await generateSynthesisDrills({ deck_id: DECK_ID, count: 1 });
+    expect(result).toMatchObject({ success: true });
+
+    const archive = chainsFor(client, 'synthesis_drills').find((chain) => chain.update.mock.calls.length > 0);
+    expect(archive?.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'archived' }));
+    expect(archive?.in).toHaveBeenCalledWith('id', ['zombie']);
   });
 
   it('counts a draft that fails validation as failed rather than saving it', async () => {

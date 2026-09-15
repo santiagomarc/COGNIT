@@ -61,6 +61,12 @@ export type RetryOptions = {
   /** Label used in server logs. */
   label: string;
   signal?: AbortSignal;
+  /**
+   * Narrows which retryable failures are actually retried. A check that
+   * already waited out an 8 s deadline should not wait out another one;
+   * pass `(kind) => kind !== 'timeout'`. Never widens the RETRYABLE set.
+   */
+  shouldRetry?: (kind: AiFailureKind, attempt: number) => boolean;
 };
 
 function sleep(ms: number, signal?: AbortSignal) {
@@ -95,11 +101,14 @@ export async function withGeminiRetry<T>(
     try {
       return await operation(attempt);
     } catch (error) {
-      lastKind = classifyAiError(error);
+      // An operation that has already classified its own failure (a truncated
+      // response raised as bad_request, say) keeps that classification.
+      lastKind = error instanceof AiServiceError ? error.kind : classifyAiError(error);
       lastMessage = error instanceof Error ? error.message : String(error);
 
       const isLastAttempt = attempt === maxAttempts;
-      if (!RETRYABLE.has(lastKind) || isLastAttempt) {
+      const retryable = RETRYABLE.has(lastKind) && (options.shouldRetry?.(lastKind, attempt) ?? true);
+      if (!retryable || isLastAttempt) {
         logger.error(`ai:${options.label}`, `${lastKind} after ${attempt} attempt(s)`, { error: lastMessage });
         throw new AiServiceError(lastKind, lastMessage, attempt);
       }

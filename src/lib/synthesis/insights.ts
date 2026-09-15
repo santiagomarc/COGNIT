@@ -4,7 +4,7 @@
  * the database. No RPC — the same trade `loadScheduleBreakdown` makes.
  */
 
-import type { LinkCoverage, SynthesisDrill, SynthesisReadings, WeakLinkRow } from '@/lib/synthesis/types';
+import type { Confidence, DrillReadingRow, DrillVerdict, LinkCoverage, SynthesisReadings, WeakLinkRow } from '@/lib/synthesis/types';
 
 export type AttemptForInsights = {
   drillId: string;
@@ -17,56 +17,48 @@ export type AttemptForInsights = {
 
 export const WEAK_LINK_MIN_SIGNALS = 2;
 
-/** Newest attempt per drill; `attempts` may be in any order. */
-export function latestAttemptByDrill<T extends { drillId: string; createdAt: string }>(attempts: T[]): Map<string, T> {
-  const latest = new Map<string, T>();
-  for (const attempt of attempts) {
-    const current = latest.get(attempt.drillId);
-    if (!current || current.createdAt < attempt.createdAt) latest.set(attempt.drillId, attempt);
-  }
-  return latest;
-}
-
 /**
- * `LINKS a/b`: over each active drill's latest attempt, covered links over
- * required links. A drill never attempted contributes 0 / n.
+ * `DUE n · LINKS a/b · LAST`, from the drill rows alone (audit P1): each
+ * active drill carries its key's size and its latest attempt's covered
+ * count, so the launcher never reads the attempts table. A drill never
+ * attempted contributes 0 / n.
  */
-export function linksCoveredLatest(
-  drills: SynthesisDrill[],
-  latest: ReadonlyMap<string, { coverage: LinkCoverage[] }>,
-): { covered: number; total: number } {
-  let covered = 0;
-  let total = 0;
-  for (const drill of drills) {
-    if (drill.status !== 'active') continue;
-    total += drill.requiredLinks.length;
-    const attempt = latest.get(drill.id);
-    if (attempt) covered += attempt.coverage.filter((entry) => entry.status === 'covered').length;
-  }
-  return { covered, total };
-}
-
-export function deckReadings(input: {
-  drills: SynthesisDrill[];
-  attempts: AttemptForInsights[];
-  now: Date;
-}): SynthesisReadings {
-  const active = input.drills.filter((drill) => drill.status === 'active');
+export function deckReadings(input: { rows: DrillReadingRow[]; now: Date }): SynthesisReadings {
+  const active = input.rows.filter((row) => row.status === 'active');
   const nowMs = input.now.getTime();
-  const latest = latestAttemptByDrill(input.attempts);
-  const links = linksCoveredLatest(active, latest);
-  const lastAttemptAt = input.attempts.reduce<string | null>(
-    (best, attempt) => (best === null || attempt.createdAt > best ? attempt.createdAt : best),
-    null,
-  );
+  let linksCovered = 0;
+  let linksTotal = 0;
+  let lastAttemptAt: string | null = null;
+  for (const row of active) {
+    linksTotal += row.linkCount;
+    linksCovered += row.lastLinksCovered ?? 0;
+    if (row.lastAttemptAt && (lastAttemptAt === null || row.lastAttemptAt > lastAttemptAt)) lastAttemptAt = row.lastAttemptAt;
+  }
 
   return {
     activeDrills: active.length,
-    due: active.filter((drill) => new Date(drill.nextDueAt).getTime() <= nowMs).length,
-    linksCovered: links.covered,
-    linksTotal: links.total,
+    due: active.filter((row) => new Date(row.nextDueAt).getTime() <= nowMs).length,
+    linksCovered,
+    linksTotal,
     lastAttemptAt,
   };
+}
+
+/**
+ * Calibration (audit F1): the share of attempts whose confidence matched the
+ * verdict — *sure* and sound, *unsure* and not sound; *fairly sure* always
+ * counts as matched, it is the honest middle. Null until there are attempts
+ * with a confidence at all.
+ */
+export function calibrationRate(attempts: { confidence: Confidence | null; verdict: DrillVerdict }[]): number | null {
+  const rated = attempts.filter((attempt) => attempt.confidence !== null && attempt.verdict !== 'off_target');
+  if (rated.length === 0) return null;
+  const matched = rated.filter((attempt) =>
+    attempt.confidence === 2
+    || (attempt.confidence === 3 && attempt.verdict === 'sound')
+    || (attempt.confidence === 1 && attempt.verdict !== 'sound'),
+  ).length;
+  return matched / rated.length;
 }
 
 export function outsideClaimsSince(attempts: AttemptForInsights[], since: Date): number {

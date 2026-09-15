@@ -11,6 +11,8 @@ export type LinkStatus = 'covered' | 'partial' | 'missing';
 export type AnswerMode = 'outline' | 'free';
 /** Index into LADDER_DAYS (schedule.ts). */
 export type Step = 0 | 1 | 2;
+/** Judgement of learning before the check: 1 unsure · 2 fairly sure · 3 sure. */
+export type Confidence = 1 | 2 | 3;
 
 export const SYNTHESIS_FORMATS: readonly SynthesisFormat[] = ['causal', 'counterfactual', 'comparative'];
 
@@ -34,6 +36,16 @@ export type SynthesisDrill = {
   lastVerdict: DrillVerdict | null;
   lastAttemptAt: string | null;
 };
+
+/**
+ * What the drill canvas receives at page load: never the answer key. The
+ * required links, the exemplar and the cards' definitions come back with
+ * the check, once the answer has been given (audit P3).
+ */
+export type CanvasDrill = Omit<SynthesisDrill, 'requiredLinks' | 'exemplar'> & { linkCount: number };
+
+/** An anchor as the canvas sees it before the check: the term only. */
+export type CanvasAnchor = Pick<AnchorCard, 'id' | 'key' | 'term'>;
 
 /**
  * The projection the study completion screen needs to offer a capstone
@@ -78,6 +90,15 @@ export type Diagnostic = {
   linksCovered: number;
   linksTotal: number;
   schedule: { step: Step; nextDueAt: string };
+  /** What the student said before the check, echoed so the result can show the calibration line. */
+  confidence: Confidence | null;
+};
+
+/** The answer key and the cards, returned with the check — never before it. */
+export type DrillReveal = {
+  requiredLinks: { id: string; text: string }[];
+  exemplar: Exemplar;
+  cards: { id: string; term: string; definition: string; explanation: string | null }[];
 };
 
 /** The last attempt on a drill, as the canvas shows it before answering. */
@@ -117,6 +138,19 @@ export type SynthesisReadings = {
   linksTotal: number;
   lastAttemptAt: string | null;
 };
+
+/** The narrow drill row the launcher's readings are computed from (audit P1). */
+export type DrillReadingRow = {
+  status: 'active' | 'archived';
+  nextDueAt: string;
+  linkCount: number;
+  lastLinksCovered: number | null;
+  lastAttemptAt: string | null;
+};
+
+export function isConfidence(value: unknown): value is Confidence {
+  return value === 1 || value === 2 || value === 3;
+}
 
 export function isDrillVerdict(value: unknown): value is DrillVerdict {
   return value === 'sound' || value === 'partial' || value === 'contradicted' || value === 'off_target';

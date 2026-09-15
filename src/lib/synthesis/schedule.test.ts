@@ -155,6 +155,18 @@ describe('orderQueue — orders, never locks', () => {
   });
 });
 
+describe('nextSchedule — confidence', () => {
+  it('brings a sure-but-partial answer back in 12 h and leaves every other cell alone', () => {
+    const partialSure = nextSchedule(1, 'partial', NOW, { confidence: 3 });
+    expect(partialSure.step).toBe(1);
+    expect(partialSure.nextDueAt.getTime() - NOW.getTime()).toBe(12 * HOUR);
+    expect(nextSchedule(1, 'partial', NOW, { confidence: 1 }).nextDueAt.getTime() - NOW.getTime()).toBe(24 * HOUR);
+    expect(nextSchedule(1, 'partial', NOW, { confidence: null }).nextDueAt.getTime() - NOW.getTime()).toBe(24 * HOUR);
+    expect(nextSchedule(0, 'sound', NOW, { confidence: 1 })).toEqual(nextSchedule(0, 'sound', NOW));
+    expect(nextSchedule(1, 'contradicted', NOW, { confidence: 3 })).toEqual(nextSchedule(1, 'contradicted', NOW));
+  });
+});
+
 describe('pickCapstoneDrill', () => {
   const good = (cardId: string) => ({ cardId, grade: 'good' as const });
 

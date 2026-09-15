@@ -56,6 +56,22 @@ export function normalizeQuizMode(rawMode: string | string[] | undefined): QuizM
   return modeValue === 'identification' ? 'identification' : 'mcq';
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * An explicit card list for a session (`?cards=id,id,…`): the drill canvas
+ * hands the cards it pulled forward straight to a review, and Insights hands
+ * over the weak-link cards. Unknown or malformed ids are dropped, duplicates
+ * collapsed, and the list is capped at the session maximum. Empty means
+ * "no explicit list" — the scope decides as usual.
+ */
+export function parseSessionCardIds(raw: string | string[] | undefined): string[] {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return [];
+  const ids = value.split(',').map((id) => id.trim()).filter((id) => UUID_PATTERN.test(id));
+  return [...new Set(ids)].slice(0, MAX_SESSION_CARD_COUNT);
+}
+
 export function normalizeStudyScope(rawScope: string | string[] | undefined): StudyScope {
   const scopeValue = Array.isArray(rawScope) ? rawScope[0] : rawScope;
 

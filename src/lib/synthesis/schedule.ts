@@ -7,13 +7,15 @@
  * the action, as one filtered update).
  */
 
-import type { CapstoneDrillCandidate, DrillVerdict, Step, SynthesisDrill } from '@/lib/synthesis/types';
+import type { CapstoneDrillCandidate, Confidence, DrillVerdict, Step, SynthesisDrill } from '@/lib/synthesis/types';
 
 /** index = step, value = days until the next due after a `sound` verdict. */
 export const LADDER_DAYS = [0, 1, 2] as const;
 export const MAX_STEP: Step = 2;
 export const PARTIAL_RETRY_HOURS = 24;
 export const CONTRADICTED_RETRY_HOURS = 12;
+/** A student who was *sure* and was not sound retries sooner: overconfidence is the thing to fix first. */
+export const OVERCONFIDENT_RETRY_HOURS = 12;
 
 const HOUR_MS = 60 * 60_000;
 const DAY_MS = 24 * HOUR_MS;
@@ -22,14 +24,28 @@ function toStep(value: number): Step {
   return Math.max(0, Math.min(MAX_STEP, Math.floor(value))) as Step;
 }
 
-export function nextSchedule(step: Step, verdict: DrillVerdict, now: Date): { step: Step; nextDueAt: Date } {
+/**
+ * @param options.confidence The student's judgement before the check (1 unsure ·
+ * 2 fairly sure · 3 sure). Only one cell changes the schedule: sure × partial
+ * comes back in 12 h instead of 24 h — a miscalibrated "sure" is the gap
+ * most worth closing while it is fresh. Unsure × sound changes nothing; the
+ * student is already calibrated toward caution.
+ */
+export function nextSchedule(
+  step: Step,
+  verdict: DrillVerdict,
+  now: Date,
+  options: { confidence?: Confidence | null } = {},
+): { step: Step; nextDueAt: Date } {
   switch (verdict) {
     case 'sound': {
       const next = toStep(step + 1);
       return { step: next, nextDueAt: new Date(now.getTime() + LADDER_DAYS[next] * DAY_MS) };
     }
-    case 'partial':
-      return { step: toStep(step), nextDueAt: new Date(now.getTime() + PARTIAL_RETRY_HOURS * HOUR_MS) };
+    case 'partial': {
+      const hours = options.confidence === 3 ? OVERCONFIDENT_RETRY_HOURS : PARTIAL_RETRY_HOURS;
+      return { step: toStep(step), nextDueAt: new Date(now.getTime() + hours * HOUR_MS) };
+    }
     case 'contradicted':
       return { step: toStep(step - 1), nextDueAt: new Date(now.getTime() + CONTRADICTED_RETRY_HOURS * HOUR_MS) };
     case 'off_target':

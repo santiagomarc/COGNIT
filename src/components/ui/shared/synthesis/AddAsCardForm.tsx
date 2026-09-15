@@ -45,7 +45,13 @@ export function AddAsCardForm({ deckId, claim }: AddAsCardFormProps) {
 
   const submit = () => {
     startTransition(async () => {
-      const result = await createCard({ deck_id: deckId, front: term.trim(), back: description.trim() });
+      let result: Awaited<ReturnType<typeof createCard>>;
+      try {
+        result = await createCard({ deck_id: deckId, front: term.trim(), back: description.trim() });
+      } catch {
+        toast.error('Could not add the card. Check your connection and try again.');
+        return;
+      }
       if (result && 'error' in result && result.error) {
         toast.error(formatActionError(result.error, 'Failed to add the card.'));
         return;

@@ -5,7 +5,7 @@
  */
 
 import type { TickState } from '@/components/ui/shared/StateTick';
-import type { DrillVerdict, LinkStatus, SynthesisFormat } from '@/lib/synthesis/types';
+import type { Confidence, DrillVerdict, LinkStatus, SynthesisFormat } from '@/lib/synthesis/types';
 
 export type Tone = 'ink' | 'due' | 'learning' | 'mastered' | 'lapsed' | 'streak';
 
@@ -59,6 +59,14 @@ export const SLOT_PLACEHOLDERS: Record<SynthesisFormat, { claim: string; mechani
 };
 
 export const FREE_TEXT_PLACEHOLDER = 'Position, mechanism, limit — in that order.';
+
+/** Judgement of learning before the check (audit F1); the digit is the hotkey. */
+export const CONFIDENCE_LABEL: Record<Confidence, string> = {
+  1: 'Unsure',
+  2: 'Fairly sure',
+  3: 'Sure',
+};
+export const CONFIDENCE_OPTIONS: readonly Confidence[] = [1, 2, 3];
 
 /**
  * sound → mastered · partial → due · contradicted → lapsed · off_target → the

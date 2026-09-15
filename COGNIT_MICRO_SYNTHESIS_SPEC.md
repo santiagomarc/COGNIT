@@ -1,7 +1,7 @@
 # Cognit — Micro-Synthesis & Argument Outlining
 
 **Technical specification · Rev. B.1 — supersedes `COGNIT_ESSAY_ENGINE_SPEC.md` (Rev. A)**
-**Status:** Phases 0–2 implemented (B.1 adjustments of 2026-09-12: no readiness gate, exam-sprint ladder, AI-verified outside claims; Phase 2 capstone and dashboard reading landed the same day) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`, Phase 2 on `983830d`
+**Status:** Phases 0–3 implemented (B.1 adjustments of 2026-09-12: no readiness gate, exam-sprint ladder, AI-verified outside claims; Phase 2 capstone and dashboard reading the same day; Phase 3 — the audit's fix week, correctness, performance, session and feature items — on 2026-09-15, see `COGNIT_MICRO_SYNTHESIS_AUDIT.md`) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`, Phases 2–3 on `983830d`
 **Applies to:** Next.js 16 (App Router) · React 19 · TypeScript strict · Supabase Postgres + pgvector · Gemini 2.5 Flash via `@google/generative-ai` 0.24 · Tailwind v4 · Vitest 4
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C), `COGNIT_HANDOFF.md`
 
@@ -703,8 +703,8 @@ first, because it is the part that matters most if the output is ever truncated.
 | Field | Check | Outcome |
 |---|---|---|
 | `coverage` | must contain every drill link id exactly once | missing ids added as `missing`; unknown ids dropped |
-| `coverage[].evidence` | `verifyQuote`: normalised substring of the answer, ≥ 8 chars | not found → `evidence: null` (status kept — coverage drives no card state, so a paraphrased quote is not worth a false negative) |
-| `contradictions[]` | `card_key` resolves **and** `card_says` is a normalised substring of that card's `front + back + explanation` (≥ 8 chars) **and** `statement` is found in the answer | either check fails → moved to `outside_claims` as `verified: false` with the model's `card_says` as the assessment; only verified rows can pull a card forward |
+| `coverage[].evidence` | `findQuote`: verbatim (`verifyQuote`, normalised substring ≥ 8 chars) **or** located (`locateQuote`, ≥ 80 % of the quote's tokens in order within one window of the answer, number/tense folded); a located quote is displayed as the answer's own span | not found either way → `evidence: null` (status kept — coverage drives no card state, so a paraphrased quote is not worth a false negative) |
+| `contradictions[]` | `card_key` resolves **and** `card_says` is found (verbatim or located) in that card's `front + back + explanation` **and** `statement` is found in the answer; what is displayed is always the span the server found | either check fails → **dropped** and counted in `usage.dropped_contradictions` — never shown, never an outside claim (Phase 3, audit R6); only verified rows can pull a card forward |
 | `outside_claims[]` | `ai_assessment` ≤ 300 chars, `term_suggestion` ≤ 60, `[redacted]` stripped | — |
 | `gap_note` | ≤ 400 chars, `[redacted]` stripped | — |
 
@@ -972,13 +972,13 @@ in this schema (design system §7.6 naming trap); the UI labels them *Term* and 
 | File | Exports | Tests |
 |---|---|---|
 | `types.ts` | §9.2 | — |
-| `text.ts` | `countWords`, `responseText`, `renderResponseForModel`, `fenceAnswer`, `verifyQuote`, `normaliseForQuote` | `text.test.ts` |
+| `text.ts` | `countWords`, `responseText`, `renderResponseForModel`, `fenceAnswer`, `verifyQuote`, `locateQuote`, `findQuote`, `normaliseForQuote` | `text.test.ts` |
 | `clusters.ts` | `selectDrillClusters`, `pairKey` | `clusters.test.ts` |
 | `prompts.ts` | `buildDrillGenerationInstruction`, `buildDrillCheckInstruction`, `renderCards`, `renderAnswerKey`, `BANNED_STEMS`, `validateDrillDraft` | `prompts.test.ts` |
 | `schemas.ts` | `DRILL_GENERATION_SCHEMA`, `DRILL_CHECK_SCHEMA` (Gemini) + `drillGenerationOutputSchema`, `drillCheckOutputSchema` (Zod) | round-trip in `verdict.test.ts` |
 | `verdict.ts` | `reconcileDiagnostic`, `computeVerdict`, `verifyContradiction` | `verdict.test.ts` |
 | `schedule.ts` | `LADDER_DAYS`, `nextSchedule`, `orderQueue`, `pickCapstoneDrill` | `schedule.test.ts` |
-| `insights.ts` | `aggregateWeakLinks`, `deckReadings`, `linksCoveredLatest` | `insights.test.ts` |
+| `insights.ts` | `aggregateWeakLinks`, `deckReadings` (from drill rows), `calibrationRate`, `outsideClaimsSince` | `insights.test.ts` |
 
 ### 9.5 File map
 
@@ -1237,7 +1237,7 @@ the telemetry strip wraps to two rows; the prompt stays at 24 px.
 | `prompts` / `validateDrillDraft` | banned stems; < 2 terms named → reject; unresolvable keys dropped; < 2 links → reject; exemplar > 110 words → reject; ids `m1…mn` assigned in order |
 | `verdict` | every branch of `computeVerdict`; missing link ids filled as `missing`; unknown ids dropped; contradiction with `card_says` not in the card → outside claim, `verified: false`; evidence not found → `null`, status kept; outside claims never change the verdict |
 | `schedule` | ladder for every (step, verdict): sound 1 d → 2 d → 2 d, partial 24 h, contradicted 12 h and step −1, off_target stays due; step cap at 2 and floor at 0; `orderQueue` never drops a drill, due first, relearning boost, no shared card in one launch, `?drill=` first; `pickCapstoneDrill` preference order |
-| `insights` | `linksCoveredLatest` uses only the latest attempt per drill; weak-links threshold and sort; 30-day outside count |
+| `insights` | `deckReadings` sums `link_count` / `last_links_covered` over active rows and reports the newest attempt; `calibrationRate` matches sure↔sound and unsure↔not-sound, ignores off-target; weak-links threshold and sort; 30-day outside count |
 
 ### 11.2 Actions
 
@@ -1294,6 +1294,38 @@ clean · `npm test` **313 passed / 31 files** (+3 `pickCapstoneDrill` tests, +4 
 call, no schema change: both readings are bounded selects on `synthesis_drills` through the
 existing RLS and index.
 
+Phase 3 (2026-09-15) implements the audit's findings; gate: `npx tsc --noEmit` clean ·
+`npm run lint` clean · `npm test` **336 passed / 32 files** · `npm run build` **16 routes**.
+One migration, `202609150900_micro_synthesis_phase3.sql` (not applied — owner's call, as
+before): two denormalised readings columns on `synthesis_drills`, three attempt columns
+(`client_attempt_id` with a partial unique index, `confidence`, `revision_of`), and the
+`synthesis_attempt_feedback` table. `database.types.ts` carries them by hand until
+`supabase gen types` is re-run. **The deploy order is load-bearing:** every check now writes
+`confidence`, `client_attempt_id` and `revision_of`, every generation writes `link_count`,
+and the launcher reads `link_count` / `last_links_covered` — deploy this code before
+`supabase db push` and every check fails at the attempt insert, after the model call.
+`npm run verify:deployment` probes the new columns by name for exactly this reason. Things
+this document said that the code now does differently, all deliberate and all from the audit:
+
+- **Contradictions are matched loosely and dropped when unmatched** (§7.4, audit R6).
+  `locateQuote` accepts a model quote when ≥ 80 % of its tokens appear in order within one
+  window of the text (a crude stemmer folds number and tense); the span *displayed* is the
+  one the server located, verbatim, never the model's paraphrase. A contradiction that
+  matches neither way is dropped and counted (`usage.dropped_contradictions`), not shown as an
+  "outside claim" — the demotion path in §7.4 is gone.
+- **The canvas never holds the answer key** (§9.3 / §10.6, audit P3). The page ships
+  `CanvasDrill` (no `required_links`, no `exemplar`) and anchors as terms only; the check
+  returns `reveal` — links, exemplar, cards — alongside the diagnostic.
+- **The output cap is `GEMINI_MODEL_MAX_TOKENS`**, not 640 / 768 (§6.2 / §7.2, audit R3); a
+  `MAX_TOKENS` finish is raised as `bad_request` and never retried at the same cap. Model
+  output maxima are clamped, not rejected (audit R4). The check does not retry a timeout.
+- **Readings come from the drill rows alone** (§9.3, audit P1): `link_count` at insert,
+  `last_links_covered` at check; the deck overview no longer reads attempts.
+- **`sound` still ignores structure**, but `claim_present` / `tradeoff_present` are overridden
+  to false for an empty outline slot, whatever the model said (audit R9).
+- **Confidence and revision** (audit F1 / F2, below) add to the check's input and the
+  attempt row; sure × partial retries in 12 h (§8.1).
+
 Two things this document said that the code does differently, deliberately:
 
 - **Write order in `checkSynthesisAttempt` is cards → attempt → drill**, not attempt → drill
@@ -1346,6 +1378,28 @@ Deploy order as the README mandates: `supabase db push`, then the app.
 | 2.4 | `(focus)/[deckId]/synthesis/page.tsx` — `?from=study` serves exactly the pinned drill; `SynthesisDrillClient` `from` prop labels the header `CAPSTONE 1/1` | |
 | 2.5 | `DueNowBand` `dueDrills` prop and sub-line reading; `(shell)/page.tsx` loads it in the dashboard `Promise.all` and links the deck with the most due | the hue is `--state-due` on the count, paired with *drills due* |
 | Gate | Phase 0 gate · UAT J7 | Phase 0 gate **passed**; J7 needs the migration applied |
+
+### 12.2c Phase 3 — the audit (2026-09-15)
+
+| # | Task | Notes |
+|---|---|---|
+| 3.1 | Guard every action call in a transition; `maxDuration = 60` on the synthesis and deck pages; quit blocked while checking; `finishReason` read; clamped output schemas; orphaned drills archived on generation; language rule in both prompts | audit R1 R2 R3 R4 R5 R7 R9 |
+| 3.2 | `locateQuote` / `findQuote` fuzzy verification with verbatim spans; unmatched contradictions dropped and logged; empty-slot override for structure | audit R6 R9 — `text.test.ts` +4, `verdict.test.ts` +2 |
+| 3.3 | `CanvasDrill` / `CanvasAnchor` projection; `DrillReveal` returned by the check; result panel renders links from the reveal and adds the *Cards* well and *Review card* links | audit P3 U4 |
+| 3.4 | `client_attempt_id` idempotency: same key → the stored attempt replayed, no reservation, no model call | audit R8 — migration + `parseStoredAttempt` |
+| 3.5 | `loadSynthesisReadings` reads four narrow columns; generation reads explanations for chosen cards only and batches the embedding fallback; the canvas page reads deck and queue in parallel | audit P1 P2 — `insights.test.ts` reworked |
+| 3.6 | `DrillSessionSummary` with *Review pulled cards now*; study page `?cards=` explicit sessions; focus moves to the verdict and to each new prompt; per-slot focus label; checking clock in seconds and a slow-check line; over-limit as a word; undo on archive; empty canvas offers generation | audit U1 U2 U3 U5 F4 — `study.test.ts` |
+| 3.7 | `ConfidencePicker` (1 / 2 / 3), required before a check; calibration line on the result; `calibration30d` on Insights; sure × partial → 12 h | audit F1 — `schedule.test.ts` +1, `insights.test.ts` +1 |
+| 3.8 | Two-stage feedback: exemplar behind a disclosure after partial / contradicted, one *Revise* (`R`) per drill per launch, `revision_of` on the attempt | audit F2 |
+| 3.9 | `TopicGenerateRow` — the launcher's topic select for `focus_topic`; generation toast names the topics; Weak links → *Review these cards* | audit F3 U5 |
+| 3.10 | `CheckFeedback` (fair / unfair + note) → `rateSynthesisAttempt` → `synthesis_attempt_feedback`; `production-assertions.sql` 9–11; `verify-deployment.mjs` column probes | audit F5 §6 |
+| Gate | Phase 0 gate | **passed** — 336 tests / 32 files, 16 routes |
+
+Deliberately not done: card-text sanitisation for the prompts (audit R9 — the sanitiser's
+`system:` / `user:` pattern would redact legitimate definitions in systems and HCI decks;
+the server-computed verdict already bounds the damage), the exam-date cadence (F6, a deck
+column and header UI beyond this feature), drill edit / regenerate (F7), voice input (F8)
+and shared-deck drills (F9).
 
 ### 12.3 Decisions resolved by B.1
 

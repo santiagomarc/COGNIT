@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
-import { GenerateSynthesisDrillsButton } from '@/components/ui/shared/synthesis/GenerateSynthesisDrillsButton';
+import { TopicGenerateRow } from '@/components/ui/shared/synthesis/TopicGenerateRow';
 import { MAX_ACTIVE_DRILLS_PER_DECK, MIN_DECK_CARDS_FOR_DRILLS } from '@/lib/synthesis/clusters';
 import type { SynthesisReadings } from '@/lib/synthesis/types';
 import { formatAge } from '@/lib/synthesis/ui';
@@ -9,6 +9,8 @@ type SynthesisLauncherProps = {
   deckId: string;
   readings: SynthesisReadings;
   cardCount: number;
+  /** The deck's most common topic tags, for topic-directed generation (audit F3). */
+  topics?: string[];
 };
 
 const COUNT_OPTIONS = [1, 3, 5] as const;
@@ -24,7 +26,7 @@ const CHIP =
  * `DUE` is informational, never a lock: the form starts a drill whenever the
  * deck has any (B.1 "drill anytime").
  */
-export function SynthesisLauncher({ deckId, readings, cardCount }: SynthesisLauncherProps) {
+export function SynthesisLauncher({ deckId, readings, cardCount, topics = [] }: SynthesisLauncherProps) {
   const tooFewCards = cardCount < MIN_DECK_CARDS_FOR_DRILLS;
   const hasDrills = readings.activeDrills > 0;
   const linksPct = readings.linksTotal > 0 ? readings.linksCovered / readings.linksTotal : 0;
@@ -54,16 +56,18 @@ export function SynthesisLauncher({ deckId, readings, cardCount }: SynthesisLaun
             />
             <Telemetry label="Last" value={formatAge(readings.lastAttemptAt)} />
             <Telemetry label="Active" value={readings.activeDrills} />
-            {readings.activeDrills < MAX_ACTIVE_DRILLS_PER_DECK ? (
-              <GenerateSynthesisDrillsButton
-                deckId={deckId}
-                count={3}
-                variant="ghost"
-                label="+ 3 more"
-                className="ml-auto h-[24px] px-2 text-[12px]"
-              />
-            ) : null}
           </div>
+          {readings.activeDrills < MAX_ACTIVE_DRILLS_PER_DECK ? (
+            <TopicGenerateRow
+              deckId={deckId}
+              topics={topics}
+              count={3}
+              variant="ghost"
+              label="+ 3 more"
+              buttonClassName="h-[30px] px-2 text-[12px]"
+              className="mt-3 flex flex-wrap items-center gap-2"
+            />
+          ) : null}
 
           <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink">
             <input type="checkbox" name="pull" value="1" defaultChecked className="size-[13px] accent-[var(--accent)]" />
@@ -103,7 +107,7 @@ export function SynthesisLauncher({ deckId, readings, cardCount }: SynthesisLaun
         </p>
       ) : (
         <div className="mt-auto pt-3.5">
-          <GenerateSynthesisDrillsButton deckId={deckId} count={3} className="h-[30px] w-full" />
+          <TopicGenerateRow deckId={deckId} topics={topics} count={3} buttonClassName="h-[30px] flex-1" className="flex flex-wrap items-center gap-2" />
         </div>
       )}
     </form>

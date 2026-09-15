@@ -22,6 +22,13 @@ import { loadSynthesisReadings } from '@/lib/synthesis/loaders';
 import { logger } from '@/lib/logger';
 import type { CardSource } from '@/index';
 
+/**
+ * Drill generation is invoked from this page: up to five parallel model calls
+ * with a 12 s deadline each, retried once. The platform default (10–15 s
+ * without Fluid compute) is below that worst case (audit R2).
+ */
+export const maxDuration = 60;
+
 type DeckCardRow = {
   id: string;
   deck_id: string;
@@ -495,6 +502,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
               estimatedMinutes={estimateSessionMinutes(schedule.due)}
               sessionBounds={sessionBounds}
               synthesisReadings={synthesisReadings}
+              synthesisTopics={topTopics.map(([tag]) => tag)}
             />
           ) : null}
 

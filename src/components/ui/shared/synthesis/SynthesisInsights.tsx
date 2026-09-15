@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { Button } from '@/components/ui/button';
 import { StateTick } from '@/components/ui/shared/StateTick';
+import { MAX_SESSION_CARD_COUNT } from '@/lib/study';
 import { loadSynthesisInsights, type SynthesisInsights } from '@/lib/synthesis/loaders';
 import { FORMAT_LABEL, VERDICT_LABEL, VERDICT_TICK, formatAge, formatClock } from '@/lib/synthesis/ui';
 
@@ -20,22 +22,31 @@ const loadForCurrentUser = cache(async (deckId: string): Promise<SynthesisInsigh
  * "Weak links" (spec §8.5): per card, how often a link citing it went missing
  * and how often a verified contradiction named it. The shape of
  * `WeakestConcepts`: rows of type with numbers right-aligned; the only hue is
- * `--state-lapsed` on a contradiction count above zero.
+ * `--state-lapsed` on a contradiction count above zero. The panel has one
+ * action (audit U5): review exactly these cards.
  */
 export async function WeakLinks({ deckId }: { deckId: string }) {
   const insights = await loadForCurrentUser(deckId);
   if (!insights || insights.attemptCount === 0) return null;
 
+  const weakCardIds = insights.weakLinks.slice(0, MAX_SESSION_CARD_COUNT).map((row) => row.cardId);
+
   return (
     <section className="surface p-5 md:p-6">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2 className={LABEL}>Weak links</h2>
         <p className={`${LABEL} tnum`}>
           Outside claims 30d <span className="text-ink">{insights.outsideClaims30d}</span>
+          {insights.calibration30d !== null ? (
+            <>
+              {' · '}Calibration 30d <span className="text-ink">{Math.round(insights.calibration30d * 100)}%</span>
+            </>
+          ) : null}
         </p>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">
         Cards whose links went missing or were contradicted in your drills.
+        {insights.calibration30d !== null ? ' Calibration is how often your confidence matched the verdict.' : null}
       </p>
 
       {insights.weakLinks.length === 0 ? (
@@ -63,6 +74,16 @@ export async function WeakLinks({ deckId }: { deckId: string }) {
           ))}
         </div>
       )}
+
+      {weakCardIds.length > 0 ? (
+        <div className="mt-4 flex justify-end">
+          <Button asChild variant="default" size="sm">
+            <Link href={`/dashboard/${deckId}/study?cards=${weakCardIds.join(',')}`}>
+              Review these {weakCardIds.length} {weakCardIds.length === 1 ? 'card' : 'cards'}
+            </Link>
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

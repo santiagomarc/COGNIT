@@ -63,7 +63,7 @@ where schemaname = 'public'
   and tablename in (
     'study_logs', 'quiz_results', 'quiz_card_results',
     'card_mastery_state', 'deck_chat_messages', 'deck_chat_sessions',
-    'synthesis_drills', 'synthesis_attempts'
+    'synthesis_drills', 'synthesis_attempts', 'synthesis_attempt_feedback'
   )
 order by tablename, cmd;
 
@@ -81,8 +81,51 @@ order by cmd;
 select tablename, policyname
 from pg_policies
 where schemaname = 'public'
-  and tablename in ('synthesis_drills', 'synthesis_attempts')
+  and tablename in ('synthesis_drills', 'synthesis_attempts', 'synthesis_attempt_feedback')
   and (policyname ilike '%shared%' or policyname ilike '%public%');
+
+-- 9. Phase 3 (202609150900) landed: both denormalised readings columns, the
+--    idempotency key with its partial unique index, and the feedback table.
+--    Expect 5 column rows and 1 index row.
+select table_name, column_name
+from information_schema.columns
+where table_schema = 'public'
+  and (
+    (table_name = 'synthesis_drills' and column_name in ('link_count', 'last_links_covered'))
+    or (table_name = 'synthesis_attempts' and column_name in ('client_attempt_id', 'confidence', 'revision_of'))
+  )
+order by table_name, column_name;
+
+select indexname, indexdef
+from pg_indexes
+where schemaname = 'public'
+  and indexname = 'synthesis_attempts_client_key_idx';
+
+-- 10. The AI usage allow-list still names both synthesis actions (a deploy
+--     before `db push` fails every synthesis call at reservation). Expect the
+--     constraint definition to contain 'synthesis_generate' and 'synthesis_check'.
+select conname, pg_get_constraintdef(oid) as definition
+from pg_constraint
+where conname = 'ai_usage_logs_action_check'
+  and pg_get_constraintdef(oid) like '%synthesis_generate%'
+  and pg_get_constraintdef(oid) like '%synthesis_check%';
+
+-- 11. Calibration and check latency, for tuning (audit F1/F5 and §11.3).
+--     Verdict distribution with p50/p95 model time in the last 30 days, and
+--     the share of checks rated unfair per verdict.
+select
+  a.verdict,
+  count(*) as attempts,
+  percentile_cont(0.5) within group (order by (a.usage->>'ms')::numeric) as p50_ms,
+  percentile_cont(0.95) within group (order by (a.usage->>'ms')::numeric) as p95_ms,
+  sum((a.usage->>'dropped_contradictions')::int) as dropped_contradictions,
+  count(f.id) filter (where f.rating = 'unfair') as rated_unfair,
+  count(f.id) as rated
+from public.synthesis_attempts a
+left join public.synthesis_attempt_feedback f on f.attempt_id = a.id
+where a.created_at > now() - interval '30 days'
+group by a.verdict
+order by attempts desc;
 
 -- ── Query plans ────────────────────────────────────────────────────
 -- Substitute a real deck id. Expect "Index Scan using

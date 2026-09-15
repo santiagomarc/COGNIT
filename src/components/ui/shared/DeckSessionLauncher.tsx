@@ -18,6 +18,8 @@ type DeckSessionLauncherProps = {
   sessionBounds: SessionBounds;
   /** The synthesis block's readings (COGNIT_MICRO_SYNTHESIS_SPEC.md §10.2). */
   synthesisReadings: SynthesisReadings;
+  /** The deck's most common topic tags, for topic-directed generation (audit F3). */
+  synthesisTopics?: string[];
 };
 
 const SCOPE_OPTIONS = [
@@ -60,6 +62,7 @@ export function DeckSessionLauncher({
   estimatedMinutes,
   sessionBounds,
   synthesisReadings,
+  synthesisTopics = [],
 }: DeckSessionLauncherProps) {
   const hasDue = dueCount > 0;
 
@@ -205,7 +208,7 @@ export function DeckSessionLauncher({
       </form>
 
       {/* ── Synthesis drills ── */}
-      <SynthesisLauncher deckId={deckId} readings={synthesisReadings} cardCount={totalCards} />
+      <SynthesisLauncher deckId={deckId} readings={synthesisReadings} cardCount={totalCards} topics={synthesisTopics} />
       </div>
     </section>
   );

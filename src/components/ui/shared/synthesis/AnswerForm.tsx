@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import type { AnchorCard, AnswerMode, OutlineResponse, SynthesisFormat } from '@/lib/synthesis/types';
+import type { AnswerMode, CanvasAnchor, OutlineResponse, SynthesisFormat } from '@/lib/synthesis/types';
 import { FREE_TEXT_PLACEHOLDER, SLOT_LABELS, SLOT_PLACEHOLDERS } from '@/lib/synthesis/ui';
 
 export type OutlineDraft = OutlineResponse;
@@ -19,9 +19,11 @@ type AnswerFormProps = {
   onOutlineChange: (outline: OutlineDraft) => void;
   freeText: string;
   onFreeTextChange: (text: string) => void;
-  anchors: AnchorCard[];
+  anchors: CanvasAnchor[];
   disabled: boolean;
   promptId: string;
+  /** Pinned above the slots while revising (audit F2): the gap note the revision answers. */
+  revisingFrom?: string | null;
 };
 
 const SLOT_CLASS =
@@ -44,6 +46,7 @@ export function AnswerForm({
   anchors,
   disabled,
   promptId,
+  revisingFrom = null,
 }: AnswerFormProps) {
   const labels = SLOT_LABELS[format];
   const placeholders = SLOT_PLACEHOLDERS[format];
@@ -91,6 +94,13 @@ export function AnswerForm({
   return (
     <div className="raised spec relative flex flex-col gap-4 p-4 md:p-5">
       <CornerBrackets />
+
+      {revisingFrom ? (
+        <div className="flex gap-3 rounded-[var(--radius-sm)] bg-surface-raised px-3 py-2" role="note">
+          <span className="slot-label shrink-0 pt-[3px]">Revising · gap</span>
+          <p className="text-[13px] leading-relaxed text-ink">{revisingFrom}</p>
+        </div>
+      ) : null}
 
       {/* Concept chips: the prompt names these anyway, so they are not a hint —
           they are typing accelerators. */}

@@ -7,22 +7,31 @@
  *
  * `propertyOrdering` is a documented Gemini field missing from the SDK's
  * 0.24 types (see ai-enrich.ts); it is spread past the type check the same way.
+ *
+ * Lenient parse, strict store (audit R4): minimums catch empty output, but
+ * a length overrun is clamped rather than failing a model call that
+ * otherwise succeeded. The database CHECKs remain the last line.
  */
 
 import { SchemaType, type Schema } from '@google/generative-ai';
 import { z } from 'zod';
 
+/** A non-empty string clamped to `max` characters instead of rejected past it. */
+const clamped = (min: number, max: number) => z.string().trim().min(min).transform((value) => value.slice(0, max));
+
 export const drillGenerationOutputSchema = z.object({
   format: z.enum(['causal', 'counterfactual', 'comparative']),
+  // The one true maximum: the DB rejects a longer prompt and a clamp would
+  // cut a question mid-sentence, so an overrun here is a retryable failure.
   prompt_text: z.string().trim().min(20).max(400),
   required_links: z.array(z.object({
-    text: z.string().trim().min(8).max(200),
+    text: clamped(8, 200),
     card_keys: z.array(z.string().regex(/^c[1-3]$/)).min(1).max(3),
   })).min(2).max(4),
   exemplar: z.object({
-    claim: z.string().trim().min(8).max(220),
-    mechanisms: z.tuple([z.string().trim().min(8).max(220), z.string().trim().min(8).max(220)]),
-    tradeoff: z.string().trim().min(8).max(220),
+    claim: clamped(8, 220),
+    mechanisms: z.tuple([clamped(8, 220), clamped(8, 220)]),
+    tradeoff: clamped(8, 220),
   }),
 });
 export type DrillGenerationOutput = z.infer<typeof drillGenerationOutputSchema>;
@@ -65,21 +74,21 @@ export const drillCheckOutputSchema = z.object({
   coverage: z.array(z.object({
     link_id: z.string().regex(/^m[1-4]$/),
     status: z.enum(['covered', 'partial', 'missing']),
-    evidence: z.string().max(200).nullable(),
+    evidence: z.string().nullable().transform((value) => (value === null ? null : value.slice(0, 200))),
   })).min(1).max(4),
   contradictions: z.array(z.object({
-    statement: z.string().min(1).max(240),
+    statement: clamped(1, 240),
     card_key: z.string().regex(/^c[1-3]$/),
-    card_says: z.string().min(1).max(240),
+    card_says: clamped(1, 240),
   })).max(3),
   outside_claims: z.array(z.object({
-    statement: z.string().min(1).max(240),
+    statement: clamped(1, 240),
     verified: z.boolean(),
-    ai_assessment: z.string().min(1).max(300),
-    term_suggestion: z.string().max(60),
+    ai_assessment: clamped(1, 300),
+    term_suggestion: z.string().trim().transform((value) => value.slice(0, 60)),
   })).max(3),
   structure: z.object({ claim_present: z.boolean(), tradeoff_present: z.boolean() }),
-  gap_note: z.string().min(1).max(400),
+  gap_note: clamped(1, 400),
   off_target: z.boolean(),
   injection_detected: z.boolean(),
 });

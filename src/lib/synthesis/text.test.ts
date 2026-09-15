@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   countWords,
   fenceAnswer,
+  findQuote,
+  locateQuote,
   normaliseForQuote,
   renderResponseForModel,
   responseText,
@@ -68,5 +70,34 @@ describe('stripRedactions', () => {
   it('removes sanitiser artefacts and collapses the gap they leave', () => {
     expect(stripRedactions('the OS must [redacted] the instruction')).toBe('the OS must the instruction');
     expect(stripRedactions('[REDACTED] leading')).toBe('leading');
+  });
+});
+
+describe('locateQuote / findQuote', () => {
+  const CARD = 'Time quantum — a quantum that is too large degenerates round-robin toward FCFS; too small spends the CPU on context switches.';
+
+  it('returns the verbatim span when the model dropped an article and changed a tense', () => {
+    const located = locateQuote('quantum too large degenerate round robin towards FCFS', CARD);
+    expect(located).not.toBeNull();
+    expect(located?.ratio).toBeGreaterThanOrEqual(0.8);
+    // Verbatim from the card, punctuation and case intact.
+    expect(located?.text).toBe('quantum that is too large degenerates round-robin toward FCFS');
+  });
+
+  it('refuses a quote the text does not contain', () => {
+    expect(locateQuote('CFS uses virtual runtime to pick the next task', CARD)).toBeNull();
+    expect(locateQuote('switches are free', CARD)).toBeNull();
+  });
+
+  it('lets a short quote differ only by number or tense, never by a word', () => {
+    expect(locateQuote('context free', CARD)).toBeNull();          // 2 tokens, half wrong
+    expect(locateQuote('context switch', CARD)).toEqual({ text: 'context switches', ratio: 1 });
+    expect(locateQuote('context switches', CARD)?.ratio).toBe(1);
+  });
+
+  it('findQuote prefers the model wording when it is verbatim, else the located span', () => {
+    expect(findQuote('too small spends the CPU', CARD)).toBe('too small spends the CPU');
+    expect(findQuote('too small spend CPU on context switch', CARD)).toBe('too small spends the CPU on context switches');
+    expect(findQuote('the scheduler is preemptive by default', CARD)).toBeNull();
   });
 });

@@ -2,9 +2,10 @@
 
 import { randomUUID } from 'node:crypto';
 import { revalidatePath } from 'next/cache';
+import { FinishReason, type GenerateContentResult } from '@google/generative-ai';
 import type { z } from 'zod';
 import { guardAction } from '@/lib/action-guard';
-import { withGeminiRetry } from '@/lib/ai-retry';
+import { AiServiceError, withGeminiRetry } from '@/lib/ai-retry';
 import { getServerEnv } from '@/lib/env-server';
 import { logger } from '@/lib/logger';
 import { MIN_CONTEXT_SIMILARITY } from '@/lib/rag';
@@ -12,9 +13,11 @@ import {
   archiveSynthesisDrillSchema,
   checkSynthesisAttemptSchema,
   generateSynthesisDrillsSchema,
+  rateSynthesisAttemptSchema,
   type ArchiveSynthesisDrillInput,
   type CheckSynthesisAttemptInput,
   type GenerateSynthesisDrillsInput,
+  type RateSynthesisAttemptInput,
 } from '@/lib/schemas';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import {
@@ -27,7 +30,13 @@ import {
   type ClusterCard,
   type DrillCluster,
 } from '@/lib/synthesis/clusters';
-import { DRILL_COLUMNS, rowToDrill, toAnchorCards, type DrillRow } from '@/lib/synthesis/loaders';
+import {
+  DRILL_COLUMNS,
+  parseStoredAttempt,
+  rowToDrill,
+  toAnchorCards,
+  type DrillRow,
+} from '@/lib/synthesis/loaders';
 import {
   buildCheckUserTurn,
   buildDrillCheckInstruction,
@@ -42,8 +51,8 @@ import {
   drillCheckOutputSchema,
   drillGenerationOutputSchema,
 } from '@/lib/synthesis/schemas';
-import { countWords, renderResponseForModel, responseText } from '@/lib/synthesis/text';
-import type { Diagnostic, Exemplar, SynthesisFormat } from '@/lib/synthesis/types';
+import { countWords, isOutlineResponse, renderResponseForModel, responseText } from '@/lib/synthesis/text';
+import type { AnchorCard, Diagnostic, DrillReveal, Exemplar, SynthesisDrill, SynthesisFormat } from '@/lib/synthesis/types';
 import { computeVerdict, countCovered, deriveCardIdSets, reconcileDiagnostic } from '@/lib/synthesis/verdict';
 import {
   getGeminiJsonModel,
@@ -60,24 +69,28 @@ import {
  * temperature 0.6) and one per check (temperature 0.1, ≈ 3 s). The model
  * classifies; the server computes the verdict, verifies every quote it will
  * show, owns the drill schedule and touches cards in exactly one way (§8.4).
+ *
+ * The output cap is the app-wide `GEMINI_MODEL_MAX_TOKENS` (audit R3): the
+ * response schema is what keeps the JSON short, and a tight cap on a
+ * thinking-capable model truncates the JSON instead. A truncated response is
+ * detected from `finishReason` and never retried at the same cap.
  */
 
 const GENERATION_TEMPERATURE = 0.6;
-const GENERATION_MAX_OUTPUT_TOKENS = 768;
 const GENERATION_TIMEOUT_MS = 12_000;
 const CHECK_TEMPERATURE = 0.1;
-const CHECK_MAX_OUTPUT_TOKENS = 640;
 const CHECK_TIMEOUT_MS = 8_000;
 /** Bounded card read for clustering; the deck page reads the same ceiling. */
 const MAX_CARDS_FOR_CLUSTERING = 400;
 const MAX_ANSWER_CHARS = 1_500;
 const PULL_FORWARD_HOURS = 24;
+/** Concurrent neighbour searches in the embedding fallback. */
+const EMBEDDING_LOOKUP_CONCURRENCY = 3;
 
 type ClusterCardRow = {
   id: string;
   front: string;
   back: string;
-  explanation: string | null;
   topic_tags: string[] | null;
 };
 
@@ -87,7 +100,7 @@ function toClusterCard(row: ClusterCardRow): ClusterCard {
     id: row.id,
     term: row.front,
     definition: row.back,
-    explanation: row.explanation,
+    explanation: null,
     tags: Array.isArray(row.topic_tags) ? row.topic_tags.filter((tag): tag is string => typeof tag === 'string') : [],
   };
 }
@@ -106,12 +119,59 @@ function parseModelJson<T>(raw: string, schema: z.ZodType<T>): T {
   return parsed.data;
 }
 
+type ModelUsage = { in: number | null; out: number | null; thoughts: number | null };
+
+function usageOf(result: GenerateContentResult): ModelUsage {
+  const usage = result.response.usageMetadata as (typeof result.response.usageMetadata & { thoughtsTokenCount?: number }) | undefined;
+  return {
+    in: usage?.promptTokenCount ?? null,
+    out: usage?.candidatesTokenCount ?? null,
+    thoughts: usage?.thoughtsTokenCount ?? null,
+  };
+}
+
+function finishReasonOf(result: GenerateContentResult): string | null {
+  return result.response.candidates?.[0]?.finishReason ?? null;
+}
+
+/**
+ * A response cut off at the output cap is not a transient failure and must
+ * not be retried at the same cap (audit R3): it is raised as `bad_request`,
+ * which withGeminiRetry never retries, with the budget in the log line.
+ */
+function assertComplete(result: GenerateContentResult, label: string): void {
+  if (finishReasonOf(result) === FinishReason.MAX_TOKENS) {
+    const usage = usageOf(result);
+    throw new AiServiceError(
+      'bad_request',
+      `${label}: response truncated at maxOutputTokens (out=${usage.out ?? '?'}, thoughts=${usage.thoughts ?? '?'})`,
+      1,
+    );
+  }
+}
+
 type SupabaseServerClient = NonNullable<Extract<Awaited<ReturnType<typeof requireOwnedDeck>>, { supabase: unknown }>>['supabase'];
+
+/** Runs `task` over `items` with at most `limit` in flight, preserving order. */
+async function mapWithConcurrency<T, R>(items: T[], limit: number, task: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await task(items[index]);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 /**
  * Embedding-neighbour clusters for decks whose tag graph is exhausted. Reuses
  * the deck-chat RPC with a card's OWN stored vector (the column round-trips
- * as a string literal, so nothing is re-embedded).
+ * as a string literal, so nothing is re-embedded). One read for every seed's
+ * vector, then the neighbour searches a few at a time (audit P2).
  */
 async function embeddingClusters(
   supabase: SupabaseServerClient,
@@ -139,40 +199,47 @@ async function embeddingClusters(
     const swap = Math.floor(Math.random() * (index + 1));
     [seeds[index], seeds[swap]] = [seeds[swap], seeds[index]];
   }
+  const tried = seeds.slice(0, input.needed * 3);
+  if (tried.length === 0) return [];
 
-  const clusters: DrillCluster[] = [];
-  const maxTries = input.needed * 3;
+  const { data: vectorRows, error: vectorError } = await supabase
+    .from('cards')
+    .select('id, embedding')
+    .eq('deck_id', input.deckId)
+    .in('id', tried);
+  if (vectorError || !vectorRows) return [];
+  const vectorById = new Map(vectorRows.map((row) => [row.id, row.embedding]));
 
-  for (const seedId of seeds.slice(0, maxTries)) {
-    if (clusters.length >= input.needed) break;
-    if (input.usedIds.has(seedId)) continue;
-
-    const { data: seed } = await supabase
-      .from('cards')
-      .select('embedding')
-      .eq('id', seedId)
-      .eq('deck_id', input.deckId)
-      .single();
-    if (!seed?.embedding) continue;
-
-    const { data: neighbours, error: rpcError } = await supabase.rpc('search_deck_cards_by_embedding', {
+  const neighbourLists = await mapWithConcurrency(tried, EMBEDDING_LOOKUP_CONCURRENCY, async (seedId) => {
+    const vector = vectorById.get(seedId);
+    if (!vector) return { seedId, neighbours: [] as { id: string; similarity: number | null }[] };
+    const { data, error } = await supabase.rpc('search_deck_cards_by_embedding', {
       p_deck_id: input.deckId,
-      p_query_embedding: seed.embedding,
+      p_query_embedding: vector,
       p_limit: 4,
     });
-    if (rpcError) {
-      logger.warn('synthesis', 'neighbour search failed', { message: rpcError.message });
-      return clusters;
+    if (error) {
+      logger.warn('synthesis', 'neighbour search failed', { message: error.message });
+      return { seedId, neighbours: [] };
     }
+    return { seedId, neighbours: (data ?? []).map((row) => ({ id: row.id, similarity: row.similarity ?? null })) };
+  });
 
-    const neighbourCards = (neighbours ?? [])
+  // Assembly stays sequential: each cluster claims its cards before the next
+  // seed is considered, so no two drills in the batch share a card.
+  const clusters: DrillCluster[] = [];
+  for (const { seedId, neighbours } of neighbourLists) {
+    if (clusters.length >= input.needed) break;
+    if (input.usedIds.has(seedId)) continue;
+    const seedCard = input.cardsById.get(seedId);
+    if (!seedCard) continue;
+
+    const neighbourCards = neighbours
       .filter((row) => row.id !== seedId && (row.similarity ?? 0) >= MIN_CONTEXT_SIMILARITY && !input.usedIds.has(row.id))
       .map((row) => input.cardsById.get(row.id))
       .filter((card): card is ClusterCard => Boolean(card))
       .slice(0, 2);
 
-    const seedCard = input.cardsById.get(seedId);
-    if (!seedCard) continue;
     const cluster = clusterFromCards([seedCard, ...neighbourCards], 'embedding');
     if (!cluster || input.existingKeys.has(pairKey(cluster.cards.map((card) => card.id)))) continue;
 
@@ -184,7 +251,9 @@ async function embeddingClusters(
 }
 
 async function generateDrillForCluster(cluster: DrillCluster, format: SynthesisFormat, index: number) {
+  const env = getServerEnv();
   const model = getGeminiJsonModel({ temperature: GENERATION_TEMPERATURE });
+  const label = `synthesis_generate_${index}`;
 
   return withGeminiRetry(
     async () => {
@@ -197,7 +266,7 @@ async function generateDrillForCluster(cluster: DrillCluster, format: SynthesisF
           generationConfig: {
             temperature: GENERATION_TEMPERATURE,
             topP: 0.95,
-            maxOutputTokens: GENERATION_MAX_OUTPUT_TOKENS,
+            maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
             responseMimeType: 'application/json',
             responseSchema: DRILL_GENERATION_SCHEMA,
           },
@@ -205,10 +274,42 @@ async function generateDrillForCluster(cluster: DrillCluster, format: SynthesisF
         },
         { timeout: GENERATION_TIMEOUT_MS },
       );
-      return parseModelJson(result.response.text(), drillGenerationOutputSchema);
+      assertComplete(result, label);
+      return {
+        draft: parseModelJson(result.response.text(), drillGenerationOutputSchema),
+        finishReason: finishReasonOf(result),
+        usage: usageOf(result),
+      };
     },
-    { label: `synthesis_generate_${index}`, maxAttempts: 2 },
+    { label, maxAttempts: 2 },
   );
+}
+
+/**
+ * Drills whose anchor cards were deleted are never served, but they used to
+ * count toward the deck's active cap until it locked (audit R5). They are
+ * archived here, on the one path that already holds every card id.
+ */
+async function archiveOrphanedDrills(
+  supabase: SupabaseServerClient,
+  input: { deckId: string; userId: string; drills: { id: string; card_ids: string[] }[]; liveCardIds: Set<string> },
+): Promise<Set<string>> {
+  const orphaned = input.drills.filter((drill) => drill.card_ids.filter((id) => input.liveCardIds.has(id)).length < 2);
+  if (orphaned.length === 0) return new Set();
+
+  const { error } = await supabase
+    .from('synthesis_drills')
+    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .eq('deck_id', input.deckId)
+    .eq('user_id', input.userId)
+    .in('id', orphaned.map((drill) => drill.id));
+
+  if (error) {
+    logger.warn('generateSynthesisDrills', 'orphaned drill archive failed', { message: error.message, count: orphaned.length });
+    return new Set();
+  }
+  logger.info('generateSynthesisDrills', 'archived drills whose cards were deleted', { count: orphaned.length });
+  return new Set(orphaned.map((drill) => drill.id));
 }
 
 export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput) {
@@ -225,15 +326,29 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
     const { supabase, user } = deckAccess;
     const deckId = parsed.data.deck_id;
 
-    const { data: cardRows, error: cardsError } = await supabase
-      .from('cards')
-      .select('id, front, back, explanation, topic_tags')
-      .eq('deck_id', deckId)
-      .order('created_at', { ascending: true })
-      .limit(MAX_CARDS_FOR_CLUSTERING);
+    // Clustering needs terms and tags only; explanations are fetched later,
+    // for the few cards that end up in a cluster (audit P2).
+    const [{ data: cardRows, error: cardsError }, { data: activeRows, error: activeError }] = await Promise.all([
+      supabase
+        .from('cards')
+        .select('id, front, back, topic_tags')
+        .eq('deck_id', deckId)
+        .order('created_at', { ascending: true })
+        .limit(MAX_CARDS_FOR_CLUSTERING),
+      supabase
+        .from('synthesis_drills')
+        .select('id, card_ids')
+        .eq('deck_id', deckId)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .limit(MAX_ACTIVE_DRILLS_PER_DECK + 1),
+    ]);
 
     if (cardsError) {
       return { error: sanitizeDatabaseError(cardsError, 'Failed to load cards for drills.') };
+    }
+    if (activeError) {
+      return { error: sanitizeDatabaseError(activeError, 'Failed to load existing drills.') };
     }
 
     const cards = ((cardRows ?? []) as ClusterCardRow[]).map(toClusterCard);
@@ -241,25 +356,16 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
       return { error: `Synthesis drills need at least ${MIN_DECK_CARDS_FOR_DRILLS} cards; this deck has ${cards.length}.` };
     }
 
-    const { data: activeRows, error: activeError } = await supabase
-      .from('synthesis_drills')
-      .select('card_ids')
-      .eq('deck_id', deckId)
-      .eq('user_id', user.id)
-      .eq('status', 'active')
-      .limit(MAX_ACTIVE_DRILLS_PER_DECK + 1);
+    const liveCardIds = new Set(cards.map((card) => card.id));
+    const archivedIds = await archiveOrphanedDrills(supabase, { deckId, userId: user.id, drills: activeRows ?? [], liveCardIds });
+    const activeDrills = (activeRows ?? []).filter((row) => !archivedIds.has(row.id));
 
-    if (activeError) {
-      return { error: sanitizeDatabaseError(activeError, 'Failed to load existing drills.') };
-    }
-
-    const activeCount = activeRows?.length ?? 0;
-    if (activeCount >= MAX_ACTIVE_DRILLS_PER_DECK) {
+    if (activeDrills.length >= MAX_ACTIVE_DRILLS_PER_DECK) {
       return { error: `This deck already has ${MAX_ACTIVE_DRILLS_PER_DECK} active drills. Archive some first.` };
     }
 
-    const count = Math.min(parsed.data.count, MAX_ACTIVE_DRILLS_PER_DECK - activeCount);
-    const existingKeys = new Set((activeRows ?? []).map((row) => pairKey(row.card_ids)));
+    const count = Math.min(parsed.data.count, MAX_ACTIVE_DRILLS_PER_DECK - activeDrills.length);
+    const existingKeys = new Set(activeDrills.map((row) => pairKey(row.card_ids)));
 
     const reservation = await reserveAiCall(supabase, user.id, 'synthesis_generate', { deck_id: deckId, count });
     if (!reservation.ok) {
@@ -290,6 +396,18 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
       return { error: 'Every related pair of cards already has a drill. Add cards or archive drills to generate more.' };
     }
 
+    // The explanations of the chosen cards only — they make the prompt, not the clustering.
+    const chosenIds = [...new Set(clusters.flatMap((cluster) => cluster.cards.map((card) => card.id)))];
+    const { data: explanationRows } = await supabase
+      .from('cards')
+      .select('id, explanation')
+      .eq('deck_id', deckId)
+      .in('id', chosenIds);
+    const explanationById = new Map((explanationRows ?? []).map((row) => [row.id, typeof row.explanation === 'string' ? row.explanation : null]));
+    for (const cluster of clusters) {
+      for (const card of cluster.cards) card.explanation = explanationById.get(card.id) ?? null;
+    }
+
     // ── One call per cluster, in parallel; one bad cluster never loses the batch ──
     const formats = parsed.data.formats;
     const env = getServerEnv();
@@ -305,6 +423,7 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
       card_ids: string[];
       topic_tag: string | null;
       required_links: { id: string; text: string; card_ids: string[] }[];
+      link_count: number;
       exemplar: Exemplar;
       generation_meta: Record<string, string | number | boolean | null>;
     }[] = [];
@@ -322,7 +441,7 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
         return;
       }
 
-      const validation = validateDrillDraft(outcome.value, cluster.cards);
+      const validation = validateDrillDraft(outcome.value.draft, cluster.cards);
       if (!validation.ok) {
         failed += 1;
         logger.warn('generateSynthesisDrills', 'draft rejected', { index, reason: validation.reason });
@@ -338,6 +457,7 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
         card_ids: drill.cardIds,
         topic_tag: cluster.topicTag,
         required_links: drill.requiredLinks.map((link) => ({ id: link.id, text: link.text, card_ids: link.cardIds })),
+        link_count: drill.requiredLinks.length,
         exemplar: drill.exemplar,
         generation_meta: {
           model: env.GEMINI_MODEL,
@@ -345,6 +465,10 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
           clustering: cluster.clustering,
           requested_format: requestedFormat,
           format_substituted: drill.format !== requestedFormat,
+          finish_reason: outcome.value.finishReason,
+          tokens_in: outcome.value.usage.in,
+          tokens_out: outcome.value.usage.out,
+          tokens_thoughts: outcome.value.usage.thoughts,
         },
       });
     });
@@ -377,8 +501,17 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
       return { error: 'AI could not produce a valid drill from this deck. Please try again.' };
     }
 
-    return { success: true as const, created: rows.length, failed, drillIds };
+    const topics = [...new Set(rows.map((row) => row.topic_tag).filter((tag): tag is string => Boolean(tag)))];
+    return { success: true as const, created: rows.length, failed, drillIds, topics };
   });
+}
+
+function revealFor(drill: SynthesisDrill, anchors: AnchorCard[]): DrillReveal {
+  return {
+    requiredLinks: drill.requiredLinks.map((link) => ({ id: link.id, text: link.text })),
+    exemplar: drill.exemplar,
+    cards: anchors.map((anchor) => ({ id: anchor.id, term: anchor.term, definition: anchor.definition, explanation: anchor.explanation })),
+  };
 }
 
 export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
@@ -394,6 +527,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     }
     const { supabase, user } = deckAccess;
     const { deck_id: deckId, drill_id: drillId, mode, response } = parsed.data;
+    const confidence = parsed.data.confidence ?? null;
 
     const { data: drillRow, error: drillError } = await supabase
       .from('synthesis_drills')
@@ -425,6 +559,46 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     if (anchors.length < 2) {
       return { error: 'The cards behind this drill were deleted. Archive it and generate a new one.' };
     }
+    const reveal = revealFor(drill, anchors);
+
+    // ── Replay (audit R8): the same client key returns the attempt it already produced ──
+    if (parsed.data.client_attempt_id) {
+      const { data: existing } = await supabase
+        .from('synthesis_attempts')
+        .select('id, verdict, coverage, contradictions, outside_claims, structure, gap_note, integrity, pulled_forward_card_ids, confidence')
+        .eq('drill_id', drillId)
+        .eq('user_id', user.id)
+        .eq('client_attempt_id', parsed.data.client_attempt_id)
+        .maybeSingle();
+
+      if (existing) {
+        const stored = parseStoredAttempt(existing);
+        if (stored) {
+          logger.info('checkSynthesisAttempt', 'replayed an existing attempt', { attempt_id: existing.id });
+          const diagnostic: Diagnostic = {
+            ...stored,
+            linksCovered: countCovered(stored.coverage),
+            linksTotal: drill.requiredLinks.length,
+            schedule: { step: drill.step, nextDueAt: drill.nextDueAt },
+          };
+          return { success: true as const, attemptId: existing.id, diagnostic, reveal, exemplar: drill.exemplar, scheduleSaved: true, replayed: true };
+        }
+      }
+    }
+
+    // ── Revision (audit F2): must point at an attempt on this drill that is not itself a revision ──
+    if (parsed.data.revision_of) {
+      const { data: original } = await supabase
+        .from('synthesis_attempts')
+        .select('id, revision_of')
+        .eq('id', parsed.data.revision_of)
+        .eq('drill_id', drillId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!original || original.revision_of) {
+        return { error: 'That attempt cannot be revised.' };
+      }
+    }
 
     // Word count is computed here, from the body — never taken from the client.
     const wordCount = countWords(responseText(response));
@@ -440,10 +614,11 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     // ── One call ──
     const nonce = randomUUID().slice(0, 8);
     const renderedAnswer = sanitizeAiInputText(renderResponseForModel(mode, response), MAX_ANSWER_CHARS);
+    const env = getServerEnv();
     const model = getGeminiJsonModel({ temperature: CHECK_TEMPERATURE });
     const startedAt = Date.now();
 
-    const { output, usage } = await withGeminiRetry(
+    const { output, usage, finishReason } = await withGeminiRetry(
       async () => {
         const result = await model.generateContent(
           {
@@ -451,7 +626,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
             generationConfig: {
               temperature: CHECK_TEMPERATURE,
               topP: 0.95,
-              maxOutputTokens: CHECK_MAX_OUTPUT_TOKENS,
+              maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
               responseMimeType: 'application/json',
               responseSchema: DRILL_CHECK_SCHEMA,
             },
@@ -473,22 +648,36 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
           },
           { timeout: CHECK_TIMEOUT_MS },
         );
+        assertComplete(result, 'synthesis_check');
         return {
           output: parseModelJson(result.response.text(), drillCheckOutputSchema),
-          usage: result.response.usageMetadata ?? null,
+          usage: usageOf(result),
+          finishReason: finishReasonOf(result),
         };
       },
-      { label: 'synthesis_check', maxAttempts: 2 },
+      // A second 8 s wait after an 8 s deadline is never what the student
+      // wants; the canvas offers the retry instead (audit R2).
+      { label: 'synthesis_check', maxAttempts: 2, shouldRetry: (kind) => kind !== 'timeout' },
     );
 
     const elapsedMs = Date.now() - startedAt;
 
     // ── The server decides ──
-    const reconciled = reconcileDiagnostic(output, { requiredLinks: drill.requiredLinks, anchors, answerText: renderedAnswer });
+    const slots = mode === 'outline' && isOutlineResponse(response)
+      ? { claim: response.claim.trim().length > 0, tradeoff: response.tradeoff.trim().length > 0 }
+      : undefined;
+    const reconciled = reconcileDiagnostic(output, { requiredLinks: drill.requiredLinks, anchors, answerText: renderedAnswer, slots });
+    if (reconciled.droppedContradictions > 0) {
+      logger.info('checkSynthesisAttempt', 'dropped contradictions the card does not say', {
+        drill_id: drillId,
+        dropped: reconciled.droppedContradictions,
+      });
+    }
     const verdict = computeVerdict(reconciled);
     const { missingCardIds, contradictedCardIds } = deriveCardIdSets(reconciled.coverage, drill.requiredLinks, reconciled.contradictions);
     const now = new Date();
-    const schedule = nextSchedule(drill.step, verdict, now);
+    const schedule = nextSchedule(drill.step, verdict, now, { confidence });
+    const linksCovered = countCovered(reconciled.coverage);
 
     // ── Cards: pull contradicted cards forward, never reset them (spec §8.4) ──
     // Runs before the attempt insert because the attempt row is immutable and
@@ -513,7 +702,6 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
       }
     }
 
-    const env = getServerEnv();
     const { data: attempt, error: attemptError } = await supabase
       .from('synthesis_attempts')
       .insert({
@@ -541,10 +729,16 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         integrity: { injection_detected: reconciled.integrity.injectionDetected, off_target: reconciled.integrity.offTarget },
         model: env.GEMINI_MODEL,
         usage: {
-          in: usage?.promptTokenCount ?? null,
-          out: usage?.candidatesTokenCount ?? null,
+          in: usage.in,
+          out: usage.out,
+          thoughts: usage.thoughts,
           ms: elapsedMs,
+          finish_reason: finishReason,
+          dropped_contradictions: reconciled.droppedContradictions,
         },
+        confidence,
+        client_attempt_id: parsed.data.client_attempt_id ?? null,
+        revision_of: parsed.data.revision_of ?? null,
       })
       .select('id')
       .single();
@@ -563,6 +757,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         attempt_count: drill.attemptCount + 1,
         last_verdict: verdict,
         last_attempt_at: now.toISOString(),
+        last_links_covered: linksCovered,
         updated_at: now.toISOString(),
       })
       .eq('id', drillId)
@@ -585,8 +780,10 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         attempt_id: attempt.id,
         verdict,
         elapsed_ms: elapsedMs,
-        prompt_tokens: usage?.promptTokenCount ?? null,
-        output_tokens: usage?.candidatesTokenCount ?? null,
+        prompt_tokens: usage.in,
+        output_tokens: usage.out,
+        thought_tokens: usage.thoughts,
+        finish_reason: finishReason,
       },
       reservation.reservationId,
     );
@@ -600,22 +797,25 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
       gapNote: reconciled.gapNote,
       integrity: reconciled.integrity,
       pulledForwardCardIds,
-      linksCovered: countCovered(reconciled.coverage),
+      linksCovered,
       linksTotal: drill.requiredLinks.length,
       schedule: { step: schedule.step, nextDueAt: schedule.nextDueAt.toISOString() },
+      confidence,
     };
 
     return {
       success: true as const,
       attemptId: attempt.id,
       diagnostic,
+      reveal,
       exemplar: drill.exemplar,
       scheduleSaved: !drillUpdateError,
+      replayed: false,
     };
   });
 }
 
-export async function archiveSynthesisDrill(data: ArchiveSynthesisDrillInput) {
+async function setDrillStatus(data: ArchiveSynthesisDrillInput, status: 'active' | 'archived', failure: string) {
   const parsed = archiveSynthesisDrillSchema.safeParse(data);
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors };
@@ -629,16 +829,75 @@ export async function archiveSynthesisDrill(data: ArchiveSynthesisDrillInput) {
 
   const { error } = await supabase
     .from('synthesis_drills')
-    .update({ status: 'archived', updated_at: new Date().toISOString() })
+    .update({ status, updated_at: new Date().toISOString() })
     .eq('id', parsed.data.drill_id)
     .eq('deck_id', parsed.data.deck_id)
     .eq('user_id', user.id);
 
   if (error) {
-    logger.error('archiveSynthesisDrill', 'update failed', { code: error.code, message: error.message });
-    return { error: sanitizeDatabaseError(error, 'Failed to archive the drill.') };
+    logger.error('setDrillStatus', 'update failed', { code: error.code, message: error.message, status });
+    return { error: sanitizeDatabaseError(error, failure) };
   }
 
   revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   return { success: true as const };
+}
+
+export async function archiveSynthesisDrill(data: ArchiveSynthesisDrillInput) {
+  return guardAction('Drill archive', () => setDrillStatus(data, 'archived', 'Failed to archive the drill.'));
+}
+
+/** The undo behind the archive toast (audit U5). */
+export async function restoreSynthesisDrill(data: ArchiveSynthesisDrillInput) {
+  return guardAction('Drill restore', () => setDrillStatus(data, 'active', 'Failed to restore the drill.'));
+}
+
+/**
+ * "Was this check fair?" (audit F5). One row per attempt, replaced on a
+ * second answer; the attempts table itself stays append-only.
+ */
+export async function rateSynthesisAttempt(data: RateSynthesisAttemptInput) {
+  return guardAction('Check feedback', async () => {
+    const parsed = rateSynthesisAttemptSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.flatten().fieldErrors as never };
+    }
+
+    const deckAccess = await requireOwnedDeck(parsed.data.deck_id);
+    if ('error' in deckAccess) {
+      return { error: deckAccess.error };
+    }
+    const { supabase, user } = deckAccess;
+
+    const { data: attempt } = await supabase
+      .from('synthesis_attempts')
+      .select('id')
+      .eq('id', parsed.data.attempt_id)
+      .eq('deck_id', parsed.data.deck_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!attempt) {
+      return { error: 'Attempt not found or access denied.' };
+    }
+
+    const { error } = await supabase
+      .from('synthesis_attempt_feedback')
+      .upsert(
+        {
+          attempt_id: parsed.data.attempt_id,
+          user_id: user.id,
+          rating: parsed.data.rating,
+          note: parsed.data.note?.length ? parsed.data.note : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'attempt_id' },
+      );
+
+    if (error) {
+      logger.error('rateSynthesisAttempt', 'upsert failed', { code: error.code, message: error.message });
+      return { error: sanitizeDatabaseError(error, 'Failed to save your feedback.') };
+    }
+
+    return { success: true as const };
+  });
 }

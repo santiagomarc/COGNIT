@@ -456,8 +456,48 @@ export type Database = {
           },
         ]
       }
+      synthesis_attempt_feedback: {
+        Row: {
+          attempt_id: string
+          created_at: string
+          id: string
+          note: string | null
+          rating: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          rating: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          rating?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synthesis_attempt_feedback_attempt_id_fkey"
+            columns: ["attempt_id"]
+            isOneToOne: true
+            referencedRelation: "synthesis_attempts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       synthesis_attempts: {
         Row: {
+          client_attempt_id: string | null
+          confidence: number | null
           contradicted_card_ids: string[]
           contradictions: Json
           coverage: Json
@@ -474,6 +514,7 @@ export type Database = {
           outside_claims: Json
           pulled_forward_card_ids: string[]
           response: Json
+          revision_of: string | null
           structure: Json
           usage: Json
           user_id: string
@@ -481,6 +522,8 @@ export type Database = {
           word_count: number
         }
         Insert: {
+          client_attempt_id?: string | null
+          confidence?: number | null
           contradicted_card_ids?: string[]
           contradictions?: Json
           coverage?: Json
@@ -497,6 +540,7 @@ export type Database = {
           outside_claims?: Json
           pulled_forward_card_ids?: string[]
           response: Json
+          revision_of?: string | null
           structure?: Json
           usage?: Json
           user_id: string
@@ -504,6 +548,8 @@ export type Database = {
           word_count: number
         }
         Update: {
+          client_attempt_id?: string | null
+          confidence?: number | null
           contradicted_card_ids?: string[]
           contradictions?: Json
           coverage?: Json
@@ -520,6 +566,7 @@ export type Database = {
           outside_claims?: Json
           pulled_forward_card_ids?: string[]
           response?: Json
+          revision_of?: string | null
           structure?: Json
           usage?: Json
           user_id?: string
@@ -541,6 +588,13 @@ export type Database = {
             referencedRelation: "synthesis_drills"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "synthesis_attempts_revision_of_fkey"
+            columns: ["revision_of"]
+            isOneToOne: false
+            referencedRelation: "synthesis_attempts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       synthesis_drills: {
@@ -554,7 +608,9 @@ export type Database = {
           generation_meta: Json
           id: string
           last_attempt_at: string | null
+          last_links_covered: number | null
           last_verdict: string | null
+          link_count: number
           next_due_at: string
           prompt_text: string
           required_links: Json
@@ -574,7 +630,9 @@ export type Database = {
           generation_meta?: Json
           id?: string
           last_attempt_at?: string | null
+          last_links_covered?: number | null
           last_verdict?: string | null
+          link_count?: number
           next_due_at?: string
           prompt_text: string
           required_links: Json
@@ -594,7 +652,9 @@ export type Database = {
           generation_meta?: Json
           id?: string
           last_attempt_at?: string | null
+          last_links_covered?: number | null
           last_verdict?: string | null
+          link_count?: number
           next_due_at?: string
           prompt_text?: string
           required_links?: Json
