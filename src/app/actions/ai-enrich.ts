@@ -6,7 +6,7 @@ import { SchemaType, type Schema } from '@google/generative-ai';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import {
-  chunkArray, getGeminiJsonModel,
+  chunkArray, getGeminiJsonModel, jsonGenerationConfig,
   recordAiUsage, requireOwnedDeck, reserveAiCall, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
 import { logger } from '@/lib/logger';
@@ -139,7 +139,15 @@ export async function enrichCards(data: EnrichCardsInput) {
       return { success: true, enrichedCount: 0, skippedCount: uniqueCardIds.length };
     }
 
-    const reservation = await reserveAiCall(supabase, user.id, 'enrich_cards');
+    // One reservation, one model call per batch of ENRICH_BATCH_SIZE cards.
+    const batchCount = Math.ceil(pendingCards.length / ENRICH_BATCH_SIZE);
+    const reservation = await reserveAiCall(
+      supabase,
+      user.id,
+      'enrich_cards',
+      { deck_id: result.data.deck_id, pending_cards: pendingCards.length, batches: batchCount },
+      { calls: batchCount },
+    );
     if (!reservation.ok) {
       return { error: reservation.error };
     }
@@ -194,10 +202,7 @@ export async function enrichCards(data: EnrichCardsInput) {
           () =>
             model.generateContent({
               systemInstruction: buildBatchSystemInstruction(),
-              generationConfig: {
-                responseMimeType: 'application/json',
-                responseSchema: ENRICHMENT_RESPONSE_SCHEMA,
-              },
+              generationConfig: jsonGenerationConfig({ responseSchema: ENRICHMENT_RESPONSE_SCHEMA }),
               contents: [
                 {
                   role: 'user',
@@ -239,34 +244,29 @@ export async function enrichCards(data: EnrichCardsInput) {
       failedCardIds.push(...failedIds);
     }
 
-    // ── Write enriched cards in windows of ENRICH_CONCURRENCY ─────────────────
-    // Bounded the same way the AI batches above are: an unbounded Promise.all
-    // here would open one simultaneous request per enriched card against the
-    // Supabase connection pool (600+ for a large deck).
-    const writeWindows = chunkArray(allEnrichedRows, ENRICH_CONCURRENCY);
-    for (const writeWindow of writeWindows) {
-      await Promise.all(
-        writeWindow.map(async (row) => {
-          const { error: updateError } = await supabase
-            .from('cards')
-            .update({
-              mcq_distractors: row.mcq_distractors,
-              id_question: row.id_question,
-              topic_tags: row.topic_tags,
-            })
-            .eq('id', row.id)
-            .eq('deck_id', result.data.deck_id);
+    // ── Write every enriched card in one statement ───────────────────────
+    // One RPC instead of one UPDATE per card (up to 200 under RLS). The
+    // function checks deck ownership once and applies the whole batch; the
+    // rows it does not touch (a card deleted mid-flight) count as failed.
+    if (allEnrichedRows.length > 0) {
+      const { data: appliedCount, error: applyError } = await supabase.rpc('apply_card_enrichment_batch', {
+        p_deck_id: result.data.deck_id,
+        p_rows: allEnrichedRows,
+      });
 
-          if (updateError) {
-            logger.warn('enrichCards', 'db update failed for card', { card_id: row.id, message: updateError.message });
-            failedCardIds.push(row.id);
-            return;
-          }
+      if (applyError) {
+        logger.error('enrichCards', 'apply_card_enrichment_batch failed', { code: applyError.code, message: applyError.message });
+        return { error: sanitizeDatabaseError(applyError, 'Cards were enriched but failed to save.') };
+      }
 
-          enrichedCount += 1;
-          enrichedCards.push(row);
-        })
-      );
+      enrichedCount = Number(appliedCount ?? 0);
+      enrichedCards.push(...allEnrichedRows);
+      if (enrichedCount < allEnrichedRows.length) {
+        logger.warn('enrichCards', 'some enriched rows did not apply', {
+          expected: allEnrichedRows.length,
+          applied: enrichedCount,
+        });
+      }
     }
 
     revalidatePath(`/dashboard/${result.data.deck_id}`);

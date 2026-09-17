@@ -34,6 +34,7 @@ const SOURCE_LABELS: Record<CardSource, string> = {
   ai_pdf: 'AI PDF',
   bulk_import: 'Bulk Import',
   ai_cleaned: 'AI Cleaned',
+  synthesis_claim: 'From a drill',
 };
 
 export function FlashcardWithActions({
@@ -110,14 +111,14 @@ export function FlashcardWithActions({
               value={editableTerm}
               onChange={(e) => setEditableTerm(e.target.value)}
               placeholder="Term (answer)"
-              className="text-sm"
+              className="sm:text-sm"
               autoFocus
             />
             <Textarea
               value={editableDescription}
               onChange={(e) => setEditableDescription(e.target.value)}
               placeholder="Description (question)"
-              className="min-h-0 flex-1 resize-none text-sm leading-relaxed"
+              className="min-h-0 flex-1 resize-none sm:text-sm leading-relaxed"
             />
 
             <div className="mt-auto flex items-center justify-end gap-2">

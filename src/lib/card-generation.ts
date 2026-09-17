@@ -7,6 +7,7 @@
  * unchanged apart from the pickBalancedCards fix noted below.
  */
 import { normalizeForMatch, normalizeWhitespace } from '@/lib/text-normalize';
+import { hasBalancedMath } from '@/lib/rich-text';
 
 export type CardDifficultyBand = 'foundational' | 'intermediate' | 'advanced';
 
@@ -227,6 +228,12 @@ export function parseAndRankGeneratedCards(
     }
 
     if (normalized.back.length < MIN_BACK_CHARS || isEnumerationLike(normalized.back)) {
+      continue;
+    }
+
+    // A stray `$` would render as a raw dollar sign on the card face; the
+    // prompt asks for `$…$` LaTeX, so an unbalanced one is a malformed card.
+    if (!hasBalancedMath(normalized.front) || !hasBalancedMath(normalized.back)) {
       continue;
     }
 

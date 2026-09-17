@@ -8,6 +8,7 @@ import { CheckFeedback } from '@/components/ui/shared/synthesis/CheckFeedback';
 import type { AnswerMode, AttemptResponse, CanvasAnchor, CanvasDrill, Diagnostic, DrillReveal } from '@/lib/synthesis/types';
 import { isOutlineResponse } from '@/lib/synthesis/text';
 import { CONFIDENCE_LABEL, LINK_TICK, SLOT_LABELS, VERDICT_LABEL, VERDICT_TICK, formatDueIn } from '@/lib/synthesis/ui';
+import { RichText } from '@/components/ui/shared/RichText';
 
 type DrillResultProps = {
   deckId: string;
@@ -180,7 +181,13 @@ export function DrillResult({
                       <span className="mt-0.5 block text-sm text-ink">“{claim.statement}”</span>
                       <span className="mt-0.5 block text-[13px] text-ink-dim">{claim.aiAssessment}</span>
                       <span className="mt-1.5 block">
-                        <AddAsCardForm deckId={deckId} claim={claim} />
+                        <AddAsCardForm
+                          deckId={deckId}
+                          claim={claim}
+                          attemptId={attemptId}
+                          claimIndex={index}
+                          absorbedCardId={diagnostic.absorbedCardIds[index] ?? null}
+                        />
                       </span>
                     </span>
                   </li>
@@ -207,10 +214,10 @@ export function DrillResult({
                 </div>
               ) : (
                 <ul className="mt-2 flex flex-col gap-2 text-sm text-ink">
-                  <li><span className="text-ink-dimmer">{labels.claim} · </span>{exemplar.claim}</li>
-                  <li><span className="text-ink-dimmer">{labels.mechanism1} · </span>{exemplar.mechanisms[0]}</li>
-                  <li><span className="text-ink-dimmer">{labels.mechanism2} · </span>{exemplar.mechanisms[1]}</li>
-                  <li><span className="text-ink-dimmer">{labels.tradeoff} · </span>{exemplar.tradeoff}</li>
+                  <li><span className="text-ink-dimmer">{labels.claim} · </span><RichText text={exemplar.claim} /></li>
+                  <li><span className="text-ink-dimmer">{labels.mechanism1} · </span><RichText text={exemplar.mechanisms[0]} /></li>
+                  <li><span className="text-ink-dimmer">{labels.mechanism2} · </span><RichText text={exemplar.mechanisms[1]} /></li>
+                  <li><span className="text-ink-dimmer">{labels.tradeoff} · </span><RichText text={exemplar.tradeoff} /></li>
                 </ul>
               )}
             </section>
@@ -238,9 +245,9 @@ export function DrillResult({
             <ul className="mt-2 flex flex-col gap-2.5">
               {reveal.cards.map((card) => (
                 <li key={card.id} className="text-sm">
-                  <span className="text-ink">{card.term}</span>
+                  <span className="text-ink"><RichText text={card.term} /></span>
                   <span className="text-ink-dimmer"> — </span>
-                  <span className="text-ink-dim">{card.definition}</span>
+                  <span className="text-ink-dim"><RichText text={card.definition} /></span>
                   {card.explanation ? (
                     <details className="mt-1">
                       <summary className={`${LABEL} cursor-pointer list-none`}>Explanation</summary>

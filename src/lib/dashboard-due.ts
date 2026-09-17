@@ -2,12 +2,15 @@ import { logger } from './logger';
 
 export type DueCardsByDeckRow = {
   deck_id: string;
+  /** Studied cards whose review is owed. Never-studied cards are `new_count`. */
   due_count: number;
+  new_count: number;
 };
 
 type RpcDueRow = {
   deck_id: string;
   due_count: number | string | null;
+  new_count?: number | string | null;
 };
 
 type RpcErrorLike = {
@@ -45,5 +48,6 @@ export async function loadDueByDeckRows(
   return (dueBreakdownRows ?? []).map((row) => ({
     deck_id: row.deck_id,
     due_count: Number(row.due_count ?? 0),
+    new_count: Number(row.new_count ?? 0),
   }));
 }

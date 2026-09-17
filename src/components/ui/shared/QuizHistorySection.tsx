@@ -22,7 +22,10 @@ export async function QuizHistorySection({ deckId }: QuizHistorySectionProps) {
   }
 
   const history = (historyResult && 'history' in historyResult ? historyResult.history : []) ?? [];
-  return <QuizHistoryList history={history} deckId={deckId} />;
+  const hasMore = Boolean(historyResult && 'hasMore' in historyResult && historyResult.hasMore);
+  // Keyed on the newest quiz so a fresh result after revalidation remounts the
+  // list instead of leaving the client's paginated state behind.
+  return <QuizHistoryList key={history[0]?.id ?? 'empty'} history={history} deckId={deckId} initialHasMore={hasMore} />;
 }
 
 export function QuizHistorySkeleton() {

@@ -47,7 +47,19 @@ export function useModalDialog({ open, onClose, initialFocus }: UseModalDialogOp
           dialog.querySelector<HTMLElement>(FOCUSABLE);
         target?.focus();
       });
-      return;
+
+      // Scroll lock. A modal that traps focus but lets the page behind it
+      // scroll is not modal on a phone: iOS scrolls the document under the
+      // scrim. The scrollbar's width is reserved as padding so desktop pages
+      // do not shift when it disappears.
+      const { overflow, paddingRight } = document.body.style;
+      const scrollbarGap = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      if (scrollbarGap > 0) document.body.style.paddingRight = `${scrollbarGap}px`;
+      return () => {
+        document.body.style.overflow = overflow;
+        document.body.style.paddingRight = paddingRight;
+      };
     }
 
     // Restore only when we actually took focus, so a first render does not

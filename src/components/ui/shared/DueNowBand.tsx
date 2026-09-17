@@ -12,6 +12,8 @@ const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: '
 
 type DueNowBandProps = {
   totalDue: number;
+  /** Never-studied cards across the account — available, not owed. */
+  totalNew?: number;
   /** Decks with at least one card due, most due first. */
   dueDecks: { deckId: string; deckTitle: string; dueCount: number }[];
   /** Whole days since the oldest overdue card came due; null when clear. */
@@ -48,6 +50,7 @@ const NAMED_DECKS = 3;
  */
 export function DueNowBand({
   totalDue,
+  totalNew = 0,
   dueDecks,
   oldestOverdueDays,
   estimatedMinutes,
@@ -129,6 +132,16 @@ export function DueNowBand({
                     </>
                   ) : null}
                   est. <span className="font-mono tnum">{estimatedMinutes}</span> min
+                  {totalNew > 0 ? (
+                    <>
+                      {' · '}<span className="font-mono tnum">{totalNew}</span> new
+                    </>
+                  ) : null}
+                </>
+              ) : totalNew > 0 ? (
+                <>
+                  No reviews owed · <span className="font-mono tnum">{totalNew}</span> new{' '}
+                  {totalNew === 1 ? 'card' : 'cards'} to learn
                 </>
               ) : showDrills ? (
                 'No cards due'

@@ -127,6 +127,59 @@ where a.created_at > now() - interval '30 days'
 group by a.verdict
 order by attempts desc;
 
+-- 12. The idempotency index behind record_synthesis_attempt's replay path
+--     (202609150900) and the absorption index (202609170970) both exist.
+--     Zero rows expected.
+select 'MISSING ' || required.indexname as problem
+from (values ('synthesis_attempts_client_key_idx'), ('cards_absorbed_claim_idx')) as required(indexname)
+where not exists (
+  select 1 from pg_indexes
+  where schemaname = 'public' and pg_indexes.indexname = required.indexname
+);
+
+-- 13. Every RLS policy evaluates auth.uid() as an InitPlan (202609170950).
+--     pg_policies deparses the wrapped form as "( SELECT auth.uid() AS uid)";
+--     any bare "auth.uid()" left after removing those is a per-row call.
+--     Zero rows expected.
+select tablename, policyname
+from pg_policies
+where schemaname = 'public'
+  and (
+    (qual is not null and regexp_replace(qual, '\( SELECT auth\.uid\(\) AS uid\)', '', 'g') like '%auth.uid()%')
+    or
+    (with_check is not null and regexp_replace(with_check, '\( SELECT auth\.uid\(\) AS uid\)', '', 'g') like '%auth.uid()%')
+  );
+
+-- 14. No foreign key without a leading-column index (202609170940). Every row
+--     is a cascade path that sequentially scans its table. Zero rows expected.
+select c.conrelid::regclass as tbl, a.attname as col
+from pg_constraint c
+join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+where c.contype = 'f'
+  and c.connamespace = 'public'::regnamespace
+  and not exists (
+    select 1 from pg_index i
+    where i.indrelid = c.conrelid and i.indkey[0] = a.attnum
+  );
+
+-- 15. The 2026-09-17 RPC set is live, with the v2 reservation signature.
+--     Zero rows expected.
+select 'MISSING ' || required.fn as problem
+from (values
+  ('reserve_ai_call(text,integer,integer,jsonb,integer,integer)'),
+  ('apply_card_enrichment_batch(uuid,jsonb)'),
+  ('log_quiz_result(uuid,text,integer,boolean,jsonb,jsonb)'),
+  ('get_quiz_history(uuid,integer,timestamp with time zone)'),
+  ('record_synthesis_attempt(uuid,uuid,uuid,jsonb,jsonb,uuid[],timestamp with time zone)'),
+  ('get_analytics_snapshot(timestamp with time zone,integer)')
+) as required(fn)
+where not exists (
+  select 1 from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.proname || '(' || replace(oidvectortypes(p.proargtypes), ', ', ',') || ')' = required.fn
+);
+
 -- ── Query plans ────────────────────────────────────────────────────
 -- Substitute a real deck id. Expect "Index Scan using
 -- cards_embedding_hnsw_idx", NOT "Seq Scan on cards".

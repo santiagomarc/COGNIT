@@ -18,6 +18,8 @@ type DeckWithCount = {
   assessedCards: number;
   lastQuizAt: string | null;
   dueCount: number;
+  newCount: number;
+  dueDrillCount: number;
   easeFactor: number | null;
 };
 
@@ -73,6 +75,14 @@ function sortDecksMostDue(items: DeckWithCount[]) {
   return [...items].sort((a, b) => {
     if (b.dueCount !== a.dueCount) {
       return b.dueCount - a.dueCount;
+    }
+    // A deck with only drills due still has work in it; it must not sink
+    // below one with nothing due.
+    if (b.dueDrillCount !== a.dueDrillCount) {
+      return b.dueDrillCount - a.dueDrillCount;
+    }
+    if (b.newCount !== a.newCount) {
+      return b.newCount - a.newCount;
     }
     return sortDecksNewestFirst([a, b])[0] === a ? -1 : 1;
   });
@@ -182,6 +192,8 @@ export function DeckGrid({ decks }: DeckGridProps) {
               tag,
               cardCount: deck.cards?.[0]?.count ?? 0,
               dueCount: deck.dueCount,
+              newCount: deck.newCount,
+              dueDrillCount: deck.dueDrillCount,
               easeFactor: deck.easeFactor,
               masteryPercentage: deck.masteryPercentage,
               assessedCards: deck.assessedCards,

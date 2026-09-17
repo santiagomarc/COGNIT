@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { HintButton } from '@/components/ui/shared/HintButton';
 import { similarity } from '@/lib/fuzzy';
 import type { StudyGrade } from '@/lib/sm2';
+import { RichText } from '@/components/ui/shared/RichText';
 
 type IdentificationModeCard = {
   id: string;
@@ -112,7 +113,7 @@ export function IdentificationMode({
           <div className="relative flex min-h-[9rem] items-center justify-center px-6 py-8 text-center sm:px-10">
             <CornerBrackets />
             <p className="mx-auto max-w-[34ch] text-balance font-serif text-[clamp(2.1rem,3.3vw,2.85rem)] leading-[1.25] tracking-[-0.02em] text-ink">
-              {prompt}
+              <RichText text={prompt} />
             </p>
           </div>
 
@@ -144,7 +145,7 @@ export function IdentificationMode({
                   <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
                     Term
                   </dt>
-                  <dd className="font-medium text-ink">{card.front}</dd>
+                  <dd className="font-medium text-ink"><RichText text={card.front} /></dd>
                 </div>
                 <div className="flex gap-3">
                   <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">

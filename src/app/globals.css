@@ -168,11 +168,17 @@
 
   --border: #e4e4e7;          /* decorative divider          · 1.23:1 */
   --border-strong: #d4d4d8;   /* enclosure, hover edge       · 1.43:1 */
-  --border-control: #8a8a93;  /* interactive edge · 3.31:1 — WCAG 1.4.11 */
+  --border-control: #8a8a93;  /* interactive edge · 3.31:1 on --bg · 3.11:1 on --recess — WCAG 1.4.11 */
 
+  /*
+   * Ink ratios are quoted against EVERY plane the ink can sit on, not only
+   * --bg: the old --ink-dimmer (#71717a) was 4.67:1 on --bg but 4.40:1 on the
+   * .well (--recess #f4f4f5), where the deck page prints 12px answers in it.
+   * scripts/contrast.mjs checks every pair and fails the lint on a regression.
+   */
   --ink: #18181b;             /* 17.13:1 · AAA */
   --ink-dim: #52525b;         /*  7.47:1 · AAA */
-  --ink-dimmer: #71717a;      /*  4.67:1 · AA  */
+  --ink-dimmer: #6b6b74;      /*  5.10:1 on --bg · 4.80:1 on --recess · AA on every plane */
   --ink-faint: #a1a1aa;       /*  2.48:1 · NON-TEXT ONLY */
 
   --accent: #18181b;
@@ -273,11 +279,13 @@
 
   --border: #27272a;          /* decorative divider          · 1.34:1 */
   --border-strong: #3f3f46;   /* enclosure, hover edge       · 1.91:1 */
-  --border-control: #63636d;  /* interactive edge · 3.35:1 — WCAG 1.4.11 */
+  /* The old #63636d was 3.35:1 on --bg but 2.77:1 on the .raised plane
+     (--raised-bg #1f1f23), where the launcher's chips sit. */
+  --border-control: #6f6f79;  /* interactive edge · 4.00:1 on --bg · 3.31:1 on --raised-bg — WCAG 1.4.11 */
 
   --ink: #fafafa;             /* 19.06:1 · AAA */
   --ink-dim: #a1a1aa;         /*  7.76:1 · AAA */
-  --ink-dimmer: #82828b;      /*  5.22:1 · AA  */
+  --ink-dimmer: #8b8b95;      /*  5.90:1 on --bg · 4.87:1 on --raised-bg · AA on every plane (was #82828b: 4.31:1 there) */
   --ink-faint: #52525b;       /*  2.57:1 · NON-TEXT ONLY */
 
   --accent: #fafafa;
@@ -1467,6 +1475,29 @@ button.term-chip:disabled {
 .rail__rows span:nth-child(2) { width: 72%; }
 .rail__rows span:nth-child(3) { width: 86%; }
 
+/* The statistics mark: the page's own histogram in miniature — three bars,
+   bottom-aligned, rising. Same 15px box and 1.5px strokes as the index mark. */
+.rail__bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.rail__bars span {
+  display: block;
+  width: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.rail__bars span:nth-child(1) { height: 40%; }
+.rail__bars span:nth-child(2) { height: 100%; }
+.rail__bars span:nth-child(3) { height: 66%; }
+
 @media (prefers-reduced-motion: reduce) {
   .rail,
   .rail__label {
@@ -1492,4 +1523,72 @@ button.term-chip:disabled {
 html {
   scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;
+}
+
+/*
+ * ─── Rich text on card faces (improvement plan §4.2) ───
+ *
+ * Math inherits `color`, so a formula takes --ink on both themes for free;
+ * display formulae scroll rather than overflow the card. Code takes the mono
+ * face on the raised plane. Syntax tokens map onto TWO ink shades only —
+ * keywords and names in --ink, strings and comments in --ink-dim — because
+ * hue is reserved for the state channel (§2.2). It reads like a printed
+ * listing, which is what the serif card face wants beside it.
+ */
+.math {
+  font-size: 1.05em;
+}
+
+.math--display {
+  display: block;
+  margin: 0.5em 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+.code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--ink);
+}
+
+.code--block {
+  display: block;
+  padding: 0.75em 0.9em;
+  margin: 0.5em 0;
+  overflow-x: auto;
+  white-space: pre;
+  text-align: left;
+  font-size: 0.78em;
+  line-height: 1.5;
+  border-radius: var(--radius-sm);
+}
+
+.code--block code {
+  display: block;
+}
+
+.code .hljs-keyword,
+.code .hljs-built_in,
+.code .hljs-title,
+.code .hljs-type,
+.code .hljs-literal,
+.code .hljs-number {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.code .hljs-string,
+.code .hljs-comment,
+.code .hljs-meta,
+.code .hljs-doctag {
+  color: var(--ink-dim);
+}
+
+.code .hljs-comment {
+  font-style: italic;
 }

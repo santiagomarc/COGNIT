@@ -1,8 +1,8 @@
-import { createClient } from '@/lib/supabase/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import type { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { GoogleGenerativeAI, type GenerationConfig, type Schema } from '@google/generative-ai';
 import type { Json } from '@/lib/database.types';
 import { logger } from '@/lib/logger';
-import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { getServerEnv } from '@/lib/env-server';
 
 export type AiActionName =
@@ -79,6 +79,39 @@ export function getGeminiEmbeddingModel() {
   });
 }
 
+/**
+ * The per-request config for a structured (JSON) call.
+ *
+ * A request-level `generationConfig` REPLACES the model-level one in
+ * @google/generative-ai 0.24 (`GenerativeModel.generateContent` spreads the
+ * request over `{ generationConfig: this.generationConfig, … }`), so a call
+ * that only passes `responseSchema` silently drops the factory's temperature
+ * and output cap and runs at the model default. Every JSON call site builds
+ * its config here so that cannot happen again.
+ *
+ * `thinkingBudget: 0` is the default on purpose: extraction, enrichment and
+ * classification gain nothing from thinking tokens, which are billed and drawn
+ * from the same output budget. Callers that measure a quality gain pass their
+ * own budget. The field is not in 0.24's types; like `propertyOrdering` it is
+ * forwarded to the REST body unchanged.
+ */
+export function jsonGenerationConfig(input: {
+  responseSchema?: Schema;
+  temperature?: number;
+  maxOutputTokens?: number;
+  thinkingBudget?: number;
+} = {}): GenerationConfig {
+  const env = getServerEnv();
+  return {
+    temperature: input.temperature ?? 0.1,
+    topP: 0.95,
+    maxOutputTokens: input.maxOutputTokens ?? env.GEMINI_MODEL_MAX_TOKENS,
+    responseMimeType: 'application/json',
+    ...(input.responseSchema ? { responseSchema: input.responseSchema } : {}),
+    ...({ thinkingConfig: { thinkingBudget: input.thinkingBudget ?? 0 } } as object),
+  };
+}
+
 export function chunkArray<T>(items: T[], size: number) {
   const chunks: T[][] = [];
   for (let index = 0; index < items.length; index += size) {
@@ -88,11 +121,6 @@ export function chunkArray<T>(items: T[], size: number) {
 }
 
 export { normalizeForMatch, normalizeWhitespace } from '@/lib/text-normalize';
-
-function isMissingAiUsageTableError(message: string) {
-  const normalized = message.toLowerCase();
-  return normalized.includes('ai_usage_logs') && normalized.includes('does not exist');
-}
 
 // Deliberately does not strip fenced code blocks: this app is used to study
 // programming material, and the system instructions on every AI call already
@@ -112,106 +140,71 @@ export function sanitizeAiInputText(rawText: string, maxChars = 50_000) {
   return sanitized.length > 0 ? sanitized : bounded.trim();
 }
 
-const DAILY_AI_CALL_CEILING = 300;
+/**
+ * The daily ceiling on model calls per user, across every action. Enforced
+ * inside `reserve_ai_call` under the same advisory lock as the per-action
+ * window, so it can neither race nor fail open.
+ */
+export const DAILY_AI_CALL_CEILING = 300;
 
-export async function enforceDailyAiBudget(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-) {
-  const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
-  const { count, error } = await supabase
-    .from('ai_usage_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('created_at', since);
+type ReservationOutcome =
+  | { ok: true; reservationId: string }
+  | { ok: false; error: string };
 
-  if (error) return null; // fail open on the ceiling; per-action limits still apply
-  return (count ?? 0) >= DAILY_AI_CALL_CEILING
-    ? 'You have reached your daily AI limit. It resets 24 hours after your first request today.'
-    : null;
-}
-
-export async function enforceAiRateLimit(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
-  action: AiActionName,
-) {
-  const policy = AI_RATE_LIMITS[action];
-  const cutoffIso = new Date(Date.now() - policy.windowMinutes * 60_000).toISOString();
-
-  const { count, error } = await supabase
-    .from('ai_usage_logs')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('action', action)
-    .gte('created_at', cutoffIso);
-
-  if (error) {
-    // The missing-table fallback only applies outside production: it exists so a
-    // fresh local checkout works before migrations are applied, never so a dropped
-    // or renamed table in production can silently disable AI spend limits.
-    if (isMissingAiUsageTableError(error.message) && process.env.NODE_ENV !== 'production') {
-      return null;
-    }
-    return 'Unable to check AI usage limits right now. Please try again.';
-  }
-
-  if ((count ?? 0) >= policy.maxRequests) {
-    return `AI limit reached for ${action.replace('_', ' ')}. Try again in about ${policy.windowMinutes} minutes.`;
-  }
-
-  return null;
-}
-
+/**
+ * Reserves spend BEFORE a model call (invariant #7). One reservation row may
+ * cover several model calls — a drill batch, an enrichment fan-out, a chat
+ * turn plus its follow-ups — so `calls` says how many, and the daily ceiling
+ * counts calls, not rows.
+ *
+ * There is no TypeScript fallback any more: the RPC is live and verified by
+ * `npm run verify:deployment`, and a fallback that counted rows in a second
+ * query was both racy and a weaker limit than the one it shadowed.
+ */
 export async function reserveAiCall(
   supabase: Awaited<ReturnType<typeof createClient>>,
   userId: string,
   action: AiActionName,
   metadata: Record<string, Json> = {},
-): Promise<{ ok: true; reservationId: string | null } | { ok: false; error: string }> {
-  const dailyError = await enforceDailyAiBudget(supabase, userId);
-  if (dailyError) return { ok: false, error: dailyError };
-
+  options: { calls?: number } = {},
+): Promise<ReservationOutcome> {
   const policy = AI_RATE_LIMITS[action];
+  const calls = Math.max(1, Math.floor(options.calls ?? 1));
 
   const { data: rpcId, error: rpcError } = await supabase.rpc('reserve_ai_call', {
     p_action: action,
     p_window_minutes: policy.windowMinutes,
     p_max_requests: policy.maxRequests,
     p_metadata: { ...metadata, phase: 'reserved' },
+    p_calls: calls,
+    p_daily_ceiling: DAILY_AI_CALL_CEILING,
   });
 
   if (!rpcError && rpcId) {
     return { ok: true, reservationId: rpcId };
   }
 
-  if (rpcError) {
-    if (rpcError.message?.includes('AI_RATE_LIMIT') || (rpcError as { code?: string }).code === 'P0001') {
-      return {
-        ok: false,
-        error: `AI limit reached for ${action.replace('_', ' ')}. Try again in about ${policy.windowMinutes} minutes.`,
-      };
-    }
-    if (!isMissingDatabaseFunctionError(rpcError.message, 'reserve_ai_call')) {
-      logger.warn('reserveAiCall', 'rpc call failed, using TypeScript fallback', { message: rpcError.message });
-    }
+  const code = (rpcError as { code?: string } | null)?.code;
+  const message = rpcError?.message ?? '';
+
+  if (message.includes('AI_RATE_LIMIT') || code === 'P0001') {
+    return {
+      ok: false,
+      error: `AI limit reached for ${action.replace('_', ' ')}. Try again in about ${policy.windowMinutes} minutes.`,
+    };
+  }
+  if (message.includes('AI_DAILY_CEILING') || code === 'P0002') {
+    return {
+      ok: false,
+      error: 'You have reached your daily AI limit. It resets 24 hours after your first request today.',
+    };
+  }
+  if (code === '28000' || message.includes('Unauthorized')) {
+    return { ok: false, error: 'You must be logged in.' };
   }
 
-  // TypeScript fallback path
-  const limitError = await enforceAiRateLimit(supabase, userId, action);
-  if (limitError) return { ok: false, error: limitError };
-
-  const { data, error } = await supabase
-    .from('ai_usage_logs')
-    .insert({ user_id: userId, action, metadata: { ...metadata, phase: 'reserved' } })
-    .select('id')
-    .single();
-
-  if (error && !isMissingAiUsageTableError(error.message)) {
-    logger.error('reserveAiCall', 'usage insert failed', { action, message: error.message });
-  }
-
-  return { ok: true, reservationId: data?.id ?? null };
+  logger.error('reserveAiCall', 'reservation failed', { action, user_id: userId, code, message });
+  return { ok: false, error: 'Unable to check AI usage limits right now. Please try again.' };
 }
 
 /**
@@ -252,7 +245,7 @@ export async function recordAiUsage(
     metadata: { ...metadata, phase: 'completed' },
   });
 
-  if (error && !isMissingAiUsageTableError(error.message)) {
+  if (error) {
     logger.error('ai_usage_logs', 'failed to insert usage row', { message: error.message });
   }
 }
@@ -274,8 +267,10 @@ export async function touchDeckUpdatedAt(
 }
 
 export async function requireOwnedDeck(deckId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Memoised per request: the insights tab renders four server components
+  // that each call an action guarded by this, and they now share one auth
+  // round-trip instead of making four.
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     return { error: 'You must be logged in.' as const };

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import type { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { AddContentPanel } from '@/components/ui/shared/AddContentPanel';
 import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
 import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
@@ -14,11 +15,11 @@ import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
 import { StateTick, type TickState } from '@/components/ui/shared/StateTick';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
-import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { estimateSessionMinutes } from '@/lib/dashboard-forecast';
 import { getSessionCardBounds } from '@/lib/study';
 import { loadSynthesisReadings } from '@/lib/synthesis/loaders';
+import type { SynthesisReadings } from '@/lib/synthesis/types';
 import { logger } from '@/lib/logger';
 import type { CardSource } from '@/index';
 
@@ -73,6 +74,7 @@ type DeckDetailSnapshot = {
   }>;
   masteryRowsErrorMessage: string | null;
   schedule: ScheduleBreakdown;
+  synthesisReadings: SynthesisReadings;
 };
 
 /** Compact age for the telemetry strip: `today`, `2d`, `3mo`. */
@@ -112,167 +114,73 @@ function formatNextReview(nextReviewAt: string | null): { label: string; state: 
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-/**
- * Deck-wide count of cards ready for MCQ. Uses an RPC so the count covers the
- * whole deck rather than the 60-card page the UI renders; falls back to a
- * bounded HEAD count when the migration has not been applied.
- */
-async function loadQuizReadyCount(
-  supabase: SupabaseServerClient,
-  deckId: string,
-): Promise<number> {
-  try {
-    const { data, error } = await supabase.rpc('count_quiz_ready_cards', { p_deck_id: deckId });
+const EMPTY_READINGS: SynthesisReadings = { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null };
 
-    if (!error) {
-      return Number(data ?? 0);
-    }
-
-    if (error?.message && !isMissingDatabaseFunctionError(error.message, 'count_quiz_ready_cards')) {
-      logger.warn('deck-page', 'count_quiz_ready_cards rpc failed', { message: error.message });
-    }
-
-    const { count } = await supabase
-      .from('cards')
-      .select('id', { count: 'exact', head: true })
-      .eq('deck_id', deckId)
-      .not('id_question', 'is', null)
-      .not('mcq_distractors', 'is', null);
-
-    return count ?? 0;
-  } catch (err) {
-    logger.warn('deck-page', 'loadQuizReadyCount failed', { err });
+/** Deck-wide count of cards ready for MCQ — the whole deck, not the 60-card page. */
+async function loadQuizReadyCount(supabase: SupabaseServerClient, deckId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('count_quiz_ready_cards', { p_deck_id: deckId });
+  if (error) {
+    logger.warn('deck-page', 'count_quiz_ready_cards rpc failed', { message: error.message });
     return 0;
   }
+  return Number(data ?? 0);
 }
 
 /** Deck-wide topic-tag histogram, for the same pagination reason. */
-async function loadTopTopics(
-  supabase: SupabaseServerClient,
-  deckId: string,
-): Promise<Array<[string, number]>> {
-  try {
-    const { data, error } = await supabase.rpc('get_deck_topic_tag_counts', {
-      p_deck_id: deckId,
-      p_limit: 10,
-    });
-
-    if (!error) {
-      return (data ?? []).map((row) => [row.topic_tag, Number(row.tag_count)] as [string, number]);
-    }
-
-    if (error?.message && !isMissingDatabaseFunctionError(error.message, 'get_deck_topic_tag_counts')) {
-      logger.warn('deck-page', 'get_deck_topic_tag_counts rpc failed', { message: error.message });
-    }
-
-    const { data: taggedCards } = await supabase
-      .from('cards')
-      .select('topic_tags')
-      .eq('deck_id', deckId)
-      .not('topic_tags', 'is', null)
-      .limit(2000);
-
-    const counts = new Map<string, number>();
-    for (const card of taggedCards ?? []) {
-      if (!Array.isArray(card.topic_tags)) continue;
-      for (const rawTag of card.topic_tags) {
-        const tag = (rawTag ?? '').trim();
-        if (!tag) continue;
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
-    }
-
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  } catch (err) {
-    logger.warn('deck-page', 'loadTopTopics failed', { err });
+async function loadTopTopics(supabase: SupabaseServerClient, deckId: string): Promise<Array<[string, number]>> {
+  const { data, error } = await supabase.rpc('get_deck_topic_tag_counts', { p_deck_id: deckId, p_limit: 10 });
+  if (error) {
+    logger.warn('deck-page', 'get_deck_topic_tag_counts rpc failed', { message: error.message });
     return [];
   }
+  return (data ?? []).map((row) => [row.topic_tag, Number(row.tag_count)] as [string, number]);
 }
 
 /**
- * The deck's SM-2 state, deck-wide (Run 6, Task 3.4).
- *
- * `get_deck_schedule_breakdown` counts the four buckets in Postgres and
- * returns one row. The row-based path below — every card's `state` and
- * `next_review_at` shipped to Node and bucketed here — is kept only as the
- * fallback for an environment where that migration has not been applied.
- *
- * `new` is a real bucket rather than a leftover: the schema defaults
- * `next_review_at` to `now()`, so a never-studied card looks due unless its
- * `state` is read alongside.
+ * The deck's SM-2 state, deck-wide, counted in Postgres by
+ * `get_deck_schedule_breakdown`. `new` is a real bucket rather than a
+ * leftover: the schema defaults `next_review_at` to `now()`, so a
+ * never-studied card looks due unless its `state` is read alongside.
  */
-const SCHEDULE_ROW_CAP = 20_000;
-
-async function loadScheduleBreakdown(
-  supabase: SupabaseServerClient,
-  deckId: string,
-): Promise<ScheduleBreakdown> {
+async function loadScheduleBreakdown(supabase: SupabaseServerClient, deckId: string): Promise<ScheduleBreakdown> {
   const empty: ScheduleBreakdown = { due: 0, learning: 0, scheduled: 0, fresh: 0 };
-
-  const rpcResult = await supabase.rpc('get_deck_schedule_breakdown', { p_deck_id: deckId });
-
-  if (!rpcResult.error) {
-    const row = rpcResult.data?.[0];
-    if (row) {
-      return { due: row.due, learning: row.learning, scheduled: row.scheduled, fresh: row.fresh };
-    }
-    return empty;
-  }
-
-  if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_deck_schedule_breakdown')) {
-    logger.warn('deck-page', 'get_deck_schedule_breakdown rpc failed, using fallback', {
-      message: rpcResult.error.message,
-    });
-  }
-
-  const { data, error } = await supabase
-    .from('cards')
-    .select('state, next_review_at')
-    .eq('deck_id', deckId)
-    .limit(SCHEDULE_ROW_CAP);
-
+  const { data, error } = await supabase.rpc('get_deck_schedule_breakdown', { p_deck_id: deckId });
   if (error) {
-    logger.warn('deck-page', 'schedule breakdown query failed', { message: error.message });
+    logger.warn('deck-page', 'get_deck_schedule_breakdown rpc failed', { message: error.message });
     return empty;
   }
-
-  const now = Date.now();
-  const breakdown = { ...empty };
-
-  for (const row of data ?? []) {
-    const state = typeof row.state === 'string' ? row.state : 'new';
-
-    if (state === 'new') {
-      breakdown.fresh += 1;
-      continue;
-    }
-
-    const dueMs = row.next_review_at ? Date.parse(row.next_review_at) : NaN;
-    if (!Number.isNaN(dueMs) && dueMs <= now) {
-      breakdown.due += 1;
-    } else if (state === 'learning' || state === 'relearning') {
-      breakdown.learning += 1;
-    } else {
-      breakdown.scheduled += 1;
-    }
-  }
-
-  return breakdown;
+  const row = data?.[0];
+  return row ? { due: row.due, learning: row.learning, scheduled: row.scheduled, fresh: row.fresh } : empty;
 }
 
+/**
+ * Every read the deck workspace needs, in ONE wave. This used to be three:
+ * the snapshot, then (quiz-ready, topics) once the count was known, then the
+ * synthesis readings — each a full round-trip in front of first paint. None
+ * of them depends on another's result; the `> 60` rule only decided which
+ * result to USE, and the in-memory fallbacks for small decks just moved the
+ * same arithmetic to Node.
+ *
+ * The 60-card page (with distractors and tags) is only read on the tabs that
+ * render it; the chat and insights tabs still get the deck-wide count.
+ */
 async function loadDeckDetailSnapshot(
   supabase: SupabaseServerClient,
   userId: string,
-  deckId: string
+  deckId: string,
+  activeTab: string,
 ): Promise<DeckDetailSnapshot> {
-  const fetchSnapshot = async () => {
-    return Promise.all([
-      supabase
-        .from('decks')
-        .select('id, title, description, created_at, share_token')
-        .eq('id', deckId)
-        .single(),
-      supabase
+  const wantsCards = activeTab === 'overview' || activeTab === 'cards';
+  const wantsOverview = activeTab === 'overview';
+
+  const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings] = await Promise.all([
+    supabase
+      .from('decks')
+      .select('id, title, description, created_at, share_token')
+      .eq('id', deckId)
+      .single(),
+    wantsCards
+      ? supabase
         .from('cards')
         .select(
           'id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags, state, next_review_at',
@@ -280,63 +188,34 @@ async function loadDeckDetailSnapshot(
         )
         .eq('deck_id', deckId)
         .order('created_at', { ascending: false })
-        .range(0, 59),
-      supabase
-        .from('card_mastery_state')
-        .select('correct, last_quiz_at')
-        .eq('user_id', userId)
+        .range(0, 59)
+      : supabase
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
         .eq('deck_id', deckId),
-      loadScheduleBreakdown(supabase, deckId),
-    ]);
-  };
-
-  let [deckRes, cardsRes, masteryRes, schedule] = await fetchSnapshot();
-
-  // Retry once if there was a transient network/fetch failure
-  if ((deckRes.error?.message?.includes('fetch failed') || cardsRes.error?.message?.includes('fetch failed')) && !deckRes.data) {
-    await new Promise((r) => setTimeout(r, 250));
-    [deckRes, cardsRes, masteryRes, schedule] = await fetchSnapshot();
-  }
+    supabase
+      .from('card_mastery_state')
+      .select('correct, last_quiz_at')
+      .eq('user_id', userId)
+      .eq('deck_id', deckId),
+    loadScheduleBreakdown(supabase, deckId),
+    loadQuizReadyCount(supabase, deckId),
+    loadTopTopics(supabase, deckId),
+    wantsOverview ? loadSynthesisReadings(supabase, { deckId, userId }) : Promise.resolve(EMPTY_READINGS),
+  ]);
 
   const { data: deck, error: deckError } = deckRes;
-  const { data: rawCards, error: cardsError, count: cardsCount } = cardsRes;
+  const { error: cardsError, count: cardsCount } = cardsRes;
   const { data: masteryRows, error: masteryRowsError } = masteryRes;
 
-  const cards = (rawCards ?? []).map((card) => ({
+  // The head-only branch returns `null` data; the page branch returns rows.
+  const rawCards = (wantsCards ? (cardsRes.data as Array<Omit<DeckCardRow, 'source' | 'created_at'> & { source: string | null; created_at: string | null }> | null) : null) ?? [];
+  const cards: DeckCardRow[] = rawCards.map((card) => ({
     ...card,
     created_at: card.created_at ?? new Date().toISOString(),
     source: card.source as CardSource,
-  })) as DeckCardRow[];
+  }));
   const totalCards = cardsCount ?? cards.length;
-
-  let quizReadyCards = 0;
-  let topTopics: Array<[string, number]> = [];
-
-  // If the deck has more than 60 cards, use the database RPCs for deck-wide stats.
-  // For 0-60 cards, compute in-memory instantly to avoid redundant round-trips.
-  if (totalCards > 60) {
-    const [rpcQuizReady, rpcTopTopics] = await Promise.all([
-      loadQuizReadyCount(supabase, deckId),
-      loadTopTopics(supabase, deckId),
-    ]);
-    quizReadyCards = rpcQuizReady;
-    topTopics = rpcTopTopics;
-  } else if (cards.length > 0) {
-    quizReadyCards = cards.filter(
-      (c) => Boolean(c.id_question) && Array.isArray(c.mcq_distractors) && c.mcq_distractors.length >= 3
-    ).length;
-
-    const counts = new Map<string, number>();
-    for (const card of cards) {
-      if (!Array.isArray(card.topic_tags)) continue;
-      for (const rawTag of card.topic_tags) {
-        const tag = (rawTag ?? '').trim();
-        if (!tag) continue;
-        counts.set(tag, (counts.get(tag) ?? 0) + 1);
-      }
-    }
-    topTopics = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  }
 
   return {
     deck: deck
@@ -356,6 +235,7 @@ async function loadDeckDetailSnapshot(
     masteryRows: masteryRows ?? [],
     masteryRowsErrorMessage: masteryRowsError?.message ?? null,
     schedule,
+    synthesisReadings,
   };
 }
 
@@ -385,8 +265,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
   const { deckId } = await params;
   const activeTab = resolveDeckTab((await searchParams)?.tab);
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     redirect('/login');
@@ -404,7 +283,8 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
     masteryRows,
     masteryRowsErrorMessage,
     schedule,
-  } = await loadDeckDetailSnapshot(supabase, user.id, deckId);
+    synthesisReadings,
+  } = await loadDeckDetailSnapshot(supabase, user.id, deckId, activeTab);
 
   if (deckErrorMessage || !deck) {
     notFound();
@@ -437,11 +317,6 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
   const unprovenCards = Math.max(totalCards - masteredCards, 0);
   const hasCards = totalCards > 0;
   const recentCards = cards.slice(0, 5);
-
-  // Two bounded reads for the launcher's synthesis block; only the overview renders it.
-  const synthesisReadings = activeTab === 'overview' && hasCards
-    ? await loadSynthesisReadings(supabase, { deckId, userId: user.id })
-    : { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null };
 
   return (
     <div className="container mx-auto flex flex-col gap-4 p-4 md:px-8 md:py-6">
@@ -562,7 +437,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
                         <span className="block truncate text-xs text-ink-dimmer">{answer}</span>
                       </span>
                       <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer sm:block">
-                        {card.source === 'ai_pdf' ? 'PDF' : card.source === 'bulk_import' ? 'Bulk' : 'Manual'}
+                        {card.source === 'ai_pdf' ? 'PDF' : card.source === 'bulk_import' ? 'Bulk' : card.source === 'synthesis_claim' ? 'Drill' : 'Manual'}
                       </span>
                       <span
                         className="w-12 shrink-0 text-right font-mono text-[13px] tnum"

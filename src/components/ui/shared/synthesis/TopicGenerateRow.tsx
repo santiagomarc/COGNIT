@@ -38,7 +38,7 @@ export function TopicGenerateRow({
           value={topic}
           onChange={(event) => setTopic(event.target.value)}
           aria-label="Topic for new drills"
-          className="h-[30px] min-w-0 max-w-[12rem] flex-1 rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-transparent px-2 text-xs text-ink outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          className="h-[30px] min-w-0 max-w-[12rem] flex-1 rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-transparent px-2 text-base text-ink outline-hidden sm:text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         >
           <option value="">Any topic</option>
           {topics.map((entry) => (

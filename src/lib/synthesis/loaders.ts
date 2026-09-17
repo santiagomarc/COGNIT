@@ -536,3 +536,37 @@ export async function loadDueDrillsByDeck(
     truncated: rows.length >= MAX_DUE_DRILLS_READ,
   };
 }
+
+/**
+ * Which outside claims of these attempts have already become cards, as
+ * `attemptId → (claimIndex → cardId)`. Read from the card's provenance
+ * columns (improvement plan §3.3): the attempt row is immutable, the card
+ * carries the link. Bounded by the attempts asked about; a canvas asks for
+ * one, Insights for at most MAX_ATTEMPTS_READ.
+ */
+export async function loadAbsorbedClaims(
+  supabase: SupabaseServerClient,
+  input: { attemptIds: string[] },
+): Promise<Map<string, Map<number, string>>> {
+  const out = new Map<string, Map<number, string>>();
+  const attemptIds = [...new Set(input.attemptIds)].slice(0, MAX_ATTEMPTS_READ);
+  if (attemptIds.length === 0) return out;
+
+  const { data, error } = await supabase
+    .from('cards')
+    .select('id, absorbed_from_attempt_id, absorbed_claim_index')
+    .in('absorbed_from_attempt_id', attemptIds);
+
+  if (error) {
+    logger.warn('synthesis', 'absorbed claims read failed', { message: error.message });
+    return out;
+  }
+
+  for (const row of data ?? []) {
+    if (!row.absorbed_from_attempt_id || row.absorbed_claim_index === null) continue;
+    const byIndex = out.get(row.absorbed_from_attempt_id) ?? new Map<number, string>();
+    byIndex.set(row.absorbed_claim_index, row.id);
+    out.set(row.absorbed_from_attempt_id, byIndex);
+  }
+  return out;
+}

@@ -30,6 +30,7 @@ import type {
 } from '@/lib/synthesis/types';
 import { isConfidence } from '@/lib/synthesis/types';
 import { FORMAT_LABEL, VERDICT_LABEL, VERDICT_TICK, formatAgo, formatClock, linksTone } from '@/lib/synthesis/ui';
+import { RichText } from '@/components/ui/shared/RichText';
 
 type SynthesisDrillClientProps = {
   deckId: string;
@@ -619,7 +620,7 @@ export function SynthesisDrillClient({
             tabIndex={-1}
             className="font-serif text-[1.5rem] leading-[1.32] tracking-[-0.02em] text-balance text-ink outline-hidden"
           >
-            {drill.promptText}
+            <RichText text={drill.promptText} />
           </p>
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className={LABEL}>Concepts</span>

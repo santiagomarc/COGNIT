@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { m, AnimatePresence, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
 import { ArrowLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
@@ -18,6 +18,7 @@ import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
 import type { CapstoneDrillCandidate } from '@/lib/synthesis/types';
 import { toast } from 'sonner';
+import { RichText } from '@/components/ui/shared/RichText';
 
 type FlashcardReviewClientProps = {
   deckId: string;
@@ -89,6 +90,14 @@ function formatDuration(ms: number): string {
 function isStudyGrade(value: unknown): value is StudyGrade {
   return value === 'again' || value === 'hard' || value === 'good' || value === 'easy';
 }
+
+type GradeJob = {
+  cardId: string;
+  grade: StudyGrade;
+  durationMs: number;
+  /** Restores the session to the moment before this grade was applied. */
+  rollback: () => void;
+};
 
 export function FlashcardReviewClient({
   deckId,
@@ -184,8 +193,17 @@ export function FlashcardReviewClient({
       return null;
     }
   });
-  const [isPending, startTransition] = useTransition();
-  const [isSubmittingGrade, setIsSubmittingGrade] = useState(false);
+  /*
+   * Grades are queued and flushed in order, never awaited by the UI. The old
+   * `isSubmittingGrade` gate refused the next grade until the previous
+   * gradeCard call had resolved, which turned the "optimistic" advance into a
+   * wait of one network round-trip per card — and, on the first lapse of a
+   * card, a wait of one model call. `pendingGrades` is for the exit button
+   * and the unload guard only; the keys never read it.
+   */
+  const outboxRef = useRef<GradeJob[]>([]);
+  const flushPromiseRef = useRef<Promise<void> | null>(null);
+  const [pendingGrades, setPendingGrades] = useState(0);
   // gradeCard already returns nextReviewAt/interval; the client used to discard
   // them, so the summary never said when the work actually pays off.
   const [scheduledReviews, setScheduledReviews] = useState<string[]>([]);
@@ -250,14 +268,9 @@ export function FlashcardReviewClient({
     []
   );
 
-  useEffect(() => {
-    if (!completed || resumeState) {
-      return;
-    }
-
-    // Freeze session duration at completion time.
-    setNowMs(Date.now());
-  }, [completed, resumeState]);
+  // The session clock freezes at completion without an effect: applyGrade sets
+  // `nowMs` on the final grade, and the ticking interval above stops as soon as
+  // `completed` is true.
 
   const progress = useMemo(() => {
     if (sessionCards.length === 0) return 0;
@@ -325,20 +338,73 @@ export function FlashcardReviewClient({
     []
   );
 
+  /**
+   * Drains the outbox one grade at a time, in order. A failure rolls the
+   * session back to the moment before the failed grade and drops everything
+   * queued after it — those later grades were applied on top of state the
+   * server never saw, so the student re-grades from the failed card.
+   */
+  const flushOutbox = useCallback((): Promise<void> => {
+    if (flushPromiseRef.current) return flushPromiseRef.current;
+
+    const run = (async () => {
+      while (outboxRef.current.length > 0) {
+        const job = outboxRef.current[0];
+        let failed = false;
+
+        try {
+          const result = await gradeCard({
+            card_id: job.cardId,
+            deck_id: deckId,
+            grade: job.grade,
+            duration_ms: job.durationMs,
+          });
+
+          if (result?.success && typeof result.nextReviewAt === 'string') {
+            setScheduledReviews((prev) => [...prev, result.nextReviewAt as string]);
+          } else if (result?.error) {
+            toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
+            failed = true;
+          }
+        } catch (error) {
+          console.error('[FlashcardReviewClient] gradeCard failed:', error);
+          toast.error('Failed to save card grade. Please try again.');
+          failed = true;
+        }
+
+        if (failed) {
+          job.rollback();
+          outboxRef.current = [];
+          setPendingGrades(0);
+          return;
+        }
+
+        outboxRef.current.shift();
+        setPendingGrades(outboxRef.current.length);
+      }
+    })().finally(() => {
+      flushPromiseRef.current = null;
+    });
+
+    flushPromiseRef.current = run;
+    return run;
+  }, [deckId]);
+
   const applyGrade = useCallback(
     (grade: StudyGrade) => {
-      if (!active || isPending || isSubmittingGrade) return;
+      if (!active) return;
       const durationMs = Date.now() - cardStart.current;
       const previousCards = sessionCards;
       const previousIndex = index;
       const previousShowAnswer = showAnswer;
+      const previousGradeLogLength = gradeLog.length;
+      const previousScheduledLength = scheduledReviews.length;
       const elapsedSessionMs = Math.max(Date.now() - sessionStartMs, MIN_ASSUMED_MS_PER_CARD);
       const reviewedCardsCount = Math.max(previousIndex + 1, 1);
       const averageMsPerCard = Math.max(MIN_ASSUMED_MS_PER_CARD, elapsedSessionMs / reviewedCardsCount);
       const nextCards = insertRequeueCard(previousCards, previousIndex, active, grade, averageMsPerCard);
-      setIsSubmittingGrade(true);
 
-      // Optimistically advance to the next card for snappier grading UX.
+      // Optimistically advance to the next card; the write happens in the outbox.
       setSessionCards(nextCards);
       setGradeLog((prev) => [...prev, { cardId: active.id, grade }]);
       setShowAnswer(false);
@@ -347,57 +413,33 @@ export function FlashcardReviewClient({
       cardStart.current = Date.now();
       setNowMs(Date.now());
 
-      startTransition(async () => {
-        try {
-          const result = await gradeCard({
-            card_id: active.id,
-            deck_id: deckId,
-            grade,
-            duration_ms: durationMs,
-          });
-
-          if (result?.success && typeof result.nextReviewAt === 'string') {
-            setScheduledReviews((prev) => [...prev, result.nextReviewAt as string]);
-          }
-
-          if (result?.error) {
-            toast.error(typeof result.error === 'string' ? result.error : 'Failed to save grade');
-
-            // Roll back optimistic UI progression when persistence fails.
-            setSessionCards(previousCards);
-            setIndex(previousIndex);
-            setShowAnswer(previousShowAnswer);
-            setGradeLog((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
-            cardStart.current = Date.now();
-            setNowMs(Date.now());
-            return;
-          }
-        } catch (error) {
-          console.error('[FlashcardReviewClient] gradeCard failed:', error);
-          toast.error('Failed to save card grade. Please try again.');
-
+      outboxRef.current.push({
+        cardId: active.id,
+        grade,
+        durationMs,
+        rollback: () => {
           setSessionCards(previousCards);
           setIndex(previousIndex);
           setShowAnswer(previousShowAnswer);
-          setGradeLog((prev) => (prev.length > 0 ? prev.slice(0, -1) : prev));
+          setGradeLog((prev) => prev.slice(0, previousGradeLogLength));
+          setScheduledReviews((prev) => prev.slice(0, previousScheduledLength));
           cardStart.current = Date.now();
           setNowMs(Date.now());
-        } finally {
-          setIsSubmittingGrade(false);
-        }
+        },
       });
+      setPendingGrades(outboxRef.current.length);
+      void flushOutbox();
     },
     [
       active,
-      deckId,
+      flushOutbox,
+      gradeLog.length,
       index,
       insertRequeueCard,
-      isPending,
-      isSubmittingGrade,
+      scheduledReviews.length,
       sessionCards,
       sessionStartMs,
       showAnswer,
-      startTransition,
     ]
   );
 
@@ -415,7 +457,7 @@ export function FlashcardReviewClient({
    */
   const commitGrade = useCallback(
     (grade: StudyGrade) => {
-      if (!active || isPending || isSubmittingGrade || committedGrade || isPaused) return;
+      if (!active || committedGrade || isPaused) return;
 
       if (prefersReducedMotion) {
         applyGrade(grade);
@@ -429,7 +471,7 @@ export function FlashcardReviewClient({
         applyGrade(grade);
       }, COMMIT_FLASH_MS);
     },
-    [active, applyGrade, committedGrade, isPaused, isPending, isSubmittingGrade, prefersReducedMotion]
+    [active, applyGrade, committedGrade, isPaused, prefersReducedMotion]
   );
 
   const clearStoredProgress = useCallback(() => {
@@ -493,6 +535,8 @@ export function FlashcardReviewClient({
   }, [startNewSession]);
 
   const saveAndExit = useCallback(async () => {
+    // Every queued grade lands before the page goes away.
+    await flushOutbox();
     clearStoredProgress();
 
     if (effectiveAttemptCount > 0) {
@@ -507,7 +551,7 @@ export function FlashcardReviewClient({
       // Best-effort cache invalidation
     }
     router.push(`/dashboard/${deckId}`);
-  }, [clearStoredProgress, deckId, effectiveAttemptCount, router]);
+  }, [clearStoredProgress, deckId, effectiveAttemptCount, flushOutbox, router]);
 
   useEffect(() => {
     if (completed) {
@@ -552,6 +596,9 @@ export function FlashcardReviewClient({
       ) {
         return;
       }
+
+      // A held key must grade one card, not one per auto-repeat.
+      if (event.repeat) return;
 
       if (event.key.toLowerCase() === 'p') {
         event.preventDefault();
@@ -598,7 +645,7 @@ export function FlashcardReviewClient({
   }, [commitGrade, completed, isPaused, resumeState, showAnswer, togglePause]);
 
   useEffect(() => {
-    if (completed || resumeState || sessionCards.length === 0) {
+    if ((completed && pendingGrades === 0) || resumeState || sessionCards.length === 0) {
       return;
     }
 
@@ -609,7 +656,7 @@ export function FlashcardReviewClient({
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [completed, resumeState, sessionCards.length]);
+  }, [completed, pendingGrades, resumeState, sessionCards.length]);
 
   const sessionDuration = nowMs - sessionStartMs;
 
@@ -732,11 +779,10 @@ export function FlashcardReviewClient({
               variant="ghost"
               size="sm"
               onClick={saveAndExit}
-              disabled={isPending || isSubmittingGrade}
               className="gap-2 px-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Save &amp; exit
+              {pendingGrades > 0 ? 'Saving…' : 'Save & exit'}
             </Button>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -891,18 +937,23 @@ export function FlashcardReviewClient({
                     dragConstraints={{ left: 0, right: 0 }}
                     style={{ x: dragX, rotate }}
                     onDragEnd={(_, info) => {
-                      if (showAnswer) {
-                        if (info.offset.x > 120) commitGrade('good');
-                        else if (info.offset.x < -120) commitGrade('again');
-                      }
+                      if (!showAnswer) return;
+                      // Distance OR velocity: a short fast flick is a grade too,
+                      // and a slow drag released back near centre is not.
+                      const flick = Math.abs(info.velocity.x) > 500 && Math.abs(info.offset.x) > 40;
+                      const swipe = Math.abs(info.offset.x) > 120;
+                      if (!flick && !swipe) return;
+                      const direction = Math.sign(flick ? info.velocity.x : info.offset.x);
+                      if (direction > 0) commitGrade('good');
+                      else if (direction < 0) commitGrade('again');
                     }}
                     className="relative cursor-grab active:cursor-grabbing"
                   >
                     <FlipCard
                       state={flipState}
                       grade={committedGrade ?? undefined}
-                      prompt={active.id_question ?? active.back}
-                      answer={active.front}
+                      prompt={<RichText text={active.id_question ?? active.back} />}
+                      answer={<RichText text={active.front} />}
                       answerAside={
                         active.mnemonic ? (
                           <span className="flip__aside">
@@ -967,7 +1018,7 @@ export function FlashcardReviewClient({
                     grade={grade}
                     card={activeSm2}
                     onCommit={commitGrade}
-                    disabled={!showAnswer || isPaused || isPending || isSubmittingGrade || committedGrade !== null}
+                    disabled={!showAnswer || isPaused || committedGrade !== null}
                     isDown={heldGrade === grade || committedGrade === grade}
                   />
                 ))}
@@ -1015,9 +1066,8 @@ export function FlashcardReviewClient({
                   type="button"
                   variant="ghost"
                   onClick={saveAndExit}
-                  disabled={isPending || isSubmittingGrade}
                 >
-                  Save &amp; exit
+                  {pendingGrades > 0 ? 'Saving…' : 'Save & exit'}
                 </Button>
               </div>
             </div>

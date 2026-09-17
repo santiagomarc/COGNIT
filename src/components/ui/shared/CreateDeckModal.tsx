@@ -176,7 +176,7 @@ export function CreateDeckModal() {
                     id="inline-deck-tag"
                     value={accentTag}
                     onChange={(event) => setAccentTag(event.target.value)}
-                    className="h-[40px] w-full rounded-[var(--radius-md)] border border-[var(--border-control)] bg-surface px-3 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="h-[40px] w-full rounded-[var(--radius-md)] border border-[var(--border-control)] bg-surface px-3 text-base sm:text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   >
                     <option value="">None</option>
                     {DECK_TAG_OPTIONS.map((option) => (

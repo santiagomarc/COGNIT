@@ -1,6 +1,7 @@
 'use server';
 
 import { randomUUID } from 'node:crypto';
+import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { FinishReason, type GenerateContentResult } from '@google/generative-ai';
 import type { z } from 'zod';
@@ -10,10 +11,12 @@ import { getServerEnv } from '@/lib/env-server';
 import { logger } from '@/lib/logger';
 import { MIN_CONTEXT_SIMILARITY } from '@/lib/rag';
 import {
+  absorbOutsideClaimSchema,
   archiveSynthesisDrillSchema,
   checkSynthesisAttemptSchema,
   generateSynthesisDrillsSchema,
   rateSynthesisAttemptSchema,
+  type AbsorbOutsideClaimInput,
   type ArchiveSynthesisDrillInput,
   type CheckSynthesisAttemptInput,
   type GenerateSynthesisDrillsInput,
@@ -32,6 +35,7 @@ import {
 } from '@/lib/synthesis/clusters';
 import {
   DRILL_COLUMNS,
+  loadAbsorbedClaims,
   parseStoredAttempt,
   rowToDrill,
   toAnchorCards,
@@ -56,11 +60,15 @@ import type { AnchorCard, Diagnostic, DrillReveal, Exemplar, SynthesisDrill, Syn
 import { computeVerdict, countCovered, deriveCardIdSets, reconcileDiagnostic } from '@/lib/synthesis/verdict';
 import {
   getGeminiJsonModel,
+  jsonGenerationConfig,
   recordAiUsage,
   requireOwnedDeck,
   reserveAiCall,
   sanitizeAiInputText,
+  touchDeckUpdatedAt,
 } from './_shared';
+import { enrichCards } from './ai-enrich';
+import { syncEmbeddings } from './chat';
 
 /**
  * Micro-synthesis Server Actions (COGNIT_MICRO_SYNTHESIS_SPEC.md Rev. B.1 §9.3).
@@ -251,7 +259,6 @@ async function embeddingClusters(
 }
 
 async function generateDrillForCluster(cluster: DrillCluster, format: SynthesisFormat, index: number) {
-  const env = getServerEnv();
   const model = getGeminiJsonModel({ temperature: GENERATION_TEMPERATURE });
   const label = `synthesis_generate_${index}`;
 
@@ -260,16 +267,12 @@ async function generateDrillForCluster(cluster: DrillCluster, format: SynthesisF
       const result = await model.generateContent(
         {
           systemInstruction: buildDrillGenerationInstruction(format),
-          // A request-level generationConfig REPLACES the model-level one in the
-          // 0.24 SDK (GenerativeModel.generateContent spreads the request over
-          // its own config), so temperature and the output cap are restated here.
-          generationConfig: {
-            temperature: GENERATION_TEMPERATURE,
-            topP: 0.95,
-            maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
-            responseMimeType: 'application/json',
+          // jsonGenerationConfig restates temperature and the output cap: a
+          // request-level config REPLACES the model-level one in the 0.24 SDK.
+          generationConfig: jsonGenerationConfig({
             responseSchema: DRILL_GENERATION_SCHEMA,
-          },
+            temperature: GENERATION_TEMPERATURE,
+          }),
           contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster.cards)}` }] }],
         },
         { timeout: GENERATION_TIMEOUT_MS },
@@ -367,7 +370,8 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
     const count = Math.min(parsed.data.count, MAX_ACTIVE_DRILLS_PER_DECK - activeDrills.length);
     const existingKeys = new Set(activeDrills.map((row) => pairKey(row.card_ids)));
 
-    const reservation = await reserveAiCall(supabase, user.id, 'synthesis_generate', { deck_id: deckId, count });
+    // One reservation covers one model call per drill requested.
+    const reservation = await reserveAiCall(supabase, user.id, 'synthesis_generate', { deck_id: deckId, count }, { calls: count });
     if (!reservation.ok) {
       return { error: reservation.error };
     }
@@ -575,11 +579,13 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         const stored = parseStoredAttempt(existing);
         if (stored) {
           logger.info('checkSynthesisAttempt', 'replayed an existing attempt', { attempt_id: existing.id });
+          const absorbed = await loadAbsorbedClaims(supabase, { attemptIds: [existing.id] });
           const diagnostic: Diagnostic = {
             ...stored,
             linksCovered: countCovered(stored.coverage),
             linksTotal: drill.requiredLinks.length,
             schedule: { step: drill.step, nextDueAt: drill.nextDueAt },
+            absorbedCardIds: Object.fromEntries(absorbed.get(existing.id) ?? []),
           };
           return { success: true as const, attemptId: existing.id, diagnostic, reveal, exemplar: drill.exemplar, scheduleSaved: true, replayed: true };
         }
@@ -623,13 +629,10 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         const result = await model.generateContent(
           {
             systemInstruction: buildDrillCheckInstruction(nonce),
-            generationConfig: {
-              temperature: CHECK_TEMPERATURE,
-              topP: 0.95,
-              maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
-              responseMimeType: 'application/json',
+            generationConfig: jsonGenerationConfig({
               responseSchema: DRILL_CHECK_SCHEMA,
-            },
+              temperature: CHECK_TEMPERATURE,
+            }),
             contents: [{
               role: 'user',
               parts: [{
@@ -679,35 +682,20 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     const schedule = nextSchedule(drill.step, verdict, now, { confidence });
     const linksCovered = countCovered(reconciled.coverage);
 
-    // ── Cards: pull contradicted cards forward, never reset them (spec §8.4) ──
-    // Runs before the attempt insert because the attempt row is immutable and
-    // must record what actually happened, not what was planned.
-    let pulledForwardCardIds: string[] = [];
-    if (parsed.data.pull_forward && verdict === 'contradicted' && contradictedCardIds.length > 0) {
-      const notAfterIso = new Date(now.getTime() + PULL_FORWARD_HOURS * 60 * 60_000).toISOString();
-      const { data: pulled, error: pullError } = await supabase
-        .from('cards')
-        .update({ next_review_at: notAfterIso })
-        .eq('deck_id', deckId)
-        .eq('state', 'review')
-        .in('id', contradictedCardIds)
-        // Never push a card later; learning/new cards are already imminent.
-        .gt('next_review_at', notAfterIso)
-        .select('id');
+    // ── One transaction: cards → attempt → drill (spec §8.4, plan §3.4) ──
+    // record_synthesis_attempt pulls contradicted review cards forward (never
+    // back), inserts the immutable attempt with what actually moved, and
+    // advances the ladder in SQL. Under an advisory lock per drill, a
+    // concurrent replay of the same client key returns the first attempt
+    // instead of failing on the unique index after the model call was paid for.
+    const pullCandidates = parsed.data.pull_forward && verdict === 'contradicted' ? contradictedCardIds : [];
+    const notAfterIso = new Date(now.getTime() + PULL_FORWARD_HOURS * 60 * 60_000).toISOString();
 
-      if (pullError) {
-        logger.error('checkSynthesisAttempt', 'pull-forward failed', { code: pullError.code, message: pullError.message });
-      } else {
-        pulledForwardCardIds = (pulled ?? []).map((row) => row.id);
-      }
-    }
-
-    const { data: attempt, error: attemptError } = await supabase
-      .from('synthesis_attempts')
-      .insert({
-        drill_id: drillId,
-        deck_id: deckId,
-        user_id: user.id,
+    const { data: recorded, error: recordError } = await supabase.rpc('record_synthesis_attempt', {
+      p_drill_id: drillId,
+      p_deck_id: deckId,
+      p_client_attempt_id: parsed.data.client_attempt_id ?? null,
+      p_attempt: {
         mode,
         response,
         word_count: wordCount,
@@ -725,7 +713,6 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         gap_note: reconciled.gapNote,
         missing_card_ids: missingCardIds,
         contradicted_card_ids: contradictedCardIds,
-        pulled_forward_card_ids: pulledForwardCardIds,
         integrity: { injection_detected: reconciled.integrity.injectionDetected, off_target: reconciled.integrity.offTarget },
         model: env.GEMINI_MODEL,
         usage: {
@@ -737,36 +724,30 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
           dropped_contradictions: reconciled.droppedContradictions,
         },
         confidence,
-        client_attempt_id: parsed.data.client_attempt_id ?? null,
         revision_of: parsed.data.revision_of ?? null,
-      })
-      .select('id')
-      .single();
-
-    if (attemptError || !attempt) {
-      logger.error('checkSynthesisAttempt', 'attempt insert failed', { code: attemptError?.code, message: attemptError?.message });
-      return { error: sanitizeDatabaseError(attemptError, 'The check ran but could not be saved.') };
-    }
-
-    // The attempt is the record; a failed schedule update is surfaced, not swallowed.
-    const { error: drillUpdateError } = await supabase
-      .from('synthesis_drills')
-      .update({
+      },
+      p_schedule: {
         step: schedule.step,
         next_due_at: schedule.nextDueAt.toISOString(),
-        attempt_count: drill.attemptCount + 1,
-        last_verdict: verdict,
-        last_attempt_at: now.toISOString(),
         last_links_covered: linksCovered,
-        updated_at: now.toISOString(),
-      })
-      .eq('id', drillId)
-      .eq('deck_id', deckId)
-      .eq('user_id', user.id);
+      },
+      p_pull_forward_card_ids: pullCandidates,
+      p_pull_forward_not_after: pullCandidates.length > 0 ? notAfterIso : null,
+    });
 
-    if (drillUpdateError) {
-      logger.error('checkSynthesisAttempt', 'drill schedule update failed', { code: drillUpdateError.code, message: drillUpdateError.message });
+    const record = recorded?.[0];
+    if (recordError || !record) {
+      logger.error('checkSynthesisAttempt', 'record_synthesis_attempt failed', { code: recordError?.code, message: recordError?.message });
+      return { error: sanitizeDatabaseError(recordError, 'The check ran but could not be saved.') };
     }
+
+    const pulledForwardCardIds = Array.isArray(record.pulled_forward_card_ids) ? record.pulled_forward_card_ids : [];
+    if (record.replayed) {
+      // A concurrent request with the same key got there first; this
+      // request's model call is discarded in favour of the recorded one.
+      logger.info('checkSynthesisAttempt', 'concurrent replay resolved by the database', { attempt_id: record.attempt_id });
+    }
+    const attempt = { id: record.attempt_id };
 
     revalidatePath(`/dashboard/${deckId}`);
 
@@ -801,6 +782,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
       linksTotal: drill.requiredLinks.length,
       schedule: { step: schedule.step, nextDueAt: schedule.nextDueAt.toISOString() },
       confidence,
+      absorbedCardIds: {},
     };
 
     return {
@@ -809,8 +791,8 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
       diagnostic,
       reveal,
       exemplar: drill.exemplar,
-      scheduleSaved: !drillUpdateError,
-      replayed: false,
+      scheduleSaved: true,
+      replayed: record.replayed,
     };
   });
 }
@@ -899,5 +881,89 @@ export async function rateSynthesisAttempt(data: RateSynthesisAttemptInput) {
     }
 
     return { success: true as const };
+  });
+}
+
+/**
+ * "+ Add as card" (improvement plan §3.3): an outside claim becomes a
+ * first-class card in one round trip. Provenance is recorded on the card
+ * (`source = 'synthesis_claim'`, the attempt and claim index), a repeat is
+ * idempotent, and — after the response — the card is enriched and embedded
+ * so it is quiz-ready and chat-visible before the student looks for it.
+ */
+export async function absorbOutsideClaim(data: AbsorbOutsideClaimInput) {
+  return guardAction('Add as card', async () => {
+    const parsed = absorbOutsideClaimSchema.safeParse(data);
+    if (!parsed.success) {
+      return { error: parsed.error.flatten().fieldErrors as never };
+    }
+
+    const deckAccess = await requireOwnedDeck(parsed.data.deck_id);
+    if ('error' in deckAccess) {
+      return { error: deckAccess.error };
+    }
+    const { supabase, user } = deckAccess;
+    const { deck_id: deckId, attempt_id: attemptId, claim_index: claimIndex } = parsed.data;
+
+    const { data: attempt } = await supabase
+      .from('synthesis_attempts')
+      .select('id')
+      .eq('id', attemptId)
+      .eq('deck_id', deckId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!attempt) {
+      return { error: 'Attempt not found or access denied.' };
+    }
+
+    const { data: card, error } = await supabase
+      .from('cards')
+      .insert({
+        deck_id: deckId,
+        front: parsed.data.front,
+        back: parsed.data.back,
+        source: 'synthesis_claim',
+        imported_by: 'synthesis',
+        absorbed_from_attempt_id: attemptId,
+        absorbed_claim_index: claimIndex,
+      })
+      .select('id')
+      .single();
+
+    if (error || !card) {
+      if (error?.code === '23505') {
+        // Already absorbed — a double-tap or a second tab. Return the existing card.
+        const { data: existing } = await supabase
+          .from('cards')
+          .select('id')
+          .eq('absorbed_from_attempt_id', attemptId)
+          .eq('absorbed_claim_index', claimIndex)
+          .maybeSingle();
+        return { success: true as const, cardId: existing?.id ?? null, duplicate: true };
+      }
+      logger.error('absorbOutsideClaim', 'insert failed', { code: error?.code, message: error?.message });
+      return { error: sanitizeDatabaseError(error, 'Failed to add the card.') };
+    }
+
+    await touchDeckUpdatedAt(supabase, deckId, user.id);
+    revalidatePath(`/dashboard/${deckId}`);
+
+    // The back half of the loop, off the response path. Both actions reserve
+    // their own spend; a refused reservation leaves the card plain, which the
+    // deck's enrich and sync controls pick up later.
+    const cardId = card.id;
+    after(async () => {
+      try {
+        await enrichCards({ deck_id: deckId, card_ids: [cardId] });
+        await syncEmbeddings({ deck_id: deckId });
+      } catch (loopError) {
+        logger.warn('absorbOutsideClaim', 'post-absorb enrichment skipped', {
+          cardId,
+          message: loopError instanceof Error ? loopError.message : String(loopError),
+        });
+      }
+    });
+
+    return { success: true as const, cardId, duplicate: false };
   });
 }

@@ -21,14 +21,19 @@ type BreadcrumbProps = {
  */
 export function Breadcrumb({ decks }: BreadcrumbProps) {
   const pathname = usePathname();
-  const deckId = pathname.match(/^\/dashboard\/([^/]+)/)?.[1];
+  const segment = pathname.match(/^\/dashboard\/([^/]+)/)?.[1];
+  // Named chromed routes sit beside the deck ids; a UUID is a deck.
+  const isStats = segment === 'stats';
+  const deckId = segment && !isStats ? segment : undefined;
   const deck = deckId ? decks.find((entry) => entry.id === deckId) : undefined;
+  const trailLabel = isStats ? 'Statistics' : deck?.title ?? 'Deck';
+  const hasTrail = Boolean(deckId) || isStats;
 
   return (
     <nav aria-label="Breadcrumb" className="min-w-0">
       <ol className="flex min-w-0 items-center gap-2 text-sm">
         <li className="shrink-0">
-          {deckId ? (
+          {hasTrail ? (
             <Link
               href="/dashboard"
               className="rounded-[var(--radius-control)] text-ink-dim outline-hidden transition-colors duration-[120ms] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
@@ -42,7 +47,7 @@ export function Breadcrumb({ decks }: BreadcrumbProps) {
           )}
         </li>
 
-        {deckId ? (
+        {hasTrail ? (
           <>
             <li aria-hidden="true" className="shrink-0 text-ink-dimmer">
               /
@@ -51,7 +56,7 @@ export function Breadcrumb({ decks }: BreadcrumbProps) {
               <span aria-current="page" className="block truncate text-ink">
                 {/* A deck outside the shell's list — past its row cap, or one
                     just deleted — still gets a trail rather than a blank. */}
-                {deck?.title ?? 'Deck'}
+                {trailLabel}
               </span>
             </li>
           </>

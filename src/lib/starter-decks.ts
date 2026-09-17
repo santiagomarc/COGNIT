@@ -102,6 +102,9 @@ export const STARTER_DECKS = {
       { front: 'Space complexity', back: 'How much additional memory an algorithm needs as its input grows.' },
       { front: 'Amortized analysis', back: 'Averaging the cost of an operation across a long sequence, so a rare expensive step is spread over many cheap ones.' },
       { front: 'Cache invalidation', back: 'Deciding when stored data has become stale and must be discarded or refreshed.' },
+      // Two cards that exercise the rich-text renderer (plan §4.2): a formula and a code literal.
+      { front: 'Logarithmic time', back: 'Work that grows as $O(\\log n)$: each step discards a constant fraction of the input, as binary search does on a sorted array.' },
+      { front: 'Off-by-one error', back: 'A loop or index that runs one step too many or too few, typically from confusing `<` with `<=` or zero-based with one-based counting.' },
     ],
   },
 } as const satisfies Record<string, StarterDeck>;

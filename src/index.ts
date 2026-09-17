@@ -3,7 +3,7 @@ import type { Database } from '@/lib/database.types';
 type Tables = Database['public']['Tables'];
 
 export type CardState = Database['public']['Enums']['card_state'];
-export type CardSource = 'manual' | 'ai_pdf' | 'bulk_import' | 'ai_cleaned';
+export type CardSource = 'manual' | 'ai_pdf' | 'bulk_import' | 'ai_cleaned' | 'synthesis_claim';
 export type QuizMode = 'mcq' | 'identification';
 
 export type DeckRow = Tables['decks']['Row'];

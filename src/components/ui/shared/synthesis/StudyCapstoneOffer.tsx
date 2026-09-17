@@ -34,9 +34,30 @@ function anchorsLine(drill: CapstoneOffer): string {
  * retrieved, offered once. A flat `.surface` beneath the summary — the
  * summary keeps the screen. *Skip* records nothing; it only closes the offer.
  */
+function dismissalKey(deckId: string) {
+  return `cognit:capstone-dismissed:${deckId}`;
+}
+
 export function StudyCapstoneOffer({ deckId, drill }: StudyCapstoneOfferProps) {
-  const [dismissed, setDismissed] = useState(false);
+  // Remembered for the tab's lifetime: a reload of the completion screen
+  // must not re-offer the drill the student just declined.
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return Boolean(drill) && window.sessionStorage.getItem(dismissalKey(deckId)) === drill?.id;
+    } catch {
+      return false;
+    }
+  });
   if (!drill || dismissed) return null;
+
+  const dismiss = () => {
+    try {
+      window.sessionStorage.setItem(dismissalKey(deckId), drill.id);
+    } catch {
+      // Storage unavailable — the in-memory dismissal still applies.
+    }
+    setDismissed(true);
+  };
 
   return (
     <section className="surface p-5" aria-labelledby="capstone-offer-label">
@@ -50,7 +71,7 @@ export function StudyCapstoneOffer({ deckId, drill }: StudyCapstoneOfferProps) {
         <Button asChild>
           <Link href={`/dashboard/${deckId}/synthesis?drill=${drill.id}&from=study`}>Start drill</Link>
         </Button>
-        <Button type="button" variant="ghost" onClick={() => setDismissed(true)}>
+        <Button type="button" variant="ghost" onClick={dismiss}>
           Skip
         </Button>
       </div>

@@ -26,7 +26,7 @@ export function DashboardSearch({ value, onChange, resultCount, totalCount }: Da
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Filter decks"
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-ink-dimmer"
+          className="flex-1 bg-transparent text-base outline-none placeholder:text-ink-dimmer sm:text-sm"
           aria-label="Filter decks by name"
         />
         {value ? (

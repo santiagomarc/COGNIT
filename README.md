@@ -31,7 +31,8 @@ without the migrations every RPC quietly falls into a slower fallback path.
 |---|---|
 | `npm run dev` | Dev server (Turbopack) |
 | `npm run build` | Production build |
-| `npm run lint` | ESLint |
+| `npm run lint` | ESLint, then the design-token contrast gate (`scripts/contrast.mjs`) |
+| `npm run contrast` | Print every ink/edge token's WCAG ratio on every plane, both themes |
 | `npm test` | Vitest, single run |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | Coverage report |

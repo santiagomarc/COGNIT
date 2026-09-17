@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server';
+import type { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { getDueByDeck, getRequestClient, getRequestNow, getSessionUser } from '@/lib/supabase/session';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
 import { GreetingHeader } from '@/components/ui/shared/GreetingHeader';
@@ -7,20 +8,17 @@ import { DueNowBand } from '@/components/ui/shared/DueNowBand';
 import { CreateDeckPanel } from '@/components/ui/shared/CreateDeckPanel';
 import { SignalPanel } from '@/components/ui/shared/SignalPanel';
 import { resolveDisplayName } from '@/lib/display-name';
-import { loadDueByDeckRows, type DueCardsByDeckRow } from '@/lib/dashboard-due';
+import type { DueCardsByDeckRow } from '@/lib/dashboard-due';
 import {
   buildSevenDayForecast,
   estimateSessionMinutes,
   forecastFromDayCounts,
-  meanEaseByDeck,
-  oldestOverdueDays,
   overdueDaysSince,
   parseCardScheduleSummary,
-  type CardScheduleRow,
   type ForecastDay,
 } from '@/lib/dashboard-forecast';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
-import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
+import { logger } from '@/lib/logger';
 import { loadDueDrillsByDeck, type DueDrillsByDeck } from '@/lib/synthesis/loaders';
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -40,8 +38,6 @@ type ScheduleSummary = {
   forecastDays: ForecastDay[];
   easeByDeck: Map<string, number>;
   overdueDays: number | null;
-  /** Only the row-based fallback can be partial; the RPC aggregates every card. */
-  truncated: boolean;
 };
 
 type DashboardSnapshot = {
@@ -63,7 +59,7 @@ async function loadActivityDays(supabase: SupabaseServerClient, userId: string):
   const rpcResult = await supabase.rpc('get_study_activity_days', { p_user_id: userId });
 
   if (rpcResult.error) {
-    console.error('[dashboard] get_study_activity_days rpc failed:', rpcResult.error.message);
+    logger.error('dashboard', 'get_study_activity_days rpc failed', { message: rpcResult.error.message });
     return [];
   }
 
@@ -79,7 +75,7 @@ async function loadMasterySummary(
   const rpcResult = await supabase.rpc('get_deck_mastery_summary', { p_user_id: userId });
 
   if (rpcResult.error) {
-    console.error('[dashboard] get_deck_mastery_summary rpc failed:', rpcResult.error.message);
+    logger.error('dashboard', 'get_deck_mastery_summary rpc failed', { message: rpcResult.error.message });
     return [];
   }
 
@@ -88,58 +84,44 @@ async function loadMasterySummary(
 
 
 /*
- * The seven-day forecast, each deck's mean ease, and the oldest overdue card.
- *
- * `get_card_schedule_summary` aggregates all three in Postgres and returns
- * ~(7 + decks + 1) values. Before it existed this page fetched up to 20,000
- * raw card rows on every load and bucketed them in Node — and silently
- * truncated the forecast past that cap. The row-based path is kept only as the
- * fallback for an environment where the migration has not been applied yet.
+ * The seven-day forecast, each deck's mean ease, and the oldest overdue card —
+ * aggregated in Postgres by `get_card_schedule_summary` and returned as
+ * ~(7 + decks + 1) values. The row-based fallback that used to sit here read
+ * up to 20,000 card rows per dashboard load; the RPC is live and verified by
+ * `npm run verify:deployment`, so a failure is logged and rendered as empty.
  */
-const CARD_SCHEDULE_ROW_CAP = 20_000;
-
 async function loadScheduleSummary(
   supabase: SupabaseServerClient,
   userId: string,
   now: Date
 ): Promise<ScheduleSummary> {
+  const empty: ScheduleSummary = {
+    forecastDays: buildSevenDayForecast([], now),
+    easeByDeck: new Map(),
+    overdueDays: null,
+  };
+
   const rpcResult = await supabase.rpc('get_card_schedule_summary', {
     p_user_id: userId,
     p_now: now.toISOString(),
     p_days: 7,
   });
 
-  if (!rpcResult.error) {
-    const summary = parseCardScheduleSummary(rpcResult.data);
-    if (summary) {
-      return {
-        forecastDays: forecastFromDayCounts(summary.forecast, now),
-        easeByDeck: new Map(summary.ease_by_deck.map((row) => [row.deck_id, row.mean_ease])),
-        overdueDays: overdueDaysSince(summary.oldest_overdue_at, now),
-        truncated: false,
-      };
-    }
-    console.error('[dashboard] get_card_schedule_summary returned an unexpected shape; using fallback');
-  } else if (!isMissingDatabaseFunctionError(rpcResult.error.message, 'get_card_schedule_summary')) {
-    console.error('[dashboard] get_card_schedule_summary rpc failed, using fallback:', rpcResult.error.message);
+  if (rpcResult.error) {
+    logger.error('dashboard', 'get_card_schedule_summary rpc failed', { message: rpcResult.error.message });
+    return empty;
   }
 
-  const { data, error } = await supabase
-    .from('cards')
-    .select('deck_id, ease_factor, next_review_at')
-    .limit(CARD_SCHEDULE_ROW_CAP);
-
-  if (error) {
-    console.error('[dashboard] card schedule query failed:', error.message);
-    return { forecastDays: buildSevenDayForecast([], now), easeByDeck: new Map(), overdueDays: null, truncated: false };
+  const summary = parseCardScheduleSummary(rpcResult.data);
+  if (!summary) {
+    logger.error('dashboard', 'get_card_schedule_summary returned an unexpected shape');
+    return empty;
   }
 
-  const rows = (data as CardScheduleRow[] | null) ?? [];
   return {
-    forecastDays: buildSevenDayForecast(rows, now),
-    easeByDeck: meanEaseByDeck(rows),
-    overdueDays: oldestOverdueDays(rows, now),
-    truncated: rows.length >= CARD_SCHEDULE_ROW_CAP,
+    forecastDays: forecastFromDayCounts(summary.forecast, now),
+    easeByDeck: new Map(summary.ease_by_deck.map((row) => [row.deck_id, row.mean_ease])),
+    overdueDays: overdueDaysSince(summary.oldest_overdue_at, now),
   };
 }
 
@@ -221,9 +203,8 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
 }
 
 async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot> {
-  const supabase = await createClient();
-  const now = new Date();
-  const nowIso = now.toISOString();
+  const supabase = await getRequestClient();
+  const now = getRequestNow();
 
   // Every read here is independent of the others, so they all run in one
   // wave. The deck-rows query used to be awaited on its own first, which put a
@@ -238,7 +219,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
     dueDrills,
   ] = await Promise.all([
     loadDeckRowsWithFallback(supabase),
-    loadDueByDeckRows(supabase, userId, nowIso),
+    getDueByDeck(userId),   // shared with the shell layout via React.cache
     loadActivityDays(supabase, userId),
     supabase
       .from('study_logs')
@@ -263,8 +244,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
 }
 
 export default async function Dashboard() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
 
   if (!user) {
     redirect('/login');
@@ -282,21 +262,17 @@ export default async function Dashboard() {
     dueDrills,
   } = await loadDashboardSnapshot(user.id);
 
-  if (schedule.truncated) {
-    console.warn(
-      `[dashboard] card schedule fallback hit the ${CARD_SCHEDULE_ROW_CAP}-row cap; forecast and per-deck ease are partial.`
-    );
-  }
-
   if (deckQueryUsedFallback && deckQueryErrorMessage) {
-    console.warn('[dashboard] relational deck count query failed, fallback was used:', deckQueryErrorMessage);
+    logger.warn('dashboard', 'relational deck count query failed, fallback was used', { message: deckQueryErrorMessage });
   }
 
-  // Build "due today" per-deck breakdown
+  // Build "due today" per-deck breakdown. Due means studied and owed; a deck
+  // with only never-studied cards is a study-ahead target, not a due one.
   const dueByDeck = new Map(dueByDeckRows.map((row) => [row.deck_id, row.due_count]));
+  const newByDeck = new Map(dueByDeckRows.map((row) => [row.deck_id, row.new_count]));
 
   const deckBreakdown = deckRows
-    .filter((d) => dueByDeck.has(d.id))
+    .filter((d) => (dueByDeck.get(d.id) ?? 0) > 0)
     .map((d) => ({
       deckId: d.id,
       deckTitle: removeDeckTagFromTitle(d.title),
@@ -305,6 +281,7 @@ export default async function Dashboard() {
     .sort((a, b) => b.dueCount - a.dueCount);
 
   const totalDue = dueByDeckRows.reduce((total, row) => total + row.due_count, 0);
+  const totalNew = dueByDeckRows.reduce((total, row) => total + row.new_count, 0);
 
   const { forecastDays, easeByDeck, overdueDays } = schedule;
   const estimatedMinutes = estimateSessionMinutes(totalDue);
@@ -327,7 +304,7 @@ export default async function Dashboard() {
   const uniqueDays = new Set<string>(activityDays.map((row) => row.activity_date));
 
   const sortedDays = Array.from(uniqueDays).sort((a, b) => b.localeCompare(a)); // newest first
-  const todayDate = new Date();
+  const todayDate = getRequestNow();
   const today = todayDate.toISOString().slice(0, 10);
   const yesterdayDate = new Date(todayDate);
   yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
@@ -386,6 +363,7 @@ export default async function Dashboard() {
   // The fallback session target when nothing is due. It used to also be where
   // an "import PDF" without a chosen target landed; that button is gone from
   // this page entirely (Run 6, requirement 3).
+  const knownDeckIds = new Set(deckRows.map((deck) => deck.id));
   const mostRecentDeck = [...deckRows].sort((a, b) =>
     (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at)
   )[0];
@@ -397,21 +375,28 @@ export default async function Dashboard() {
    */
   const greetingName = resolveDisplayName(user);
 
+  // With nothing due, prefer the deck holding the most unseen cards over the
+  // most recently touched one: that is where studying ahead does the most.
+  const mostNewDeck = [...dueByDeckRows].sort((a, b) => b.new_count - a.new_count)[0];
   const sessionHref = deckBreakdown[0]
     ? `/dashboard/${deckBreakdown[0].deckId}/study`
-    : mostRecentDeck
-      ? `/dashboard/${mostRecentDeck.id}/study?scope=include_reviewed`
-      : null;
+    : mostNewDeck && mostNewDeck.new_count > 0 && knownDeckIds.has(mostNewDeck.deck_id)
+      ? `/dashboard/${mostNewDeck.deck_id}/study?scope=include_reviewed`
+      : mostRecentDeck
+        ? `/dashboard/${mostRecentDeck.id}/study?scope=include_reviewed`
+        : null;
 
-  // The drills reading leads to a deck launcher (micro-synthesis spec §4.1):
-  // the deck with the most due, restricted to decks this page knows about.
-  const knownDeckIds = new Set(deckRows.map((deck) => deck.id));
+  // The drills reading leads straight to the drill canvas (micro-synthesis
+  // spec §4.1): the deck with the most due, restricted to decks this page knows about.
   const topDrillDeck = dueDrills.decks.find((deck) => knownDeckIds.has(deck.deckId));
   const dueDrillsReading = {
     total: dueDrills.total,
     deckCount: dueDrills.decks.length,
-    href: topDrillDeck ? `/dashboard/${topDrillDeck.deckId}` : null,
+    href: topDrillDeck
+      ? `/dashboard/${topDrillDeck.deckId}/synthesis?count=${Math.min(3, Math.max(1, topDrillDeck.dueCount))}&pull=1`
+      : null,
   };
+  const dueDrillsByDeck = new Map(dueDrills.decks.map((deck) => [deck.deckId, deck.dueCount]));
 
   return (
     /*
@@ -447,6 +432,7 @@ export default async function Dashboard() {
             <div className="min-w-0 flex-1">
               <DueNowBand
                 totalDue={totalDue}
+                totalNew={totalNew}
                 dueDecks={deckBreakdown}
                 oldestOverdueDays={overdueDays}
                 estimatedMinutes={estimatedMinutes}
@@ -486,6 +472,8 @@ export default async function Dashboard() {
                   assessedCards: mastery?.assessedCards ?? 0,
                   lastQuizAt: mastery?.lastQuizAt ?? null,
                   dueCount: dueByDeck.get(deck.id) ?? 0,
+                  newCount: newByDeck.get(deck.id) ?? 0,
+                  dueDrillCount: dueDrillsByDeck.get(deck.id) ?? 0,
                   easeFactor: easeByDeck.get(deck.id) ?? null,
                 };
               })}

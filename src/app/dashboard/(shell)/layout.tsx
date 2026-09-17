@@ -1,13 +1,12 @@
 import { redirect } from 'next/navigation';
 
-import { createClient } from '@/lib/supabase/server';
+import { getDueByDeck, getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { AccountControl } from '@/components/ui/shared/AccountControl';
 import { AmbientField } from '@/components/ui/shared/AmbientField';
 import { AppRail } from '@/components/ui/shared/AppRail';
 import { Breadcrumb } from '@/components/ui/shared/Breadcrumb';
 import { CommandPalette } from '@/components/ui/shared/CommandPalette';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
-import { loadDueByDeckRows } from '@/lib/dashboard-due';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 
 /**
@@ -37,10 +36,9 @@ const PALETTE_DECK_CAP = 500;
  * open event at a component that was not mounted.
  */
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Shared with the page below through React.cache: one client, one auth
+  // round-trip and one due-cards read per request, not one per layer.
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     redirect('/login');
@@ -53,7 +51,7 @@ export default async function ShellLayout({ children }: { children: React.ReactN
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(PALETTE_DECK_CAP),
-    loadDueByDeckRows(supabase, user.id, new Date().toISOString()),
+    getDueByDeck(user.id),
   ]);
 
   const dueByDeck = new Map(dueRows.map((row) => [row.deck_id, row.due_count]));

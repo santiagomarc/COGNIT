@@ -76,6 +76,14 @@ export function buildPaletteCommands({
       href: '/dashboard',
     },
     {
+      id: 'stats',
+      label: 'Statistics',
+      hint: '/dashboard/stats',
+      group: 'Actions',
+      keywords: 'stats statistics analytics retention forgetting curve progress',
+      href: '/dashboard/stats',
+    },
+    {
       id: 'new-deck',
       label: 'New deck',
       group: 'Actions',

@@ -2,7 +2,7 @@ import {z} from "zod";
 import { DECK_TAG_VALUES } from '@/lib/deck-tags';
 import { MAX_ANSWER_WORDS, countWords, responseText } from '@/lib/synthesis/text';
 
-export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned']);
+export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned', 'synthesis_claim']);
 
 /* ═══════════ Auth Schemas ═══════════ */
 
@@ -281,3 +281,17 @@ export const rateSynthesisAttemptSchema = z.object({
 });
 
 export type RateSynthesisAttemptInput = z.infer<typeof rateSynthesisAttemptSchema>;
+
+/**
+ * "+ Add as card" from a drill result (improvement plan §3.3). The claim is
+ * identified by the attempt it was made in and its index in that attempt's
+ * outside_claims (0–2, spec §7.3), so a second tap finds the first card.
+ */
+export const absorbOutsideClaimSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  attempt_id: z.uuid({ message: 'Invalid attempt id' }),
+  claim_index: z.number().int().min(0).max(2),
+  front: z.string().trim().min(1, { message: 'Term is required' }).max(1000),
+  back: z.string().trim().min(1, { message: 'Description is required' }).max(2000),
+});
+export type AbsorbOutsideClaimInput = z.infer<typeof absorbOutsideClaimSchema>;

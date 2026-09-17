@@ -5,52 +5,20 @@ import {
   syncEmbeddingsSchema, SyncEmbeddingsInput,
   createDeckChatSessionSchema, CreateDeckChatSessionInput,
   getDeckChatMessagesSchema, GetDeckChatMessagesInput,
-  chatWithDeckSchema, ChatWithDeckInput,
   semanticSearchSchema, SemanticSearchInput,
 } from '@/lib/schemas';
-import { SchemaType, type Schema } from '@google/generative-ai';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import {
-  getGeminiJsonModel, normalizeWhitespace,
   recordAiUsage, requireOwnedDeck, reserveAiCall, sanitizeAiInputText,
 } from './_shared';
 import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
-import { withGeminiRetry } from '@/lib/ai-retry';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
-import { buildDeckChatSystemInstruction, retrieveDeckContext } from '@/lib/rag';
 
 // Bounds each syncEmbeddings invocation so a large deck can't run past the
 // server action's execution limit; the client re-invokes until pending is 0.
 const CARDS_PER_SYNC_BATCH = 200;
-
-const DECK_CHAT_RESPONSE_SCHEMA: Schema = {
-  type: SchemaType.OBJECT,
-  required: ['answer', 'followup_suggestions'],
-  properties: {
-    answer: { type: SchemaType.STRING },
-    followup_suggestions: {
-      type: SchemaType.ARRAY,
-      items: { type: SchemaType.STRING },
-    },
-  },
-};
-
-function parseDeckChatResponse(raw: string) {
-  const parsed = JSON.parse(raw) as { answer?: unknown; followup_suggestions?: unknown };
-  const answer = typeof parsed.answer === 'string' ? normalizeWhitespace(parsed.answer) : '';
-  const followupSuggestions = Array.isArray(parsed.followup_suggestions)
-    ? parsed.followup_suggestions
-      .filter((value): value is string => typeof value === 'string')
-      .map((value) => normalizeWhitespace(value))
-      .filter((value) => value.length > 0)
-      .slice(0, 3)
-    : [];
-
-  return { answer, followupSuggestions };
-}
 
 const DECK_CHAT_MIGRATION_ERROR = 'Deck chat is not available yet. Please apply the latest database migrations first.';
 
@@ -302,187 +270,6 @@ export async function getDeckChatMessages(data: GetDeckChatMessagesInput) {
   }
 
   return { success: true, messages: messages ?? [] };
-}
-
-export async function chatWithDeck(data: ChatWithDeckInput) {
-  return guardAction('Deck chat', async () => {
-    const parsed = chatWithDeckSchema.safeParse(data);
-    if (!parsed.success) {
-      return { error: parsed.error.flatten().fieldErrors as never };
-    }
-
-    const deckAccess = await requireOwnedDeck(parsed.data.deck_id);
-    if ('error' in deckAccess) {
-      return { error: deckAccess.error };
-    }
-
-    const { supabase, user, deck } = deckAccess;
-    const reservation = await reserveAiCall(supabase, user.id, 'chat_with_deck');
-    if (!reservation.ok) {
-      return { error: reservation.error };
-    }
-
-    const sanitizedMessage = sanitizeAiInputText(parsed.data.message, 2_000);
-    if (!sanitizedMessage) {
-      return { error: 'Message is empty after sanitization.' };
-    }
-
-    let sessionId = parsed.data.session_id ?? null;
-    if (!sessionId) {
-      const createResult = await createDeckChatSession({
-        deck_id: parsed.data.deck_id,
-        title: sanitizedMessage.slice(0, 80),
-      });
-      if (createResult.error || !createResult.success) {
-        return { error: createResult.error ?? 'Failed to initialize chat session.' };
-      }
-      sessionId = createResult.session.id;
-    }
-
-    const { data: session, error: sessionError } = await supabase
-      .from('deck_chat_sessions')
-      .select('id')
-      .eq('id', sessionId)
-      .eq('deck_id', parsed.data.deck_id)
-      .eq('user_id', user.id)
-      .single();
-
-    if (sessionError || !session) {
-      return { error: 'Chat session not found.' };
-    }
-
-    const topK = parsed.data.top_k ?? 5;
-
-    // Threshold-aware retrieval. The old inline path fell back to the five
-    // OLDEST cards when the vector RPC failed and fed them to the model as
-    // "deck context" — a confident answer built from unrelated cards. That
-    // fallback is deliberately gone; retrieveDeckContext degrades loudly.
-    const context = await retrieveDeckContext(supabase, {
-      deckId: parsed.data.deck_id,
-      query: sanitizedMessage,
-      topK,
-    });
-
-    if (context.degraded) {
-      return {
-        error: 'Deck search is unavailable right now, so I can\'t answer from your cards. Please try again shortly.',
-      };
-    }
-
-    const contextCards = context.cards;
-
-    const { data: historyRows, error: historyError } = await supabase
-      .from('deck_chat_messages')
-      .select('role, content')
-      .eq('session_id', sessionId)
-      .eq('deck_id', parsed.data.deck_id)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(6);
-
-    if (historyError && !isMissingTableError(historyError.message, 'deck_chat_messages')) {
-      return { error: sanitizeDatabaseError(historyError, 'Failed to load chat history context.') };
-    }
-
-    const conversationHistory = (historyRows ?? []).reverse();
-    const contextText = contextCards
-      .map((card, index) => `${index + 1}. ${card.front}: ${card.back}`)
-      .join('\n');
-
-    // Chat keeps some warmth; extraction/enrichment use the 0.1 default.
-    const model = getGeminiJsonModel({ temperature: 0.4 });
-    const response = await withGeminiRetry(
-      () =>
-        model.generateContent({
-          systemInstruction: buildDeckChatSystemInstruction({
-            deckTitle: removeDeckTagFromTitle(deck.title ?? '').trim() || 'Untitled Deck',
-            contextText,
-            grounded: context.grounded,
-          }),
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseSchema: DECK_CHAT_RESPONSE_SCHEMA,
-          },
-          contents: [
-            ...conversationHistory.map((entry) => ({
-              role: entry.role === 'assistant' ? 'model' : 'user',
-              parts: [{ text: entry.content }],
-            })),
-            {
-              role: 'user',
-              parts: [{ text: sanitizedMessage }],
-            },
-          ],
-        }),
-      { label: 'chat_with_deck' },
-    );
-
-    const { answer, followupSuggestions } = parseDeckChatResponse(response.response.text());
-    if (!answer) {
-      return { error: 'AI returned an empty chat response. Please try again.' };
-    }
-
-    const userMsg = {
-      session_id: sessionId,
-      deck_id: parsed.data.deck_id,
-      user_id: user.id,
-      role: 'user',
-      content: sanitizedMessage,
-      referenced_card_ids: [],
-      followup_suggestions: [],
-    };
-
-    const assistantMsg = {
-      session_id: sessionId,
-      deck_id: parsed.data.deck_id,
-      user_id: user.id,
-      role: 'assistant',
-      content: answer,
-      referenced_card_ids: contextCards.map((card) => card.id),
-      followup_suggestions: followupSuggestions,
-    };
-
-    const userInsert = await supabase.from('deck_chat_messages').insert(userMsg);
-    if (userInsert.error && isMissingTableError(userInsert.error.message, 'deck_chat_messages')) {
-      return { error: DECK_CHAT_MIGRATION_ERROR };
-    }
-
-    const assistantInsert = await supabase.from('deck_chat_messages').insert(assistantMsg);
-
-    if (assistantInsert.error) {
-      logger.warn('chatWithDeck', 'failed to persist assistant message', { message: assistantInsert.error.message });
-    }
-
-    await supabase
-      .from('deck_chat_sessions')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', sessionId)
-      .eq('deck_id', parsed.data.deck_id)
-      .eq('user_id', user.id);
-
-    await recordAiUsage(
-      supabase,
-      user.id,
-      'chat_with_deck',
-      {
-        deck_id: parsed.data.deck_id,
-        session_id: sessionId,
-        top_k: topK,
-        context_count: contextCards.length,
-        prompt_chars: sanitizedMessage.length,
-        response_chars: answer.length,
-      },
-      reservation.reservationId,
-    );
-
-    return {
-      success: true as const,
-      sessionId,
-      answer,
-      followupSuggestions,
-      references: contextCards.map((card) => ({ id: card.id, front: card.front })),
-    };
-  });
 }
 
 export type SemanticSearchResult = {

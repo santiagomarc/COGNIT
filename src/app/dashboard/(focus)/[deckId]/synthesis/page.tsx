@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { SynthesisDrillClient } from '@/components/ui/shared/synthesis/SynthesisDrillClient';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadSynthesisQueue, toCanvasDrill } from '@/lib/synthesis/loaders';
@@ -53,8 +53,7 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
   const { deckId } = await params;
   const resolved = searchParams ? await searchParams : undefined;
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
   if (!user) {
     redirect('/login');
   }

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { chatWithDeckSchema } from '@/lib/schemas';
@@ -6,6 +7,7 @@ import { createDeckChatSession } from '@/app/actions/chat';
 import {
   getGeminiJsonModel,
   getGeminiTextModel,
+  jsonGenerationConfig,
   recordAiUsage,
   reserveAiCall,
   sanitizeAiInputText,
@@ -29,6 +31,13 @@ import { logger } from '@/lib/logger';
  *   event: delta  {"text":"…"}
  *   event: done   {"followupSuggestions":[…],"messageId"}
  *   event: error  {"message","retryable","partial"?}
+ *
+ * Cancellation: the client aborts its fetch on navigation or a newer send
+ * (use-deck-chat-stream.ts). That abort is observed here through
+ * `request.signal` and the stream's `cancel()` hook: the model stream is
+ * abandoned, whatever was delivered is persisted as a truncated turn, and the
+ * follow-up call is skipped. Before this, a cancelled turn still consumed the
+ * full stream, persisted an answer nobody saw and paid for follow-ups.
  */
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,10 +82,18 @@ export async function POST(request: NextRequest) {
   }
 
   // Reserve BEFORE the model call so a failed stream still counts against the
-  // budget — the whole point of finding S-2.
-  const reservation = await reserveAiCall(supabase, user.id, 'chat_with_deck');
+  // budget — the whole point of finding S-2. A turn is two model calls: the
+  // answer and its follow-ups.
+  const reservation = await reserveAiCall(
+    supabase,
+    user.id,
+    'chat_with_deck',
+    { deck_id: parsed.data.deck_id },
+    { calls: 2 },
+  );
   if (!reservation.ok) {
-    return NextResponse.json({ error: reservation.error }, { status: 429 });
+    const status = reservation.error === 'You must be logged in.' ? 401 : 429;
+    return NextResponse.json({ error: reservation.error }, { status });
   }
 
   const message = sanitizeAiInputText(parsed.data.message, 2_000);
@@ -104,9 +121,25 @@ export async function POST(request: NextRequest) {
   const activeSessionId = sessionId;
   const deckTitle = removeDeckTagFromTitle(deck.title ?? '').trim() || 'Untitled Deck';
 
+  // One controller for the whole turn: the request's own abort (client went
+  // away) and the stream's cancel() (consumer stopped reading) both land here.
+  const abort = new AbortController();
+  const onRequestAbort = () => abort.abort();
+  request.signal.addEventListener('abort', onRequestAbort, { once: true });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let answer = '';
+      // enqueue() throws once the consumer has cancelled; the turn is over
+      // either way, so the throw must not be mistaken for a model failure.
+      const send = (event: string, data: unknown) => {
+        if (abort.signal.aborted) return;
+        try {
+          controller.enqueue(sse(event, data));
+        } catch {
+          abort.abort();
+        }
+      };
 
       try {
         // ── 1. Retrieve (threshold-aware) ──
@@ -117,16 +150,17 @@ export async function POST(request: NextRequest) {
         });
 
         if (context.degraded) {
-          controller.enqueue(sse('error', {
+          send('error', {
             message: 'Deck search is unavailable right now, so I can\'t answer from your cards.',
             retryable: true,
-          }));
+          });
           return;
         }
+        if (abort.signal.aborted) return;
 
         // Emitted before the first token so source chips render while the
         // model is still thinking — retrieval is the slow part.
-        controller.enqueue(sse('meta', {
+        send('meta', {
           sessionId: activeSessionId,
           grounded: context.grounded,
           degraded: context.degraded,
@@ -135,7 +169,7 @@ export async function POST(request: NextRequest) {
             front: card.front,
             similarity: card.similarity,
           })),
-        }));
+        });
 
         // ── 2. Recent turns for continuity ──
         const { data: historyRows } = await supabase
@@ -155,35 +189,64 @@ export async function POST(request: NextRequest) {
         // ── 3. Stream the answer ──
         const textModel = getGeminiTextModel({ temperature: 0.4 });
         const result = await withGeminiRetry(
-          () => textModel.generateContentStream({
-            systemInstruction: buildDeckChatSystemInstruction({
-              deckTitle,
-              contextText,
-              grounded: context.grounded,
-            }),
-            contents: [
-              ...history.map((entry) => ({
-                role: entry.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: entry.content }],
-              })),
-              { role: 'user', parts: [{ text: message }] },
-            ],
-          }),
-          { label: 'deck_chat_stream', maxAttempts: 2 },
+          () => textModel.generateContentStream(
+            {
+              systemInstruction: buildDeckChatSystemInstruction({
+                deckTitle,
+                contextText,
+                grounded: context.grounded,
+                nonce: randomUUID().slice(0, 8),
+              }),
+              contents: [
+                ...history.map((entry) => ({
+                  role: entry.role === 'assistant' ? 'model' : 'user',
+                  parts: [{ text: entry.content }],
+                })),
+                { role: 'user', parts: [{ text: message }] },
+              ],
+            },
+            { signal: abort.signal },
+          ),
+          { label: 'deck_chat_stream', maxAttempts: 2, signal: abort.signal },
         );
 
         for await (const chunk of result.stream) {
+          if (abort.signal.aborted) break;
           const text = chunk.text();
           if (!text) continue;
           answer += text;
-          controller.enqueue(sse('delta', { text }));
+          send('delta', { text });
+        }
+
+        if (abort.signal.aborted) {
+          // The user left. Keep what they saw so the session reads back
+          // honestly; no follow-ups — nobody is there to read them.
+          if (answer.trim()) {
+            await persistTurn(supabase, {
+              sessionId: activeSessionId,
+              deckId: parsed.data.deck_id,
+              userId: user.id,
+              userMessage: message,
+              answer,
+              referencedCardIds: context.cards.map((card) => card.id),
+              followupSuggestions: [],
+            });
+          }
+          logger.info('api/chat', 'stream cancelled by client', { answer_chars: answer.length });
+          return;
         }
 
         if (!answer.trim()) {
           throw new AiServiceError('malformed_output', 'Model returned an empty stream.', 1);
         }
 
-        // ── 4. Persist, then follow-ups (best effort) ──
+        // ── 4. Follow-ups (best effort), then persist the whole turn ──
+        // Follow-ups go into the assistant row: a reopened session used to lose
+        // every chip because persistTurn wrote an empty array before they existed.
+        const followupSuggestions = abort.signal.aborted
+          ? []
+          : await generateFollowups(message, answer, abort.signal).catch(() => []);
+
         const messageId = await persistTurn(supabase, {
           sessionId: activeSessionId,
           deckId: parsed.data.deck_id,
@@ -191,10 +254,10 @@ export async function POST(request: NextRequest) {
           userMessage: message,
           answer,
           referencedCardIds: context.cards.map((card) => card.id),
+          followupSuggestions,
         });
 
-        const followupSuggestions = await generateFollowups(message, answer).catch(() => []);
-        controller.enqueue(sse('done', { followupSuggestions, messageId }));
+        send('done', { followupSuggestions, messageId });
 
         await recordAiUsage(
           supabase,
@@ -211,20 +274,34 @@ export async function POST(request: NextRequest) {
           reservation.reservationId,
         );
       } catch (error) {
+        if (abort.signal.aborted) {
+          // An abort surfaces as a rejected fetch inside the SDK; it is not a failure.
+          logger.info('api/chat', 'stream cancelled by client', { answer_chars: answer.length });
+          return;
+        }
+
         const kind = error instanceof AiServiceError ? error.kind : classifyAiError(error);
         logger.error('api/chat', 'stream failed', {
           error: error instanceof Error ? error.message : String(error),
         });
 
-        controller.enqueue(sse('error', {
+        send('error', {
           message: aiFailureMessage(kind, 'Deck chat'),
           retryable: kind === 'rate_limited' || kind === 'unavailable' || kind === 'timeout',
           // A partial answer is still useful — let the client keep what streamed.
           partial: answer || undefined,
-        }));
+        });
       } finally {
-        controller.close();
+        request.signal.removeEventListener('abort', onRequestAbort);
+        try {
+          controller.close();
+        } catch {
+          // Already closed by a cancel().
+        }
       }
+    },
+    cancel() {
+      abort.abort();
     },
   });
 
@@ -246,6 +323,7 @@ type PersistTurnInput = {
   userMessage: string;
   answer: string;
   referencedCardIds: string[];
+  followupSuggestions: string[];
 };
 
 async function persistTurn(
@@ -275,7 +353,7 @@ async function persistTurn(
       role: 'assistant',
       content: input.answer,
       referenced_card_ids: input.referencedCardIds,
-      followup_suggestions: [],
+      followup_suggestions: input.followupSuggestions,
     })
     .select('id')
     .single();
@@ -294,22 +372,22 @@ async function persistTurn(
 }
 
 /** Cheap second call. Failure is non-fatal — the answer has already streamed. */
-async function generateFollowups(question: string, answer: string): Promise<string[]> {
+async function generateFollowups(question: string, answer: string, signal: AbortSignal): Promise<string[]> {
   const model = getGeminiJsonModel({ temperature: 0.4 });
 
   const response = await withGeminiRetry(
-    () => model.generateContent({
-      systemInstruction: [
-        'Given a study question and its answer, propose up to 3 short follow-up questions the learner could ask next.',
-        'Under 12 words each. Return JSON: {"suggestions":[...]}',
-      ].join('\n'),
-      generationConfig: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 256,
+    () => model.generateContent(
+      {
+        systemInstruction: [
+          'Given a study question and its answer, propose up to 3 short follow-up questions the learner could ask next.',
+          'Under 12 words each. Return JSON: {"suggestions":[...]}',
+        ].join('\n'),
+        generationConfig: jsonGenerationConfig({ temperature: 0.4, maxOutputTokens: 256 }),
+        contents: [{ role: 'user', parts: [{ text: `Q: ${question}\nA: ${answer}` }] }],
       },
-      contents: [{ role: 'user', parts: [{ text: `Q: ${question}\nA: ${answer}` }] }],
-    }),
-    { label: 'deck_chat_followups', maxAttempts: 1 },
+      { signal },
+    ),
+    { label: 'deck_chat_followups', maxAttempts: 1, signal },
   );
 
   const parsed = JSON.parse(response.response.text()) as { suggestions?: unknown };

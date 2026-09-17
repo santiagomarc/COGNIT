@@ -4,6 +4,37 @@ export const DEFAULT_SESSION_CARD_COUNT = 10;
 export const MIN_SESSION_CARD_COUNT = 5;
 export const MAX_SESSION_CARD_COUNT = 50;
 
+/** Unseen cards a default session may introduce. Reviews are never capped. */
+export const NEW_CARDS_PER_SESSION = 5;
+/** One new card after every N scheduled cards. */
+export const NEW_CARD_INTERLEAVE_EVERY = 3;
+
+/**
+ * Merges new cards into a run of scheduled ones, one new card after every
+ * `every` scheduled cards, so a session never opens with a block of unseen
+ * terms and never buries them all at the end either. Leftovers of either
+ * list follow in order.
+ */
+export function interleaveNewCards<T>(scheduled: T[], fresh: T[], options: { every: number }): T[] {
+  const every = Math.max(1, Math.floor(options.every));
+  const out: T[] = [];
+  let scheduledIndex = 0;
+  let freshIndex = 0;
+
+  while (scheduledIndex < scheduled.length || freshIndex < fresh.length) {
+    for (let step = 0; step < every && scheduledIndex < scheduled.length; step += 1) {
+      out.push(scheduled[scheduledIndex]);
+      scheduledIndex += 1;
+    }
+    if (freshIndex < fresh.length) {
+      out.push(fresh[freshIndex]);
+      freshIndex += 1;
+    }
+  }
+
+  return out;
+}
+
 export type QuizMode = 'mcq' | 'identification';
 export type StudyScope = 'due' | 'include_reviewed' | 'unmastered_only';
 

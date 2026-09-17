@@ -12,7 +12,12 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
       data-slot="textarea"
       className={cn(
         "placeholder:text-ink-dimmer selection:bg-primary selection:text-primary-foreground",
-        "w-full min-w-0 rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-3 py-2 text-sm",
+        /*
+         * 16px on mobile, 14px from `sm` up — the same rule as input.tsx.
+         * Below 16px iOS Safari zooms the viewport on focus and never zooms
+         * back; the chat composer and the four drill slots are all textareas.
+         */
+        "w-full min-w-0 rounded-[var(--radius-control)] border border-[var(--border-control)] bg-transparent px-3 py-2 text-base sm:text-sm",
         "transition-[border-color,background-color] duration-[120ms] ease-out outline-hidden",
         "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]",

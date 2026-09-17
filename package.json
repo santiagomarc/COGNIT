@@ -6,11 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint && node scripts/contrast.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "verify:deployment": "node --env-file=.env.local scripts/verify-deployment.mjs"
+    "verify:deployment": "node --env-file=.env.local scripts/verify-deployment.mjs",
+    "contrast": "node scripts/contrast.mjs --verbose"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -21,6 +22,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "framer-motion": "^12.34.3",
+    "highlight.js": "^11.12.0",
+    "katex": "^0.18.7",
     "lucide-react": "^0.562.0",
     "next": "16.1.0",
     "pdf-parse": "^2.4.5",

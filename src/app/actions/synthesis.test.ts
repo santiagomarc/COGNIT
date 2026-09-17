@@ -12,10 +12,18 @@ const mocks = vi.hoisted(() => ({
   generateContent: vi.fn(),
   reserveAiCall: vi.fn(),
   recordAiUsage: vi.fn(),
+  enrichCards: vi.fn(async () => ({ success: true })),
+  syncEmbeddings: vi.fn(async () => ({ success: true })),
+  afterCallbacks: [] as Array<() => unknown>,
 }));
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: async () => mocks.client }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
+// `after()` needs a request scope; the test collects the callbacks and runs
+// them explicitly so the response/side-effect ordering is observable.
+vi.mock('next/server', () => ({ after: (fn: () => unknown) => { mocks.afterCallbacks.push(fn); } }));
+vi.mock('./ai-enrich', () => ({ enrichCards: mocks.enrichCards }));
+vi.mock('./chat', () => ({ syncEmbeddings: mocks.syncEmbeddings }));
 vi.mock('@/lib/env-server', () => ({
   getServerEnv: () => ({ GEMINI_API_KEY: 'test', GEMINI_MODEL: 'gemini-test', GEMINI_EMBEDDING_MODEL: 'embed-test', GEMINI_MODEL_MAX_TOKENS: 4096 }),
 }));
@@ -90,8 +98,24 @@ function buildClient(overrides: Record<string, QueryResult> = {}) {
       synthesis_attempts: { data: { id: 'attempt-1' }, error: null },
       ...overrides,
     },
-    rpcs: { search_deck_cards_by_embedding: { data: [], error: null } },
+    rpcs: {
+      search_deck_cards_by_embedding: { data: [], error: null },
+      // The write side of a check is one RPC (plan §3.4).
+      record_synthesis_attempt: { data: [{ attempt_id: 'attempt-1', replayed: false, pulled_forward_card_ids: [] }], error: null },
+    },
   });
+}
+
+/** The payload of the one write RPC a check makes, or undefined when none was made. */
+function recordCall(client: ReturnType<typeof createSupabaseMock>) {
+  const call = (client.rpc.mock.calls as unknown as unknown[][]).find((args) => args[0] === 'record_synthesis_attempt');
+  return call?.[1] as {
+    p_client_attempt_id: string | null;
+    p_attempt: Record<string, unknown> & { usage: Record<string, unknown> };
+    p_schedule: { step: number; next_due_at: string; last_links_covered: number };
+    p_pull_forward_card_ids: string[];
+    p_pull_forward_not_after: string | null;
+  } | undefined;
 }
 
 type Chain = { update: ReturnType<typeof vi.fn>; gt: ReturnType<typeof vi.fn>; in: ReturnType<typeof vi.fn> };
@@ -151,13 +175,15 @@ describe('checkSynthesisAttempt', () => {
     expect(result.diagnostic.linksCovered).toBe(2);
     expect(result.diagnostic.schedule.step).toBe(1);
 
-    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, unknown>;
-    expect(inserted.word_count).toBe(33);   // counted from the body, not the client
-    expect(inserted.verdict).toBe('sound');
-    expect(inserted.model).toBe('gemini-test');
-
-    const drillUpdate = chainsFor(client, 'synthesis_drills').find((chain) => chain.update.mock.calls.length > 0);
-    expect(drillUpdate?.update).toHaveBeenCalledWith(expect.objectContaining({ step: 1, last_verdict: 'sound', attempt_count: 1 }));
+    const record = recordCall(client);
+    expect(record).toBeDefined();
+    expect(record?.p_attempt.word_count).toBe(33);   // counted from the body, not the client
+    expect(record?.p_attempt.verdict).toBe('sound');
+    expect(record?.p_attempt.model).toBe('gemini-test');
+    expect(record?.p_schedule).toMatchObject({ step: 1, last_links_covered: 2 });
+    // No direct writes remain: the RPC owns cards, the attempt and the drill.
+    expect(client.__inserted.synthesis_attempts).toBeUndefined();
+    expect(chainsFor(client, 'synthesis_drills').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
     expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_check', expect.objectContaining({ verdict: 'sound' }), 'r1');
   });
 
@@ -191,15 +217,14 @@ describe('checkSynthesisAttempt', () => {
     expect(result.diagnostic.verdict).toBe('contradicted');
     expect(result.diagnostic.contradictions).toHaveLength(1);
 
-    const cardUpdate = chainsFor(client, 'cards').find((chain) => chain.update.mock.calls.length > 0);
-    expect(cardUpdate).toBeDefined();
-    expect(cardUpdate?.update).toHaveBeenCalledWith({ next_review_at: expect.any(String) });
-    // The filter that makes it non-destructive: never push a card later.
-    expect(cardUpdate?.gt).toHaveBeenCalledWith('next_review_at', expect.any(String));
-    expect(cardUpdate?.in).toHaveBeenCalledWith('id', [CARD_A]);
-
-    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, unknown>;
-    expect(inserted.contradicted_card_ids).toEqual([CARD_A]);
+    // The contradicted card is offered to the RPC, which pulls it forward but
+    // never later (`next_review_at > not_after` is the filter inside the function).
+    const record = recordCall(client);
+    expect(record?.p_pull_forward_card_ids).toEqual([CARD_A]);
+    expect(record?.p_pull_forward_not_after).toEqual(expect.any(String));
+    expect(record?.p_attempt.contradicted_card_ids).toEqual([CARD_A]);
+    // The action never touches cards directly any more.
+    expect(chainsFor(client, 'cards').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
   });
 
   it('drops a contradiction the server cannot find in the card: no verdict effect, no card effect, no invented outside claim', async () => {
@@ -218,10 +243,9 @@ describe('checkSynthesisAttempt', () => {
     expect(result.diagnostic.verdict).toBe('sound');
     expect(result.diagnostic.contradictions).toEqual([]);
     expect(result.diagnostic.outsideClaims).toEqual([]);
-    expect(chainsFor(client, 'cards').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
-
-    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, Record<string, unknown>>;
-    expect(inserted.usage.dropped_contradictions).toBe(1);
+    const record = recordCall(client);
+    expect(record?.p_pull_forward_card_ids).toEqual([]);
+    expect(record?.p_attempt.usage.dropped_contradictions).toBe(1);
   });
 
   it('accepts a contradiction quoted loosely and displays the card\'s and the student\'s own words', async () => {
@@ -265,10 +289,9 @@ describe('checkSynthesisAttempt', () => {
     expect(dueInHours).toBeGreaterThan(11.9);
     expect(dueInHours).toBeLessThan(12.1);
 
-    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, unknown>;
-    expect(inserted.confidence).toBe(3);
-    const drillUpdate = chainsFor(client, 'synthesis_drills').find((chain) => chain.update.mock.calls.length > 0);
-    expect(drillUpdate?.update).toHaveBeenCalledWith(expect.objectContaining({ last_links_covered: 1 }));
+    const record = recordCall(client);
+    expect(record?.p_attempt.confidence).toBe(3);
+    expect(record?.p_schedule.last_links_covered).toBe(1);
   });
 
   it('replays an attempt with the same client key instead of calling the model again', async () => {
@@ -342,7 +365,9 @@ describe('checkSynthesisAttempt', () => {
     const result = await check({ pull_forward: false });
     if (!('success' in result) || !result.success) throw new Error('expected success');
     expect(result.diagnostic.verdict).toBe('contradicted');
-    expect(chainsFor(client, 'cards').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
+    // Nothing is offered to the RPC to move.
+    expect(recordCall(client)?.p_pull_forward_card_ids).toEqual([]);
+    expect(recordCall(client)?.p_pull_forward_not_after).toBeNull();
     expect(result.diagnostic.pulledForwardCardIds).toEqual([]);
   });
 
@@ -354,7 +379,7 @@ describe('checkSynthesisAttempt', () => {
     const result = await check();
     if (!('success' in result) || !result.success) throw new Error('expected success');
     expect(result.diagnostic.verdict).toBe('off_target');
-    expect(chainsFor(client, 'cards').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
+    expect(recordCall(client)?.p_pull_forward_card_ids).toEqual([]);
     expect(result.diagnostic.schedule.step).toBe(0);
     expect(Date.parse(result.diagnostic.schedule.nextDueAt)).toBeLessThanOrEqual(Date.now());
   });
@@ -373,6 +398,53 @@ describe('checkSynthesisAttempt', () => {
       aiAssessment: 'CFS picks the least virtual runtime.',
       termSuggestion: 'Completely Fair Scheduler',
     });
+  });
+
+  it('reports what the database actually pulled forward, and a concurrent replay as replayed', async () => {
+    const client = createSupabaseMock({
+      tables: {
+        decks: { data: { id: DECK_ID, title: 'OS' }, error: null },
+        synthesis_drills: { data: drillRow(), error: null },
+        cards: { data: ANCHOR_ROWS, error: null },
+        synthesis_attempts: { data: null, error: null },
+      },
+      rpcs: {
+        search_deck_cards_by_embedding: { data: [], error: null },
+        record_synthesis_attempt: { data: [{ attempt_id: 'attempt-9', replayed: true, pulled_forward_card_ids: [CARD_A] }], error: null },
+      },
+    });
+    mocks.client = client;
+    respondWith(modelOutput({
+      contradictions: [{
+        statement: 'A long quantum makes interactive bursts wait behind full slices',
+        card_key: 'c1',
+        card_says: 'too large degenerates toward FCFS',
+      }],
+    }));
+
+    const result = await check({ client_attempt_id: '00000000-0000-4000-8000-0000000000ee' });
+    expect(result).toMatchObject({ success: true, attemptId: 'attempt-9', replayed: true, scheduleSaved: true });
+    if (!('success' in result) || !result.success) return;
+    expect(result.diagnostic.pulledForwardCardIds).toEqual([CARD_A]);
+  });
+
+  it('surfaces a failed write as a typed error after the model call', async () => {
+    const client = createSupabaseMock({
+      tables: {
+        decks: { data: { id: DECK_ID, title: 'OS' }, error: null },
+        synthesis_drills: { data: drillRow(), error: null },
+        cards: { data: ANCHOR_ROWS, error: null },
+        synthesis_attempts: { data: null, error: null },
+      },
+      rpcs: {
+        search_deck_cards_by_embedding: { data: [], error: null },
+        record_synthesis_attempt: { data: null, error: { message: 'connection reset', code: '08006' } },
+      },
+    });
+    mocks.client = client;
+
+    const result = await check();
+    expect(result).toMatchObject({ error: expect.stringContaining('could not be saved') });
   });
 
   it('returns a typed failure, never a rejection, when the reservation is refused', async () => {
@@ -494,5 +566,82 @@ describe('generateSynthesisDrills', () => {
     const result = await generateSynthesisDrills({ deck_id: DECK_ID, count: 1 });
     expect(result).toMatchObject({ error: expect.stringContaining('could not produce a valid drill') });
     expect(client.__inserted.synthesis_drills).toBeUndefined();
+  });
+});
+
+describe('absorbOutsideClaim', () => {
+  const ATTEMPT_ID = '00000000-0000-4000-8000-0000000000a1';
+  const NEW_CARD_ID = '00000000-0000-4000-8000-0000000000c9';
+
+  async function absorb(input: Partial<Parameters<typeof import('./synthesis').absorbOutsideClaim>[0]> = {}) {
+    const { absorbOutsideClaim } = await import('./synthesis');
+    return absorbOutsideClaim({
+      deck_id: DECK_ID,
+      attempt_id: ATTEMPT_ID,
+      claim_index: 1,
+      front: 'Priority inversion',
+      back: 'A low-priority task holds a lock a high-priority task needs.',
+      ...input,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.afterCallbacks.length = 0;
+  });
+
+  it('inserts a provenance-carrying card and schedules enrichment and embedding after the response', async () => {
+    const client = buildClient({
+      synthesis_attempts: { data: { id: ATTEMPT_ID }, error: null },
+      cards: { data: { id: NEW_CARD_ID }, error: null },
+    });
+    mocks.client = client;
+
+    const result = await absorb();
+    expect(result).toEqual({ success: true, cardId: NEW_CARD_ID, duplicate: false });
+
+    const inserted = client.__inserted.cards?.[0] as Record<string, unknown>;
+    expect(inserted).toMatchObject({
+      deck_id: DECK_ID,
+      source: 'synthesis_claim',
+      absorbed_from_attempt_id: ATTEMPT_ID,
+      absorbed_claim_index: 1,
+      front: 'Priority inversion',
+    });
+
+    // Nothing AI-shaped ran before the response was produced.
+    expect(mocks.enrichCards).not.toHaveBeenCalled();
+    expect(mocks.afterCallbacks).toHaveLength(1);
+    await mocks.afterCallbacks[0]();
+    expect(mocks.enrichCards).toHaveBeenCalledWith({ deck_id: DECK_ID, card_ids: [NEW_CARD_ID] });
+    expect(mocks.syncEmbeddings).toHaveBeenCalledWith({ deck_id: DECK_ID });
+  });
+
+  it('is idempotent: a second absorb of the same claim returns the existing card without inserting', async () => {
+    const client = buildClient({
+      synthesis_attempts: { data: { id: ATTEMPT_ID }, error: null },
+      cards: { data: { id: NEW_CARD_ID }, error: { message: 'duplicate key value violates unique constraint', code: '23505' } },
+    });
+    mocks.client = client;
+
+    const result = await absorb();
+    // The insert failed on the partial unique index; the existing card is looked up.
+    expect(result).toMatchObject({ success: true, duplicate: true });
+    expect(mocks.afterCallbacks).toHaveLength(0);
+  });
+
+  it('refuses an attempt that is not the caller\'s', async () => {
+    mocks.client = buildClient({ synthesis_attempts: { data: null, error: null } });
+    const result = await absorb();
+    expect(result).toMatchObject({ error: expect.stringContaining('not found') });
+    expect((mocks.client as ReturnType<typeof createSupabaseMock>).__inserted.cards).toBeUndefined();
+  });
+
+  it('rejects a claim index outside 0–2 before touching the database', async () => {
+    const client = buildClient();
+    mocks.client = client;
+    const result = await absorb({ claim_index: 3 });
+    expect(result).toMatchObject({ error: expect.anything() });
+    expect(client.from).not.toHaveBeenCalled();
   });
 });

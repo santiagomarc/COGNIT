@@ -46,7 +46,12 @@ function buildClient(cards: CardRow[], overrides: Record<string, QueryResult> = 
       card_mastery_state: { data: [], error: null },
       ...overrides,
     },
-    rpcs: { apply_quiz_sm2_batch: { data: cards.length, error: null } },
+    rpcs: {
+      log_quiz_result: {
+        data: [{ quiz_result_id: 'quiz-1', created_at: '2026-09-07T00:00:00Z', updated_cards: cards.length }],
+        error: null,
+      },
+    },
   });
 }
 
@@ -180,9 +185,10 @@ describe('logQuizResult — anti-cheat contract', () => {
     expect(result).toMatchObject({ error: expect.stringContaining('not found') });
   });
 
-  it('passes the server-derived `correct` flag to the batch RPC', async () => {
-    // apply_quiz_sm2_batch folds card_mastery_state into the same transaction,
-    // and relies on this flag being the server's verdict, not the client's.
+  it('passes the server-derived `correct` flag to the atomic RPC', async () => {
+    // log_quiz_result folds the card schedule, study_logs, card_mastery_state
+    // and both history rows into one transaction, and relies on this flag
+    // being the server's verdict, not the client's.
     const client = buildClient([card(CARD_A, 'Mitosis')]);
     mocks.client = client;
 
@@ -192,10 +198,19 @@ describe('logQuizResult — anti-cheat contract', () => {
     });
 
     const call = (client.rpc.mock.calls as unknown as unknown[][])
-      .find((args) => args[0] === 'apply_quiz_sm2_batch');
+      .find((args) => args[0] === 'log_quiz_result');
     expect(call).toBeDefined();
 
-    const { p_updates: updates } = call![1] as { p_updates: Array<{ correct: boolean }> };
-    expect(updates[0].correct).toBe(true);
+    const payload = call![1] as {
+      p_updates: Array<{ correct: boolean }>;
+      p_card_results: Array<{ correct: boolean; correct_answer_text: string }>;
+      p_mode: string;
+    };
+    expect(payload.p_updates[0].correct).toBe(true);
+    expect(payload.p_card_results[0]).toMatchObject({ correct: true, correct_answer_text: 'Mitosis' });
+    expect(payload.p_mode).toBe('mcq');
+    // No direct history inserts remain: the RPC owns both tables.
+    expect(client.__inserted.quiz_results).toBeUndefined();
+    expect(client.__inserted.quiz_card_results).toBeUndefined();
   });
 });

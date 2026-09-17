@@ -1,7 +1,17 @@
 import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
-import { normalizeSessionCardCount, normalizeStudyScope, parseSessionCardIds, type StudyScope, type StudySessionCard } from '@/lib/study';
+import {
+  MAX_SESSION_CARD_COUNT,
+  NEW_CARDS_PER_SESSION,
+  NEW_CARD_INTERLEAVE_EVERY,
+  interleaveNewCards,
+  normalizeSessionCardCount,
+  normalizeStudyScope,
+  parseSessionCardIds,
+  type StudyScope,
+  type StudySessionCard,
+} from '@/lib/study';
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadCapstoneCandidates } from '@/lib/synthesis/loaders';
@@ -22,72 +32,75 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
   const { deckId } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     redirect('/login');
   }
 
-  const { data: deck } = await supabase
-    .from('decks')
-    .select('id, title')
-    .eq('id', deckId)
-    .eq('user_id', user.id)
-    .single();
+  const explicitCardIds = parseSessionCardIds(resolvedSearchParams?.cards);
+  // An explicit card list is a review of exactly those cards, due or not.
+  const studyScope: StudyScope = explicitCardIds.length > 0 ? 'include_reviewed' : normalizeStudyScope(resolvedSearchParams?.scope);
+  const now = new Date().toISOString();
+
+  /*
+   * One wave. The deck read, the deck-wide count (for the empty state), the
+   * session's cards and the capstone candidates are independent; this page
+   * used to await them in three steps.
+   *
+   * Session composition (improvement plan §4.6): reviews and (re)learning
+   * cards that are due come first — they are the ones decaying — and new
+   * cards are interleaved one per three so a session never opens with a run
+   * of unseen terms. `next_review_at` is NOT NULL (default now()), so the old
+   * `is.null` clause matched nothing and a never-studied card sorted by its
+   * creation time, ahead of every overdue review.
+   */
+  const SELECT = 'id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question, topic_tags, mnemonic';
+  const base = () => supabase.from('cards').select(SELECT).eq('deck_id', deckId);
+  // Bounded by the maximum session so the count query is never the limiter.
+  const readCap = MAX_SESSION_CARD_COUNT;
+
+  const [{ data: deck }, { count: totalInDeck }, capstoneDrills, ...cardReads] = await Promise.all([
+    supabase.from('decks').select('id, title').eq('id', deckId).eq('user_id', user.id).single(),
+    supabase.from('cards').select('id', { count: 'exact', head: true }).eq('deck_id', deckId),
+    loadCapstoneCandidates(supabase, { deckId, userId: user.id }),
+    ...(explicitCardIds.length > 0
+      ? [base().in('id', explicitCardIds).order('next_review_at', { ascending: true }).limit(readCap)]
+      : studyScope === 'due'
+        ? [
+          // Due reviews and (re)learning steps, most overdue first.
+          base().neq('state', 'new').lte('next_review_at', now).order('next_review_at', { ascending: true }).limit(readCap),
+          // Unseen cards, oldest first; the per-session allowance is applied below.
+          base().eq('state', 'new').order('created_at', { ascending: true }).limit(readCap),
+        ]
+        : studyScope === 'unmastered_only'
+          ? [
+            base().in('state', ['learning', 'relearning']).order('next_review_at', { ascending: true }).limit(readCap),
+            base().eq('state', 'new').order('created_at', { ascending: true }).limit(readCap),
+          ]
+          : [
+            // include_reviewed: everything, soonest review first, new cards after.
+            base().neq('state', 'new').order('next_review_at', { ascending: true }).limit(readCap),
+            base().eq('state', 'new').order('created_at', { ascending: true }).limit(readCap),
+          ]),
+  ]);
 
   if (!deck) {
     notFound();
   }
 
-  // Count total cards in the deck (for the empty-state message)
-  const { count: totalInDeck } = await supabase
-    .from('cards')
-    .select('id', { count: 'exact', head: true })
-    .eq('deck_id', deckId);
-
-  const explicitCardIds = parseSessionCardIds(resolvedSearchParams?.cards);
   const sessionCardCount = explicitCardIds.length > 0
     ? explicitCardIds.length
     : normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0);
-  // An explicit card list is a review of exactly those cards, due or not.
-  const studyScope: StudyScope = explicitCardIds.length > 0 ? 'include_reviewed' : normalizeStudyScope(resolvedSearchParams?.scope);
 
-  // Keep SM-2 ordering across all scopes: new (null next_review_at) first, then soonest review date.
-  // Scope behavior:
-  //   • due (default): only due/new cards
-  //   • include_reviewed: include scheduled review cards even if not due yet
-  //   • unmastered_only: only cards not yet in stable review state
-  const now = new Date().toISOString();
-
-  let cardQuery = supabase
-    .from('cards')
-    .select('id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question, topic_tags, mnemonic')
-    .eq('deck_id', deckId);
-
-  if (explicitCardIds.length > 0) {
-    cardQuery = cardQuery.in('id', explicitCardIds);
-  }
-
-  if (studyScope === 'due') {
-    cardQuery = cardQuery.or(`next_review_at.is.null,next_review_at.lte.${now}`);
-  }
-
-  if (studyScope === 'unmastered_only') {
-    cardQuery = cardQuery.or('state.is.null,state.eq.new,state.eq.learning,state.eq.relearning');
-  }
-
-  // The deck's drills ride along for the completion screen's capstone offer
-  // (spec §8.3); an empty result — no drills, or the table not yet migrated —
-  // simply means no offer.
-  const [{ data: dueCards }, capstoneDrills] = await Promise.all([
-    cardQuery
-      .order('next_review_at', { ascending: true, nullsFirst: true })
-      .limit(sessionCardCount),
-    loadCapstoneCandidates(supabase, { deckId, userId: user.id }),
-  ]);
+  const [scheduledRows, freshRows] = [cardReads[0]?.data ?? [], cardReads[1]?.data ?? []];
+  // New cards trickle in beside reviews, but never displace them; when there
+  // is nothing scheduled (a brand-new deck) they fill the session instead.
+  const newAllowance = Math.max(NEW_CARDS_PER_SESSION, sessionCardCount - scheduledRows.length);
+  const dueCards = explicitCardIds.length > 0
+    ? scheduledRows
+    : interleaveNewCards(scheduledRows, freshRows.slice(0, newAllowance), { every: NEW_CARD_INTERLEAVE_EVERY })
+      .slice(0, sessionCardCount);
 
   const cards: StudySessionCard[] = (dueCards ?? []).map((c) => ({
     id: c.id,

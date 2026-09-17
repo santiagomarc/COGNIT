@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { QuizAssessmentClient } from '@/components/ui/shared/QuizAssessmentClient';
 import {
   getSessionCardBounds,
@@ -72,30 +72,30 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   const mode = normalizeQuizMode(resolvedSearchParams?.mode);
   const focusUnproven = normalizeBooleanQueryParam(resolvedSearchParams?.focus_unproven);
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     redirect('/login');
   }
 
-  const { data: deck } = await supabase
-    .from('decks')
-    .select('id, title')
-    .eq('id', deckId)
-    .eq('user_id', user.id)
-    .single();
+  // One wave: the deck, the deck-wide count and — in focus mode — the proven
+  // count are independent reads. This page used to await them in sequence.
+  const [{ data: deck }, { count: totalInDeck }, provenResult] = await Promise.all([
+    supabase.from('decks').select('id, title').eq('id', deckId).eq('user_id', user.id).single(),
+    supabase.from('cards').select('id', { count: 'exact', head: true }).eq('deck_id', deckId),
+    focusUnproven
+      ? supabase
+        .from('card_mastery_state')
+        .select('card_id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('deck_id', deckId)
+        .eq('correct', true)
+      : Promise.resolve(null),
+  ]);
 
   if (!deck) {
     notFound();
   }
-
-  const { count: totalInDeck } = await supabase
-    .from('cards')
-    .select('id', { count: 'exact', head: true })
-    .eq('deck_id', deckId);
 
   const availableCardCount = totalInDeck ?? 0;
   const { max: maxQuizCards } = getSessionCardBounds(availableCardCount);
@@ -107,20 +107,11 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   // derived from the real unproven count instead.
   let unprovenCardCount = 0;
   if (focusUnproven) {
-    const [{ count: provenCount, error: provenCountError }] = await Promise.all([
-      supabase
-        .from('card_mastery_state')
-        .select('card_id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('deck_id', deckId)
-        .eq('correct', true),
-    ]);
-
-    if (provenCountError) {
-      logger.error('quiz-page', 'failed to count proven cards', { message: provenCountError.message });
+    if (!provenResult || provenResult.error) {
+      logger.error('quiz-page', 'failed to count proven cards', { message: provenResult?.error?.message ?? 'no result' });
       unprovenCardCount = availableCardCount;
     } else {
-      unprovenCardCount = Math.max(0, availableCardCount - (provenCount ?? 0));
+      unprovenCardCount = Math.max(0, availableCardCount - (provenResult.count ?? 0));
     }
   }
 
@@ -131,47 +122,22 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
       ? Math.min(Math.max(sessionCardCount, unprovenCardCount), availableCardCount, 500)
       : Math.min(Math.max(sessionCardCount * 2, 20), 100);
 
-  type QuizCardRow = {
-    id: string;
-    front: string;
-    back: string;
-    state: string | null;
-    interval: number | null;
-    ease_factor: number | null;
-    repetition_count: number | null;
-    mcq_distractors: unknown;
-    id_question: string | null;
-    topic_tags: unknown;
-    mnemonic: string | null;
-  };
-
+  // select_quiz_cards orders by priority (due → unproven → rest, or unproven
+  // first in focus mode) and randomises within each tier. No fallback: the
+  // RPC is live and verified; a failure is an error, not a silently different
+  // selection policy.
   const { data: rpcCards, error: rpcError } = await supabase.rpc('select_quiz_cards', {
     p_deck_id: deckId,
     p_limit: limitToFetch > 0 ? limitToFetch : 20,
-    // Pushes the unproven-first ordering into Postgres, and randomises within
-    // each priority tier so a repeat quiz is not the same cards in a new order.
     p_focus_unproven: focusUnproven,
   });
 
-  let rawCards: QuizCardRow[] = [];
-  let usedRpc = false;
-
-  if (!rpcError && rpcCards && rpcCards.length > 0) {
-    rawCards = rpcCards;
-    usedRpc = true;
-  } else {
-    // Fallback: bounded card fetch (P-2)
-    const { data: fallbackCards } = await supabase
-      .from('cards')
-      .select('id, front, back, state, interval, ease_factor, repetition_count, mcq_distractors, id_question, topic_tags, mnemonic')
-      .eq('deck_id', deckId)
-      .order('created_at', { ascending: true })
-      .limit(limitToFetch > 0 ? limitToFetch : 20);
-
-    rawCards = (fallbackCards ?? []) as QuizCardRow[];
+  if (rpcError) {
+    logger.error('quiz-page', 'select_quiz_cards rpc failed', { message: rpcError.message });
+    throw new Error('Failed to load quiz cards.');
   }
 
-  const studyCards = rawCards.map(toStudyCard);
+  const studyCards = (rpcCards ?? []).map(toStudyCard);
   const takeCount = maxQuizCards === 0
     ? 0
     : focusUnproven
@@ -179,41 +145,10 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
       ? Math.min(Math.max(sessionCardCount, unprovenCardCount), studyCards.length)
       : Math.min(sessionCardCount, studyCards.length);
 
-  let cards: StudySessionCard[];
-
-  if (usedRpc) {
-    // The RPC already ordered by priority and randomised within each tier, so
-    // slice FIRST (keeping the priority) and shuffle only the chosen cards for
-    // presentation order. Shuffling before slicing would throw the priority away.
-    cards = shuffleItems(studyCards.slice(0, takeCount));
-  } else {
-    // Fallback rows come back in deterministic created_at order, so shuffle the
-    // pool to get variety, then apply the focus filter in TypeScript.
-    const shuffledCards = shuffleItems(studyCards);
-    cards = shuffledCards.slice(0, takeCount);
-
-    if (focusUnproven && shuffledCards.length > 0) {
-      const { data: provenMasteryRows, error: provenMasteryError } = await supabase
-        .from('card_mastery_state')
-        .select('card_id')
-        .eq('user_id', user.id)
-        .eq('deck_id', deckId)
-        .eq('correct', true);
-
-      if (provenMasteryError) {
-        logger.error('quiz-page', 'failed to read mastery state for focus_unproven', { message: provenMasteryError.message });
-      } else {
-        const provenCardIds = new Set((provenMasteryRows ?? []).map((row) => row.card_id));
-        const unproven = shuffledCards.filter((card) => !provenCardIds.has(card.id));
-        const proven = shuffledCards.filter((card) => provenCardIds.has(card.id));
-
-        cards = [...unproven, ...proven].slice(
-          0,
-          Math.min(Math.max(sessionCardCount, unproven.length), shuffledCards.length),
-        );
-      }
-    }
-  }
+  // The RPC already ordered by priority and randomised within each tier, so
+  // slice FIRST (keeping the priority) and shuffle only the chosen cards for
+  // presentation order. Shuffling before slicing would throw the priority away.
+  const cards: StudySessionCard[] = shuffleItems(studyCards.slice(0, takeCount));
 
   return (
     <QuizAssessmentClient

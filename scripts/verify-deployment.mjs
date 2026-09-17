@@ -21,8 +21,14 @@ const supabase = createClient(
 // Every RPC introduced in Phases 2-4. An anon caller has no auth.uid(), so the
 // expected outcome is an authorization/empty result — NOT "function does not
 // exist", which is what a missing migration looks like.
+const ZERO_VECTOR = `[${Array(768).fill(0).join(',')}]`;
+const DECK = '00000000-0000-4000-8000-000000000001';
+
 const RPCS = {
-  reserve_ai_call:            { p_action: 'get_hint', p_window_minutes: 60, p_max_requests: 1 },
+  // v2 signature (202609170900): p_calls / p_daily_ceiling. The 4-argument
+  // form was dropped, so a stale database fails here rather than reserving
+  // without a ceiling.
+  reserve_ai_call:            { p_action: 'get_hint', p_window_minutes: 60, p_max_requests: 1, p_metadata: {}, p_calls: 1, p_daily_ceiling: 300 },
   apply_card_embeddings_batch:{ p_deck_id: '00000000-0000-4000-8000-000000000001', p_updates: [] },
   apply_quiz_sm2_batch:       { p_deck_id: '00000000-0000-4000-8000-000000000001', p_updates: [] },
   select_quiz_cards:          { p_deck_id: '00000000-0000-4000-8000-000000000001', p_limit: 5, p_focus_unproven: false },
@@ -31,7 +37,15 @@ const RPCS = {
   get_due_cards_by_deck:      { p_user_id: '00000000-0000-4000-8000-000000000001' },
   set_deck_sharing:           { p_deck_id: '00000000-0000-4000-8000-000000000001', p_enabled: true, p_rotate: false },
   clone_shared_deck:          { p_share_token: 'deadbeefdeadbeefdeadbeefdeadbeef' },
-  search_deck_cards_by_embedding: { p_deck_id: '00000000-0000-4000-8000-000000000001', p_query_embedding: `[${Array(768).fill(0).join(',')}]`, p_limit: 1 },
+  search_deck_cards_by_embedding: { p_deck_id: DECK, p_query_embedding: ZERO_VECTOR, p_limit: 1 },
+  search_user_cards_by_embedding: { p_user_id: DECK, p_query_embedding: ZERO_VECTOR, p_limit: 1 },
+  // Improvement plan, 2026-09-17 migration set.
+  apply_card_enrichment_batch: { p_deck_id: DECK, p_rows: [] },
+  log_quiz_result:            { p_deck_id: DECK, p_mode: 'mcq', p_duration_ms: 0, p_include_in_history: true, p_updates: [], p_card_results: [] },
+  get_quiz_history:           { p_deck_id: DECK, p_limit: 1 },
+  record_synthesis_attempt:   { p_drill_id: DECK, p_deck_id: DECK, p_client_attempt_id: null, p_attempt: {}, p_schedule: {}, p_pull_forward_card_ids: [], p_pull_forward_not_after: null },
+  get_card_schedule_summary:  { p_user_id: DECK, p_days: 7 },
+  get_deck_schedule_breakdown:{ p_deck_id: DECK },
 };
 
 let missing = 0;
@@ -60,6 +74,8 @@ const SYNTHESIS_PROBES = [
   ['synthesis_drills', 'id, link_count, last_links_covered'],
   ['synthesis_attempts', 'id, client_attempt_id, confidence, revision_of'],
   ['synthesis_attempt_feedback', 'id, rating'],
+  // Absorption provenance (202609170970).
+  ['cards', 'id, absorbed_from_attempt_id, absorbed_claim_index'],
 ];
 for (const [table, columns] of SYNTHESIS_PROBES) {
   const probe = await supabase.from(table).select(columns).limit(1);

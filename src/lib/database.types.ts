@@ -82,6 +82,8 @@ export type Database = {
       }
       cards: {
         Row: {
+          absorbed_claim_index: number | null
+          absorbed_from_attempt_id: string | null
           ai_hint: string | null
           back: string
           created_at: string | null
@@ -104,6 +106,8 @@ export type Database = {
           topic_tags: string[] | null
         }
         Insert: {
+          absorbed_claim_index?: number | null
+          absorbed_from_attempt_id?: string | null
           ai_hint?: string | null
           back: string
           created_at?: string | null
@@ -126,6 +130,8 @@ export type Database = {
           topic_tags?: string[] | null
         }
         Update: {
+          absorbed_claim_index?: number | null
+          absorbed_from_attempt_id?: string | null
           ai_hint?: string | null
           back?: string
           created_at?: string | null
@@ -683,6 +689,10 @@ export type Database = {
         Args: { p_deck_id: string; p_updates: Json }
         Returns: number
       }
+      apply_card_enrichment_batch: {
+        Args: { p_deck_id: string; p_rows: Json }
+        Returns: number
+      }
       apply_quiz_sm2_batch: {
         Args: { p_deck_id: string; p_updates: Json }
         Returns: number
@@ -726,6 +736,10 @@ export type Database = {
           scheduled: number
         }[]
       }
+      get_analytics_snapshot: {
+        Args: { p_days?: number; p_now?: string }
+        Returns: Json
+      }
       get_card_schedule_summary: {
         Args: { p_days?: number; p_now?: string; p_user_id: string }
         Returns: Json
@@ -735,6 +749,7 @@ export type Database = {
         Returns: {
           deck_id: string
           due_count: number
+          new_count: number
         }[]
       }
       get_legacy_mastery_snapshots: {
@@ -782,9 +797,54 @@ export type Database = {
         }
         Returns: undefined
       }
+      get_quiz_history: {
+        Args: { p_before?: string | null; p_deck_id: string; p_limit?: number }
+        Returns: {
+          id: string
+          mode: string
+          total_cards: number
+          correct_cards: number
+          duration_ms: number
+          created_at: string
+          misses: Json
+        }[]
+      }
+      log_quiz_result: {
+        Args: {
+          p_card_results: Json
+          p_deck_id: string
+          p_duration_ms: number
+          p_include_in_history: boolean
+          p_mode: string
+          p_updates: Json
+        }
+        Returns: {
+          quiz_result_id: string
+          created_at: string
+          updated_cards: number
+        }[]
+      }
+      record_synthesis_attempt: {
+        Args: {
+          p_attempt: Json
+          p_client_attempt_id?: string | null
+          p_deck_id: string
+          p_drill_id: string
+          p_pull_forward_card_ids: string[]
+          p_pull_forward_not_after?: string | null
+          p_schedule: Json
+        }
+        Returns: {
+          attempt_id: string
+          replayed: boolean
+          pulled_forward_card_ids: string[]
+        }[]
+      }
       reserve_ai_call: {
         Args: {
           p_action: string
+          p_calls?: number
+          p_daily_ceiling?: number
           p_max_requests: number
           p_metadata?: Json
           p_window_minutes: number

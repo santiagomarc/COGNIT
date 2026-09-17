@@ -1,8 +1,11 @@
 'use client';
 
+import { useState, useTransition } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 
 import type { QuizHistoryEntry } from '@/index';
+import { getQuizHistory } from '@/app/actions/quiz';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 
@@ -28,7 +31,38 @@ function scoreColor(percentage: number) {
   return 'var(--ink)';
 }
 
-export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry[]; deckId: string }) {
+type QuizHistoryListProps = {
+  history: QuizHistoryEntry[];
+  deckId: string;
+  /** Whether the server had more rows than the first page. */
+  initialHasMore?: boolean;
+};
+
+export function QuizHistoryList({ history: initialHistory, deckId, initialHasMore = false }: QuizHistoryListProps) {
+  const [history, setHistory] = useState(initialHistory);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [isPending, startTransition] = useTransition();
+
+  const loadOlder = () => {
+    const last = history[history.length - 1];
+    if (!last) return;
+    startTransition(async () => {
+      let result: Awaited<ReturnType<typeof getQuizHistory>>;
+      try {
+        result = await getQuizHistory(deckId, { before: last.created_at });
+      } catch {
+        toast.error('Could not load older quizzes. Check your connection and try again.');
+        return;
+      }
+      if ('error' in result) {
+        toast.error(result.error);
+        return;
+      }
+      setHistory((prev) => [...prev, ...result.history]);
+      setHasMore(result.hasMore);
+    });
+  };
+
   if (!history || history.length === 0) {
     return (
       <section className="surface p-5 text-center md:p-6">
@@ -52,7 +86,7 @@ export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry
           Quiz history
         </h2>
         <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
-          {history.length} attempts
+          {history.length}{hasMore ? '+' : ''} attempts
         </p>
       </div>
 
@@ -126,6 +160,14 @@ export function QuizHistoryList({ history, deckId }: { history: QuizHistoryEntry
           );
         })}
       </Accordion>
+
+      {hasMore ? (
+        <div className="mt-4 flex justify-center">
+          <Button type="button" variant="ghost" size="sm" onClick={loadOlder} disabled={isPending}>
+            {isPending ? 'Loading…' : 'Load older'}
+          </Button>
+        </div>
+      ) : null}
     </section>
   );
 }

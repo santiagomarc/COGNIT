@@ -10,15 +10,6 @@ import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { normalizeForMatch, requireOwnedDeck } from './_shared';
 import { logger } from '@/lib/logger';
 
-type QuizCardHistoryRow = {
-  quiz_result_id: string;
-  card_id: string;
-  correct: boolean;
-  prompt_text: string | null;
-  correct_answer_text: string | null;
-  user_answer_text: string | null;
-};
-
 export async function logQuizResult(data: LogQuizResultInput) {
   const result = logQuizResultSchema.safeParse(data);
   if (!result.success) {
@@ -30,7 +21,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
     return { error: deckAccess.error };
   }
 
-  const { supabase, user } = deckAccess;
+  const { supabase } = deckAccess;
   const uniqueCardIds = [...new Set(result.data.results.map((entry) => entry.card_id))];
   const { data: ownedCards, error: ownedCardsError } = await supabase
     .from('cards')
@@ -98,10 +89,16 @@ export async function logQuizResult(data: LogQuizResultInput) {
     };
   });
 
-  // Apply every card's scheduling update, study_logs row, and mastery state
-  // atomically in one round trip.
-  const batchRpcResult = await supabase.rpc('apply_quiz_sm2_batch', {
+  const correctCards = evaluatedResults.filter((entry) => entry.correct).length;
+
+  // One transaction: every card's schedule, its study_logs row, its mastery
+  // state, the quiz_results row and its quiz_card_results. The history tables
+  // are append-only, so a partial write used to be permanent.
+  const { data: logged, error: logError } = await supabase.rpc('log_quiz_result', {
     p_deck_id: result.data.deck_id,
+    p_mode: result.data.mode,
+    p_duration_ms: result.data.duration_ms,
+    p_include_in_history: result.data.include_in_history,
     p_updates: sm2Updates.map(({ card_id, sm2Result, grade, correct }) => ({
       card_id,
       state: sm2Result.state,
@@ -112,105 +109,13 @@ export async function logQuizResult(data: LogQuizResultInput) {
       grade,
       correct,
     })),
+    p_card_results: evaluatedResults,
   });
 
-  if (batchRpcResult.error) {
-    logger.warn('logQuizResult', 'apply_quiz_sm2_batch failed, using fallback persistence path', {
-      code: batchRpcResult.error.code,
-      message: batchRpcResult.error.message,
-    });
-
-    const nowIso = new Date().toISOString();
-    for (const { card_id, sm2Result, grade, correct } of sm2Updates) {
-      const { error: updateErr } = await supabase
-        .from('cards')
-        .update({
-          state: sm2Result.state,
-          interval: sm2Result.interval,
-          ease_factor: sm2Result.easeFactor,
-          repetition_count: sm2Result.repetitionCount,
-          next_review_at: sm2Result.nextReviewAt.toISOString(),
-          last_review_at: nowIso,
-        })
-        .eq('id', card_id)
-        .eq('deck_id', result.data.deck_id);
-
-      if (updateErr) {
-        logger.error('logQuizResult', 'fallback update card error', { code: updateErr.code, message: updateErr.message });
-      }
-
-      const { error: logErr } = await supabase.from('study_logs').insert({
-        user_id: user.id,
-        card_id,
-        grade,
-        review_duration_ms: 0,
-      });
-
-      if (logErr) {
-        logger.warn('logQuizResult', 'fallback study log error', { code: logErr.code, message: logErr.message });
-      }
-
-      const { error: masteryErr } = await supabase.from('card_mastery_state').upsert(
-        {
-          user_id: user.id,
-          deck_id: result.data.deck_id,
-          card_id,
-          correct,
-          last_quiz_at: nowIso,
-          updated_at: nowIso,
-        },
-        { onConflict: 'user_id,deck_id,card_id' }
-      );
-
-      if (masteryErr) {
-        logger.warn('logQuizResult', 'fallback card mastery error', { code: masteryErr.code, message: masteryErr.message });
-      }
-    }
-  }
-  // ────────────────────────────────────────────────────────────────────────
-
-  const correctCards = evaluatedResults.filter((entry) => entry.correct).length;
-  const insertQuizResultBase = {
-    user_id: user.id,
-    deck_id: result.data.deck_id,
-    mode: result.data.mode,
-    total_cards: evaluatedResults.length,
-    correct_cards: correctCards,
-    duration_ms: result.data.duration_ms,
-  };
-
-  const { data: insertedQuizResult, error: quizResultError } = await supabase
-    .from('quiz_results')
-    .insert({
-      ...insertQuizResultBase,
-      include_in_history: result.data.include_in_history,
-    })
-    .select('id, created_at')
-    .single();
-
-  if (quizResultError || !insertedQuizResult) {
-    if (quizResultError) {
-      logger.error('logQuizResult', 'quiz result insert error', { code: quizResultError.code, message: quizResultError.message });
-    }
-    return { error: sanitizeDatabaseError(quizResultError, 'Failed to save quiz result.') };
-  }
-
-  const { error: quizCardResultsError } = await supabase
-    .from('quiz_card_results')
-    .insert(
-      evaluatedResults.map((entry) => ({
-        quiz_result_id: insertedQuizResult.id,
-        card_id: entry.card_id,
-        correct: entry.correct,
-        prompt_text: entry.prompt_text,
-        correct_answer_text: entry.correct_answer_text,
-        user_answer_text: entry.user_answer_text,
-      }))
-    );
-
-  if (quizCardResultsError) {
-    logger.error('logQuizResult', 'quiz card results insert error', { code: quizCardResultsError.code, message: quizCardResultsError.message });
-    return { error: sanitizeDatabaseError(quizCardResultsError, 'Failed to save quiz details.') };
+  const insertedQuizResult = logged?.[0];
+  if (logError || !insertedQuizResult) {
+    logger.error('logQuizResult', 'log_quiz_result rpc failed', { code: logError?.code, message: logError?.message });
+    return { error: sanitizeDatabaseError(logError, 'Failed to save quiz result.') };
   }
 
   revalidatePath('/dashboard');
@@ -218,99 +123,79 @@ export async function logQuizResult(data: LogQuizResultInput) {
 
   return {
     success: true,
-    quizResultId: insertedQuizResult.id,
+    quizResultId: insertedQuizResult.quiz_result_id,
     correctCards,
     totalCards: evaluatedResults.length,
   };
 }
 
-export async function getQuizHistory(deckId: string) {
+// Not exported: a 'use server' module may only export async functions (invariant #2).
+const QUIZ_HISTORY_PAGE_SIZE = 20;
+
+type QuizHistoryMissRow = {
+  card_id?: unknown;
+  prompt?: unknown;
+  correct_answer?: unknown;
+  user_answer?: unknown;
+};
+
+/**
+ * One page of quiz history, newest first, with each quiz's misses already
+ * nested by the database. `before` is the `created_at` of the last row the
+ * client holds; `hasMore` says whether to offer another page.
+ */
+export async function getQuizHistory(deckId: string, options: { before?: string | null; limit?: number } = {}) {
   const deckAccess = await requireOwnedDeck(deckId);
   if ('error' in deckAccess) {
     return { error: deckAccess.error };
   }
 
-  const { supabase, user } = deckAccess;
+  const { supabase } = deckAccess;
+  const limit = Math.min(Math.max(1, options.limit ?? QUIZ_HISTORY_PAGE_SIZE), 50);
 
-  const { data: quizResults, error: quizResultsError } = await supabase
-    .from('quiz_results')
-    .select('id, deck_id, mode, total_cards, correct_cards, duration_ms, created_at')
-    .eq('deck_id', deckId)
-    .eq('user_id', user.id)
-    .eq('include_in_history', true)
-    .order('created_at', { ascending: false })
-    .limit(200);
+  const { data, error } = await supabase.rpc('get_quiz_history', {
+    p_deck_id: deckId,
+    p_limit: limit + 1,           // one extra row answers "is there another page?"
+    p_before: options.before ?? null,
+  });
 
-  if (quizResultsError) {
-    logger.error('getQuizHistory', 'quiz results error', { code: quizResultsError.code, message: quizResultsError.message });
+  if (error) {
+    logger.error('getQuizHistory', 'get_quiz_history rpc failed', { code: error.code, message: error.message });
     return { error: 'Failed to fetch quiz history.' };
   }
 
-  if (!quizResults || quizResults.length === 0) {
-    return { history: [] as QuizHistoryEntry[] };
-  }
+  const rows = data ?? [];
+  const page = rows.slice(0, limit);
 
-  // Only the misses are ever rendered (`incorrect_answers`, `wrong_count`);
-  // totals come from the quiz_results row itself. Filtering here instead of
-  // in Node stops every correct answer's full prompt/answer text from being
-  // fetched only to be discarded — at a typical ~80% pass rate that is ~5x
-  // fewer rows on every history load.
-  const { data: quizCardRows, error: quizCardRowsError } = await supabase
-    .from('quiz_card_results')
-    .select('quiz_result_id, card_id, correct, prompt_text, correct_answer_text, user_answer_text')
-    .in('quiz_result_id', quizResults.map((row) => row.id))
-    .eq('correct', false)
-    .limit(20000);
+  const history: QuizHistoryEntry[] = page.map((row) => {
+    const misses = Array.isArray(row.misses) ? (row.misses as QuizHistoryMissRow[]) : [];
+    const incorrectAnswers = misses.map((miss) => ({
+      card_id: typeof miss.card_id === 'string' ? miss.card_id : '',
+      card_number: null,
+      prompt: typeof miss.prompt === 'string' && miss.prompt ? miss.prompt : 'Card content unavailable',
+      correct_answer: typeof miss.correct_answer === 'string' && miss.correct_answer ? miss.correct_answer : 'Card term unavailable',
+      user_answer: typeof miss.user_answer === 'string' && miss.user_answer.trim().length > 0 ? miss.user_answer : null,
+    }));
 
-  if (quizCardRowsError) {
-    logger.error('getQuizHistory', 'quiz card rows error', { code: quizCardRowsError.code, message: quizCardRowsError.message });
-    return { error: 'Failed to fetch quiz history details.' };
-  }
-
-  const rowsByQuizResultId = new Map<string, QuizCardHistoryRow[]>();
-  for (const row of quizCardRows ?? []) {
-    const existing = rowsByQuizResultId.get(row.quiz_result_id) ?? [];
-    existing.push(row);
-    rowsByQuizResultId.set(row.quiz_result_id, existing);
-  }
-
-  const history: QuizHistoryEntry[] = quizResults.map((result) => {
-    const details = rowsByQuizResultId.get(result.id) ?? [];
-    const incorrectAnswers = details
-      .filter((detail) => !detail.correct)
-      .map((detail) => {
-        return {
-          card_id: detail.card_id,
-          card_number: null,
-          prompt: detail.prompt_text ?? 'Card content unavailable',
-          correct_answer: detail.correct_answer_text ?? 'Card term unavailable',
-          user_answer:
-            typeof detail.user_answer_text === 'string' && detail.user_answer_text.trim().length > 0
-              ? detail.user_answer_text
-              : null,
-        };
-      });
-
-    const totalCards = result.total_cards > 0 ? result.total_cards : 1;
-    const scorePercentage = Math.round((result.correct_cards / totalCards) * 100);
+    const totalCards = row.total_cards > 0 ? row.total_cards : 1;
 
     return {
-      id: result.id,
-      deck_id: result.deck_id,
+      id: row.id,
+      deck_id: deckId,
       // The `mode` CHECK constraint guarantees this is 'mcq' | 'identification';
       // Postgres reports the column type as plain text.
-      mode: result.mode as QuizMode,
-      total_cards: result.total_cards,
-      correct_cards: result.correct_cards,
-      score_percentage: scorePercentage,
+      mode: row.mode as QuizMode,
+      total_cards: row.total_cards,
+      correct_cards: row.correct_cards,
+      score_percentage: Math.round((row.correct_cards / totalCards) * 100),
       wrong_count: incorrectAnswers.length,
-      duration_ms: result.duration_ms,
-      created_at: result.created_at,
+      duration_ms: row.duration_ms,
+      created_at: row.created_at,
       incorrect_answers: incorrectAnswers,
     };
   });
 
-  return { history };
+  return { history, hasMore: rows.length > limit };
 }
 
 export type WeakestConcept = {

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { loadDueByDeckRows } from './dashboard-due';
 
 type DueRpcResult = {
-  data: Array<{ deck_id: string; due_count: number | string | null }> | null;
+  data: Array<{ deck_id: string; due_count: number | string | null; new_count?: number | string | null }> | null;
   error: { message: string; code?: string } | null;
 };
 
@@ -32,8 +32,8 @@ describe('loadDueByDeckRows', () => {
     expect(supabase.rpc).toHaveBeenCalledTimes(1);
     expect(supabase.from).not.toHaveBeenCalled();
     expect(rows).toEqual([
-      { deck_id: 'deck-1', due_count: 3 },
-      { deck_id: 'deck-2', due_count: 1 },
+      { deck_id: 'deck-1', due_count: 3, new_count: 0 },
+      { deck_id: 'deck-2', due_count: 1, new_count: 0 },
     ]);
   });
 

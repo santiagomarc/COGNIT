@@ -1,18 +1,27 @@
 'use server';
 
+import { after } from 'next/server';
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import {
   createCardSchema, CreateCardInput,
   updateCardSchema, UpdateCardInput,
   bulkImportSchema, BulkImportInput,
 } from '@/lib/schemas';
-import { revalidatePath } from 'next/cache';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import { requireOwnedDeck, touchDeckUpdatedAt } from './_shared';
+import { recordAiUsage, requireOwnedDeck, reserveAiCall, touchDeckUpdatedAt } from './_shared';
 import { logger } from '@/lib/logger';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 
 const BULK_DELETE_MAX_COUNT = 200;
+
+const uuidSchema = z.uuid();
+const deleteCardSchema = z.object({ card_id: uuidSchema, deck_id: uuidSchema });
+const bulkDeleteSchema = z.object({
+  deck_id: uuidSchema,
+  card_ids: z.array(uuidSchema).min(1, { message: 'No cards selected.' }).max(BULK_DELETE_MAX_COUNT),
+});
 
 function trimNullableString(value: string | undefined) {
   const trimmed = value?.trim();
@@ -83,6 +92,8 @@ export async function updateCard(data: UpdateCardInput) {
     return { error: 'Deck not found or access denied.' };
   }
 
+  // Every derived field is dropped with the text that produced it: distractors,
+  // the identification question, the hint, tags, the mnemonic and the vector.
   const updatePayload = {
     front: result.data.front,
     back: result.data.back,
@@ -94,48 +105,65 @@ export async function updateCard(data: UpdateCardInput) {
     embedding: null,
   };
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('cards')
     .update(updatePayload)
     .eq('id', result.data.id)
-    .eq('deck_id', result.data.deck_id);
+    .eq('deck_id', result.data.deck_id)
+    .select('id')
+    .maybeSingle();
 
   if (error) {
     logger.error('updateCard', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to update card.') };
   }
 
-  await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
-
-  try {
-    const textToEmbed = `${result.data.front} ${result.data.back}`.trim();
-    if (textToEmbed) {
-      const embeddings = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT' });
-      if (embeddings.length > 0 && embeddings[0]) {
-        const vectorLiteral = toVectorLiteral(embeddings[0]);
-        const { error: embedError } = await supabase
-          .from('cards')
-          .update({ embedding: vectorLiteral })
-          .eq('id', result.data.id)
-          .eq('deck_id', result.data.deck_id);
-
-        if (embedError) {
-          logger.warn('updateCard', 'Failed to update embedding for card', {
-            cardId: result.data.id,
-            message: embedError.message,
-          });
-        }
-      }
-    }
-  } catch (embedErr) {
-    logger.warn('updateCard', 'Failed to generate embedding for card', {
-      cardId: result.data.id,
-      message: embedErr instanceof Error ? embedErr.message : String(embedErr),
-    });
+  if (!updated) {
+    return { error: 'Card not found or access denied.' };
   }
+
+  await touchDeckUpdatedAt(supabase, result.data.deck_id, user.id);
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
+
+  // Re-embed off the response path, reserved like every other model call
+  // (invariant #7). This used to run inline, unreserved and unguarded: an
+  // uncounted embedding per edit and 300–800 ms on every save. A refused
+  // reservation simply leaves `embedding` null; the deck-chat sync button
+  // picks the card up with the rest of the pending ones.
+  const cardId = result.data.id;
+  const deckId = result.data.deck_id;
+  const textToEmbed = `${result.data.front}\n${result.data.back}`.trim();
+  if (textToEmbed) {
+    after(async () => {
+      const reservation = await reserveAiCall(supabase, user.id, 'sync_embeddings', { card_id: cardId, trigger: 'update_card' });
+      if (!reservation.ok) {
+        logger.info('updateCard', 'embedding deferred to the next sync', { cardId, reason: reservation.error });
+        return;
+      }
+      try {
+        // embedTexts already runs under withGeminiRetry.
+        const [vector] = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT' });
+        if (!vector) return;
+        const { error: embedError } = await supabase
+          .from('cards')
+          .update({ embedding: toVectorLiteral(vector) })
+          .eq('id', cardId)
+          .eq('deck_id', deckId);
+        if (embedError) {
+          logger.warn('updateCard', 'embedding write failed', { cardId, message: embedError.message });
+        }
+        await recordAiUsage(supabase, user.id, 'sync_embeddings', { card_id: cardId, synced_cards: embedError ? 0 : 1 }, reservation.reservationId);
+      } catch (embedErr) {
+        logger.warn('updateCard', 'embedding skipped', {
+          cardId,
+          message: embedErr instanceof Error ? embedErr.message : String(embedErr),
+        });
+      }
+    });
+  }
+
   return { success: true };
 }
 
@@ -182,56 +210,48 @@ export async function bulkImportCards(data: BulkImportInput) {
 }
 
 export async function deleteCard(cardId: string, deckId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Unauthorized' };
+  const parsed = deleteCardSchema.safeParse({ card_id: cardId, deck_id: deckId });
+  if (!parsed.success) {
+    return { error: 'Invalid card or deck id.' };
   }
 
-  // Verify deck ownership
-  const { data: ownedDeck, error: deckError } = await supabase
-    .from('decks')
-    .select('id')
-    .eq('id', deckId)
-    .eq('user_id', user.id)
-    .single();
-
-  if (deckError || !ownedDeck) {
-    return { error: 'Deck not found or access denied.' };
+  const deckAccess = await requireOwnedDeck(parsed.data.deck_id);
+  if ('error' in deckAccess) {
+    return { error: deckAccess.error === 'You must be logged in.' ? 'Unauthorized' : deckAccess.error };
   }
 
-  const { error } = await supabase
+  const { supabase, user } = deckAccess;
+
+  const { data: deleted, error } = await supabase
     .from('cards')
     .delete()
-    .eq('id', cardId)
-    .eq('deck_id', deckId);
+    .eq('id', parsed.data.card_id)
+    .eq('deck_id', parsed.data.deck_id)
+    .select('id')
+    .maybeSingle();
 
   if (error) {
     logger.error('deleteCard', 'db error', { code: error.code, message: error.message });
     return { error: sanitizeDatabaseError(error, 'Failed to delete card.') };
   }
 
-  await touchDeckUpdatedAt(supabase, deckId, user.id);
+  if (!deleted) {
+    return { error: 'Card not found or access denied.' };
+  }
 
-  revalidatePath(`/dashboard/${deckId}`);
+  await touchDeckUpdatedAt(supabase, parsed.data.deck_id, user.id);
+
+  revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   revalidatePath('/dashboard');
   return { success: true };
 }
 
 export async function bulkDeleteCards(cardIds: string[], deckId: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Unauthorized' };
-  }
-
   const normalizedIds = Array.from(
     new Set(
-      cardIds
-        .map((id) => id?.trim())
-        .filter((id): id is string => Boolean(id))
+      (Array.isArray(cardIds) ? cardIds : [])
+        .map((id) => (typeof id === 'string' ? id.trim() : ''))
+        .filter((id) => id.length > 0)
     )
   );
 
@@ -243,22 +263,21 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
     return { error: `You can delete at most ${BULK_DELETE_MAX_COUNT} cards at once.` };
   }
 
-  // Verify deck ownership before deleting cards.
-  const { data: ownedDeck, error: deckError } = await supabase
-    .from('decks')
-    .select('id')
-    .eq('id', deckId)
-    .eq('user_id', user.id)
-    .single();
-
-  if (deckError || !ownedDeck) {
-    return { error: 'Deck not found or access denied.' };
+  const parsed = bulkDeleteSchema.safeParse({ deck_id: deckId, card_ids: normalizedIds });
+  if (!parsed.success) {
+    return { error: 'Invalid card or deck id.' };
   }
 
-  let deletedCount = 0;
+  const deckAccess = await requireOwnedDeck(parsed.data.deck_id);
+  if ('error' in deckAccess) {
+    return { error: deckAccess.error === 'You must be logged in.' ? 'Unauthorized' : deckAccess.error };
+  }
+
+  const { supabase, user } = deckAccess;
+
   const { data: rpcDeletedCount, error: rpcError } = await supabase.rpc('delete_owned_cards_batch', {
-    p_deck_id: deckId,
-    p_card_ids: normalizedIds,
+    p_deck_id: parsed.data.deck_id,
+    p_card_ids: parsed.data.card_ids,
   });
 
   if (rpcError) {
@@ -269,14 +288,17 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   const parsedDeletedCount = typeof rpcDeletedCount === 'number'
     ? rpcDeletedCount
     : Number(rpcDeletedCount ?? 0);
+  const deletedCount = Number.isFinite(parsedDeletedCount) ? parsedDeletedCount : 0;
 
-  deletedCount = Number.isFinite(parsedDeletedCount) ? parsedDeletedCount : 0;
+  if (deletedCount > 0) {
+    await touchDeckUpdatedAt(supabase, parsed.data.deck_id, user.id);
+  }
 
-  revalidatePath(`/dashboard/${deckId}`);
-  revalidatePath(`/dashboard/${deckId}/study`);
-  revalidatePath(`/dashboard/${deckId}/quiz`);
+  revalidatePath(`/dashboard/${parsed.data.deck_id}`);
+  revalidatePath(`/dashboard/${parsed.data.deck_id}/study`);
+  revalidatePath(`/dashboard/${parsed.data.deck_id}/quiz`);
   revalidatePath('/dashboard');
-  return { success: true, deletedCount, requestedCount: normalizedIds.length };
+  return { success: true, deletedCount, requestedCount: parsed.data.card_ids.length };
 }
 
 export async function getDeckCardsPage(deckId: string, offset: number, limit = 60) {

@@ -28,6 +28,7 @@ describe('buildPaletteCommands', () => {
     expect(ids).toEqual([
       'start-session',
       'decks',
+      'stats',
       'new-deck',
       'toggle-theme',
       'sign-out',
@@ -119,7 +120,7 @@ describe('groupPaletteCommands', () => {
   it('collects consecutive rows under one heading', () => {
     const sections = groupPaletteCommands(build());
     expect(sections.map((s) => s.group)).toEqual(['Actions', 'Decks']);
-    expect(sections[0].commands).toHaveLength(5);
+    expect(sections[0].commands).toHaveLength(6);
     expect(sections[1].commands.map((c) => c.id)).toEqual(['deck:a', 'deck:b']);
   });
 

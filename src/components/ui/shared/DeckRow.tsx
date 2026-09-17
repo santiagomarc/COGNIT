@@ -11,7 +11,12 @@ export type DeckRowData = {
   title: string;
   tag: string | null;
   cardCount: number;
+  /** Studied cards whose review is owed. */
   dueCount: number;
+  /** Never-studied cards — available, not owed. */
+  newCount: number;
+  /** Synthesis drills due now (micro-synthesis spec §4.1). */
+  dueDrillCount: number;
   /** Mean SM-2 ease across the deck's cards; null when nothing is scheduled. */
   easeFactor: number | null;
   masteryPercentage: number;
@@ -59,7 +64,7 @@ const DECK_COL = {
  */
 function deckState(deck: DeckRowData): TickState {
   if (deck.cardCount === 0) return 'empty';
-  if (deck.dueCount > 0) return 'due';
+  if (deck.dueCount > 0 || deck.dueDrillCount > 0) return 'due';
   if (deck.assessedCards === 0) return 'neutral';
   if (deck.masteryPercentage >= 70) return 'mastered';
   return 'learning';
@@ -134,8 +139,21 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
         <div className={DECK_COL.due}>
           <dt className="sr-only">Due</dt>
-          <dd style={{ color: deck.dueCount > 0 ? 'var(--state-due)' : 'var(--ink-dimmer)' }}>
+          <dd
+            style={{ color: deck.dueCount > 0 ? 'var(--state-due)' : 'var(--ink-dimmer)' }}
+            title={deck.newCount > 0 ? `${deck.newCount} new ${deck.newCount === 1 ? 'card' : 'cards'} to learn` : undefined}
+          >
             {deck.dueCount}
+            {/* Drills due ride beside the card count: a drill is a task too. */}
+            {deck.dueDrillCount > 0 ? (
+              <span
+                className="ml-1 text-[10px] uppercase tracking-[0.12em]"
+                style={{ color: 'var(--state-due)' }}
+                aria-label={`${deck.dueDrillCount} ${deck.dueDrillCount === 1 ? 'drill' : 'drills'} due`}
+              >
+                +{deck.dueDrillCount}d
+              </span>
+            ) : null}
           </dd>
         </div>
 

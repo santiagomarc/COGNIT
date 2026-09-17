@@ -26,8 +26,8 @@ type AppRailProps = {
  *  1. **It occupies a column rather than floating.** Expanding widens the
  *     column and reflows the page beside it; nothing is ever underneath it, so
  *     no page has to reserve clearance for it (F-03).
- *  2. **Every destination is real.** Deck index, search, account. Nothing here
- *     is a placeholder for a route that has not been built.
+ *  2. **Every destination is real.** Deck index, statistics, search, account.
+ *     Nothing here is a placeholder for a route that has not been built.
  *  3. **It is desktop-only.** Mobile gets a header breadcrumb and the account
  *     sheet — and no bottom bar of any kind, so the study route's grade deck
  *     has nothing floating above it.
@@ -40,6 +40,7 @@ export function AppRail({ email }: AppRailProps) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
   const onIndex = pathname === '/dashboard';
+  const onStats = pathname.startsWith('/dashboard/stats');
   // A chevron is inside §6's allowlist; a panel glyph is not.
   const ExpandIcon = expanded ? ChevronsLeft : ChevronsRight;
 
@@ -66,6 +67,24 @@ export function AppRail({ email }: AppRailProps) {
           <span />
         </span>
         <span className="rail__label">Decks</span>
+      </Link>
+
+      <Link
+        href="/dashboard/stats"
+        className="rail__btn"
+        aria-current={onStats ? 'page' : undefined}
+        title="Statistics"
+      >
+        {/*
+         * Same reasoning as the index mark: no invented metaphor. Three bars
+         * of rising height is the page's own histogram in miniature.
+         */}
+        <span className="rail__bars" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="rail__label">Stats</span>
       </Link>
 
       <button

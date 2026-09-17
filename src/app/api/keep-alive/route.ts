@@ -1,4 +1,5 @@
 // src/app/api/keep-alive/route.ts
+import { timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/lib/database.types';
@@ -7,6 +8,14 @@ import { logger } from '@/lib/logger';
 
 // Force this route to always fetch fresh data, skipping Next.js caching
 export const dynamic = 'force-dynamic';
+
+/** Length-guarded constant-time compare: `!==` leaks the first differing byte's position. */
+function constantTimeEquals(a: string, b: string) {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  if (left.length !== right.length) return false;
+  return timingSafeEqual(left, right);
+}
 
 export async function GET(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET;
@@ -24,7 +33,7 @@ export async function GET(request: NextRequest) {
   if (cronSecret) {
     const authHeader = request.headers.get('authorization');
     const expectedAuth = `Bearer ${cronSecret}`;
-    if (!authHeader || authHeader !== expectedAuth) {
+    if (!authHeader || !constantTimeEquals(authHeader, expectedAuth)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

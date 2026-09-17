@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { Kbd } from '@/components/ui/Kbd';
 import type { StudyGrade } from '@/lib/sm2';
+import { RichText } from '@/components/ui/shared/RichText';
 
 type MCQModeCard = {
   id: string;
@@ -163,7 +164,7 @@ export function MCQMode({
           <div className="relative flex min-h-[9rem] items-center justify-center px-6 py-8 text-center sm:px-10">
             <CornerBrackets />
             <p className="mx-auto max-w-[34ch] text-balance font-serif text-[clamp(2.1rem,3.3vw,2.85rem)] leading-[1.25] tracking-[-0.02em] text-ink">
-              {prompt}
+              <RichText text={prompt} />
             </p>
           </div>
 
@@ -197,7 +198,7 @@ export function MCQMode({
                   className="opt"
                 >
                   <Kbd className="mt-[3px] shrink-0">{index + 1}</Kbd>
-                  <span className="flex-1 text-[14px] leading-[1.5]">{option}</span>
+                  <span className="flex-1 text-[14px] leading-[1.5]"><RichText text={option} /></span>
                   {result === 'correct' ? (
                     <span className="mt-[3px] shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-mastered)]">
                       Correct

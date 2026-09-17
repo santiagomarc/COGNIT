@@ -92,6 +92,8 @@ export type Diagnostic = {
   schedule: { step: Step; nextDueAt: string };
   /** What the student said before the check, echoed so the result can show the calibration line. */
   confidence: Confidence | null;
+  /** Outside claims already turned into cards, by claim index (improvement plan §3.3). */
+  absorbedCardIds: Record<number, string>;
 };
 
 /** The answer key and the cards, returned with the check — never before it. */

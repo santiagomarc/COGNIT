@@ -249,7 +249,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 id="card-count"
                 value={maxCardChoice}
                 onChange={(e) => setMaxCardChoice(e.target.value)}
-                className="h-[32px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-surface px-2 text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className="h-[32px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-surface px-2 text-base sm:text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>
