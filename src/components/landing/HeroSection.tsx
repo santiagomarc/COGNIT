@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
+import Link, { useLinkStatus } from 'next/link';
+import { ArrowRight, Loader2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -20,6 +21,36 @@ const SPECIMEN_DECKS = [
   { name: 'Data Structures', cards: 18, due: 0, mastery: 88, state: 'var(--state-mastered)' },
   { name: 'Linear Algebra', cards: 31, due: 3, mastery: 41, state: 'var(--state-learning)' },
 ];
+
+/**
+ * The body of a CTA link, with the navigation's pending state made visible.
+ *
+ * Next disables `<Link>` prefetching in development, so a click there waits
+ * on the route being compiled and fetched — up to a second — with no feedback,
+ * which reads as the page freezing. Production prefetches from the viewport
+ * and lands in ~20ms, but a slow connection on a cold visit still has a gap.
+ * `useLinkStatus` reports the in-flight navigation; the trailing icon slot
+ * becomes a spinner and the label dims. The spinner's 100ms fade-in delay is
+ * what stops it flashing on navigations that are already instant.
+ *
+ * Must render *inside* the `<Link>`: that is where `useLinkStatus` reads from.
+ */
+function CtaBody({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+  const { pending } = useLinkStatus();
+
+  return (
+    <>
+      <span className={pending ? 'opacity-70' : undefined}>{children}</span>
+      {pending ? (
+        <span className="inline-flex animate-in fade-in fill-mode-both delay-100" aria-hidden="true">
+          <Loader2 className="h-4 w-4 animate-spin" />
+        </span>
+      ) : (
+        icon
+      )}
+    </>
+  );
+}
 
 /**
  * The landing hero (design system §1.1, §9.2).
@@ -89,12 +120,15 @@ export function HeroSection() {
               {/* The page's one filled button (§7.2). */}
               <Button asChild variant="primary" size="lg" className="w-full px-8 text-base sm:w-auto">
                 <Link href="/login?mode=signup">
-                  Start free
-                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  <CtaBody icon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}>
+                    Start free
+                  </CtaBody>
                 </Link>
               </Button>
               <Button asChild size="lg" className="w-full px-8 text-base sm:w-auto">
-                <Link href="/login?mode=login">Sign in</Link>
+                <Link href="/login?mode=login">
+                  <CtaBody>Sign in</CtaBody>
+                </Link>
               </Button>
             </div>
           </FadeInUp>
