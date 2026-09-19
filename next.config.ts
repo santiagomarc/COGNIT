@@ -19,6 +19,15 @@ const nextConfig: NextConfig = {
     // Its default 10MB cap silently truncates the stream, which surfaces as an
     // uncaught "Unexpected end of form" and a generic client-side failure.
     proxyClientMaxBodySize: '12mb',
+    /*
+     * How long the client router keeps a dynamic page it has already rendered.
+     * The default is zero, so back/forward and re-visiting a deck all pay a
+     * fresh server render. Thirty seconds makes returning to a page you just
+     * left instant. It is safe because every mutating server action calls
+     * `revalidatePath`, which purges this cache — a write is never followed by
+     * a stale read.
+     */
+    staleTimes: { dynamic: 30 },
   },
   async headers() {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://*.supabase.co';

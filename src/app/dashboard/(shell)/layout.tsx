@@ -1,20 +1,17 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 
-import { getDueByDeck, getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { getSessionUser } from '@/lib/supabase/session';
 import { AccountControl } from '@/components/ui/shared/AccountControl';
 import { AmbientField } from '@/components/ui/shared/AmbientField';
 import { AppRail } from '@/components/ui/shared/AppRail';
-import { Breadcrumb } from '@/components/ui/shared/Breadcrumb';
-import { CommandPalette } from '@/components/ui/shared/CommandPalette';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
-import { removeDeckTagFromTitle } from '@/lib/deck-tags';
-
-/**
- * How many decks the rail's palette and breadcrumb can name. Past this the
- * breadcrumb falls back to "Deck" and the palette stops listing — both degrade
- * to something honest rather than to a blank.
- */
-const PALETTE_DECK_CAP = 500;
+import {
+  ShellBreadcrumb,
+  ShellBreadcrumbFallback,
+  ShellCommandPalette,
+  ShellCommandPaletteFallback,
+} from '@/components/ui/shared/ShellNav';
 
 /**
  * Chromed routes — the deck index and deck detail (design system §8).
@@ -29,6 +26,14 @@ const PALETTE_DECK_CAP = 500;
  * accident — which is what let the old dock keep a Dashboard link on a paused
  * quiz that bypassed `requestQuit()` (F-01).
  *
+ * The layout waits for exactly one thing before the frame goes out: the
+ * session, which `getSessionUser` verifies locally from the cookie. The deck
+ * list the breadcrumb and palette need is read behind the two Suspense
+ * boundaries in the header, so the rail, the header bar and the page's own
+ * skeleton reach the browser on the first flush and the titles stream in
+ * after. Reading it up here used to hold back the entire response — skeleton
+ * included — for the layout's queries.
+ *
  * The two dialogs are mounted here rather than on the page so every chromed
  * route can reach them. That also repairs a real gap: `CreateDeckModal` used to
  * be rendered inside the due-now band, which is not rendered when the account
@@ -36,50 +41,11 @@ const PALETTE_DECK_CAP = 500;
  * open event at a component that was not mounted.
  */
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
-  // Shared with the page below through React.cache: one client, one auth
-  // round-trip and one due-cards read per request, not one per layer.
-  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
+  const user = await getSessionUser();
 
   if (!user) {
     redirect('/login');
   }
-
-  const [deckResult, dueRows] = await Promise.all([
-    supabase
-      .from('decks')
-      .select('id, title')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(PALETTE_DECK_CAP),
-    getDueByDeck(user.id),
-  ]);
-
-  const dueByDeck = new Map(dueRows.map((row) => [row.deck_id, row.due_count]));
-
-  const decks = (deckResult.data ?? []).map((deck) => ({
-    id: deck.id,
-    title: removeDeckTagFromTitle(deck.title),
-    dueCount: dueByDeck.get(deck.id) ?? 0,
-  }));
-
-  const totalDue = decks.reduce((sum, deck) => sum + deck.dueCount, 0);
-  const mostDue = decks.reduce<(typeof decks)[number] | null>(
-    (best, deck) => (best === null || deck.dueCount > best.dueCount ? deck : best),
-    null
-  );
-
-  /*
-   * "Start session" has to go somewhere true. With work outstanding that is the
-   * deck holding the most of it; with none it is study-ahead on the most
-   * recently touched deck — the same fallback the due-now band uses. With no
-   * decks at all the command is not offered, rather than offered and dead.
-   */
-  const sessionHref =
-    mostDue && mostDue.dueCount > 0
-      ? `/dashboard/${mostDue.id}/study`
-      : decks[0]
-        ? `/dashboard/${decks[0].id}/study?scope=include_reviewed`
-        : null;
 
   return (
     <div className="flex min-h-dvh">
@@ -91,19 +57,23 @@ export default async function ShellLayout({ children }: { children: React.ReactN
       */}
       <AmbientField />
 
-      <AppRail email={user.email ?? null} />
+      <AppRail email={user.email} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-[var(--bg)]">
           <div className="flex h-12 items-center justify-between gap-4 px-4 md:px-6">
-            <Breadcrumb decks={decks} />
+            <Suspense fallback={<ShellBreadcrumbFallback />}>
+              <ShellBreadcrumb userId={user.id} />
+            </Suspense>
 
             <div className="flex shrink-0 items-center gap-2">
-              <CommandPalette decks={decks} sessionHref={sessionHref} totalDue={totalDue} />
+              <Suspense fallback={<ShellCommandPaletteFallback />}>
+                <ShellCommandPalette userId={user.id} />
+              </Suspense>
               {/* Desktop keeps the account in the rail foot (§8); this is the
                   mobile anchor for the same sheet. */}
               <div className="md:hidden">
-                <AccountControl email={user.email ?? null} placement="header" />
+                <AccountControl email={user.email} placement="header" />
               </div>
             </div>
           </div>

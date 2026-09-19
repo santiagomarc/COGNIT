@@ -4,8 +4,12 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 type BreadcrumbProps = {
-  /** Titles already stripped of their `[tag]` prefix by the caller. */
-  decks: { id: string; title: string }[];
+  /**
+   * Titles already stripped of their `[tag]` prefix by the caller. Null while
+   * the shell is still loading them — the trail keeps its shape and shows a
+   * placeholder where the title will land, rather than the wrong word.
+   */
+  decks: { id: string; title: string }[] | null;
 };
 
 /**
@@ -25,9 +29,10 @@ export function Breadcrumb({ decks }: BreadcrumbProps) {
   // Named chromed routes sit beside the deck ids; a UUID is a deck.
   const isStats = segment === 'stats';
   const deckId = segment && !isStats ? segment : undefined;
-  const deck = deckId ? decks.find((entry) => entry.id === deckId) : undefined;
+  const deck = deckId && decks ? decks.find((entry) => entry.id === deckId) : undefined;
   const trailLabel = isStats ? 'Statistics' : deck?.title ?? 'Deck';
   const hasTrail = Boolean(deckId) || isStats;
+  const trailPending = Boolean(deckId) && decks === null;
 
   return (
     <nav aria-label="Breadcrumb" className="min-w-0">
@@ -56,7 +61,15 @@ export function Breadcrumb({ decks }: BreadcrumbProps) {
               <span aria-current="page" className="block truncate text-ink">
                 {/* A deck outside the shell's list — past its row cap, or one
                     just deleted — still gets a trail rather than a blank. */}
-                {trailLabel}
+                {trailPending ? (
+                  <span
+                    role="status"
+                    aria-label="Loading deck title"
+                    className="glass-skeleton inline-block h-3.5 w-24 rounded-sm align-middle"
+                  />
+                ) : (
+                  trailLabel
+                )}
               </span>
             </li>
           </>

@@ -43,6 +43,8 @@ type PaletteRow = {
   hint?: string;
   /** Second line — only search results have one. */
   detail?: string;
+  /** Where `run` navigates, when it navigates — prefetched under the cursor. */
+  href?: string;
   run: () => void;
 };
 
@@ -197,6 +199,7 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
           key: command.id,
           label: command.label,
           hint: command.hint,
+          href: command.href,
           run: () => {
             if (command.href) {
               close();
@@ -219,14 +222,16 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
     }
 
     for (const card of results) {
+      const href = `/dashboard/${card.deck_id}`;
       flat.push({
         key: `result:${card.id}`,
         label: card.front,
         detail: card.back,
         hint: `${removeDeckTagFromTitle(card.deck_title)} · ${Math.round(card.similarity * 100)}%`,
+        href,
         run: () => {
           close();
-          router.push(`/dashboard/${card.deck_id}`);
+          router.push(href);
         },
       });
     }
@@ -238,6 +243,19 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
   useEffect(() => {
     setActiveIndex((index) => (index >= rows.length ? Math.max(rows.length - 1, 0) : index));
   }, [rows.length]);
+
+  /*
+   * Warm the destination under the cursor. Rows navigate with `router.push`,
+   * which — unlike `<Link>` — prefetches nothing on its own, so without this
+   * every jump from the palette paid a full server round-trip before even the
+   * skeleton appeared. Hover and the arrow keys both move the cursor, so one
+   * effect covers both, and the router de-duplicates repeat requests.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const href = rows[activeIndex]?.href;
+    if (href) router.prefetch(href);
+  }, [open, rows, activeIndex, router]);
 
   useEffect(() => {
     if (!open) return;

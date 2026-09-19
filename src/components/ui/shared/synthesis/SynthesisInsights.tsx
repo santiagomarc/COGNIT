@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { cache } from 'react';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { Button } from '@/components/ui/button';
 import { StateTick } from '@/components/ui/shared/StateTick';
 import { MAX_SESSION_CARD_COUNT } from '@/lib/study';
@@ -10,10 +10,10 @@ import { FORMAT_LABEL, VERDICT_LABEL, VERDICT_TICK, formatAge, formatClock } fro
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
 
 // Both panels render under their own Suspense boundary; `cache` makes the
-// second one reuse the first's reads within the request.
+// second one reuse the first's reads within the request — and the client and
+// identity come from the request-wide cache, so this adds no auth call of its own.
 const loadForCurrentUser = cache(async (deckId: string): Promise<SynthesisInsights | null> => {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
   if (!user) return null;
   return loadSynthesisInsights(supabase, { deckId, userId: user.id });
 });

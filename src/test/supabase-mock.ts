@@ -52,7 +52,14 @@ export function createSupabaseMock(options: MockOptions = {}) {
   };
 
   return {
-    auth: { getUser: vi.fn(async () => ({ data: { user }, error: null })) },
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user }, error: null })),
+      // The local-verification path `getSessionUser` takes: a signed-out client
+      // yields no data, a signed-in one yields the token's claims.
+      getClaims: vi.fn(async () =>
+        user ? { data: { claims: { sub: user.id } }, error: null } : { data: null, error: null }
+      ),
+    },
     from: vi.fn(builder),
     rpc: vi.fn(async (name: string) => rpcs[name] ?? { data: null, error: null }),
     /** Test helper — payloads passed to .insert(), keyed by table. */
