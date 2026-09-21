@@ -1,6 +1,6 @@
 import {z} from "zod";
 import { DECK_TAG_VALUES } from '@/lib/deck-tags';
-import { MAX_ANSWER_WORDS, countWords, responseText } from '@/lib/synthesis/text';
+import { countWords, maxWordsFor, responseText } from '@/lib/synthesis/text';
 
 export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned', 'synthesis_claim']);
 
@@ -213,12 +213,12 @@ export type LogQuizResultInput = z.infer<typeof logQuizResultSchema>;
 
 /* ═══════════ Micro-synthesis (COGNIT_MICRO_SYNTHESIS_SPEC.md §9.1) ═══════════ */
 
-export const synthesisFormatSchema = z.enum(['causal', 'counterfactual', 'comparative']);
+export const synthesisFormatSchema = z.enum(['causal', 'counterfactual', 'comparative', 'evaluate', 'apply', 'distinguish', 'elaborate']);
 
 export const generateSynthesisDrillsSchema = z.object({
   deck_id: z.uuid({ message: 'Invalid deck id' }),
   count: z.number().int().min(1).max(5).default(3),
-  formats: z.array(synthesisFormatSchema).min(1).max(3).default(['causal', 'counterfactual', 'comparative']),
+  formats: z.array(synthesisFormatSchema).min(1).max(7).default(['causal', 'counterfactual', 'comparative']),
   /** Restrict clustering to one topic tag; omitted = whole deck. */
   focus_topic: z.string().trim().min(2).max(80).optional(),
 });
@@ -230,17 +230,33 @@ const synthesisOutlineResponseSchema = z.object({
   claim: z.string().trim().min(1, { message: 'State your claim' }).max(200),
   mechanisms: z.tuple([z.string().trim().max(220), z.string().trim().max(220)]),
   tradeoff: z.string().trim().max(220),
+  /** The optional evidence slot (plan D12). */
+  evidence: z.string().trim().max(220).optional(),
 });
 
 const synthesisFreeResponseSchema = z.object({
   text: z.string().trim().min(1, { message: 'Write an answer' }).max(1_500),
 });
 
+const synthesisPlanPointSchema = z.object({
+  claim: z.string().trim().max(220),
+  mechanism: z.string().trim().max(300),
+  evidence: z.string().trim().max(220),
+  limit: z.string().trim().max(220),
+});
+
+/** An essay plan (plan D15): thesis, three points, conclusion. Only the thesis is required to submit. */
+const synthesisPlanResponseSchema = z.object({
+  thesis: z.string().trim().min(1, { message: 'State your thesis' }).max(300),
+  points: z.tuple([synthesisPlanPointSchema, synthesisPlanPointSchema, synthesisPlanPointSchema]),
+  conclusion: z.string().trim().max(300),
+});
+
 export const checkSynthesisAttemptSchema = z.object({
   deck_id: z.uuid({ message: 'Invalid deck id' }),
   drill_id: z.uuid({ message: 'Invalid drill id' }),
-  mode: z.enum(['outline', 'free']),
-  response: z.union([synthesisOutlineResponseSchema, synthesisFreeResponseSchema]),
+  mode: z.enum(['outline', 'free', 'plan']),
+  response: z.union([synthesisOutlineResponseSchema, synthesisFreeResponseSchema, synthesisPlanResponseSchema]),
   duration_ms: z.number().int().min(0).default(0),
   /** Pull contradicted cards forward to tomorrow's queue (spec §8.4). */
   pull_forward: z.boolean().default(true),
@@ -254,13 +270,18 @@ export const checkSynthesisAttemptSchema = z.object({
   client_attempt_id: z.uuid({ message: 'Invalid attempt key' }).optional(),
   /** The attempt this one revises — the one in-place revise after a partial or contradicted verdict (audit F2). */
   revision_of: z.uuid({ message: 'Invalid attempt id' }).optional(),
+  /** Which wording the student answered: 0 = the original, 1–2 = a variant (plan D6). */
+  prompt_variant: z.number().int().min(0).max(2).default(0),
+  /** The exemplar was shown before answering (the deck's first drill, plan D14); recorded, never graded differently. */
+  worked_example: z.boolean().default(false),
 }).superRefine((value, ctx) => {
-  const isOutline = 'claim' in value.response;
-  if (isOutline !== (value.mode === 'outline')) {
+  const shape = 'thesis' in value.response ? 'plan' : 'claim' in value.response ? 'outline' : 'free';
+  if (shape !== value.mode) {
     ctx.addIssue({ code: 'custom', path: ['mode'], message: 'Mode does not match the answer shape' });
   }
-  if (countWords(responseText(value.response)) > MAX_ANSWER_WORDS) {
-    ctx.addIssue({ code: 'custom', path: ['response'], message: `Keep it under ${MAX_ANSWER_WORDS} words` });
+  const limit = maxWordsFor(value.mode);
+  if (countWords(responseText(value.response)) > limit) {
+    ctx.addIssue({ code: 'custom', path: ['response'], message: `Keep it under ${limit} words` });
   }
 });
 
@@ -272,6 +293,35 @@ export const archiveSynthesisDrillSchema = z.object({
 });
 
 export type ArchiveSynthesisDrillInput = z.infer<typeof archiveSynthesisDrillSchema>;
+
+/** A plan question over 4–8 cards of one topic (plan D15); from a pasted question when `question_id` is given (D16). */
+export const generatePlanQuestionsSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  count: z.number().int().min(1).max(3).default(1),
+  focus_topic: z.string().trim().min(2).max(80).optional(),
+  question_id: z.uuid({ message: 'Invalid question id' }).optional(),
+});
+export type GeneratePlanQuestionsInput = z.input<typeof generatePlanQuestionsSchema>;
+
+/** Past-paper questions, pasted one per line (plan D16). */
+export const ingestQuestionsSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  questions: z.array(z.string().trim().min(10, { message: 'A question needs at least ten characters' }).max(600)).min(1).max(20),
+});
+export type IngestQuestionsInput = z.infer<typeof ingestQuestionsSchema>;
+
+export const deleteQuestionSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  question_id: z.uuid({ message: 'Invalid question id' }),
+});
+export type DeleteQuestionInput = z.infer<typeof deleteQuestionSchema>;
+
+/** The deck's exam date as an ISO date-time, or null to clear it (plan D19). */
+export const setExamDateSchema = z.object({
+  deck_id: z.uuid({ message: 'Invalid deck id' }),
+  exam_at: z.iso.datetime({ offset: true, message: 'Invalid date' }).nullable(),
+});
+export type SetExamDateInput = z.infer<typeof setExamDateSchema>;
 
 export const rateSynthesisAttemptSchema = z.object({
   deck_id: z.uuid({ message: 'Invalid deck id' }),

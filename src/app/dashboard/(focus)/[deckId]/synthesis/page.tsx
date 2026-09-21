@@ -20,8 +20,22 @@ type SynthesisPageProps = {
     drill?: string | string[];
     pull?: string | string[];
     from?: string | string[];
+    /** `sprint`: a countdown, results withheld until the end (plan D13). */
+    mode?: string | string[];
+    minutes?: string | string[];
+    /** `plan`: essay-plan questions instead of drills (plan D15). */
+    kind?: string | string[];
   }>;
 };
+
+const SPRINT_MINUTES_DEFAULT = 8;
+const SPRINT_MINUTES_MAX = 30;
+
+function normaliseMinutes(value: string | string[] | undefined): number {
+  const parsed = Number.parseInt(first(value) ?? '', 10);
+  if (!Number.isFinite(parsed)) return SPRINT_MINUTES_DEFAULT;
+  return Math.min(SPRINT_MINUTES_MAX, Math.max(1, parsed));
+}
 
 const DEFAULT_COUNT = 3;
 const MAX_COUNT = 5;
@@ -60,6 +74,8 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
 
   const pinned = first(resolved?.drill);
   const fromStudy = first(resolved?.from) === 'study';
+  const sessionMode = first(resolved?.mode) === 'sprint' ? 'sprint' : 'drill';
+  const kind = first(resolved?.kind) === 'plan' ? 'plan' : 'drill';
 
   // The ownership check and the queue read are independent (RLS already
   // scopes the drills); the deck row only decides `notFound` (audit P2).
@@ -75,6 +91,7 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
       userId: user.id,
       count: fromStudy ? 1 : normaliseCount(resolved?.count),
       drillId: pinned && UUID_PATTERN.test(pinned) ? pinned : null,
+      kind,
     }),
   ]);
 
@@ -99,9 +116,13 @@ export default async function DeckSynthesisPage({ params, searchParams }: Synthe
       drills={drills}
       anchorsByDrill={anchorsByDrill}
       lastAttemptByDrill={queue.lastAttemptByDrill}
+      historyByDrill={queue.historyByDrill}
+      workedExample={sessionMode === 'sprint' || kind === 'plan' ? null : queue.workedExample}
       pullForward={normaliseBoolean(resolved?.pull, true)}
       activeDrillCount={queue.activeDrillCount}
       from={fromStudy ? 'study' : undefined}
+      sessionMode={sessionMode}
+      sprintMinutes={normaliseMinutes(resolved?.minutes)}
     />
   );
 }

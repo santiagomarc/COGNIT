@@ -7,13 +7,44 @@
  * the action, as one filtered update).
  */
 
-import type { CapstoneDrillCandidate, Confidence, DrillVerdict, Step, SynthesisDrill } from '@/lib/synthesis/types';
+import type { CapstoneDrillCandidate, Confidence, DrillKind, DrillVerdict, Step, SynthesisDrill, SynthesisFormat } from '@/lib/synthesis/types';
 
 /** index = step, value = days until the next due after a `sound` verdict. */
 export const LADDER_DAYS = [0, 1, 2] as const;
+/** Plans are longer and rarer: a sound plan comes back in 1, then 3, then 7 days (plan D15). */
+export const PLAN_LADDER_DAYS = [1, 3, 7] as const;
+/** Inside three days of the exam every sound drill is back within the day (plan D19). */
+export const FINAL_DAYS_LADDER = [0, 0.5, 1] as const;
+/** More than two weeks out the sprint cadence is too tight; the ladder stretches. */
+export const DISTANT_LADDER_DAYS = [1, 3, 7] as const;
+export const FINAL_DAYS_THRESHOLD = 3;
+export const SPRINT_THRESHOLD_DAYS = 14;
+
+/**
+ * Which ladder a drill walks, given the deck's exam date (plan D19). No
+ * date, or a date already past, means the sprint cadence — the default the
+ * feature launched with.
+ */
+export function ladderFor(kind: DrillKind, daysToExam: number | null): readonly number[] {
+  if (kind === 'plan') return PLAN_LADDER_DAYS;
+  if (daysToExam === null || daysToExam < 0) return LADDER_DAYS;
+  if (daysToExam <= FINAL_DAYS_THRESHOLD) return FINAL_DAYS_LADDER;
+  if (daysToExam <= SPRINT_THRESHOLD_DAYS) return LADDER_DAYS;
+  return DISTANT_LADDER_DAYS;
+}
+
+/** Whole days from `now` to the exam, negative once it has passed, null without a date. */
+export function daysToExam(examAt: string | null | undefined, now: Date): number | null {
+  if (!examAt) return null;
+  const at = Date.parse(examAt);
+  if (Number.isNaN(at)) return null;
+  return Math.ceil((at - now.getTime()) / (24 * 60 * 60_000));
+}
 export const MAX_STEP: Step = 2;
 export const PARTIAL_RETRY_HOURS = 24;
 export const CONTRADICTED_RETRY_HOURS = 12;
+export const PLAN_PARTIAL_RETRY_HOURS = 48;
+export const PLAN_CONTRADICTED_RETRY_HOURS = 24;
 /** A student who was *sure* and was not sound retries sooner: overconfidence is the thing to fix first. */
 export const OVERCONFIDENT_RETRY_HOURS = 12;
 
@@ -35,24 +66,30 @@ export function nextSchedule(
   step: Step,
   verdict: DrillVerdict,
   now: Date,
-  options: { confidence?: Confidence | null } = {},
+  options: { confidence?: Confidence | null; kind?: DrillKind; daysToExam?: number | null } = {},
 ): { step: Step; nextDueAt: Date } {
+  const plan = options.kind === 'plan';
+  const ladder = ladderFor(options.kind ?? 'drill', options.daysToExam ?? null);
   switch (verdict) {
     case 'sound': {
       const next = toStep(step + 1);
-      return { step: next, nextDueAt: new Date(now.getTime() + LADDER_DAYS[next] * DAY_MS) };
+      return { step: next, nextDueAt: new Date(now.getTime() + ladder[next] * DAY_MS) };
     }
     case 'partial': {
-      const hours = options.confidence === 3 ? OVERCONFIDENT_RETRY_HOURS : PARTIAL_RETRY_HOURS;
+      const base = plan ? PLAN_PARTIAL_RETRY_HOURS : PARTIAL_RETRY_HOURS;
+      const hours = options.confidence === 3 ? Math.min(base, OVERCONFIDENT_RETRY_HOURS) : base;
       return { step: toStep(step), nextDueAt: new Date(now.getTime() + hours * HOUR_MS) };
     }
     case 'contradicted':
-      return { step: toStep(step - 1), nextDueAt: new Date(now.getTime() + CONTRADICTED_RETRY_HOURS * HOUR_MS) };
+      return { step: toStep(step - 1), nextDueAt: new Date(now.getTime() + (plan ? PLAN_CONTRADICTED_RETRY_HOURS : CONTRADICTED_RETRY_HOURS) * HOUR_MS) };
     case 'off_target':
       // Nothing was learned; the drill stays due and an in-place retry is offered.
       return { step: toStep(step), nextDueAt: new Date(now.getTime()) };
   }
 }
+
+/** Formats that demand a judgement or a construction rather than a chain. */
+const HARDER_FORMATS: ReadonlySet<SynthesisFormat> = new Set(['evaluate', 'apply', 'distinguish', 'elaborate']);
 
 export type QueueCandidate = {
   drill: SynthesisDrill;
@@ -74,14 +111,21 @@ export function orderQueue(input: {
 }): SynthesisDrill[] {
   const random = input.random ?? Math.random;
   const nowMs = input.now.getTime();
+  const active = input.candidates.filter((candidate) => candidate.drill.status === 'active' && candidate.drill.cardIds.length >= 2);
 
-  const scored = input.candidates
-    .filter((candidate) => candidate.drill.status === 'active' && candidate.drill.cardIds.length >= 2)
+  // Difficulty preference (plan D18): once a drill has been sound twice
+  // (step 2), a harder drill on any of the same cards is preferred over it —
+  // the relation is known; the next thing to test is a judgement about it.
+  const masteredCards = new Set(active.filter((candidate) => candidate.drill.step >= MAX_STEP).flatMap((candidate) => candidate.drill.cardIds));
+  const isHarder = (drill: SynthesisDrill) => drill.bloom === 'evaluate' || drill.bloom === 'create' || HARDER_FORMATS.has(drill.format);
+
+  const scored = active
     .map((candidate) => {
       const due = new Date(candidate.drill.nextDueAt).getTime() <= nowMs;
       const relearning = candidate.anchorStates.some((state) => state === 'relearning');
       const pinned = input.pinnedDrillId != null && candidate.drill.id === input.pinnedDrillId;
-      const priority = (pinned ? -10 : 0) + (due ? 0 : 1) - (relearning ? 0.5 : 0);
+      const stepUp = candidate.drill.step < MAX_STEP && isHarder(candidate.drill) && candidate.drill.cardIds.some((id) => masteredCards.has(id));
+      const priority = (pinned ? -10 : 0) + (due ? 0 : 1) - (relearning ? 0.5 : 0) - (stepUp ? 0.25 : 0);
       return { drill: candidate.drill, priority, tiebreak: random() };
     })
     .sort((a, b) =>

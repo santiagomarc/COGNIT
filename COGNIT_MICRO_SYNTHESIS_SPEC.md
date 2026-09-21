@@ -1,7 +1,7 @@
 # Cognit — Micro-Synthesis & Argument Outlining
 
 **Technical specification · Rev. B.1 — supersedes `COGNIT_ESSAY_ENGINE_SPEC.md` (Rev. A)**
-**Status:** Phases 0–3 implemented (B.1 adjustments of 2026-09-12: no readiness gate, exam-sprint ladder, AI-verified outside claims; Phase 2 capstone and dashboard reading the same day; Phase 3 — the audit's fix week, correctness, performance, session and feature items — on 2026-09-15, see `COGNIT_MICRO_SYNTHESIS_AUDIT.md`) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`, Phases 2–3 on `983830d`
+**Status:** Phases 0–4 implemented (B.1 adjustments of 2026-09-12; Phase 2 capstone and dashboard reading; Phase 3 from `COGNIT_MICRO_SYNTHESIS_AUDIT.md` on 2026-09-15; Phase 4 — plans, formats, grading integrity, the live gates — from `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` via `COGNIT_MICRO_SYNTHESIS_EXECUTION_PLAN.md` on 2026-09-21, §12.2d) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`; Phase 4 on `dbe01eb`
 **Applies to:** Next.js 16 (App Router) · React 19 · TypeScript strict · Supabase Postgres + pgvector · Gemini 2.5 Flash via `@google/generative-ai` 0.24 · Tailwind v4 · Vitest 4
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C), `COGNIT_HANDOFF.md`
 
@@ -1400,6 +1400,47 @@ Deliberately not done: card-text sanitisation for the prompts (audit R9 — the 
 the server-computed verdict already bounds the damage), the exam-date cadence (F6, a deck
 column and header UI beyond this feature), drill edit / regenerate (F7), voice input (F8)
 and shared-deck drills (F9).
+
+### 12.2d Phase 4 — Audit II executed (2026-09-21)
+
+Executed from `COGNIT_MICRO_SYNTHESIS_EXECUTION_PLAN.md`; every decision there (D1–D19) is
+now code. Gate: `npx tsc --noEmit` clean · `npm run lint` clean · `npm test` **407 passed /
+34 files** · `npm run build` clean · `npm run ai:gate` (one production-config call, a drill and
+a plan generated live and checked against their own keys) and `npm run ai:calibrate` (the §11.3
+set, 30 answers × 3 runs) **both pass** on `gemini-3.5-flash-lite`: per-link agreement 99.1 %,
+run-to-run 98.6 %, contradiction precision 100 %, recall 100 %, zero contradictions on
+outside-knowledge answers, verified flags 27/27, injection 6/6, p50 1.9 s.
+
+Three migrations, none applied (owner's call, deploy order load-bearing): `202609210900`
+(variants, bloom, scenario, seven formats), `202609210910` (plans, band, question bank, the
+RPC writing `band`), `202609210920` (`decks.exam_at`). `npm run verify:deployment` probes
+every new column by name; `production-assertions.sql` 16–17 cover them.
+
+What this document said that the code now does differently, all from the audit:
+
+- **P0** — `jsonGenerationConfig` is model-family-aware: no `thinkingBudget` on a Gemini 3.x
+  model (it is a 400), temperature 1.0 there, `thinkingLevel` on request; generation may run
+  on `GEMINI_MODEL_GENERATION`.
+- **§7.4** — a `covered` link needs evidence the server can locate (verbatim or fuzzy), else
+  `partial`; `sound` = no link missing and every *core* link covered; conditions are core.
+- **§6.2 / §6.3** — keys carry `kind` and `core`; three cards need three links, every card
+  cited, one boundary; exam stems rotate; two graded exemplars in the instruction; two
+  prompt variants per drill served in rotation; `bloom` tagged; `prompt_version` recorded.
+- **§4 / Appendix B** — four new formats (`evaluate`, `apply` with a scenario, `distinguish`,
+  `elaborate`), an optional evidence slot, sprint mode, a worked example on a deck's first
+  drill, a revision diff and a per-drill history row.
+- **New surface — essay plans** (`kind = 'plan'`): a set question over 4–8 cards of a topic
+  or a pasted past-paper question, answered as thesis · three points (claim, because,
+  evidence, limit) · conclusion, checked twice and merged conservatively, graded in bands
+  (*developing / secure / strong*) on a 1 / 3 / 7-day ladder; the question bank maps pasted
+  questions to cards by embedding and names the concepts the deck lacks.
+- **§8** — a verified contradiction schedules a repair drill on the card (one open per card,
+  due 48 h); contradictions carry a misconception kind; the deck's exam date compresses or
+  stretches the ladder; Insights gains *Drill signals* (links covered per day, sound-rate by
+  format, mistakes by kind).
+
+Deliberately not done, as the plan's D20 says: the concept map, cross-deck drills, voice
+input, sharing, the `@google/genai` migration and the read-RPC.
 
 ### 12.3 Decisions resolved by B.1
 

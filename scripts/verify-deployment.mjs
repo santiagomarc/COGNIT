@@ -71,9 +71,11 @@ console.log(cols.error
 // produces. The Phase 3 columns are probed by name so a half-applied
 // migration set fails here rather than at the first check.
 const SYNTHESIS_PROBES = [
-  ['synthesis_drills', 'id, link_count, last_links_covered'],
-  ['synthesis_attempts', 'id, client_attempt_id, confidence, revision_of'],
+  // Phase 3 (202609150900) and Phase 4 (202609210900, 202609210910) columns, by name.
+  ['synthesis_drills', 'id, link_count, last_links_covered, prompt_variants, bloom, scenario, kind, question_text, command_word'],
+  ['synthesis_attempts', 'id, client_attempt_id, confidence, revision_of, band'],
   ['synthesis_attempt_feedback', 'id, rating'],
+  ['synthesis_questions', 'id, mapped_card_ids, missing_concepts, drill_id'],
   // Absorption provenance (202609170970).
   ['cards', 'id, absorbed_from_attempt_id, absorbed_claim_index'],
 ];

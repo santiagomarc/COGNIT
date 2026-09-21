@@ -4,7 +4,7 @@
  * the database. No RPC — the same trade `loadScheduleBreakdown` makes.
  */
 
-import type { Confidence, DrillReadingRow, DrillVerdict, LinkCoverage, SynthesisReadings, WeakLinkRow } from '@/lib/synthesis/types';
+import type { Confidence, DrillReadingRow, DrillVerdict, LinkCoverage, MisconceptionKind, SynthesisFormat, SynthesisReadings, WeakLinkRow } from '@/lib/synthesis/types';
 
 export type AttemptForInsights = {
   drillId: string;
@@ -13,7 +13,14 @@ export type AttemptForInsights = {
   missingCardIds: string[];
   contradictedCardIds: string[];
   outsideClaimCount: number;
+  verdict?: DrillVerdict;
+  format?: SynthesisFormat;
+  confidence?: Confidence | null;
+  contradictionKinds?: MisconceptionKind[];
 };
+
+export type FormatRateRow = { format: SynthesisFormat; attempts: number; sound: number };
+export type DailyPoint = { date: string; attempts: number; linksCovered: number; linksTotal: number };
 
 export const WEAK_LINK_MIN_SIGNALS = 2;
 
@@ -41,6 +48,7 @@ export function deckReadings(input: { rows: DrillReadingRow[]; now: Date }): Syn
     linksCovered,
     linksTotal,
     lastAttemptAt,
+    plans: { active: 0, due: 0 },
   };
 }
 
@@ -93,4 +101,52 @@ export function aggregateWeakLinks(
   return [...rows.values()]
     .filter((row) => row.missing + row.contradicted >= WEAK_LINK_MIN_SIGNALS)
     .sort((a, b) => b.contradicted - a.contradicted || b.missing - a.missing || (a.lastAt < b.lastAt ? 1 : -1));
+}
+
+/** Attempts and sound verdicts per format (audit U6): which kind of question the student can already answer. */
+export function formatSoundRates(attempts: AttemptForInsights[]): FormatRateRow[] {
+  const rows = new Map<SynthesisFormat, FormatRateRow>();
+  for (const attempt of attempts) {
+    if (!attempt.format || !attempt.verdict || attempt.verdict === 'off_target') continue;
+    const row = rows.get(attempt.format) ?? { format: attempt.format, attempts: 0, sound: 0 };
+    row.attempts += 1;
+    if (attempt.verdict === 'sound') row.sound += 1;
+    rows.set(attempt.format, row);
+  }
+  return [...rows.values()].sort((a, b) => b.attempts - a.attempts);
+}
+
+/** How many verified contradictions of each kind, inside the window (audit G7). */
+export function misconceptionCounts(attempts: AttemptForInsights[], since: Date): Partial<Record<MisconceptionKind, number>> {
+  const sinceIso = since.toISOString();
+  const counts: Partial<Record<MisconceptionKind, number>> = {};
+  for (const attempt of attempts) {
+    if (attempt.createdAt < sinceIso) continue;
+    for (const kind of attempt.contradictionKinds ?? []) counts[kind] = (counts[kind] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * One point per day for the last `days` days (UTC), oldest first: how many
+ * links were covered out of how many asked — the number a sparkline shows
+ * climbing. Days without attempts are present with zeros so the line has a
+ * fixed width.
+ */
+export function dailyLinkSeries(attempts: AttemptForInsights[], now: Date, days = 30): DailyPoint[] {
+  const byDate = new Map<string, DailyPoint>();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - (days - 1)));
+  for (let index = 0; index < days; index += 1) {
+    const day = new Date(start.getTime() + index * 86_400_000);
+    const date = day.toISOString().slice(0, 10);
+    byDate.set(date, { date, attempts: 0, linksCovered: 0, linksTotal: 0 });
+  }
+  for (const attempt of attempts) {
+    const point = byDate.get(attempt.createdAt.slice(0, 10));
+    if (!point) continue;
+    point.attempts += 1;
+    point.linksCovered += attempt.coverage.filter((entry) => entry.status === 'covered').length;
+    point.linksTotal += attempt.coverage.length;
+  }
+  return [...byDate.values()];
 }

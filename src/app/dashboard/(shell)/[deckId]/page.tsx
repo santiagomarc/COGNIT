@@ -9,7 +9,8 @@ import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
 import { DeckReadings } from '@/components/ui/shared/DeckReadings';
 import { DeckSegments, resolveDeckTab } from '@/components/ui/shared/DeckSegments';
 import { DeckSessionLauncher } from '@/components/ui/shared/DeckSessionLauncher';
-import { DrillHistory, SynthesisInsightsSkeleton, WeakLinks } from '@/components/ui/shared/synthesis/SynthesisInsights';
+import { DrillHistory, DrillSignals, SynthesisInsightsSkeleton, WeakLinks } from '@/components/ui/shared/synthesis/SynthesisInsights';
+import { QuestionBank, QuestionBankSkeleton } from '@/components/ui/shared/synthesis/QuestionBank';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
@@ -59,6 +60,7 @@ type DeckDetailSnapshot = {
     description: string | null;
     created_at: string;
     share_token: string | null;
+    exam_at: string | null;
   } | null;
   deckErrorMessage: string | null;
   cards: DeckCardRow[];
@@ -114,7 +116,7 @@ function formatNextReview(nextReviewAt: string | null): { label: string; state: 
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
-const EMPTY_READINGS: SynthesisReadings = { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null };
+const EMPTY_READINGS: SynthesisReadings = { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null, plans: { active: 0, due: 0 } };
 
 /** Deck-wide count of cards ready for MCQ — the whole deck, not the 60-card page. */
 async function loadQuizReadyCount(supabase: SupabaseServerClient, deckId: string): Promise<number> {
@@ -176,7 +178,7 @@ async function loadDeckDetailSnapshot(
   const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings] = await Promise.all([
     supabase
       .from('decks')
-      .select('id, title, description, created_at, share_token')
+      .select('id, title, description, created_at, share_token, exam_at')
       .eq('id', deckId)
       .single(),
     wantsCards
@@ -223,6 +225,7 @@ async function loadDeckDetailSnapshot(
         ...deck,
         created_at: deck.created_at ?? new Date().toISOString(),
         share_token: deck.share_token ?? null,
+        exam_at: deck.exam_at ?? null,
       }
       : null,
     deckErrorMessage: deckError?.message ?? null,
@@ -378,7 +381,14 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
               sessionBounds={sessionBounds}
               synthesisReadings={synthesisReadings}
               synthesisTopics={topTopics.map(([tag]) => tag)}
+              examAt={deck.exam_at}
             />
+          ) : null}
+
+          {hasCards ? (
+            <Suspense fallback={<QuestionBankSkeleton />}>
+              <QuestionBank deckId={deckId} />
+            </Suspense>
           ) : null}
 
           <DeckReadings
@@ -483,6 +493,10 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
 
             <Suspense fallback={<QuizHistorySkeleton />}>
               <QuizHistorySection deckId={deckId} />
+            </Suspense>
+
+            <Suspense fallback={<SynthesisInsightsSkeleton />}>
+              <DrillSignals deckId={deckId} />
             </Suspense>
 
             <Suspense fallback={<SynthesisInsightsSkeleton />}>

@@ -5,7 +5,7 @@
  */
 
 import type { TickState } from '@/components/ui/shared/StateTick';
-import type { Confidence, DrillVerdict, LinkStatus, SynthesisFormat } from '@/lib/synthesis/types';
+import type { Band, Confidence, DrillVerdict, LinkStatus, MisconceptionKind, SynthesisFormat } from '@/lib/synthesis/types';
 
 export type Tone = 'ink' | 'due' | 'learning' | 'mastered' | 'lapsed' | 'streak';
 
@@ -13,6 +13,21 @@ export const FORMAT_LABEL: Record<SynthesisFormat, string> = {
   causal: 'Causal',
   counterfactual: 'Counterfactual',
   comparative: 'Comparative',
+  evaluate: 'Evaluate',
+  apply: 'Apply',
+  distinguish: 'Distinguish',
+  elaborate: 'Elaborate',
+};
+
+/** One line per format for the launcher's picker. */
+export const FORMAT_HINT: Record<SynthesisFormat, string> = {
+  causal: 'by what mechanism A constrains B',
+  counterfactual: 'what breaks if X is removed',
+  comparative: 'when A beats B, and what it costs',
+  evaluate: 'to what extent a claim holds',
+  apply: 'what happens in a concrete case',
+  distinguish: 'two concepts people confuse',
+  elaborate: 'why, three levels deep',
 };
 
 /** Slot labels and placeholders per format (spec Appendix B). */
@@ -35,6 +50,30 @@ export const SLOT_LABELS: Record<SynthesisFormat, { claim: string; mechanism1: s
     mechanism2: 'What A sacrifices',
     tradeoff: 'Boundary',
   },
+  evaluate: {
+    claim: 'Position',
+    mechanism1: 'For',
+    mechanism2: 'Against',
+    tradeoff: 'Judgement',
+  },
+  apply: {
+    claim: 'What happens',
+    mechanism1: 'Because (1)',
+    mechanism2: 'Because (2)',
+    tradeoff: 'Unless',
+  },
+  distinguish: {
+    claim: 'The distinction',
+    mechanism1: 'A applies when',
+    mechanism2: 'B applies when',
+    tradeoff: 'Where they overlap',
+  },
+  elaborate: {
+    claim: 'Claim',
+    mechanism1: 'Why',
+    mechanism2: 'Why, one level deeper',
+    tradeoff: 'Where the chain stops',
+  },
 };
 
 export const SLOT_PLACEHOLDERS: Record<SynthesisFormat, { claim: string; mechanism1: string; mechanism2: string; tradeoff: string }> = {
@@ -56,7 +95,34 @@ export const SLOT_PLACEHOLDERS: Record<SynthesisFormat, { claim: string; mechani
     mechanism2: 'or what B wins',
     tradeoff: 'the condition that flips the choice',
   },
+  evaluate: {
+    claim: 'how far the claim holds, in one line',
+    mechanism1: 'the strongest mechanism for it',
+    mechanism2: 'the strongest consideration against it',
+    tradeoff: 'your judgement, and what decides it',
+  },
+  apply: {
+    claim: 'the outcome in this case',
+    mechanism1: 'which concept drives it, and how',
+    mechanism2: 'the second concept at work',
+    tradeoff: 'the change in the case that would flip the outcome',
+  },
+  distinguish: {
+    claim: 'the feature that separates them',
+    mechanism1: 'the condition under which A is the right concept',
+    mechanism2: 'the condition under which B is',
+    tradeoff: 'the case where both apply, or neither',
+  },
+  elaborate: {
+    claim: 'the relation that holds',
+    mechanism1: 'because…',
+    mechanism2: 'and that is because…',
+    tradeoff: 'the point at which the reasons run out',
+  },
 };
+
+/** The optional evidence slot (plan D12), shown when the key asks for a named example. */
+export const EVIDENCE_SLOT = { label: 'Evidence', placeholder: 'a named example, case, study or datum the cards give' } as const;
 
 export const FREE_TEXT_PLACEHOLDER = 'Position, mechanism, limit — in that order.';
 
@@ -86,11 +152,32 @@ export const VERDICT_TONE: Record<DrillVerdict, Tone> = {
   off_target: 'ink',
 };
 
+/** Essay-plan bands (plan D15): the examiner's words, and the same three ticks the verdict uses. */
+export const BAND_LABEL: Record<Band, string> = {
+  developing: 'Developing',
+  secure: 'Secure',
+  strong: 'Strong',
+};
+export const BAND_TICK: Record<Band, TickState> = {
+  developing: 'due',
+  secure: 'learning',
+  strong: 'mastered',
+};
+
 export const VERDICT_LABEL: Record<DrillVerdict, string> = {
   sound: 'Sound',
   partial: 'Partial',
   contradicted: 'Contradicted',
   off_target: 'Off target',
+};
+
+/** The misconception kinds in the student's words (audit G7). */
+export const MISCONCEPTION_LABEL: Record<MisconceptionKind, string> = {
+  reversal: 'direction reversed',
+  overgeneralisation: 'rule stretched past its condition',
+  conflation: 'two concepts merged',
+  wrong_condition: 'condition misstated',
+  other: 'contradicts the card',
 };
 
 /** Red is reserved for *wrong*; a missing link is absence, not error. */

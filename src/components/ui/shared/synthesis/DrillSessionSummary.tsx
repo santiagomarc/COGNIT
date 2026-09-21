@@ -4,8 +4,24 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { StateTick } from '@/components/ui/shared/StateTick';
-import type { DrillVerdict, SynthesisFormat } from '@/lib/synthesis/types';
+import { DrillResult } from '@/components/ui/shared/synthesis/DrillResult';
+import type { AnswerMode, AttemptResponse, CanvasAnchor, CanvasDrill, Diagnostic, DrillReveal, DrillVerdict, SynthesisFormat } from '@/lib/synthesis/types';
 import { FORMAT_LABEL, VERDICT_LABEL, VERDICT_TICK, formatClock, formatDueIn } from '@/lib/synthesis/ui';
+
+/** A sprint's withheld result, replayed in the summary (plan D13). */
+export type StoredResult = {
+  drill: CanvasDrill;
+  anchors: CanvasAnchor[];
+  result: {
+    attemptId: string;
+    diagnostic: Diagnostic;
+    reveal: DrillReveal;
+    scheduleSaved: boolean;
+    mode: AnswerMode;
+    response: AttemptResponse;
+    isRevision: boolean;
+  };
+};
 
 export type SessionEntry = {
   drillId: string;
@@ -24,6 +40,8 @@ type DrillSessionSummaryProps = {
   entries: SessionEntry[];
   skipped: number;
   elapsedMs: number;
+  /** Sprint only: each drill's full result, opened from its row. */
+  results?: Record<string, StoredResult>;
 };
 
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
@@ -34,7 +52,7 @@ const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] t
  * now* is the concrete "successive relearning" step the spec promises —
  * the contradicted cards, as a study session, while the error is fresh.
  */
-export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs }: DrillSessionSummaryProps) {
+export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs, results }: DrillSessionSummaryProps) {
   const counts = entries.reduce<Record<DrillVerdict, number>>(
     (acc, entry) => ({ ...acc, [entry.verdict]: acc[entry.verdict] + 1 }),
     { sound: 0, partial: 0, contradicted: 0, off_target: 0 },
@@ -47,8 +65,8 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs }: Dri
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
       <section className="surface p-6 text-center md:p-8">
-        <p className={LABEL}>Session</p>
-        <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Drills complete</h2>
+        <p className={LABEL}>{results ? 'Sprint' : 'Session'}</p>
+        <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">{results ? 'Sprint over' : 'Drills complete'}</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           <span className="font-mono tnum">{entries.length}</span> {entries.length === 1 ? 'drill' : 'drills'} ·{' '}
           <span className="font-mono tnum">{linksCovered}/{linksTotal}</span> links
@@ -68,19 +86,54 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs }: Dri
 
       {entries.length > 0 ? (
         <ul className="surface divide-y divide-border">
-          {entries.map((entry) => (
-            <li key={entry.drillId} className="flex items-center gap-3 px-5 py-3">
-              <StateTick state={VERDICT_TICK[entry.verdict]} />
-              <span className="w-24 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
-                {VERDICT_LABEL[entry.verdict]}{entry.revised ? ' · rev' : ''}
-              </span>
-              <span className="w-10 shrink-0 font-mono text-[13px] tnum text-ink">{entry.linksCovered}/{entry.linksTotal}</span>
-              <span className="min-w-0 flex-1 truncate text-sm text-ink">{entry.promptText}</span>
-              <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer md:block">
-                {FORMAT_LABEL[entry.format]}
-              </span>
-            </li>
-          ))}
+          {entries.map((entry) => {
+            const stored = results?.[entry.drillId];
+            const row = (
+              <>
+                <StateTick state={VERDICT_TICK[entry.verdict]} />
+                <span className="w-24 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+                  {VERDICT_LABEL[entry.verdict]}{entry.revised ? ' · rev' : ''}
+                </span>
+                <span className="w-10 shrink-0 font-mono text-[13px] tnum text-ink">{entry.linksCovered}/{entry.linksTotal}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-ink">{entry.promptText}</span>
+                <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer md:block">
+                  {FORMAT_LABEL[entry.format]}
+                </span>
+              </>
+            );
+            if (!stored) {
+              return <li key={entry.drillId} className="flex items-center gap-3 px-5 py-3">{row}</li>;
+            }
+            // A sprint withheld the feedback; each row opens its full result.
+            return (
+              <li key={entry.drillId}>
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-3 outline-hidden focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent)]">
+                    {row}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-dimmer transition-transform group-open:rotate-90" aria-hidden="true" />
+                  </summary>
+                  <div className="border-t border-border px-4 py-4">
+                    <DrillResult
+                      deckId={deckId}
+                      drill={stored.drill}
+                      anchors={stored.anchors}
+                      attemptId={stored.result.attemptId}
+                      diagnostic={stored.result.diagnostic}
+                      reveal={stored.result.reveal}
+                      mode={stored.result.mode}
+                      response={stored.result.response}
+                      scheduleSaved={stored.result.scheduleSaved}
+                      exemplarHidden={false}
+                      onShowExemplar={() => undefined}
+                      isRevision={stored.result.isRevision}
+                      previousResponse={null}
+                      history={[]}
+                    />
+                  </div>
+                </details>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
 

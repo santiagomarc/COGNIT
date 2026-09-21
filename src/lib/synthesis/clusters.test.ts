@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clusterFromCards, pairKey, randomClusters, selectDrillClusters, type ClusterCard } from './clusters';
+import { clusterFromCards, pairKey, randomClusters, selectDrillClusters, selectPlanCluster, type ClusterCard } from './clusters';
 
 function card(id: string, term: string, tags: string[]): ClusterCard {
   return { id, term, definition: `definition of ${term}`, explanation: null, tags };
@@ -96,5 +96,27 @@ describe('clusterFromCards', () => {
     const cluster = clusterFromCards([a, card('b', 'B', []), card('c', 'C', []), card('d', 'D', [])], 'embedding');
     expect(cluster?.cards.map((c) => c.id)).toEqual(['a', 'b', 'c']);
     expect(cluster?.clustering).toBe('embedding');
+  });
+});
+
+describe('selectPlanCluster', () => {
+  const tagged = (id: string, tags: string[]): ClusterCard => ({ id, term: id, definition: 'd', explanation: null, tags });
+
+  it('takes the widest tag with at least four cards, most connected first, capped at eight', () => {
+    const cards = [
+      tagged('a', ['sched', 'cpu']), tagged('b', ['sched', 'cpu']), tagged('c', ['sched']), tagged('d', ['sched', 'io']), tagged('e', ['sched']),
+      tagged('f', ['memory']), tagged('g', ['memory']),
+    ];
+    const cluster = selectPlanCluster({ cards, random: () => 0.5 });
+    expect(cluster?.topicTag).toBe('sched');
+    expect(cluster?.cards.map((c) => c.id).slice(0, 2).sort()).toEqual(['a', 'b']);   // the two sharing an extra tag lead
+    expect(cluster?.cards).toHaveLength(5);
+  });
+
+  it('honours a focus topic that is wide enough and returns null when no tag is', () => {
+    const cards = [tagged('a', ['x']), tagged('b', ['x']), tagged('c', ['x']), tagged('d', ['x']), tagged('e', ['y'])];
+    expect(selectPlanCluster({ cards, focusTopic: 'X' })?.topicTag).toBe('x');
+    expect(selectPlanCluster({ cards, focusTopic: 'y' })?.topicTag).toBe('x');    // y is too narrow; the widest wins
+    expect(selectPlanCluster({ cards: cards.slice(0, 3) })).toBeNull();
   });
 });

@@ -5,6 +5,8 @@ import {
   findQuote,
   locateQuote,
   normaliseForQuote,
+  stripKeyIds,
+  wordDiff,
   renderResponseForModel,
   responseText,
   stripRedactions,
@@ -99,5 +101,58 @@ describe('locateQuote / findQuote', () => {
     expect(findQuote('too small spends the CPU', CARD)).toBe('too small spends the CPU');
     expect(findQuote('too small spend CPU on context switch', CARD)).toBe('too small spends the CPU on context switches');
     expect(findQuote('the scheduler is preemptive by default', CARD)).toBeNull();
+  });
+});
+
+describe('stripKeyIds', () => {
+  it('removes bracketed and bare link/card keys and tidies the punctuation left behind', () => {
+    expect(stripKeyIds('You miss the tuning link (m3).')).toBe('You miss the tuning link.');
+    expect(stripKeyIds('Links m1 and m2 are covered; card c2 says otherwise (c1, c3).')).toBe('Links and are covered; card says otherwise.');
+    // Keys are lower-case; "vitamin C1" and "xm1" are words, not keys.
+    expect(stripKeyIds('The m1 macro and vitamin C1 are unaffected: xm1 stays.')).toBe('The macro and vitamin C1 are unaffected: xm1 stays.');
+    expect(stripKeyIds('Ask: what is the quantum just above?')).toBe('Ask: what is the quantum just above?');
+  });
+});
+
+describe('evidence slot and wordDiff', () => {
+  it('counts and renders the evidence slot only when it holds text', () => {
+    const outline = { claim: 'A', mechanisms: ['b c', 'd'] as [string, string], tradeoff: 'e', evidence: '  ' };
+    expect(countWords(responseText(outline))).toBe(5);
+    expect(renderResponseForModel('outline', outline)).not.toContain('Evidence:');
+    const withEvidence = { ...outline, evidence: 'Denning 1968' };
+    expect(countWords(responseText(withEvidence))).toBe(7);
+    expect(renderResponseForModel('outline', withEvidence)).toMatch(/\nEvidence: Denning 1968$/);
+  });
+
+  it('diffs a revision word by word', () => {
+    const diff = wordDiff('the quantum sets waiting', 'the quantum sets responsiveness and waiting');
+    expect(diff).toEqual([
+      { text: 'the', kind: 'same' },
+      { text: 'quantum', kind: 'same' },
+      { text: 'sets', kind: 'same' },
+      { text: 'responsiveness', kind: 'added' },
+      { text: 'and', kind: 'added' },
+      { text: 'waiting', kind: 'same' },
+    ]);
+    expect(wordDiff('a b', 'b c').map((t) => `${t.kind}:${t.text}`)).toEqual(['removed:a', 'same:b', 'added:c']);
+  });
+});
+
+describe('plan responses', () => {
+  it('counts every field and renders labelled sections for the checker', () => {
+    const plan = {
+      thesis: 'The quantum decides responsiveness.',
+      points: [
+        { claim: 'Short quantum helps.', mechanism: 'Fewer full slices to wait behind.', evidence: '', limit: 'Not below a burst.' },
+        { claim: '', mechanism: '', evidence: '', limit: '' },
+        { claim: 'Switches cost.', mechanism: 'Each is overhead.', evidence: 'Context switch card.', limit: '' },
+      ] as [never, never, never],
+      conclusion: 'So keep it just above a burst.',
+    };
+    expect(countWords(responseText(plan))).toBe(32);
+    const rendered = renderResponseForModel('plan', plan);
+    expect(rendered).toMatch(/^Thesis: The quantum decides responsiveness\.\nPoint 1:\n  Claim: Short quantum helps\./);
+    expect(rendered).toMatch(/Point 2:\n  Claim: \(empty\)/);
+    expect(rendered).toMatch(/Conclusion: So keep it just above a burst\.$/);
   });
 });

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   recordAiUsage: vi.fn(),
   enrichCards: vi.fn(async () => ({ success: true })),
   syncEmbeddings: vi.fn(async () => ({ success: true })),
+  embedTexts: vi.fn(),
   afterCallbacks: [] as Array<() => unknown>,
 }));
 
@@ -23,6 +24,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 // them explicitly so the response/side-effect ordering is observable.
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => { mocks.afterCallbacks.push(fn); } }));
 vi.mock('./ai-enrich', () => ({ enrichCards: mocks.enrichCards }));
+vi.mock('@/lib/embeddings', () => ({ embedTexts: mocks.embedTexts, toVectorLiteral: (values: number[]) => `[${values.join(',')}]` }));
 vi.mock('./chat', () => ({ syncEmbeddings: mocks.syncEmbeddings }));
 vi.mock('@/lib/env-server', () => ({
   getServerEnv: () => ({ GEMINI_API_KEY: 'test', GEMINI_MODEL: 'gemini-test', GEMINI_EMBEDDING_MODEL: 'embed-test', GEMINI_MODEL_MAX_TOKENS: 4096 }),
@@ -266,6 +268,7 @@ describe('checkSynthesisAttempt', () => {
       statement: 'long quantum makes interactive bursts wait behind full slices',
       cardId: CARD_A,
       cardSays: 'too large degenerates toward FCFS',
+      kind: 'other',
     }]);
   });
 
@@ -281,7 +284,10 @@ describe('checkSynthesisAttempt', () => {
 
     const result = await check({ confidence: 3 });
     if (!('success' in result) || !result.success) throw new Error('expected success');
-    expect(result.reveal.requiredLinks).toEqual([{ id: 'm1', text: expect.any(String) }, { id: 'm2', text: expect.any(String) }]);
+    expect(result.reveal.requiredLinks).toEqual([
+      expect.objectContaining({ id: 'm1', text: expect.any(String), kind: 'mechanism', core: true }),
+      expect.objectContaining({ id: 'm2', text: expect.any(String), kind: 'mechanism', core: true }),
+    ]);
     expect(result.reveal.cards.map((card) => card.term)).toEqual(['Time quantum', 'Interactive process']);
     expect(result.diagnostic.confidence).toBe(3);
     // Sure × partial comes back in 12 h, not 24 h.
@@ -292,6 +298,25 @@ describe('checkSynthesisAttempt', () => {
     const record = recordCall(client);
     expect(record?.p_attempt.confidence).toBe(3);
     expect(record?.p_schedule.last_links_covered).toBe(1);
+  });
+
+  it('checks against the wording the student saw and records the variant and prompt version', async () => {
+    const variant = 'Explain how the Time quantum shapes an Interactive process through context switching.';
+    const client = buildClient({ synthesis_drills: { data: drillRow({ prompt_variants: [variant], attempt_count: 1 }), error: null } });
+    mocks.client = client;
+
+    const result = await check({ prompt_variant: 1 });
+    if (!('success' in result) || !result.success) throw new Error('expected success');
+
+    const request = mocks.generateContent.mock.calls[0][0] as { contents: { parts: { text: string }[] }[] };
+    expect(request.contents[0].parts[0].text).toContain(`DRILL (causal): ${variant}`);
+    const inserted = client.__inserted.synthesis_attempts?.[0] as Record<string, Record<string, unknown>> | undefined;
+    // The write goes through the RPC now; the payload it was given carries the provenance.
+    const rpcCalls = client.rpc.mock.calls as unknown as [string, { p_attempt: { usage: Record<string, unknown> } }][];
+    const rpcCall = rpcCalls.find((call) => call[0] === 'record_synthesis_attempt');
+    const payload = rpcCall![1].p_attempt;
+    expect(payload.usage).toMatchObject({ prompt_variant: 1, prompt_version: expect.any(String), demoted_covered: 0 });
+    expect(inserted).toBeUndefined();
   });
 
   it('replays an attempt with the same client key instead of calling the model again', async () => {
@@ -349,6 +374,38 @@ describe('checkSynthesisAttempt', () => {
     const chained = await check({ revision_of: '00000000-0000-4000-8000-0000000000bb' });
     expect(chained).toMatchObject({ error: 'That attempt cannot be revised.' });
     expect(mocks.reserveAiCall).not.toHaveBeenCalled();
+  });
+
+  it('queues a repair drill after a verified contradiction, and only then (plan D17)', async () => {
+    mocks.afterCallbacks.length = 0;
+    const client = buildClient();
+    mocks.client = client;
+    respondWith(modelOutput({
+      contradictions: [{
+        statement: 'A long quantum makes interactive bursts wait behind full slices',
+        card_key: 'c1',
+        card_says: 'too large degenerates toward FCFS',
+        kind: 'reversal',
+      }],
+    }));
+    const contradicted = await check();
+    if (!('success' in contradicted) || !contradicted.success) throw new Error('expected success');
+    expect(contradicted.diagnostic.contradictions[0].kind).toBe('reversal');
+    expect(mocks.afterCallbacks).toHaveLength(1);
+
+    // Running the repair reserves generation spend tagged with the attempt it
+    // repairs, and a draft the validator rejects (the mock keeps answering with
+    // a check-shaped output) is recorded as created: 0 — never thrown.
+    mocks.reserveAiCall.mockClear();
+    await mocks.afterCallbacks[0]();
+    expect(mocks.reserveAiCall).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ repair_of: 'attempt-1' }), { calls: 1 });
+    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ repair_of: 'attempt-1', created: 0 }), 'r1');
+
+    mocks.afterCallbacks.length = 0;
+    respondWith(modelOutput());
+    const sound = await check();
+    if (!('success' in sound) || !sound.success) throw new Error('expected success');
+    expect(mocks.afterCallbacks).toHaveLength(0);
   });
 
   it('honours pull_forward = false even with a verified contradiction', async () => {
@@ -479,9 +536,13 @@ describe('generateSynthesisDrills', () => {
   const validDraft = {
     format: 'causal',
     prompt_text: 'By what mechanism does the time quantum constrain an interactive process when context switch overhead rises?',
+    prompt_variants: ['Explain how the time quantum and context switch overhead together limit an interactive process.'],
+    scenario: null,
+    bloom: 'analyse',
     required_links: [
-      { text: 'A smaller quantum forces more context switches, each pure overhead.', card_keys: ['c1', 'c3'] },
-      { text: 'A larger quantum makes interactive processes wait longer.', card_keys: ['c1', 'c2'] },
+      { text: 'A smaller quantum forces more context switches, each pure overhead.', card_keys: ['c1', 'c3'], kind: 'mechanism', core: true },
+      { text: 'A larger quantum makes interactive processes wait longer.', card_keys: ['c1', 'c2'], kind: 'mechanism', core: true },
+      { text: 'Only while a burst is shorter than the quantum.', card_keys: ['c1', 'c2'], kind: 'condition', core: true },
     ],
     exemplar: { claim: 'The quantum trades overhead for waiting.', mechanisms: ['Shrinking it multiplies switches.', 'Growing it delays interactive bursts.'], tradeoff: 'Set it just above a burst.' },
   };
@@ -522,10 +583,14 @@ describe('generateSynthesisDrills', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].card_ids).toEqual(expect.arrayContaining([CARD_A, CARD_B]));
     expect(rows[0].required_links).toEqual([
-      expect.objectContaining({ id: 'm1' }),
-      expect.objectContaining({ id: 'm2' }),
+      expect.objectContaining({ id: 'm1', kind: 'mechanism', core: true }),
+      expect.objectContaining({ id: 'm2', kind: 'mechanism', core: true }),
+      expect.objectContaining({ id: 'm3', kind: 'condition', core: true }),
     ]);
-    expect(rows[0].generation_meta).toMatchObject({ clustering: 'tags', model: 'gemini-test', requested_format: 'causal' });
+    expect(rows[0].link_count).toBe(3);
+    expect(rows[0].prompt_variants).toEqual(['Explain how the time quantum and context switch overhead together limit an interactive process.']);
+    expect(rows[0].bloom).toBe('analyse');
+    expect(rows[0].generation_meta).toMatchObject({ clustering: 'tags', model: 'gemini-test', requested_format: 'causal', prompt_version: expect.any(String) });
     expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ created: 1 }), 'r1');
   });
 
@@ -540,7 +605,7 @@ describe('generateSynthesisDrills', () => {
       },
     });
     mocks.client = client;
-    respondWith({ ...validDraft, required_links: validDraft.required_links.map((link) => ({ ...link, card_keys: ['c1', 'c2'] })) });
+    respondWith({ ...validDraft, required_links: validDraft.required_links.map((link, index) => ({ ...link, card_keys: index === 0 ? ['c1', 'c3'] : ['c1', 'c2'] })) });
 
     const { generateSynthesisDrills } = await import('./synthesis');
     const result = await generateSynthesisDrills({ deck_id: DECK_ID, count: 1 });
@@ -643,5 +708,175 @@ describe('absorbOutsideClaim', () => {
     const result = await absorb({ claim_index: 3 });
     expect(result).toMatchObject({ error: expect.anything() });
     expect(client.from).not.toHaveBeenCalled();
+  });
+});
+
+describe('plans (execution plan D15 / D16)', () => {
+  const PLAN_ID = '00000000-0000-4000-8000-0000000000e1';
+  const CARD_D = '00000000-0000-4000-8000-00000000000d';
+  const CARD_E = '00000000-0000-4000-8000-00000000000e';
+  const PLAN_EXEMPLAR = {
+    thesis: 'The quantum decides responsiveness within the limits aging sets.',
+    points: [
+      { claim: 'Short quanta keep interactive processes responsive.', mechanism: 'Fewer full slices to wait behind.', evidence: '', limit: 'Not below a burst.' },
+      { claim: 'Switching costs.', mechanism: 'Each switch is pure overhead.', evidence: 'The context switch card.', limit: '' },
+      { claim: 'Aging matters under a convoy.', mechanism: 'Waiting raises priority.', evidence: '', limit: '' },
+    ],
+    conclusion: 'So the quantum matters most for interactive workloads.',
+  };
+  function planRow(overrides: Record<string, unknown> = {}) {
+    return drillRow({
+      id: PLAN_ID,
+      kind: 'plan',
+      format: 'evaluate',
+      question_text: 'To what extent does the time quantum determine the responsiveness of an interactive process?',
+      command_word: 'to what extent',
+      prompt_text: 'To what extent does the time quantum determine the responsiveness of an interactive process?',
+      card_ids: [CARD_A, CARD_B, CARD_C, CARD_D],
+      required_links: [
+        { id: 'm1', text: 'A short quantum keeps an interactive process responsive.', card_ids: [CARD_A, CARD_B], kind: 'mechanism', core: true },
+        { id: 'm2', text: 'A short quantum multiplies context switches.', card_ids: [CARD_A, CARD_C], kind: 'mechanism', core: true },
+        { id: 'm3', text: 'Under a convoy the quantum matters less than aging.', card_ids: [CARD_D], kind: 'evaluation', core: true },
+        { id: 'm4', text: 'The context switch card names the cost.', card_ids: [CARD_C], kind: 'evidence', core: false },
+      ],
+      exemplar: PLAN_EXEMPLAR,
+      ...overrides,
+    });
+  }
+  const PLAN_ANCHORS = [
+    ...ANCHOR_ROWS,
+    { id: CARD_C, front: 'Context switch', back: 'pure overhead, no useful work', explanation: null, state: 'review' },
+    { id: CARD_D, front: 'Convoy effect', back: 'short jobs queue behind a long one', explanation: null, state: 'review' },
+  ];
+  const PLAN_ANSWER = {
+    thesis: 'The quantum mostly decides responsiveness, but aging limits how far.',
+    points: [
+      { claim: 'A short quantum keeps an interactive process responsive.', mechanism: 'It waits behind fewer full slices.', evidence: '', limit: 'not below a burst' },
+      { claim: 'Short quanta multiply context switches.', mechanism: 'Each switch is pure overhead.', evidence: 'the context switch card', limit: '' },
+      { claim: 'Under a convoy the quantum matters less than aging.', mechanism: 'Waiting raises priority until the long job yields.', evidence: '', limit: '' },
+    ] as [never, never, never],
+    conclusion: 'So it matters most for interactive workloads and least under a convoy.',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.reserveAiCall.mockResolvedValue({ ok: true, reservationId: 'r1' });
+    mocks.recordAiUsage.mockResolvedValue(undefined);
+  });
+
+  it('refuses a drill answer to a plan and a plan answer to a drill', async () => {
+    mocks.client = buildClient({ synthesis_drills: { data: planRow(), error: null }, cards: { data: PLAN_ANCHORS, error: null } });
+    const asDrill = await check({ drill_id: PLAN_ID });
+    expect(asDrill).toMatchObject({ error: 'This question needs a plan, not a drill answer.' });
+
+    mocks.client = buildClient();
+    const asPlan = await check({ mode: 'plan', response: PLAN_ANSWER });
+    expect(asPlan).toMatchObject({ error: 'This is a drill, not a plan question.' });
+    expect(mocks.generateContent).not.toHaveBeenCalled();
+  });
+
+  it('checks a plan with the plan-shaped instruction, computes the band, and records it through the RPC', async () => {
+    const client = buildClient({ synthesis_drills: { data: planRow(), error: null }, cards: { data: PLAN_ANCHORS, error: null } });
+    mocks.client = client;
+    respondWith(modelOutput({
+      coverage: [
+        { link_id: 'm1', status: 'covered', evidence: 'waits behind fewer full slices' },
+        { link_id: 'm2', status: 'covered', evidence: 'Each switch is pure overhead' },
+        { link_id: 'm3', status: 'covered', evidence: 'the quantum matters less than aging' },
+        { link_id: 'm4', status: 'covered', evidence: 'the context switch card' },
+      ],
+      structure: { claim_present: true, tradeoff_present: true },
+    }));
+
+    const result = await check({ drill_id: PLAN_ID, mode: 'plan', response: PLAN_ANSWER, confidence: 2 });
+    if (!('success' in result) || !result.success) throw new Error(`expected success, got ${JSON.stringify(result)}`);
+    expect(result.diagnostic.verdict).toBe('sound');
+    expect(result.diagnostic.band).toBe('strong');
+    expect(result.reveal.planExemplar).toEqual(PLAN_EXEMPLAR);
+    // The four-slot digest still travels for the shared surfaces.
+    expect(result.reveal.exemplar.claim).toBe(PLAN_EXEMPLAR.thesis);
+
+    const request = mocks.generateContent.mock.calls[0][0] as { systemInstruction: string; contents: { parts: { text: string }[] }[] };
+    expect(request.systemInstruction).toMatch(/ESSAY PLAN/);
+    expect(request.contents[0].parts[0].text).toMatch(/QUESTION \(essay plan\)/);
+    expect(request.contents[0].parts[0].text).toMatch(/Thesis: The quantum mostly decides/);
+
+    // Two samples for a plan (audit G6), one reservation covering both.
+    expect(mocks.generateContent).toHaveBeenCalledTimes(2);
+    expect(mocks.reserveAiCall).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_check', expect.objectContaining({ samples: 2 }), { calls: 2 });
+
+    const payload = recordCall(client);
+    expect(payload?.p_attempt).toMatchObject({ mode: 'plan', band: 'strong', verdict: 'sound' });
+    expect(payload?.p_attempt.usage).toMatchObject({ samples: 2 });
+    // Plans walk the 1 / 3 / 7 ladder: sound at step 0 → step 1, due in 3 days.
+    expect(payload?.p_schedule.step).toBe(1);
+    const dueInDays = (Date.parse(payload!.p_schedule.next_due_at) - Date.now()) / 86_400_000;
+    expect(dueInDays).toBeGreaterThan(2.9);
+    expect(dueInDays).toBeLessThan(3.1);
+  });
+
+  it('generates a plan question over a topic, inserts it as kind plan with the plan exemplar and a link count', async () => {
+    const cards = [
+      { id: CARD_A, front: 'Time quantum', back: 'The fixed CPU slice.', explanation: null, topic_tags: ['scheduling'] },
+      { id: CARD_B, front: 'Interactive process', back: 'Short bursts.', explanation: null, topic_tags: ['scheduling'] },
+      { id: CARD_C, front: 'Context switch', back: 'Pure overhead.', explanation: null, topic_tags: ['scheduling'] },
+      { id: CARD_D, front: 'Convoy effect', back: 'Short jobs queue behind a long one.', explanation: null, topic_tags: ['scheduling'] },
+      { id: CARD_E, front: 'Aging', back: 'Priority rises with waiting.', explanation: null, topic_tags: ['scheduling'] },
+    ];
+    const client = createSupabaseMock({
+      tables: {
+        decks: { data: { id: DECK_ID, title: 'OS' }, error: null },
+        cards: { data: cards, error: null },
+        synthesis_drills: { data: [{ id: 'new-plan' }], error: null, count: 0 },
+      },
+    });
+    mocks.client = client;
+    respondWith({
+      command_word: 'To what extent',
+      question_text: 'To what extent does the time quantum determine the responsiveness of an interactive process under a convoy effect?',
+      required_links: [
+        { text: 'A short quantum keeps an interactive process responsive because it waits behind fewer full slices.', card_keys: ['c1', 'c2'], kind: 'mechanism', core: true },
+        { text: 'A short quantum multiplies context switches, each pure overhead.', card_keys: ['c1', 'c3'], kind: 'mechanism', core: true },
+        { text: 'Under a convoy the quantum matters less than aging.', card_keys: ['c4', 'c5'], kind: 'evaluation', core: true },
+        { text: 'The quantum should sit just above a burst.', card_keys: ['c1', 'c2'], kind: 'condition', core: true },
+      ],
+      missing_concepts: ['multilevel feedback queue'],
+      exemplar_plan: PLAN_EXEMPLAR,
+    });
+
+    const { generatePlanQuestions } = await import('./synthesis');
+    const result = await generatePlanQuestions({ deck_id: DECK_ID, count: 1, focus_topic: 'scheduling' });
+    expect(result).toMatchObject({ success: true, created: 1, failed: 0, missingConcepts: ['multilevel feedback queue'] });
+
+    const rows = client.__inserted.synthesis_drills?.[0] as Array<Record<string, unknown>>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ kind: 'plan', format: 'evaluate', command_word: 'to what extent', link_count: 4, topic_tag: 'scheduling' });
+    expect(rows[0].card_ids).toHaveLength(5);
+    expect(rows[0].exemplar).toEqual(PLAN_EXEMPLAR);
+    expect(rows[0].generation_meta).toMatchObject({ clustering: 'tags', prompt_version: expect.any(String) });
+    expect(mocks.reserveAiCall).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ kind: 'plan' }), { calls: 1 });
+  });
+
+  it('ingests pasted questions, maps each to the deck by embedding, and saves them', async () => {
+    const client = createSupabaseMock({
+      tables: {
+        decks: { data: { id: DECK_ID, title: 'OS' }, error: null },
+        synthesis_questions: { data: [{ id: 'q1', text: 'Discuss the convoy effect.', mapped_card_ids: [CARD_A, CARD_D] }], error: null },
+      },
+      rpcs: {
+        search_deck_cards_by_embedding: { data: [{ id: CARD_A, similarity: 0.7 }, { id: CARD_D, similarity: 0.6 }, { id: CARD_B, similarity: 0.2 }], error: null },
+      },
+    });
+    mocks.client = client;
+    mocks.embedTexts.mockResolvedValue([[0.1, 0.2, 0.3]]);
+
+    const { ingestQuestions } = await import('./synthesis');
+    const result = await ingestQuestions({ deck_id: DECK_ID, questions: ['Discuss the convoy effect.'] });
+    expect(result).toMatchObject({ success: true, unmapped: false, questions: [{ id: 'q1', mappedCards: 2 }] });
+
+    const inserted = client.__inserted.synthesis_questions?.[0] as Array<Record<string, unknown>>;
+    // Only cards above the similarity floor are mapped.
+    expect(inserted[0]).toMatchObject({ source: 'paper', mapped_card_ids: [CARD_A, CARD_D] });
+    expect(mocks.reserveAiCall).toHaveBeenCalledWith(expect.anything(), 'user-1', 'semantic_search', expect.anything(), { calls: 1 });
   });
 });

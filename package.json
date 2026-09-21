@@ -11,7 +11,11 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "verify:deployment": "node --env-file=.env.local scripts/verify-deployment.mjs",
-    "contrast": "node scripts/contrast.mjs --verbose"
+    "contrast": "node scripts/contrast.mjs --verbose",
+    "ai:smoke": "vitest run --config vitest.live.config.ts src/test/live/smoke.live.ts",
+    "ai:calibrate": "vitest run --config vitest.live.config.ts src/test/live/synthesis-calibration.live.ts",
+    "ai:generation": "vitest run --config vitest.live.config.ts src/test/live/generation.live.ts",
+    "ai:gate": "vitest run --config vitest.live.config.ts src/test/live/smoke.live.ts src/test/live/generation.live.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

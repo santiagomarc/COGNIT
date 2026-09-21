@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { StateTick } from '@/components/ui/shared/StateTick';
 import { AddAsCardForm } from '@/components/ui/shared/synthesis/AddAsCardForm';
 import { CheckFeedback } from '@/components/ui/shared/synthesis/CheckFeedback';
-import type { AnswerMode, AttemptResponse, CanvasAnchor, CanvasDrill, Diagnostic, DrillReveal } from '@/lib/synthesis/types';
-import { isOutlineResponse } from '@/lib/synthesis/text';
-import { CONFIDENCE_LABEL, LINK_TICK, SLOT_LABELS, VERDICT_LABEL, VERDICT_TICK, formatDueIn } from '@/lib/synthesis/ui';
+import type { AnswerMode, AttemptResponse, CanvasAnchor, CanvasDrill, Diagnostic, DrillAttemptHistoryEntry, DrillReveal } from '@/lib/synthesis/types';
+import { isOutlineResponse, isPlanResponse, responseText, wordDiff } from '@/lib/synthesis/text';
+import { BAND_LABEL, BAND_TICK, CONFIDENCE_LABEL, EVIDENCE_SLOT, LINK_TICK, MISCONCEPTION_LABEL, SLOT_LABELS, VERDICT_LABEL, VERDICT_TICK, formatAge, formatDueIn } from '@/lib/synthesis/ui';
 import { RichText } from '@/components/ui/shared/RichText';
 
 type DrillResultProps = {
@@ -30,6 +30,10 @@ type DrillResultProps = {
   onShowExemplar: () => void;
   /** This result is the revision of an earlier attempt on the same drill. */
   isRevision: boolean;
+  /** The attempt this one revised, for the word-level diff (audit U3). */
+  previousResponse: AttemptResponse | null;
+  /** Past attempts on this drill, newest first (audit U4). */
+  history: DrillAttemptHistoryEntry[];
 };
 
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
@@ -59,6 +63,8 @@ export function DrillResult({
   exemplarHidden,
   onShowExemplar,
   isRevision,
+  previousResponse,
+  history,
 }: DrillResultProps) {
   const termById = new Map(anchors.map((anchor) => [anchor.id, anchor.term]));
   const linkById = new Map(reveal.requiredLinks.map((link) => [link.id, link]));
@@ -66,19 +72,24 @@ export function DrillResult({
   const offTarget = diagnostic.verdict === 'off_target';
   const pulled = diagnostic.pulledForwardCardIds.map((id) => termById.get(id)).filter((term): term is string => Boolean(term));
   const exemplar = reveal.exemplar;
+  const isPlan = drill.kind === 'plan';
+  // A plan is graded in a band (plan D15); the verdict still drives the ladder.
+  const headline = isPlan && diagnostic.band ? BAND_LABEL[diagnostic.band] : VERDICT_LABEL[diagnostic.verdict];
+  const headlineTick = isPlan && diagnostic.band ? BAND_TICK[diagnostic.band] : VERDICT_TICK[diagnostic.verdict];
 
   return (
     <div className="flex flex-col gap-4">
       <section className="raised spec relative p-4 md:p-5" aria-labelledby="drill-verdict">
         {/* Verdict: a tick, the word, and the counts — colour is never alone. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <StateTick state={VERDICT_TICK[diagnostic.verdict]} />
+          <StateTick state={headlineTick} />
           <h2 id="drill-verdict" tabIndex={-1} className="text-[15px] font-semibold text-ink outline-hidden">
-            {VERDICT_LABEL[diagnostic.verdict]}
+            {headline}
+            {isPlan && diagnostic.band ? <span className="ml-2 font-normal text-ink-dim">· {VERDICT_LABEL[diagnostic.verdict].toLowerCase()}</span> : null}
             {isRevision ? <span className="ml-2 font-normal text-ink-dim">· revised</span> : null}
           </h2>
           <span className={`${LABEL} tnum`}>
-            {diagnostic.linksCovered} of {diagnostic.linksTotal} links · {diagnostic.contradictions.length}{' '}
+            {diagnostic.linksCovered} of {diagnostic.linksTotal} {isPlan ? 'points' : 'links'} · {diagnostic.contradictions.length}{' '}
             {diagnostic.contradictions.length === 1 ? 'contradiction' : 'contradictions'} · {diagnostic.outsideClaims.length} outside
           </span>
         </div>
@@ -105,7 +116,7 @@ export function DrillResult({
             <div className="rule rule--soft my-3" aria-hidden="true" />
 
             {/* Mechanism checklist: covered → mastered, partial → due, missing → an empty tick. */}
-            <ul className="flex flex-col" aria-label="Required links">
+            <ul className="flex flex-col" aria-label={isPlan ? 'Required points' : 'Required links'}>
               {diagnostic.coverage.map((entry) => {
                 const link = linkById.get(entry.linkId);
                 return (
@@ -113,7 +124,12 @@ export function DrillResult({
                     <StateTick state={LINK_TICK[entry.status]} className="mt-[3px]" />
                     <span className={`${LABEL} w-20 shrink-0 pt-[3px]`}>{entry.status}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm text-ink">{link?.text ?? entry.linkId}</span>
+                      <span className="block text-sm text-ink">
+                        {link?.text ?? entry.linkId}
+                        {link && link.kind !== 'mechanism' ? (
+                          <span className={`${LABEL} ml-2`}>{link.kind}</span>
+                        ) : null}
+                      </span>
                       {entry.evidence ? (
                         <span className="quote mt-0.5 block text-[13px]">“{entry.evidence}”</span>
                       ) : null}
@@ -136,6 +152,9 @@ export function DrillResult({
                       <span className="mt-0.5 block text-[13px] text-ink-dim">
                         card says: “{entry.cardSays}”
                       </span>
+                      {entry.kind !== 'other' ? (
+                        <span className={`${LABEL} mt-0.5 block`}>{MISCONCEPTION_LABEL[entry.kind]}</span>
+                      ) : null}
                       <span className="mt-1.5 flex flex-wrap items-center gap-2">
                         <TermChip term={termById.get(entry.cardId) ?? 'card'} />
                         {/* The card may be the thing that is wrong; either way it is one tap from a review. */}
@@ -162,9 +181,9 @@ export function DrillResult({
             {/* A sound verdict has covered every link; an empty slot is worth a word, not a demotion. */}
             {(!diagnostic.structure.claimPresent || !diagnostic.structure.tradeoffPresent) ? (
               <p className={`${LABEL} mt-2 pl-[calc(5rem+0.75rem)]`}>
-                {!diagnostic.structure.claimPresent ? `${labels.claim} slot empty` : null}
+                {!diagnostic.structure.claimPresent ? (isPlan ? 'thesis does not answer the question' : `${labels.claim} slot empty`) : null}
                 {!diagnostic.structure.claimPresent && !diagnostic.structure.tradeoffPresent ? ' · ' : null}
-                {!diagnostic.structure.tradeoffPresent ? `${labels.tradeoff} slot empty` : null}
+                {!diagnostic.structure.tradeoffPresent ? (isPlan ? 'no judgement made' : `${labels.tradeoff} slot empty`) : null}
               </p>
             ) : null}
 
@@ -202,7 +221,7 @@ export function DrillResult({
         <>
           <div className="grid gap-4 md:grid-cols-2">
             <section className="well p-4" aria-label="Exemplar">
-              <h3 className={LABEL}>Exemplar</h3>
+              <h3 className={LABEL}>{isPlan ? 'Exemplar plan' : 'Exemplar'}</h3>
               {exemplarHidden ? (
                 <div className="mt-2 flex flex-col items-start gap-2">
                   <p className="text-[13px] text-ink-dim">
@@ -211,6 +230,19 @@ export function DrillResult({
                   <Button type="button" variant="ghost" size="sm" onClick={onShowExemplar}>
                     Show exemplar
                   </Button>
+                </div>
+              ) : isPlan && reveal.planExemplar ? (
+                <div className="mt-2 flex flex-col gap-2 text-sm text-ink">
+                  <p><span className="text-ink-dimmer">Thesis · </span><RichText text={reveal.planExemplar.thesis} /></p>
+                  {reveal.planExemplar.points.map((point, index) => (
+                    <p key={index}>
+                      <span className="text-ink-dimmer">{index + 1} · </span><RichText text={point.claim} />
+                      <span className="text-ink-dim"> — <RichText text={point.mechanism} /></span>
+                      {point.evidence ? <span className="text-ink-dim"> · evidence: <RichText text={point.evidence} /></span> : null}
+                      {point.limit ? <span className="text-ink-dim"> · limit: <RichText text={point.limit} /></span> : null}
+                    </p>
+                  ))}
+                  <p><span className="text-ink-dimmer">Conclusion · </span><RichText text={reveal.planExemplar.conclusion} /></p>
                 </div>
               ) : (
                 <ul className="mt-2 flex flex-col gap-2 text-sm text-ink">
@@ -223,17 +255,51 @@ export function DrillResult({
             </section>
 
             <section className="well p-4" aria-label="Your answer">
-              <h3 className={LABEL}>Your answer</h3>
-              {mode === 'outline' && isOutlineResponse(response) ? (
+              <h3 className={LABEL}>{isRevision && previousResponse ? 'Your revision · what changed' : isPlan ? 'Your plan' : 'Your answer'}</h3>
+              {isRevision && previousResponse ? (
+                // The repair, not two blocks of prose: removed words struck, added words underlined.
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+                  {wordDiff(responseText(previousResponse), responseText(response)).map((token, index) => (
+                    <span
+                      key={index}
+                      className={
+                        token.kind === 'added'
+                          ? 'underline decoration-[var(--state-mastered)] decoration-2 underline-offset-[3px]'
+                          : token.kind === 'removed'
+                            ? 'text-ink-dimmer line-through'
+                            : undefined
+                      }
+                    >
+                      {token.text}{' '}
+                    </span>
+                  ))}
+                </p>
+              ) : mode === 'plan' && isPlanResponse(response) ? (
+                <div className="mt-2 flex flex-col gap-2 text-sm text-ink">
+                  <p><span className="text-ink-dimmer">Thesis · </span>{response.thesis || '—'}</p>
+                  {response.points.map((point, index) => (
+                    <p key={index}>
+                      <span className="text-ink-dimmer">{index + 1} · </span>{point.claim || '—'}
+                      {point.mechanism ? <span className="text-ink-dim"> — {point.mechanism}</span> : null}
+                      {point.evidence ? <span className="text-ink-dim"> · evidence: {point.evidence}</span> : null}
+                      {point.limit ? <span className="text-ink-dim"> · limit: {point.limit}</span> : null}
+                    </p>
+                  ))}
+                  <p><span className="text-ink-dimmer">Conclusion · </span>{response.conclusion || '—'}</p>
+                </div>
+              ) : mode === 'outline' && isOutlineResponse(response) ? (
                 <ul className="mt-2 flex flex-col gap-2 text-sm text-ink">
                   <li><span className="text-ink-dimmer">{labels.claim} · </span>{response.claim || '—'}</li>
                   <li><span className="text-ink-dimmer">{labels.mechanism1} · </span>{response.mechanisms[0] || '—'}</li>
                   <li><span className="text-ink-dimmer">{labels.mechanism2} · </span>{response.mechanisms[1] || '—'}</li>
                   <li><span className="text-ink-dimmer">{labels.tradeoff} · </span>{response.tradeoff || '—'}</li>
+                  {response.evidence?.trim() ? (
+                    <li><span className="text-ink-dimmer">{EVIDENCE_SLOT.label} · </span>{response.evidence}</li>
+                  ) : null}
                 </ul>
               ) : (
                 <p className="mt-2 whitespace-pre-wrap text-sm text-ink">
-                  {isOutlineResponse(response) ? '' : response.text}
+                  {isOutlineResponse(response) || isPlanResponse(response) ? '' : response.text}
                 </p>
               )}
             </section>
@@ -279,6 +345,20 @@ export function DrillResult({
           Next due {scheduleSaved ? formatDueIn(diagnostic.schedule.nextDueAt) : '— not saved'}
         </span>
       </div>
+
+      {/* This relation over time: the signal spaced practice never shows (audit U4). */}
+      {history.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Previous attempts on this drill">
+          <span className={LABEL}>Before this</span>
+          {history.map((entry, index) => (
+            <span key={`${entry.createdAt}-${index}`} className="flex items-center gap-1.5 text-[13px] text-ink-dim" title={VERDICT_LABEL[entry.verdict]}>
+              <StateTick state={VERDICT_TICK[entry.verdict]} />
+              <span className="font-mono tnum">{entry.linksCovered}/{entry.linksTotal}</span>
+              <span className="font-mono tnum text-ink-dimmer">{formatAge(entry.createdAt)}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {!offTarget ? <CheckFeedback deckId={deckId} attemptId={attemptId} /> : null}
     </div>

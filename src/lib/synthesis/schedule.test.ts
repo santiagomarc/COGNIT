@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LADDER_DAYS, nextSchedule, orderQueue, pickCapstoneDrill } from './schedule';
+import { LADDER_DAYS, PLAN_LADDER_DAYS, daysToExam, ladderFor, nextSchedule, orderQueue, pickCapstoneDrill } from './schedule';
 import type { SynthesisDrill } from './types';
 
 const NOW = new Date('2026-09-12T12:00:00Z');
@@ -9,11 +9,21 @@ function drill(id: string, overrides: Partial<SynthesisDrill> = {}): SynthesisDr
   return {
     id,
     deckId: 'deck',
+    kind: 'drill',
+    questionText: null,
+    commandWord: null,
+    planExemplar: null,
     format: 'causal',
     promptText: `prompt ${id}`,
+    promptVariants: [],
+    scenario: null,
+    bloom: null,
     cardIds: [`${id}-a`, `${id}-b`],
     topicTag: null,
-    requiredLinks: [{ id: 'm1', text: 'l', cardIds: [`${id}-a`] }, { id: 'm2', text: 'l', cardIds: [`${id}-b`] }],
+    requiredLinks: [
+      { id: 'm1', text: 'l', cardIds: [`${id}-a`], kind: 'mechanism', core: true },
+      { id: 'm2', text: 'l', cardIds: [`${id}-b`], kind: 'mechanism', core: true },
+    ],
     exemplar: { claim: 'c', mechanisms: ['m', 'm'], tradeoff: 't' },
     status: 'active',
     step: 0,
@@ -155,6 +165,23 @@ describe('orderQueue — orders, never locks', () => {
   });
 });
 
+describe('orderQueue — difficulty preference', () => {
+  it('prefers a harder drill on cards whose easy drill has been sound twice, when both are due', () => {
+    const easy = drill('easy', { step: 2, cardIds: ['x', 'y'] });
+    const hard = drill('hard', { format: 'evaluate', bloom: 'evaluate', cardIds: ['y', 'z'] });
+    const unrelated = drill('other', { cardIds: ['p', 'q'] });
+    const order = orderQueue({
+      candidates: [easy, unrelated, hard].map((d) => ({ drill: d, anchorStates: ['review', 'review'] })),
+      count: 3,
+      now: NOW,
+      random: () => 0.5,
+    });
+    expect(order[0].id).toBe('hard');
+    // The easy drill shares a card with the hard one, so it does not sit in the same launch; the unrelated one does.
+    expect(order.map((d) => d.id)).toEqual(['hard', 'other']);
+  });
+});
+
 describe('nextSchedule — confidence', () => {
   it('brings a sure-but-partial answer back in 12 h and leaves every other cell alone', () => {
     const partialSure = nextSchedule(1, 'partial', NOW, { confidence: 3 });
@@ -164,6 +191,41 @@ describe('nextSchedule — confidence', () => {
     expect(nextSchedule(1, 'partial', NOW, { confidence: null }).nextDueAt.getTime() - NOW.getTime()).toBe(24 * HOUR);
     expect(nextSchedule(0, 'sound', NOW, { confidence: 1 })).toEqual(nextSchedule(0, 'sound', NOW));
     expect(nextSchedule(1, 'contradicted', NOW, { confidence: 3 })).toEqual(nextSchedule(1, 'contradicted', NOW));
+  });
+});
+
+describe('nextSchedule — plans', () => {
+  const DAY = 24 * HOUR;
+  it('walks the 1 / 3 / 7 day ladder, retries partial in 48 h (12 h when sure) and contradicted in 24 h', () => {
+    expect([...PLAN_LADDER_DAYS]).toEqual([1, 3, 7]);
+    expect(nextSchedule(0, 'sound', NOW, { kind: 'plan' })).toEqual({ step: 1, nextDueAt: new Date(NOW.getTime() + 3 * DAY) });
+    expect(nextSchedule(2, 'sound', NOW, { kind: 'plan' }).nextDueAt.getTime() - NOW.getTime()).toBe(7 * DAY);
+    expect(nextSchedule(1, 'partial', NOW, { kind: 'plan' }).nextDueAt.getTime() - NOW.getTime()).toBe(48 * HOUR);
+    expect(nextSchedule(1, 'partial', NOW, { kind: 'plan', confidence: 3 }).nextDueAt.getTime() - NOW.getTime()).toBe(12 * HOUR);
+    expect(nextSchedule(1, 'contradicted', NOW, { kind: 'plan' })).toEqual({ step: 0, nextDueAt: new Date(NOW.getTime() + 24 * HOUR) });
+    // Drills are untouched.
+    expect(nextSchedule(0, 'sound', NOW, { kind: 'drill' })).toEqual(nextSchedule(0, 'sound', NOW));
+  });
+});
+
+describe('exam-aware ladders (plan D19)', () => {
+  const DAY = 24 * HOUR;
+  it('compresses inside three days, keeps the sprint inside two weeks, stretches beyond, and ignores a past date', () => {
+    expect(ladderFor('drill', null)).toBe(LADDER_DAYS);
+    expect([...ladderFor('drill', 2)]).toEqual([0, 0.5, 1]);
+    expect(ladderFor('drill', 10)).toBe(LADDER_DAYS);
+    expect([...ladderFor('drill', 30)]).toEqual([1, 3, 7]);
+    expect(ladderFor('drill', -1)).toBe(LADDER_DAYS);
+    expect(ladderFor('plan', 2)).toBe(PLAN_LADDER_DAYS);
+    expect(nextSchedule(0, 'sound', NOW, { daysToExam: 2 }).nextDueAt.getTime() - NOW.getTime()).toBe(12 * HOUR);
+    expect(nextSchedule(0, 'sound', NOW, { daysToExam: 30 }).nextDueAt.getTime() - NOW.getTime()).toBe(3 * DAY);
+  });
+
+  it('counts whole days to the exam', () => {
+    expect(daysToExam(null, NOW)).toBeNull();
+    expect(daysToExam('not a date', NOW)).toBeNull();
+    expect(daysToExam(new Date(NOW.getTime() + 2.5 * DAY).toISOString(), NOW)).toBe(3);
+    expect(daysToExam(new Date(NOW.getTime() - DAY).toISOString(), NOW)).toBe(-1);
   });
 });
 

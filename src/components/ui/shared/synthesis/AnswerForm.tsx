@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type { AnswerMode, CanvasAnchor, OutlineResponse, SynthesisFormat } from '@/lib/synthesis/types';
-import { FREE_TEXT_PLACEHOLDER, SLOT_LABELS, SLOT_PLACEHOLDERS } from '@/lib/synthesis/ui';
+import { normaliseForQuote } from '@/lib/synthesis/text';
+import { EVIDENCE_SLOT, FREE_TEXT_PLACEHOLDER, SLOT_LABELS, SLOT_PLACEHOLDERS } from '@/lib/synthesis/ui';
 
 export type OutlineDraft = OutlineResponse;
 
@@ -24,6 +25,8 @@ type AnswerFormProps = {
   promptId: string;
   /** Pinned above the slots while revising (audit F2): the gap note the revision answers. */
   revisingFrom?: string | null;
+  /** The key asks for a named example: show the fifth slot (plan D12). */
+  showEvidence?: boolean;
 };
 
 const SLOT_CLASS =
@@ -47,10 +50,28 @@ export function AnswerForm({
   disabled,
   promptId,
   revisingFrom = null,
+  showEvidence = false,
 }: AnswerFormProps) {
   const labels = SLOT_LABELS[format];
   const placeholders = SLOT_PLACEHOLDERS[format];
   const lastFocused = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+
+  // What the answer already names (audit U2): a chip dims once its term is in
+  // the text, and the meter says which slots hold anything. Both are computed
+  // from slot emptiness and term presence only — no content is judged here.
+  const answerNormalised = ` ${normaliseForQuote(mode === 'outline'
+    ? [outline.claim, outline.mechanisms[0], outline.mechanisms[1], outline.tradeoff, outline.evidence ?? ''].join(' ')
+    : freeText)} `;
+  const isNamed = (term: string) => {
+    const needle = normaliseForQuote(term);
+    return needle.length > 0 && answerNormalised.includes(` ${needle} `);
+  };
+  const filled = {
+    claim: outline.claim.trim().length > 0,
+    mechanisms: [outline.mechanisms[0], outline.mechanisms[1]].filter((slot) => slot.trim().length > 0).length,
+    tradeoff: outline.tradeoff.trim().length > 0,
+    evidence: (outline.evidence ?? '').trim().length > 0,
+  };
 
   const rememberFocus = useCallback((event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     lastFocused.current = event.currentTarget;
@@ -74,7 +95,7 @@ export function AnswerForm({
       onFreeTextChange(nextValue);
     } else {
       const field = target.name as keyof OutlineDraft | 'mechanism1' | 'mechanism2';
-      if (field === 'claim' || field === 'tradeoff') {
+      if (field === 'claim' || field === 'tradeoff' || field === 'evidence') {
         onOutlineChange({ ...outline, [field]: nextValue });
       } else if (field === 'mechanism1') {
         onOutlineChange({ ...outline, mechanisms: [nextValue, outline.mechanisms[1]] });
@@ -108,18 +129,38 @@ export function AnswerForm({
         <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
           Insert
         </span>
-        {anchors.map((anchor) => (
-          <button
-            key={anchor.id}
-            type="button"
-            className="term-chip"
-            onClick={() => insertTerm(anchor.term)}
-            disabled={locked}
-            title={`Insert "${anchor.term}"`}
-          >
-            {anchor.term}
-          </button>
-        ))}
+        {anchors.map((anchor) => {
+          const named = isNamed(anchor.term);
+          return (
+            <button
+              key={anchor.id}
+              type="button"
+              className="term-chip"
+              style={named ? { color: 'var(--ink-dimmer)', borderColor: 'var(--border)' } : undefined}
+              aria-pressed={named}
+              onClick={() => insertTerm(anchor.term)}
+              disabled={locked}
+              title={named ? `"${anchor.term}" is in your answer` : `Insert "${anchor.term}"`}
+            >
+              {anchor.term}
+            </button>
+          );
+        })}
+        {mode === 'outline' ? (
+          <span className="ml-auto font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer" aria-live="polite">
+            <span style={{ color: filled.claim ? 'var(--ink)' : undefined }}>{labels.claim}</span>
+            {' · '}
+            <span style={{ color: filled.mechanisms === 2 ? 'var(--ink)' : undefined }}>{filled.mechanisms}/2</span>
+            {' · '}
+            <span style={{ color: filled.tradeoff ? 'var(--ink)' : undefined }}>{labels.tradeoff}</span>
+            {showEvidence ? (
+              <>
+                {' · '}
+                <span style={{ color: filled.evidence ? 'var(--ink)' : undefined }}>{EVIDENCE_SLOT.label}</span>
+              </>
+            ) : null}
+          </span>
+        ) : null}
       </div>
 
       {mode === 'outline' ? (
@@ -183,6 +224,25 @@ export function AnswerForm({
               className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
             />
           </label>
+          {showEvidence ? (
+            <>
+              <div className="rule rule--soft" aria-hidden="true" />
+              <label className="flex flex-col gap-1">
+                <span className="slot-label">{EVIDENCE_SLOT.label}</span>
+                <Textarea
+                  name="evidence"
+                  value={outline.evidence ?? ''}
+                  onChange={(event) => onOutlineChange({ ...outline, evidence: event.target.value })}
+                  onFocus={rememberFocus}
+                  placeholder={EVIDENCE_SLOT.placeholder}
+                  maxLength={220}
+                  rows={2}
+                  disabled={locked}
+                  className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
+                />
+              </label>
+            </>
+          ) : null}
         </div>
       ) : (
         <label className="flex flex-col gap-1">

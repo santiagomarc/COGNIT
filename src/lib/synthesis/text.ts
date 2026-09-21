@@ -3,13 +3,25 @@
  * (persisted word_count, quote verification, fencing). Pure; client-safe.
  */
 
-import type { AnswerMode, AttemptResponse, FreeResponse, OutlineResponse } from '@/lib/synthesis/types';
+import type { AnswerMode, AttemptResponse, FreeResponse, OutlineResponse, PlanResponse } from '@/lib/synthesis/types';
 
 export const MAX_ANSWER_WORDS = 150;
+/** An essay plan is longer than a drill answer — three points with evidence — but still a plan, not an essay (plan D15). */
+export const MAX_PLAN_WORDS = 250;
 
 export function isOutlineResponse(response: AttemptResponse): response is OutlineResponse {
   return typeof (response as OutlineResponse).claim === 'string';
 }
+
+export function isPlanResponse(response: AttemptResponse): response is PlanResponse {
+  return typeof (response as PlanResponse).thesis === 'string' && Array.isArray((response as PlanResponse).points);
+}
+
+export function maxWordsFor(mode: AnswerMode): number {
+  return mode === 'plan' ? MAX_PLAN_WORDS : MAX_ANSWER_WORDS;
+}
+
+const PLAN_POINT_LABELS = ['Claim', 'Mechanism', 'Evidence', 'Limit'] as const;
 
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -17,8 +29,18 @@ export function countWords(text: string): number {
 
 /** Every field of the answer joined, for counting and for quote lookups. */
 export function responseText(response: AttemptResponse): string {
+  if (isPlanResponse(response)) {
+    return [
+      response.thesis,
+      ...response.points.flatMap((point) => [point.claim, point.mechanism, point.evidence, point.limit]),
+      response.conclusion,
+    ]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join('\n');
+  }
   if (isOutlineResponse(response)) {
-    return [response.claim, response.mechanisms[0], response.mechanisms[1], response.tradeoff]
+    return [response.claim, response.mechanisms[0], response.mechanisms[1], response.tradeoff, response.evidence ?? '']
       .map((part) => part.trim())
       .filter(Boolean)
       .join('\n');
@@ -28,15 +50,69 @@ export function responseText(response: AttemptResponse): string {
 
 /** The labelled form the model reads. Labels are fixed so quotes stay verbatim. */
 export function renderResponseForModel(mode: AnswerMode, response: AttemptResponse): string {
+  if (mode === 'plan' && isPlanResponse(response)) {
+    const lines = [`Thesis: ${response.thesis.trim() || '(empty)'}`];
+    response.points.forEach((point, index) => {
+      lines.push(`Point ${index + 1}:`);
+      const values = [point.claim, point.mechanism, point.evidence, point.limit];
+      PLAN_POINT_LABELS.forEach((label, slot) => {
+        lines.push(`  ${label}: ${values[slot].trim() || '(empty)'}`);
+      });
+    });
+    lines.push(`Conclusion: ${response.conclusion.trim() || '(empty)'}`);
+    return lines.join('\n');
+  }
   if (mode === 'outline' && isOutlineResponse(response)) {
-    return [
+    const lines = [
       `Claim: ${response.claim.trim() || '(empty)'}`,
       `Mechanism 1: ${response.mechanisms[0].trim() || '(empty)'}`,
       `Mechanism 2: ${response.mechanisms[1].trim() || '(empty)'}`,
       `Trade-off: ${response.tradeoff.trim() || '(empty)'}`,
-    ].join('\n');
+    ];
+    if (response.evidence?.trim()) lines.push(`Evidence: ${response.evidence.trim()}`);
+    return lines.join('\n');
   }
   return responseText(response);
+}
+
+/* ── Word diff (audit U3) ─────────────────────────────────────────── */
+
+export type DiffToken = { text: string; kind: 'same' | 'added' | 'removed' };
+
+/**
+ * A word-level diff of a revision against the attempt it revises: an LCS
+ * over whitespace tokens, so the result panel can show the repair rather
+ * than two blocks of prose. Bounded: inputs over 400 tokens each are
+ * compared on their first 400.
+ */
+export function wordDiff(before: string, after: string): DiffToken[] {
+  const a = before.trim().split(/\s+/).filter(Boolean).slice(0, 400);
+  const b = after.trim().split(/\s+/).filter(Boolean).slice(0, 400);
+  const table: number[][] = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    for (let j = b.length - 1; j >= 0; j -= 1) {
+      table[i][j] = a[i] === b[j] ? table[i + 1][j + 1] + 1 : Math.max(table[i + 1][j], table[i][j + 1]);
+    }
+  }
+  const out: DiffToken[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      out.push({ text: a[i], kind: 'same' });
+      i += 1;
+      j += 1;
+    } else if (table[i + 1][j] >= table[i][j + 1]) {
+      out.push({ text: a[i], kind: 'removed' });
+      i += 1;
+    } else {
+      out.push({ text: b[j], kind: 'added' });
+      j += 1;
+    }
+  }
+  while (i < a.length) out.push({ text: a[i++], kind: 'removed' });
+  while (j < b.length) out.push({ text: b[j++], kind: 'added' });
+  return out;
 }
 
 /**
@@ -78,6 +154,20 @@ export function verifyQuote(quote: string | null | undefined, haystack: string, 
 /** Sanitiser artefacts must not reach the student's screen or a new card. */
 export function stripRedactions(text: string): string {
   return text.replace(/\s*\[redacted\]\s*/gi, ' ').replace(/\s{2,}/g, ' ').trim();
+}
+
+/**
+ * The model is told never to mention link or card keys (m1, c2) in prose
+ * meant for the student; this is the safety net for when it does (plan D7):
+ * "the tuning link (m3)" → "the tuning link", "link m2 and card c1" → "link and card".
+ */
+export function stripKeyIds(text: string): string {
+  return text
+    .replace(/\s*\(\s*(?:[mc][1-4])(?:\s*(?:,|and|&)\s*[mc][1-4])*\s*\)/gi, '')
+    .replace(/(?<![\p{L}\p{N}])[mc][1-4](?![\p{L}\p{N}])/gu, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim();
 }
 
 /* ── Fuzzy quote location (audit R6) ─────────────────────────────── */

@@ -41,22 +41,39 @@ function getGeminiClient() {
   return new GoogleGenerativeAI(getServerEnv().GEMINI_API_KEY);
 }
 
+export type ModelFamily = '2.5' | '3';
+export type ModelPurpose = 'check' | 'generation';
+
 /**
- * @param options.temperature Defaults to 0.1. Extraction and enrichment want
- * near-determinism — the same PDF should yield the same cards. Callers that
- * want warmth (deck chat) pass their own value.
+ * The generation-config dialect a model speaks (execution plan D1). Gemini
+ * 3.x replaced `thinkingBudget` with `thinkingLevel` and rejects the budget
+ * with a 400 (measured on gemini-3.5-flash-lite, Audit II §2); it also asks
+ * for temperature 1.0. Everything before it takes a budget and a temperature.
  */
-export function getGeminiJsonModel(options?: { temperature?: number }) {
+export function modelFamily(model: string, override?: ModelFamily): ModelFamily {
+  if (override) return override;
+  return /gemini-3/i.test(model) ? '3' : '2.5';
+}
+
+/** The model a purpose runs on: generation may be routed to a stronger model (plan D2). */
+export function resolveModelName(purpose: ModelPurpose = 'check'): string {
   const env = getServerEnv();
+  return purpose === 'generation' ? (env.GEMINI_MODEL_GENERATION ?? env.GEMINI_MODEL) : env.GEMINI_MODEL;
+}
+
+/**
+ * @param options.temperature Defaults to 0.1 on 2.5-family models. Extraction
+ * and enrichment want near-determinism — the same PDF should yield the same
+ * cards. Callers that want warmth (deck chat) pass their own value. On a 3.x
+ * model the request-level config pins temperature to 1.0 regardless (D1).
+ * @param options.purpose `generation` routes to GEMINI_MODEL_GENERATION when set.
+ */
+export function getGeminiJsonModel(options?: { temperature?: number; purpose?: ModelPurpose }) {
   const genai = getGeminiClient();
+  const model = resolveModelName(options?.purpose);
   return genai.getGenerativeModel({
-    model: env.GEMINI_MODEL,
-    generationConfig: {
-      temperature: options?.temperature ?? 0.1,
-      topP: 0.95,
-      responseMimeType: 'application/json',
-      maxOutputTokens: env.GEMINI_MODEL_MAX_TOKENS,
-    },
+    model,
+    generationConfig: jsonGenerationConfig({ temperature: options?.temperature, model }),
   });
 }
 
@@ -79,6 +96,8 @@ export function getGeminiEmbeddingModel() {
   });
 }
 
+export type ThinkingEffort = 'none' | 'low' | 'high';
+
 /**
  * The per-request config for a structured (JSON) call.
  *
@@ -89,26 +108,41 @@ export function getGeminiEmbeddingModel() {
  * and output cap and runs at the model default. Every JSON call site builds
  * its config here so that cannot happen again.
  *
- * `thinkingBudget: 0` is the default on purpose: extraction, enrichment and
- * classification gain nothing from thinking tokens, which are billed and drawn
- * from the same output budget. Callers that measure a quality gain pass their
- * own budget. The field is not in 0.24's types; like `propertyOrdering` it is
+ * Thinking is off by default: extraction, enrichment and classification gain
+ * nothing from thinking tokens, which are billed and drawn from the same
+ * output budget (measured: 8× output tokens and 4× latency for the same
+ * verdict, Audit II §2). The dialect is the model family's (D1):
+ *
+ *   2.5  thinkingConfig.thinkingBudget  0 / 1024 / 8192, caller temperature
+ *   3    thinkingConfig.thinkingLevel   omitted (model default) / low / high,
+ *        temperature 1.0 — the vendor's guidance; a budget of 0 is a 400.
+ *
+ * Neither field is in 0.24's types; like `propertyOrdering` they are
  * forwarded to the REST body unchanged.
  */
 export function jsonGenerationConfig(input: {
   responseSchema?: Schema;
   temperature?: number;
   maxOutputTokens?: number;
-  thinkingBudget?: number;
+  thinking?: ThinkingEffort;
+  /** The model the config is for; defaults to GEMINI_MODEL. */
+  model?: string;
 } = {}): GenerationConfig {
   const env = getServerEnv();
+  const family = modelFamily(input.model ?? env.GEMINI_MODEL, env.GEMINI_MODEL_FAMILY);
+  const thinking = input.thinking ?? 'none';
+
+  const thinkingConfig = family === '3'
+    ? (thinking === 'none' ? null : { thinkingLevel: thinking })
+    : { thinkingBudget: thinking === 'none' ? 0 : thinking === 'low' ? 1024 : 8192 };
+
   return {
-    temperature: input.temperature ?? 0.1,
+    temperature: family === '3' ? 1.0 : (input.temperature ?? 0.1),
     topP: 0.95,
     maxOutputTokens: input.maxOutputTokens ?? env.GEMINI_MODEL_MAX_TOKENS,
     responseMimeType: 'application/json',
     ...(input.responseSchema ? { responseSchema: input.responseSchema } : {}),
-    ...({ thinkingConfig: { thinkingBudget: input.thinkingBudget ?? 0 } } as object),
+    ...(thinkingConfig ? ({ thinkingConfig } as object) : {}),
   };
 }
 
@@ -278,7 +312,7 @@ export async function requireOwnedDeck(deckId: string) {
 
   const { data: deck, error } = await supabase
     .from('decks')
-    .select('id, title')
+    .select('id, title, exam_at')
     .eq('id', deckId)
     .eq('user_id', user.id)
     .single();

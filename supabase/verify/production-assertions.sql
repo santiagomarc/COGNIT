@@ -180,6 +180,47 @@ where not exists (
     and p.proname || '(' || replace(oidvectortypes(p.proargtypes), ', ', ',') || ')' = required.fn
 );
 
+-- 16. Phase 4 (202609210900, 202609210910): the drill columns behind
+--     variants, formats, plans and the question bank. Expect 9 column rows,
+--     the widened format CHECK, and the plan-aware attempt CHECKs.
+select table_name, column_name
+from information_schema.columns
+where table_schema = 'public'
+  and (
+    (table_name = 'synthesis_drills' and column_name in ('prompt_variants', 'bloom', 'scenario', 'kind', 'question_text', 'command_word'))
+    or (table_name = 'synthesis_attempts' and column_name in ('band'))
+    or (table_name = 'synthesis_questions' and column_name in ('mapped_card_ids', 'missing_concepts'))
+  )
+order by table_name, column_name;
+
+select conname, pg_get_constraintdef(oid) as definition
+from pg_constraint
+where conrelid in ('public.synthesis_drills'::regclass, 'public.synthesis_attempts'::regclass)
+  and contype = 'c'
+  and (
+    pg_get_constraintdef(oid) like '%elaborate%'          -- the seven formats
+    or pg_get_constraintdef(oid) like '%''plan''%'        -- kind and mode
+    or pg_get_constraintdef(oid) like '%400%'             -- plan word count
+  )
+order by conname;
+
+-- 17. Grading integrity readings (execution plan D4/D6/G6): how often the
+--     server overrode the model, and how the variants and samples are used.
+--     Informational.
+select
+  a.mode,
+  count(*) as attempts,
+  sum((a.usage->>'demoted_covered')::int) as demoted_covered,
+  sum((a.usage->>'dropped_contradictions')::int) as dropped_contradictions,
+  count(*) filter (where (a.usage->>'prompt_variant')::int > 0) as on_a_variant,
+  count(*) filter (where (a.usage->>'worked_example')::boolean) as after_worked_example,
+  count(*) filter (where a.band = 'strong') as strong_plans,
+  a.usage->>'prompt_version' as prompt_version
+from public.synthesis_attempts a
+where a.created_at > now() - interval '30 days'
+group by a.mode, a.usage->>'prompt_version'
+order by attempts desc;
+
 -- ── Query plans ────────────────────────────────────────────────────
 -- Substitute a real deck id. Expect "Index Scan using
 -- cards_embedding_hnsw_idx", NOT "Seq Scan on cards".

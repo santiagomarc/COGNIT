@@ -14,10 +14,11 @@ import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { AnswerForm, type OutlineDraft } from '@/components/ui/shared/synthesis/AnswerForm';
 import { ConfidencePicker } from '@/components/ui/shared/synthesis/ConfidencePicker';
 import { DrillResult } from '@/components/ui/shared/synthesis/DrillResult';
-import { DrillSessionSummary, type SessionEntry } from '@/components/ui/shared/synthesis/DrillSessionSummary';
+import { DrillSessionSummary, type SessionEntry, type StoredResult } from '@/components/ui/shared/synthesis/DrillSessionSummary';
 import { GenerateSynthesisDrillsButton } from '@/components/ui/shared/synthesis/GenerateSynthesisDrillsButton';
 import { formatActionError } from '@/lib/ai-feedback';
-import { MAX_ANSWER_WORDS, countWords, responseText } from '@/lib/synthesis/text';
+import { countWords, maxWordsFor, responseText } from '@/lib/synthesis/text';
+import { EMPTY_PLAN, PlanForm, type PlanDraft } from '@/components/ui/shared/synthesis/PlanForm';
 import type {
   AnswerMode,
   AttemptResponse,
@@ -25,9 +26,12 @@ import type {
   CanvasDrill,
   Confidence,
   Diagnostic,
+  DrillAttemptHistoryEntry,
   DrillReveal,
+  Exemplar,
   LastAttemptSummary,
 } from '@/lib/synthesis/types';
+import { SLOT_LABELS } from '@/lib/synthesis/ui';
 import { isConfidence } from '@/lib/synthesis/types';
 import { FORMAT_LABEL, VERDICT_LABEL, VERDICT_TICK, formatAgo, formatClock, linksTone } from '@/lib/synthesis/ui';
 import { RichText } from '@/components/ui/shared/RichText';
@@ -38,10 +42,17 @@ type SynthesisDrillClientProps = {
   drills: CanvasDrill[];
   anchorsByDrill: Record<string, CanvasAnchor[]>;
   lastAttemptByDrill: Record<string, LastAttemptSummary>;
+  /** The last few attempts per drill, newest first (audit U4). */
+  historyByDrill: Record<string, DrillAttemptHistoryEntry[]>;
+  /** The first drill's exemplar, only while the deck has no attempts (plan D14). */
+  workedExample: Exemplar | null;
   pullForward: boolean;
   activeDrillCount: number;
   /** Set when the study completion screen's capstone offer opened this drill (spec §8.3). */
   from?: 'study';
+  /** Sprint (plan D13): a countdown, results withheld until the end. */
+  sessionMode: 'drill' | 'sprint';
+  sprintMinutes: number;
 };
 
 type Phase = 'answering' | 'checking' | 'diagnosed' | 'finished';
@@ -56,17 +67,18 @@ type CheckResult = {
   isRevision: boolean;
 };
 
-const EMPTY_OUTLINE: OutlineDraft = { claim: '', mechanisms: ['', ''], tradeoff: '' };
+const EMPTY_OUTLINE: OutlineDraft = { claim: '', mechanisms: ['', ''], tradeoff: '', evidence: '' };
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
 /** Past this, the checking reading says so in words (audit U3). */
 const SLOW_CHECK_MS = 4_000;
 const VERY_SLOW_CHECK_MS = 10_000;
 
 type PersistedAnswer = {
-  version: 2;
+  version: 3;
   mode: AnswerMode;
   outline: OutlineDraft;
   freeText: string;
+  plan: PlanDraft;
   confidence: Confidence | null;
   /** The key of a check that did not come back; a retry reuses it (audit R8). */
   clientAttemptId: string | null;
@@ -78,12 +90,13 @@ function readPersistedAnswer(key: string): PersistedAnswer | null {
     const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedAnswer> & { version?: number };
-    if (parsed.version !== 2 || !parsed.mode || !parsed.outline) return null;
+    if (parsed.version !== 3 || !parsed.mode || !parsed.outline) return null;
     return {
-      version: 2,
+      version: 3,
       mode: parsed.mode,
       outline: parsed.outline,
       freeText: parsed.freeText ?? '',
+      plan: parsed.plan ?? EMPTY_PLAN,
       confidence: isConfidence(parsed.confidence) ? parsed.confidence : null,
       clientAttemptId: typeof parsed.clientAttemptId === 'string' ? parsed.clientAttemptId : null,
     };
@@ -118,10 +131,15 @@ export function SynthesisDrillClient({
   drills,
   anchorsByDrill,
   lastAttemptByDrill,
+  historyByDrill,
+  workedExample,
   pullForward,
   activeDrillCount,
   from,
+  sessionMode,
+  sprintMinutes,
 }: SynthesisDrillClientProps) {
+  const isSprint = sessionMode === 'sprint';
   const router = useRouter();
   const [index, setIndex] = useState(0);
   const drill = drills[index] ?? null;
@@ -130,7 +148,8 @@ export function SynthesisDrillClient({
   const storageKey = drill ? `synthesis-answer:${deckId}:${drill.id}` : null;
 
   const [phase, setPhase] = useState<Phase>('answering');
-  const [mode, setMode] = useState<AnswerMode>('outline');
+  const [mode, setMode] = useState<AnswerMode>(drills[0]?.kind === 'plan' ? 'plan' : 'outline');
+  const [plan, setPlan] = useState<PlanDraft>(EMPTY_PLAN);
   const [outline, setOutline] = useState<OutlineDraft>(EMPTY_OUTLINE);
   const [freeText, setFreeText] = useState('');
   const [confidence, setConfidence] = useState<Confidence | null>(null);
@@ -145,8 +164,12 @@ export function SynthesisDrillClient({
   const [checkElapsedMs, setCheckElapsedMs] = useState(0);
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [sessionEntries, setSessionEntries] = useState<SessionEntry[]>([]);
+  const [sprintResults, setSprintResults] = useState<Record<string, StoredResult>>({});
   const [skipped, setSkipped] = useState(0);
   const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
+  const [workedExampleOpen, setWorkedExampleOpen] = useState(true);
+  const [previousResponse, setPreviousResponse] = useState<AttemptResponse | null>(null);
+  const [timeLeftMs, setTimeLeftMs] = useState(sprintMinutes * 60_000);
   const [isChecking, startCheck] = useTransition();
   const [isArchiving, startArchive] = useTransition();
   // Set in an effect: Date.now() during render is impure (react-hooks/purity).
@@ -156,6 +179,15 @@ export function SynthesisDrillClient({
   const clientAttemptIdRef = useRef<string | null>(null);
   const promptRef = useRef<HTMLParagraphElement | null>(null);
   const confidenceRef = useRef<HTMLDivElement | null>(null);
+  const deadlineRef = useRef<number>(0);
+  const timeUpRef = useRef(false);
+  // The countdown's callback needs the latest index and phase without re-arming the interval.
+  const indexRef = useRef(0);
+  const phaseRef = useRef<Phase>('answering');
+  useEffect(() => {
+    indexRef.current = index;
+    phaseRef.current = phase;
+  }, [index, phase]);
 
   // Restore a half-typed answer for this drill (tab-lifetime only, like the
   // quiz). Deferred a tick: sessionStorage is client-only, so restoring after
@@ -170,6 +202,7 @@ export function SynthesisDrillClient({
       setMode(persisted.mode);
       setOutline(persisted.outline);
       setFreeText(persisted.freeText);
+      setPlan(persisted.plan);
       setConfidence(persisted.confidence);
       clientAttemptIdRef.current = persisted.clientAttemptId;
     }, 0);
@@ -179,10 +212,11 @@ export function SynthesisDrillClient({
   useEffect(() => {
     if (!storageKey || phase !== 'answering') return;
     const payload: PersistedAnswer = {
-      version: 2,
+      version: 3,
       mode,
       outline,
       freeText,
+      plan,
       confidence,
       clientAttemptId: clientAttemptIdRef.current,
     };
@@ -191,7 +225,7 @@ export function SynthesisDrillClient({
     } catch {
       // Ignore storage failures.
     }
-  }, [confidence, freeText, mode, outline, phase, storageKey]);
+  }, [confidence, freeText, mode, outline, phase, plan, storageKey]);
 
   // Elapsed clock, ticking only while answering. The start mark is taken here
   // rather than in render, once per drill.
@@ -213,6 +247,31 @@ export function SynthesisDrillClient({
     return () => window.clearInterval(intervalId);
   }, [phase]);
 
+  // Sprint countdown (plan D13). The deadline is set once, on the first
+  // tick; zero ends the launch as soon as no check is in flight — what was
+  // not reached counts as skipped, like an exam paper.
+  const endSprint = useCallback((answeredCurrent: boolean) => {
+    setSkipped((count) => count + Math.max(0, drills.length - indexRef.current - (answeredCurrent ? 1 : 0)));
+    setSessionElapsedMs(sessionStartedAtRef.current ? Date.now() - sessionStartedAtRef.current : 0);
+    setPhase('finished');
+  }, [drills.length]);
+
+  useEffect(() => {
+    if (!isSprint || phase === 'finished') return;
+    if (deadlineRef.current === 0) deadlineRef.current = Date.now() + sprintMinutes * 60_000;
+    const intervalId = window.setInterval(() => {
+      const left = deadlineRef.current - Date.now();
+      setTimeLeftMs(Math.max(0, left));
+      if (left <= 0 && !timeUpRef.current) {
+        timeUpRef.current = true;
+        window.clearInterval(intervalId);
+        // A check in flight finishes the sprint itself when it lands.
+        if (phaseRef.current !== 'checking') endSprint(false);
+      }
+    }, 500);
+    return () => window.clearInterval(intervalId);
+  }, [endSprint, isSprint, phase, sprintMinutes]);
+
   // Focus follows the phase (audit U2): the verdict when it arrives, the
   // prompt when a new drill does. Screen readers announce both; keyboard
   // users are placed, not left where the button was.
@@ -226,28 +285,38 @@ export function SynthesisDrillClient({
   }, [index]);
 
   const response: AttemptResponse = useMemo(
-    () => (mode === 'outline'
-      ? { claim: outline.claim, mechanisms: [outline.mechanisms[0], outline.mechanisms[1]] as [string, string], tradeoff: outline.tradeoff }
-      : { text: freeText }),
-    [freeText, mode, outline],
+    () => (mode === 'plan'
+      ? plan
+      : mode === 'outline'
+        ? {
+          claim: outline.claim,
+          mechanisms: [outline.mechanisms[0], outline.mechanisms[1]] as [string, string],
+          tradeoff: outline.tradeoff,
+          ...(outline.evidence?.trim() ? { evidence: outline.evidence } : {}),
+        }
+        : { text: freeText }),
+    [freeText, mode, outline, plan],
   );
+  const wordLimit = maxWordsFor(mode);
   const wordCount = useMemo(() => countWords(responseText(response)), [response]);
-  const overLimit = wordCount > MAX_ANSWER_WORDS;
-  const hasAnswer = wordCount > 0 && (mode === 'free' || outline.claim.trim().length > 0);
+  const overLimit = wordCount > wordLimit;
+  const hasAnswer = wordCount > 0 && (mode === 'free' || (mode === 'plan' ? plan.thesis.trim().length > 0 : outline.claim.trim().length > 0));
   // A check in flight is as unfinished as an unchecked answer (audit R7).
   const dirty = phase === 'checking' || (phase === 'answering' && wordCount > 0);
 
-  const resetForDrill = useCallback(() => {
+  const resetForDrill = useCallback((nextKind: 'drill' | 'plan' = 'drill') => {
     setPhase('answering');
-    setMode('outline');
+    setMode(nextKind === 'plan' ? 'plan' : 'outline');
     setOutline(EMPTY_OUTLINE);
     setFreeText('');
+    setPlan(EMPTY_PLAN);
     setConfidence(null);
     setConfidenceMissing(false);
     setResult(null);
     setExemplarHidden(false);
     setRevisionOf(null);
     setRevisionGapNote(null);
+    setPreviousResponse(null);
     setCheckError(null);
     setElapsedMs(0);
     startedAtRef.current = 0;
@@ -260,6 +329,24 @@ export function SynthesisDrillClient({
       return [...others, entry];
     });
   }, []);
+
+  const isLast = index >= drills.length - 1;
+
+  const finish = useCallback(() => {
+    setSessionElapsedMs(sessionStartedAtRef.current ? Date.now() - sessionStartedAtRef.current : 0);
+    setPhase('finished');
+  }, []);
+
+  const goNext = useCallback(() => {
+    if (isLast) {
+      finish();
+      return;
+    }
+    setIndex((current) => current + 1);
+    resetForDrill(drills[index + 1]?.kind ?? 'drill');
+  }, [drills, finish, index, isLast, resetForDrill]);
+
+  const showingWorkedExample = Boolean(workedExample) && index === 0 && workedExampleOpen && phase === 'answering';
 
   const check = useCallback(() => {
     if (!drill || phase !== 'answering' || !hasAnswer || overLimit || isChecking) return;
@@ -274,7 +361,7 @@ export function SynthesisDrillClient({
     // One key per check; a retry after a failure sends the same one, so the
     // server can hand back the attempt it already made (audit R8).
     if (!clientAttemptIdRef.current) clientAttemptIdRef.current = newClientAttemptId();
-    const snapshot = { mode, response, confidence, revisionOf, clientAttemptId: clientAttemptIdRef.current };
+    const snapshot = { mode, response, confidence, revisionOf, clientAttemptId: clientAttemptIdRef.current, workedExample: showingWorkedExample };
 
     startCheck(async () => {
       let outcome: Awaited<ReturnType<typeof checkSynthesisAttempt>>;
@@ -289,24 +376,28 @@ export function SynthesisDrillClient({
           confidence: snapshot.confidence,
           client_attempt_id: snapshot.clientAttemptId ?? undefined,
           revision_of: snapshot.revisionOf ?? undefined,
+          prompt_variant: drill.promptVariant,
+          worked_example: snapshot.workedExample,
         });
       } catch {
         // The request itself failed (a timeout, a dropped connection): the
         // answer stays, the key stays, and the retry is one tap (audit R1).
         setPhase('answering');
         setCheckError('The check did not come back. Your answer is still here — try again.');
+        if (isSprint && timeUpRef.current) endSprint(false);
         return;
       }
 
       if (!outcome || !('success' in outcome) || !outcome.success) {
         setPhase('answering');
         setCheckError(formatActionError('error' in outcome ? outcome.error : null, 'The check failed. Please try again.'));
+        if (isSprint && timeUpRef.current) endSprint(false);
         return;
       }
 
       const isRevision = snapshot.revisionOf !== null;
       const verdict = outcome.diagnostic.verdict;
-      setResult({
+      const checkResult: CheckResult = {
         attemptId: outcome.attemptId,
         diagnostic: outcome.diagnostic,
         reveal: outcome.reveal,
@@ -314,13 +405,19 @@ export function SynthesisDrillClient({
         mode: snapshot.mode,
         response: snapshot.response,
         isRevision,
-      });
-      // Two-stage feedback (audit F2): the exemplar waits while a revise is
-      // still possible; a revision, a sound answer or an off-target one
-      // shows it at once.
-      setExemplarHidden(!isRevision && (verdict === 'partial' || verdict === 'contradicted'));
-      setPhase('diagnosed');
+      };
       clientAttemptIdRef.current = null;
+      if (isSprint) {
+        // Results wait for the end of the sprint (plan D13); the next drill comes at once.
+        setSprintResults((results) => ({ ...results, [drill.id]: { drill, anchors, result: checkResult } }));
+      } else {
+        setResult(checkResult);
+        // Two-stage feedback (audit F2): the exemplar waits while a revise is
+        // still possible; a revision, a sound answer or an off-target one
+        // shows it at once.
+        setExemplarHidden(!isRevision && (verdict === 'partial' || verdict === 'contradicted'));
+        setPhase('diagnosed');
+      }
       const termById = new Map(anchors.map((anchor) => [anchor.id, anchor.term]));
       recordEntry({
         drillId: drill.id,
@@ -349,24 +446,12 @@ export function SynthesisDrillClient({
       if (!outcome.scheduleSaved) {
         toast.warning("Saved, but the drill's schedule did not update.");
       }
+      if (isSprint) {
+        if (timeUpRef.current) endSprint(true);
+        else goNext();
+      }
     });
-  }, [anchors, confidence, deckId, drill, hasAnswer, isChecking, mode, overLimit, phase, pullForward, recordEntry, response, revisionOf, storageKey]);
-
-  const isLast = index >= drills.length - 1;
-
-  const finish = useCallback(() => {
-    setSessionElapsedMs(sessionStartedAtRef.current ? Date.now() - sessionStartedAtRef.current : 0);
-    setPhase('finished');
-  }, []);
-
-  const goNext = useCallback(() => {
-    if (isLast) {
-      finish();
-      return;
-    }
-    setIndex((current) => current + 1);
-    resetForDrill();
-  }, [finish, isLast, resetForDrill]);
+  }, [anchors, confidence, deckId, drill, endSprint, goNext, hasAnswer, isChecking, isSprint, mode, overLimit, phase, pullForward, recordEntry, response, revisionOf, showingWorkedExample, storageKey]);
 
   const skip = useCallback(() => {
     if (phase !== 'answering') return;
@@ -404,6 +489,7 @@ export function SynthesisDrillClient({
     setRevisedDrillIds((ids) => [...ids, drill.id]);
     setRevisionOf(result.attemptId);
     setRevisionGapNote(result.diagnostic.gapNote);
+    setPreviousResponse(result.response);
     setResult(null);
     setPhase('answering');
     setCheckError(null);
@@ -526,7 +612,13 @@ export function SynthesisDrillClient({
           <div className="rule" aria-hidden="true" />
         </header>
         <main className="flex flex-1 items-start justify-center p-4 md:p-8">
-          <DrillSessionSummary deckId={deckId} entries={sessionEntries} skipped={skipped} elapsedMs={sessionElapsedMs} />
+          <DrillSessionSummary
+            deckId={deckId}
+            entries={sessionEntries}
+            skipped={skipped}
+            elapsedMs={sessionElapsedMs}
+            results={isSprint ? sprintResults : undefined}
+          />
         </main>
       </div>
     );
@@ -581,10 +673,10 @@ export function SynthesisDrillClient({
               <span className={LABEL}>Deck</span>
               <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">{deckTitle}</span>
             </div>
-            <Telemetry label={from === 'study' ? 'Capstone' : 'Drill'} value={`${index + 1}/${drills.length}`} />
+            <Telemetry label={from === 'study' ? 'Capstone' : drill.kind === 'plan' ? 'Plan' : 'Drill'} value={`${index + 1}/${drills.length}`} />
             <div className="flex items-baseline gap-2">
-              <span className={LABEL}>Format</span>
-              <span className="text-[13px] leading-none text-ink">{FORMAT_LABEL[drill.format]}</span>
+              <span className={LABEL}>{drill.kind === 'plan' ? 'Command' : 'Format'}</span>
+              <span className="text-[13px] leading-none text-ink">{drill.kind === 'plan' ? (drill.commandWord ?? 'essay') : FORMAT_LABEL[drill.format]}</span>
             </div>
             {phase === 'diagnosed' && linksReading && result ? (
               <Telemetry
@@ -594,7 +686,7 @@ export function SynthesisDrillClient({
               />
             ) : (
               // Over the limit is an input state, not a card state: a word, not a hue (audit U5).
-              <Telemetry label="Words" value={overLimit ? `${wordCount}/${MAX_ANSWER_WORDS} · over` : `${wordCount}/${MAX_ANSWER_WORDS}`} />
+              <Telemetry label="Words" value={overLimit ? `${wordCount}/${wordLimit} · over` : `${wordCount}/${wordLimit}`} />
             )}
             {phase === 'checking' ? (
               <div className="flex items-center gap-2">
@@ -604,7 +696,9 @@ export function SynthesisDrillClient({
                 </span>
               </div>
             ) : (
-              <Telemetry label={phase === 'diagnosed' ? 'Time' : 'Elapsed'} value={formatClock(elapsedMs)} />
+              isSprint
+                ? <Telemetry label="Left" value={formatClock(timeLeftMs)} tone={timeLeftMs < 60_000 ? 'due' : 'ink'} />
+                : <Telemetry label={phase === 'diagnosed' ? 'Time' : 'Elapsed'} value={formatClock(elapsedMs)} />
             )}
           </div>
         </div>
@@ -614,6 +708,12 @@ export function SynthesisDrillClient({
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 pb-8 md:px-8">
         {/* The prompt: one thing to read, on the flat ground. */}
         <section aria-labelledby={`${promptId}-prompt`}>
+          {drill.scenario ? (
+            // An `apply` drill is set in a case: the case reads first, in prose, then the question.
+            <p className="mb-3 max-w-[62ch] text-[15px] leading-relaxed text-ink-dim">
+              <RichText text={drill.scenario} />
+            </p>
+          ) : null}
           <p
             id={`${promptId}-prompt`}
             ref={promptRef}
@@ -655,21 +755,57 @@ export function SynthesisDrillClient({
             exemplarHidden={exemplarHidden}
             onShowExemplar={() => setExemplarHidden(false)}
             isRevision={result.isRevision}
+            previousResponse={result.isRevision ? previousResponse : null}
+            history={historyByDrill[drill.id] ?? []}
           />
         ) : (
-          <AnswerForm
-            format={drill.format}
-            mode={mode}
-            onModeChange={setMode}
-            outline={outline}
-            onOutlineChange={setOutline}
-            freeText={freeText}
-            onFreeTextChange={setFreeText}
-            anchors={anchors}
-            disabled={phase === 'checking'}
-            promptId={promptId}
-            revisingFrom={revisionOf ? revisionGapNote : null}
-          />
+          <>
+            {showingWorkedExample && workedExample ? (
+              // The deck's first drill ever: a worked example before the attempt
+              // (plan D14) — the fastest way to learn what "sound" looks like,
+              // shown once and never again for this deck.
+              <section className="well p-4" aria-label="Worked example">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className={LABEL}>Worked example · your first drill here</h3>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setWorkedExampleOpen(false)} className="h-[24px] px-2 text-[12px]">
+                    Hide
+                  </Button>
+                </div>
+                <p className="mt-1 text-[13px] text-ink-dim">This is what a sound answer looks like for this question. Read it, then write your own in the slots below — the next drills will not show one.</p>
+                <ul className="mt-2 flex flex-col gap-2 text-sm text-ink">
+                  <li><span className="text-ink-dimmer">{SLOT_LABELS[drill.format].claim} · </span><RichText text={workedExample.claim} /></li>
+                  <li><span className="text-ink-dimmer">{SLOT_LABELS[drill.format].mechanism1} · </span><RichText text={workedExample.mechanisms[0]} /></li>
+                  <li><span className="text-ink-dimmer">{SLOT_LABELS[drill.format].mechanism2} · </span><RichText text={workedExample.mechanisms[1]} /></li>
+                  <li><span className="text-ink-dimmer">{SLOT_LABELS[drill.format].tradeoff} · </span><RichText text={workedExample.tradeoff} /></li>
+                </ul>
+              </section>
+            ) : null}
+            {drill.kind === 'plan' ? (
+              <PlanForm
+                plan={plan}
+                onChange={setPlan}
+                anchors={anchors}
+                disabled={phase === 'checking'}
+                promptId={promptId}
+                revisingFrom={revisionOf ? revisionGapNote : null}
+              />
+            ) : (
+              <AnswerForm
+                format={drill.format}
+                mode={mode === 'plan' ? 'outline' : mode}
+                onModeChange={setMode}
+                outline={outline}
+                onOutlineChange={setOutline}
+                freeText={freeText}
+                onFreeTextChange={setFreeText}
+                anchors={anchors}
+                disabled={phase === 'checking'}
+                promptId={promptId}
+                revisingFrom={revisionOf ? revisionGapNote : null}
+                showEvidence={drill.linkKinds.includes('evidence')}
+              />
+            )}
+          </>
         )}
 
         {phase === 'checking' && checkElapsedMs >= VERY_SLOW_CHECK_MS ? (

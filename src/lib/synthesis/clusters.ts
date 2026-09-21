@@ -147,3 +147,46 @@ export function clusterFromCards(cards: ClusterCard[], clustering: Clustering): 
   if (unique.length < 2) return null;
   return { cards: unique, topicTag: null, clustering };
 }
+
+/* ── Plan clusters (plan D15) ─────────────────────────────────────── */
+
+export const MIN_PLAN_CLUSTER = 4;
+export const MAX_PLAN_CLUSTER = 8;
+
+/**
+ * The 4–8 cards a plan question is set over: one topic tag's cards, the
+ * most connected first (a card sharing tags with the others is one the
+ * question can tie in). The topic is the one asked for, else the tag with
+ * the most cards that has at least four. Null when no tag is wide enough —
+ * the caller falls back to the deck's most-connected cards, or to random.
+ */
+export function selectPlanCluster(input: {
+  cards: ClusterCard[];
+  focusTopic?: string;
+  random?: () => number;
+}): { cards: ClusterCard[]; topicTag: string | null } | null {
+  const random = input.random ?? Math.random;
+  const tagsById = new Map(input.cards.map((card) => [card.id, normalisedTags(card)]));
+  const byTag = new Map<string, ClusterCard[]>();
+  for (const card of input.cards) {
+    for (const tag of tagsById.get(card.id) ?? []) byTag.set(tag, [...(byTag.get(tag) ?? []), card]);
+  }
+
+  const focus = input.focusTopic ? normaliseTag(input.focusTopic) : null;
+  let topic: string | null = null;
+  if (focus && (byTag.get(focus)?.length ?? 0) >= MIN_PLAN_CLUSTER) {
+    topic = focus;
+  } else {
+    const wide = [...byTag.entries()].filter(([, cards]) => cards.length >= MIN_PLAN_CLUSTER).sort((a, b) => b[1].length - a[1].length || random() - 0.5);
+    topic = wide[0]?.[0] ?? null;
+  }
+  if (!topic) return null;
+
+  const pool = byTag.get(topic) ?? [];
+  const connectedness = (card: ClusterCard) => {
+    const mine = new Set(tagsById.get(card.id) ?? []);
+    return pool.reduce((sum, other) => (other.id === card.id ? sum : sum + (tagsById.get(other.id) ?? []).filter((tag) => mine.has(tag)).length), 0);
+  };
+  const ordered = [...pool].map((card) => ({ card, score: connectedness(card), tiebreak: random() })).sort((a, b) => b.score - a.score || a.tiebreak - b.tiebreak);
+  return { cards: ordered.slice(0, MAX_PLAN_CLUSTER).map((entry) => entry.card), topicTag: topic };
+}

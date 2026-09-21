@@ -7,24 +7,40 @@ import { logger } from '@/lib/logger';
 import {
   aggregateWeakLinks,
   calibrationRate,
+  dailyLinkSeries,
   deckReadings,
+  formatSoundRates,
+  misconceptionCounts,
   outsideClaimsSince,
   type AttemptForInsights,
+  type DailyPoint,
+  type FormatRateRow,
 } from '@/lib/synthesis/insights';
 import { orderQueue } from '@/lib/synthesis/schedule';
 import { cardKey } from '@/lib/synthesis/prompts';
 import {
+  isBand,
+  isBloom,
   isConfidence,
+  isDrillKind,
   isDrillVerdict,
   isSynthesisFormat,
+  nextPromptVariant,
+  promptForAttempt,
   type AnchorCard,
   type CanvasDrill,
   type CapstoneDrillCandidate,
   type Diagnostic,
+  type DrillAttemptHistoryEntry,
   type DrillHistoryRow,
+  type DrillKind,
+  type Exemplar,
   type LastAttemptSummary,
   type LinkCoverage,
+  type MisconceptionKind,
+  type PlanExemplar,
   type Step,
+  type SynthesisFormat,
   type SynthesisDrill,
   type SynthesisReadings,
   type WeakLinkRow,
@@ -46,17 +62,39 @@ const HISTORY_ROWS = 20;
 /** Cross-deck due read for the dashboard: 25 decks at the per-deck cap. */
 const MAX_DUE_DRILLS_READ = 1000;
 
+// Legacy rows carry no kind or core: they are read as mechanism / core, which
+// is the rule they were graded under (plan D3).
 const requiredLinksSchema = z.array(z.object({
   id: z.string().min(1),
   text: z.string().min(1),
   card_ids: z.array(z.string()).min(1),
+  kind: z.enum(['mechanism', 'condition', 'evidence', 'evaluation']).catch('mechanism'),
+  core: z.boolean().catch(true),
 })).min(2).max(4);
+
+const promptVariantsSchema = z.array(z.string().min(1)).max(3).catch([]);
 
 const exemplarSchema = z.object({
   claim: z.string(),
   mechanisms: z.tuple([z.string(), z.string()]),
   tradeoff: z.string(),
 });
+
+const planPointSchema = z.object({ claim: z.string(), mechanism: z.string(), evidence: z.string().catch(''), limit: z.string().catch('') });
+const planExemplarSchema = z.object({
+  thesis: z.string(),
+  points: z.tuple([planPointSchema, planPointSchema, planPointSchema]),
+  conclusion: z.string(),
+});
+
+/** A plan's exemplar as the four-slot digest the shared surfaces (capstone, worked example, insights) can show. */
+export function digestPlanExemplar(plan: PlanExemplar): Exemplar {
+  return {
+    claim: plan.thesis,
+    mechanisms: [plan.points[0].mechanism, plan.points[1].mechanism],
+    tradeoff: plan.points.map((point) => point.limit).find((limit) => limit.trim().length > 0) ?? plan.conclusion,
+  };
+}
 
 const coverageSchema = z.array(z.object({
   link_id: z.string(),
@@ -67,8 +105,14 @@ const coverageSchema = z.array(z.object({
 export type DrillRow = {
   id: string;
   deck_id: string;
+  kind: string;
+  question_text: string | null;
+  command_word: string | null;
   format: string;
   prompt_text: string;
+  prompt_variants: Json;
+  scenario: string | null;
+  bloom: string | null;
   card_ids: string[];
   topic_tag: string | null;
   required_links: Json;
@@ -82,25 +126,37 @@ export type DrillRow = {
 };
 
 export const DRILL_COLUMNS =
-  'id, deck_id, format, prompt_text, card_ids, topic_tag, required_links, exemplar, status, step, next_due_at, attempt_count, last_verdict, last_attempt_at';
+  'id, deck_id, kind, question_text, command_word, format, prompt_text, prompt_variants, scenario, bloom, card_ids, topic_tag, required_links, exemplar, status, step, next_due_at, attempt_count, last_verdict, last_attempt_at';
 
 /** A row whose JSON no longer parses is skipped, never thrown. */
 export function rowToDrill(row: DrillRow): SynthesisDrill | null {
+  const kind = isDrillKind(row.kind) ? row.kind : 'drill';
   const links = requiredLinksSchema.safeParse(row.required_links);
-  const exemplar = exemplarSchema.safeParse(row.exemplar);
+  // A plan stores its model plan in the same column; the digest is derived.
+  const planExemplar = kind === 'plan' ? planExemplarSchema.safeParse(row.exemplar) : null;
+  const exemplar = planExemplar
+    ? (planExemplar.success ? { success: true as const, data: digestPlanExemplar(planExemplar.data) } : { success: false as const })
+    : exemplarSchema.safeParse(row.exemplar);
   if (!links.success || !exemplar.success || !isSynthesisFormat(row.format)) {
-    logger.warn('synthesis', 'skipping malformed drill row', { drill_id: row.id });
+    logger.warn('synthesis', 'skipping malformed drill row', { drill_id: row.id, kind });
     return null;
   }
 
   return {
     id: row.id,
     deckId: row.deck_id,
+    kind,
+    questionText: typeof row.question_text === 'string' && row.question_text.trim() ? row.question_text : null,
+    commandWord: typeof row.command_word === 'string' && row.command_word.trim() ? row.command_word : null,
+    planExemplar: planExemplar?.success ? planExemplar.data : null,
     format: row.format,
     promptText: row.prompt_text,
+    promptVariants: promptVariantsSchema.parse(row.prompt_variants ?? []),
+    scenario: typeof row.scenario === 'string' && row.scenario.trim() ? row.scenario : null,
+    bloom: isBloom(row.bloom) ? row.bloom : null,
     cardIds: row.card_ids,
     topicTag: row.topic_tag,
-    requiredLinks: links.data.map((link) => ({ id: link.id, text: link.text, cardIds: link.card_ids })),
+    requiredLinks: links.data.map((link) => ({ id: link.id, text: link.text, cardIds: link.card_ids, kind: link.kind, core: link.core })),
     exemplar: exemplar.data,
     status: row.status === 'archived' ? 'archived' : 'active',
     step: Math.max(0, Math.min(2, row.step)) as Step,
@@ -111,13 +167,24 @@ export function rowToDrill(row: DrillRow): SynthesisDrill | null {
   };
 }
 
-/** The drill without its answer key — what the canvas is allowed to hold before the check (audit P3). */
+/**
+ * The drill without its answer key — what the canvas is allowed to hold
+ * before the check (audit P3). The wording served rotates with the attempt
+ * count (plan D6); the kinds of the key travel, its texts do not.
+ */
 export function toCanvasDrill(drill: SynthesisDrill): CanvasDrill {
+  const promptVariant = nextPromptVariant(drill);
   return {
     id: drill.id,
     deckId: drill.deckId,
+    kind: drill.kind,
+    questionText: drill.questionText,
+    commandWord: drill.commandWord,
     format: drill.format,
-    promptText: drill.promptText,
+    promptText: promptForAttempt(drill, promptVariant),
+    promptVariant,
+    scenario: drill.scenario,
+    bloom: drill.bloom,
     cardIds: drill.cardIds,
     topicTag: drill.topicTag,
     status: drill.status,
@@ -127,6 +194,7 @@ export function toCanvasDrill(drill: SynthesisDrill): CanvasDrill {
     lastVerdict: drill.lastVerdict,
     lastAttemptAt: drill.lastAttemptAt,
     linkCount: drill.requiredLinks.length,
+    linkKinds: [...new Set(drill.requiredLinks.map((link) => link.kind))],
   };
 }
 
@@ -137,7 +205,12 @@ export function parseCoverage(value: Json): LinkCoverage[] {
     : [];
 }
 
-const storedContradictionsSchema = z.array(z.object({ statement: z.string(), card_id: z.string(), card_says: z.string() }));
+const storedContradictionsSchema = z.array(z.object({
+  statement: z.string(),
+  card_id: z.string(),
+  card_says: z.string(),
+  kind: z.enum(['reversal', 'overgeneralisation', 'conflation', 'wrong_condition', 'other']).catch('other'),
+}));
 const storedOutsideClaimsSchema = z.array(z.object({
   statement: z.string(),
   verified: z.boolean(),
@@ -157,6 +230,7 @@ export type StoredAttemptRow = {
   integrity: Json;
   pulled_forward_card_ids: string[];
   confidence: number | null;
+  band?: string | null;
 };
 
 /**
@@ -166,7 +240,7 @@ export type StoredAttemptRow = {
  */
 export function parseStoredAttempt(
   row: StoredAttemptRow,
-): Pick<Diagnostic, 'verdict' | 'coverage' | 'contradictions' | 'outsideClaims' | 'structure' | 'gapNote' | 'integrity' | 'pulledForwardCardIds' | 'confidence'> | null {
+): Pick<Diagnostic, 'verdict' | 'coverage' | 'contradictions' | 'outsideClaims' | 'structure' | 'gapNote' | 'integrity' | 'pulledForwardCardIds' | 'confidence' | 'band'> | null {
   if (!isDrillVerdict(row.verdict)) return null;
   const contradictions = storedContradictionsSchema.safeParse(row.contradictions);
   const outsideClaims = storedOutsideClaimsSchema.safeParse(row.outside_claims);
@@ -177,7 +251,7 @@ export function parseStoredAttempt(
   return {
     verdict: row.verdict,
     coverage: parseCoverage(row.coverage),
-    contradictions: contradictions.data.map((entry) => ({ statement: entry.statement, cardId: entry.card_id, cardSays: entry.card_says })),
+    contradictions: contradictions.data.map((entry) => ({ statement: entry.statement, cardId: entry.card_id, cardSays: entry.card_says, kind: entry.kind })),
     outsideClaims: outsideClaims.data.map((entry) => ({
       statement: entry.statement,
       verified: entry.verified,
@@ -189,6 +263,7 @@ export function parseStoredAttempt(
     integrity: { injectionDetected: integrity.data.injection_detected, offTarget: integrity.data.off_target },
     pulledForwardCardIds: row.pulled_forward_card_ids ?? [],
     confidence: isConfidence(row.confidence) ? row.confidence : null,
+    band: isBand(row.band) ? row.band : null,
   };
 }
 
@@ -229,8 +304,17 @@ export type SynthesisQueue = {
   drills: SynthesisDrill[];
   anchorsByDrill: Record<string, AnchorCard[]>;
   lastAttemptByDrill: Record<string, LastAttemptSummary>;
+  /** The last few attempts per served drill, newest first (audit U4). */
+  historyByDrill: Record<string, DrillAttemptHistoryEntry[]>;
   activeDrillCount: number;
+  /**
+   * The first served drill's exemplar, only while the deck has no attempts
+   * at all (plan D14): a worked example for a novice, shown once, never again.
+   */
+  workedExample: Exemplar | null;
 };
+
+const HISTORY_PER_DRILL = 5;
 
 /**
  * Due first, a lapse-affected anchor next, everything else after — and never
@@ -238,7 +322,7 @@ export type SynthesisQueue = {
  */
 export async function loadSynthesisQueue(
   supabase: SupabaseServerClient,
-  input: { deckId: string; userId: string; count: number; drillId?: string | null; now?: Date },
+  input: { deckId: string; userId: string; count: number; drillId?: string | null; now?: Date; kind?: DrillKind },
 ): Promise<SynthesisQueue> {
   const now = input.now ?? new Date();
   const { data: rows, error } = await supabase
@@ -247,12 +331,13 @@ export async function loadSynthesisQueue(
     .eq('deck_id', input.deckId)
     .eq('user_id', input.userId)
     .eq('status', 'active')
+    .eq('kind', input.kind ?? 'drill')
     .order('next_due_at', { ascending: true })
     .limit(MAX_DRILLS_READ);
 
   if (error) {
     logger.error('synthesis', 'drill read failed', { message: error.message });
-    return { drills: [], anchorsByDrill: {}, lastAttemptByDrill: {}, activeDrillCount: 0 };
+    return { drills: [], anchorsByDrill: {}, lastAttemptByDrill: {}, historyByDrill: {}, activeDrillCount: 0, workedExample: null };
   }
 
   const drills = (rows ?? []).map((row) => rowToDrill(row as DrillRow)).filter((drill): drill is SynthesisDrill => drill !== null);
@@ -269,31 +354,54 @@ export async function loadSynthesisQueue(
   const ordered = orderQueue({ candidates, count: input.count, now, pinnedDrillId: input.drillId ?? null });
 
   const lastAttemptByDrill: Record<string, LastAttemptSummary> = {};
+  const historyByDrill: Record<string, DrillAttemptHistoryEntry[]> = {};
+  let workedExample: Exemplar | null = null;
   if (ordered.length > 0) {
-    const { data: attempts, error: attemptsError } = await supabase
-      .from('synthesis_attempts')
-      .select('id, drill_id, verdict, gap_note, coverage, created_at')
-      .eq('user_id', input.userId)
-      .in('drill_id', ordered.map((drill) => drill.id))
-      .order('created_at', { ascending: false })
-      .limit(ordered.length * 4);
+    const [{ data: attempts, error: attemptsError }, { count: deckAttempts, error: countError }] = await Promise.all([
+      supabase
+        .from('synthesis_attempts')
+        .select('id, drill_id, verdict, gap_note, coverage, created_at')
+        .eq('user_id', input.userId)
+        .in('drill_id', ordered.map((drill) => drill.id))
+        .order('created_at', { ascending: false })
+        .limit(ordered.length * (HISTORY_PER_DRILL + 1)),
+      supabase
+        .from('synthesis_attempts')
+        .select('id', { count: 'exact', head: true })
+        .eq('deck_id', input.deckId)
+        .eq('user_id', input.userId),
+    ]);
 
     if (attemptsError) {
       logger.warn('synthesis', 'last-attempt read failed', { message: attemptsError.message });
     }
+    if (countError) {
+      logger.warn('synthesis', 'attempt count read failed', { message: countError.message });
+    }
+    // A novice on this deck sees the first drill's exemplar before answering, once.
+    if (!countError && (deckAttempts ?? 0) === 0) workedExample = ordered[0].exemplar;
 
     const drillById = new Map(ordered.map((drill) => [drill.id, drill]));
     for (const attempt of attempts ?? []) {
-      if (lastAttemptByDrill[attempt.drill_id] || !isDrillVerdict(attempt.verdict)) continue;
+      if (!isDrillVerdict(attempt.verdict)) continue;
       const coverage = parseCoverage(attempt.coverage);
-      lastAttemptByDrill[attempt.drill_id] = {
-        attemptId: attempt.id,
-        verdict: attempt.verdict,
-        gapNote: attempt.gap_note,
-        linksCovered: coverage.filter((entry) => entry.status === 'covered').length,
-        linksTotal: drillById.get(attempt.drill_id)?.requiredLinks.length ?? coverage.length,
-        createdAt: attempt.created_at,
-      };
+      const linksCovered = coverage.filter((entry) => entry.status === 'covered').length;
+      const linksTotal = drillById.get(attempt.drill_id)?.requiredLinks.length ?? coverage.length;
+      if (!lastAttemptByDrill[attempt.drill_id]) {
+        lastAttemptByDrill[attempt.drill_id] = {
+          attemptId: attempt.id,
+          verdict: attempt.verdict,
+          gapNote: attempt.gap_note,
+          linksCovered,
+          linksTotal,
+          createdAt: attempt.created_at,
+        };
+      }
+      const history = historyByDrill[attempt.drill_id] ?? [];
+      if (history.length < HISTORY_PER_DRILL) {
+        history.push({ verdict: attempt.verdict, linksCovered, linksTotal, createdAt: attempt.created_at });
+        historyByDrill[attempt.drill_id] = history;
+      }
     }
   }
 
@@ -301,7 +409,9 @@ export async function loadSynthesisQueue(
     drills: ordered,
     anchorsByDrill: Object.fromEntries(ordered.map((drill) => [drill.id, anchorsByDrill[drill.id]])),
     lastAttemptByDrill,
+    historyByDrill,
     activeDrillCount: candidates.length,
+    workedExample,
   };
 }
 
@@ -310,6 +420,7 @@ type AttemptRow = {
   drill_id: string;
   verdict: string;
   coverage: Json;
+  contradictions: Json;
   missing_card_ids: string[];
   contradicted_card_ids: string[];
   outside_claims: Json;
@@ -321,7 +432,7 @@ type AttemptRow = {
 async function loadAttemptRows(supabase: SupabaseServerClient, deckId: string, userId: string): Promise<AttemptRow[]> {
   const { data, error } = await supabase
     .from('synthesis_attempts')
-    .select('id, drill_id, verdict, coverage, missing_card_ids, contradicted_card_ids, outside_claims, duration_ms, confidence, created_at')
+    .select('id, drill_id, verdict, coverage, contradictions, missing_card_ids, contradicted_card_ids, outside_claims, duration_ms, confidence, created_at')
     .eq('deck_id', deckId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -333,7 +444,8 @@ async function loadAttemptRows(supabase: SupabaseServerClient, deckId: string, u
   return (data ?? []) as AttemptRow[];
 }
 
-function toInsightAttempt(row: AttemptRow): AttemptForInsights {
+function toInsightAttempt(row: AttemptRow, format?: SynthesisFormat): AttemptForInsights {
+  const contradictions = storedContradictionsSchema.safeParse(row.contradictions);
   return {
     drillId: row.drill_id,
     createdAt: row.created_at,
@@ -341,6 +453,10 @@ function toInsightAttempt(row: AttemptRow): AttemptForInsights {
     missingCardIds: row.missing_card_ids ?? [],
     contradictedCardIds: row.contradicted_card_ids ?? [],
     outsideClaimCount: Array.isArray(row.outside_claims) ? row.outside_claims.length : 0,
+    verdict: isDrillVerdict(row.verdict) ? row.verdict : undefined,
+    format,
+    confidence: isConfidence(row.confidence) ? row.confidence : null,
+    contradictionKinds: contradictions.success ? contradictions.data.map((entry) => entry.kind) : [],
   };
 }
 
@@ -370,27 +486,34 @@ export async function loadSynthesisReadings(
 ): Promise<SynthesisReadings> {
   const { data, error } = await supabase
     .from('synthesis_drills')
-    .select('next_due_at, link_count, last_links_covered, last_attempt_at')
+    .select('kind, next_due_at, link_count, last_links_covered, last_attempt_at')
     .eq('deck_id', input.deckId)
     .eq('user_id', input.userId)
     .eq('status', 'active')
-    .limit(MAX_DRILLS_READ);
+    .limit(MAX_DRILLS_READ * 2);
 
   if (error) {
     logger.error('synthesis', 'readings read failed', { message: error.message });
-    return { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null };
+    return { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null, plans: { active: 0, due: 0 } };
   }
 
-  return deckReadings({
-    rows: (data ?? []).map((row) => ({
+  const now = input.now ?? new Date();
+  const rows = data ?? [];
+  const drillReadings = deckReadings({
+    rows: rows.filter((row) => row.kind !== 'plan').map((row) => ({
       status: 'active' as const,
       nextDueAt: row.next_due_at,
       linkCount: row.link_count,
       lastLinksCovered: row.last_links_covered,
       lastAttemptAt: row.last_attempt_at,
     })),
-    now: input.now ?? new Date(),
+    now,
   });
+  const plans = rows.filter((row) => row.kind === 'plan');
+  return {
+    ...drillReadings,
+    plans: { active: plans.length, due: plans.filter((row) => new Date(row.next_due_at).getTime() <= now.getTime()).length },
+  };
 }
 
 export type SynthesisInsights = {
@@ -400,6 +523,12 @@ export type SynthesisInsights = {
   attemptCount: number;
   /** Share of confidence-rated attempts in the last 30 days whose confidence matched the verdict; null when none. */
   calibration30d: number | null;
+  /** Attempts and sound verdicts per format (audit U6). */
+  formatRates: FormatRateRow[];
+  /** Verified contradictions by kind, last 30 days (audit G7). */
+  misconceptions30d: Partial<Record<MisconceptionKind, number>>;
+  /** Links covered per day, last 30 days, oldest first. */
+  daily: DailyPoint[];
 };
 
 export async function loadSynthesisInsights(
@@ -411,8 +540,8 @@ export async function loadSynthesisInsights(
     loadDeckDrills(supabase, input.deckId, input.userId),
     loadAttemptRows(supabase, input.deckId, input.userId),
   ]);
-  const attempts = attemptRows.map(toInsightAttempt);
   const drillById = new Map(drills.map((drill) => [drill.id, drill]));
+  const attempts = attemptRows.map((row) => toInsightAttempt(row, drillById.get(row.drill_id)?.format));
 
   const weakCardIds = [...new Set(attempts.flatMap((attempt) => [...attempt.missingCardIds, ...attempt.contradictedCardIds]))].slice(0, 100);
   const termById = new Map<string, string>();
@@ -454,6 +583,9 @@ export async function loadSynthesisInsights(
       if (row.created_at < sinceIso || !isDrillVerdict(row.verdict)) return [];
       return [{ confidence: isConfidence(row.confidence) ? row.confidence : null, verdict: row.verdict }];
     })),
+    formatRates: formatSoundRates(attempts),
+    misconceptions30d: misconceptionCounts(attempts, since30d),
+    daily: dailyLinkSeries(attempts, now),
   };
 }
 
@@ -569,4 +701,42 @@ export async function loadAbsorbedClaims(
     out.set(row.absorbed_from_attempt_id, byIndex);
   }
   return out;
+}
+
+export type QuestionBankRow = {
+  id: string;
+  text: string;
+  source: 'paper' | 'generated';
+  mappedCards: number;
+  missingConcepts: string[];
+  drillId: string | null;
+  createdAt: string;
+};
+
+/** The deck's pasted questions, newest first (plan D16). Bounded. */
+export async function loadQuestionBank(
+  supabase: SupabaseServerClient,
+  input: { deckId: string; userId: string },
+): Promise<QuestionBankRow[]> {
+  const { data, error } = await supabase
+    .from('synthesis_questions')
+    .select('id, text, source, mapped_card_ids, missing_concepts, drill_id, created_at')
+    .eq('deck_id', input.deckId)
+    .eq('user_id', input.userId)
+    .order('created_at', { ascending: false })
+    .limit(40);
+
+  if (error) {
+    logger.warn('synthesis', 'question bank read failed', { message: error.message });
+    return [];
+  }
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    text: row.text,
+    source: row.source === 'generated' ? 'generated' : 'paper',
+    mappedCards: row.mapped_card_ids?.length ?? 0,
+    missingConcepts: row.missing_concepts ?? [],
+    drillId: row.drill_id,
+    createdAt: row.created_at,
+  }));
 }

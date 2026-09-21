@@ -78,3 +78,60 @@ describe('loadDueDrillsByDeck', () => {
     });
   });
 });
+
+describe('loadSynthesisQueue — worked example and history', () => {
+  const DRILL = {
+    id: 'd1', deck_id: 'deck', kind: 'drill', question_text: null, command_word: null, format: 'causal', prompt_text: 'By what mechanism does Time quantum shape an Interactive process?',
+    prompt_variants: ['Explain how the Time quantum shapes an Interactive process.'], scenario: null, bloom: 'analyse',
+    card_ids: ['a', 'b'], topic_tag: null,
+    required_links: [{ id: 'm1', text: 'l1', card_ids: ['a'] }, { id: 'm2', text: 'l2', card_ids: ['b'], kind: 'condition', core: true }],
+    exemplar: { claim: 'c', mechanisms: ['m', 'm'], tradeoff: 't' },
+    status: 'active', step: 0, next_due_at: NOW.toISOString(), attempt_count: 1, last_verdict: 'partial', last_attempt_at: NOW.toISOString(),
+  };
+  const CARDS = [
+    { id: 'a', front: 'Time quantum', back: 'slice', explanation: null, state: 'review' },
+    { id: 'b', front: 'Interactive process', back: 'bursts', explanation: null, state: 'new' },
+  ];
+  const ATTEMPTS = [
+    { id: 'x2', drill_id: 'd1', verdict: 'partial', gap_note: 'g', coverage: [{ link_id: 'm1', status: 'covered', evidence: null }, { link_id: 'm2', status: 'missing', evidence: null }], created_at: '2026-09-11T00:00:00Z' },
+    { id: 'x1', drill_id: 'd1', verdict: 'sound', gap_note: '', coverage: [{ link_id: 'm1', status: 'covered', evidence: null }, { link_id: 'm2', status: 'covered', evidence: null }], created_at: '2026-09-10T00:00:00Z' },
+  ];
+
+  it('reads legacy links as mechanism/core, serves the variant for the attempt count, and lists the history newest first', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        synthesis_drills: { data: [DRILL], error: null },
+        cards: { data: CARDS, error: null },
+        synthesis_attempts: { data: ATTEMPTS, error: null, count: 2 },
+      },
+    });
+    const { loadSynthesisQueue, toCanvasDrill } = await import('./loaders');
+    const queue = await loadSynthesisQueue(supabase as never, { deckId: 'deck', userId: 'user-1', count: 3, now: NOW });
+
+    expect(queue.drills[0].requiredLinks[0]).toMatchObject({ kind: 'mechanism', core: true });
+    expect(queue.drills[0].requiredLinks[1]).toMatchObject({ kind: 'condition', core: true });
+    expect(queue.workedExample).toBeNull();                                   // the deck has attempts
+    expect(queue.historyByDrill.d1.map((entry) => entry.verdict)).toEqual(['partial', 'sound']);
+    expect(queue.lastAttemptByDrill.d1.attemptId).toBe('x2');
+
+    const canvas = toCanvasDrill(queue.drills[0]);
+    expect(canvas.promptVariant).toBe(1);                                     // attempt_count 1 → the first variant
+    expect(canvas.promptText).toBe('Explain how the Time quantum shapes an Interactive process.');
+    expect(canvas.linkKinds).toEqual(['mechanism', 'condition']);
+    expect(canvas).not.toHaveProperty('exemplar');
+  });
+
+  it('offers the first drill\'s exemplar as a worked example while the deck has no attempts', async () => {
+    const supabase = createSupabaseMock({
+      tables: {
+        synthesis_drills: { data: [{ ...DRILL, attempt_count: 0 }], error: null },
+        cards: { data: CARDS, error: null },
+        synthesis_attempts: { data: [], error: null, count: 0 },
+      },
+    });
+    const { loadSynthesisQueue } = await import('./loaders');
+    const queue = await loadSynthesisQueue(supabase as never, { deckId: 'deck', userId: 'user-1', count: 3, now: NOW });
+    expect(queue.workedExample).toEqual({ claim: 'c', mechanisms: ['m', 'm'], tradeoff: 't' });
+    expect(queue.historyByDrill).toEqual({});
+  });
+});

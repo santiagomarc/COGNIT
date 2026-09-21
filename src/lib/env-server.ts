@@ -12,6 +12,17 @@ import { z } from 'zod';
 const serverEnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1, 'GEMINI_API_KEY is required for AI features'),
   GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'),
+  /**
+   * Which generation-config dialect the model speaks (execution plan D1).
+   * Derived from the model name when unset: `gemini-3*` → '3' (thinking_level,
+   * temperature 1.0), anything else → '2.5' (thinking_budget). Set it for a
+   * model whose name does not say.
+   */
+  GEMINI_MODEL_FAMILY: z.enum(['2.5', '3']).optional(),
+  /** Drill and plan generation may run on a stronger model than checks (plan D2). Defaults to GEMINI_MODEL. */
+  GEMINI_MODEL_GENERATION: z.string().min(1).optional(),
+  /** Thinking effort for generation calls only; checks never think (plan D2). */
+  GEMINI_GENERATION_THINKING: z.enum(['none', 'low', 'high']).default('none'),
   GEMINI_EMBEDDING_MODEL: z.string().default('gemini-embedding-001'),
   GEMINI_MODEL_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
   CRON_SECRET: z.string().min(16).optional(),
@@ -27,6 +38,9 @@ export function getServerEnv(): ServerEnv {
   const parsed = serverEnvSchema.safeParse({
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_MODEL: process.env.GEMINI_MODEL,
+    GEMINI_MODEL_FAMILY: process.env.GEMINI_MODEL_FAMILY,
+    GEMINI_MODEL_GENERATION: process.env.GEMINI_MODEL_GENERATION,
+    GEMINI_GENERATION_THINKING: process.env.GEMINI_GENERATION_THINKING,
     GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL,
     GEMINI_MODEL_MAX_TOKENS: process.env.GEMINI_MODEL_MAX_TOKENS,
     CRON_SECRET: process.env.CRON_SECRET,

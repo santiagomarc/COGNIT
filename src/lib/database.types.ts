@@ -298,6 +298,7 @@ export type Database = {
           clone_count: number
           created_at: string | null
           description: string | null
+          exam_at: string | null
           id: string
           is_public: boolean | null
           share_token: string | null
@@ -310,6 +311,7 @@ export type Database = {
           clone_count?: number
           created_at?: string | null
           description?: string | null
+          exam_at?: string | null
           id?: string
           is_public?: boolean | null
           share_token?: string | null
@@ -322,6 +324,7 @@ export type Database = {
           clone_count?: number
           created_at?: string | null
           description?: string | null
+          exam_at?: string | null
           id?: string
           is_public?: boolean | null
           share_token?: string | null
@@ -502,6 +505,7 @@ export type Database = {
       }
       synthesis_attempts: {
         Row: {
+          band: string | null
           client_attempt_id: string | null
           confidence: number | null
           contradicted_card_ids: string[]
@@ -528,6 +532,7 @@ export type Database = {
           word_count: number
         }
         Insert: {
+          band?: string | null
           client_attempt_id?: string | null
           confidence?: number | null
           contradicted_card_ids?: string[]
@@ -554,6 +559,7 @@ export type Database = {
           word_count: number
         }
         Update: {
+          band?: string | null
           client_attempt_id?: string | null
           confidence?: number | null
           contradicted_card_ids?: string[]
@@ -603,23 +609,80 @@ export type Database = {
           },
         ]
       }
+      synthesis_questions: {
+        Row: {
+          created_at: string
+          deck_id: string
+          drill_id: string | null
+          id: string
+          mapped_card_ids: string[]
+          missing_concepts: string[]
+          source: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deck_id: string
+          drill_id?: string | null
+          id?: string
+          mapped_card_ids?: string[]
+          missing_concepts?: string[]
+          source?: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deck_id?: string
+          drill_id?: string | null
+          id?: string
+          mapped_card_ids?: string[]
+          missing_concepts?: string[]
+          source?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synthesis_questions_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "synthesis_questions_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "synthesis_drills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       synthesis_drills: {
         Row: {
           attempt_count: number
+          bloom: string | null
           card_ids: string[]
+          command_word: string | null
           created_at: string
           deck_id: string
           exemplar: Json
           format: string
           generation_meta: Json
           id: string
+          kind: string
           last_attempt_at: string | null
           last_links_covered: number | null
           last_verdict: string | null
           link_count: number
           next_due_at: string
           prompt_text: string
+          prompt_variants: Json
+          question_text: string | null
           required_links: Json
+          scenario: string | null
           status: string
           step: number
           topic_tag: string | null
@@ -628,20 +691,26 @@ export type Database = {
         }
         Insert: {
           attempt_count?: number
+          bloom?: string | null
           card_ids: string[]
+          command_word?: string | null
           created_at?: string
           deck_id: string
           exemplar: Json
           format: string
           generation_meta?: Json
           id?: string
+          kind?: string
           last_attempt_at?: string | null
           last_links_covered?: number | null
           last_verdict?: string | null
           link_count?: number
           next_due_at?: string
           prompt_text: string
+          prompt_variants?: Json
+          question_text?: string | null
           required_links: Json
+          scenario?: string | null
           status?: string
           step?: number
           topic_tag?: string | null
@@ -650,20 +719,26 @@ export type Database = {
         }
         Update: {
           attempt_count?: number
+          bloom?: string | null
           card_ids?: string[]
+          command_word?: string | null
           created_at?: string
           deck_id?: string
           exemplar?: Json
           format?: string
           generation_meta?: Json
           id?: string
+          kind?: string
           last_attempt_at?: string | null
           last_links_covered?: number | null
           last_verdict?: string | null
           link_count?: number
           next_due_at?: string
           prompt_text?: string
+          prompt_variants?: Json
+          question_text?: string | null
           required_links?: Json
+          scenario?: string | null
           status?: string
           step?: number
           topic_tag?: string | null
