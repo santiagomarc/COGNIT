@@ -46,6 +46,8 @@ const RPCS = {
   record_synthesis_attempt:   { p_drill_id: DECK, p_deck_id: DECK, p_client_attempt_id: null, p_attempt: {}, p_schedule: {}, p_pull_forward_card_ids: [], p_pull_forward_not_after: null },
   get_card_schedule_summary:  { p_user_id: DECK, p_days: 7 },
   get_deck_schedule_breakdown:{ p_deck_id: DECK },
+  // Analytics Hub (202609180900). An anon caller gets an empty snapshot.
+  get_analytics_snapshot:     { p_now: new Date().toISOString(), p_days: 7 },
 };
 
 let missing = 0;
@@ -78,6 +80,8 @@ const SYNTHESIS_PROBES = [
   ['synthesis_questions', 'id, mapped_card_ids, missing_concepts, drill_id'],
   // Absorption provenance (202609170970).
   ['cards', 'id, absorbed_from_attempt_id, absorbed_claim_index'],
+  // Exam date (202609210920).
+  ['decks', 'id, exam_at'],
 ];
 for (const [table, columns] of SYNTHESIS_PROBES) {
   const probe = await supabase.from(table).select(columns).limit(1);

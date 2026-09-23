@@ -2,6 +2,8 @@ import 'server-only';
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { loadDueByDeckRows } from '@/lib/dashboard-due';
+import { logger } from '@/lib/logger';
+import { verifiedClaims } from '@/lib/supabase/claims';
 
 /**
  * Per-request memoisation of the reads every chromed route repeats.
@@ -45,10 +47,9 @@ export type SessionUser = {
  */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await getRequestClient();
-  const { data, error } = await supabase.auth.getClaims();
-  if (error || !data) return null;
+  const claims = await verifiedClaims(supabase);
+  if (!claims) return null;
 
-  const { claims } = data;
   return {
     id: claims.sub,
     email: claims.email ?? null,
@@ -61,6 +62,30 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
  * compute agrees to the millisecond — and so the cache below has a stable key.
  */
 export const getRequestNow = cache(() => new Date());
+
+/**
+ * Work queued with `after()` runs once the response has been flushed, when a
+ * refreshed session can no longer reach the browser's cookies. supabase-js
+ * refreshes on demand whenever the access token is within 90 s of expiry, and
+ * Supabase rotates the refresh token when it does: a background write in that
+ * window strands the browser on a revoked token, and reuse detection then
+ * signs the user out. Call this before `after()` — if the token would enter
+ * the window before the work can finish (maxDuration 60 s + the 90 s margin),
+ * refresh it now, while this action can still set cookies.
+ */
+export async function ensureSessionHeadroom(minSeconds = 180): Promise<void> {
+  try {
+    const supabase = await getRequestClient();
+    const { data } = await supabase.auth.getSession();
+    const expiresAt = data.session?.expires_at;
+    if (!expiresAt || expiresAt * 1000 - Date.now() >= minSeconds * 1000) return;
+    const { error } = await supabase.auth.refreshSession();
+    if (error) logger.warn('session', 'pre-background refresh failed', { message: error.message });
+  } catch (error) {
+    // Best-effort: the action it protects must never fail because of it.
+    logger.warn('session', 'session headroom check skipped', { message: error instanceof Error ? error.message : String(error) });
+  }
+}
 
 /** Due cards per deck for the signed-in user, once per request. */
 export const getDueByDeck = cache(async (userId: string) => {

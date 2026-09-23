@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { pageShortcutBlocked } from '@/lib/hotkeys';
 import { m, AnimatePresence, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
 import { ArrowLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
@@ -590,6 +591,7 @@ export function FlashcardReviewClient({
     if (completed || resumeState) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement

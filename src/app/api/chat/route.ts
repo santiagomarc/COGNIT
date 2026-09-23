@@ -268,6 +268,9 @@ export async function POST(request: NextRequest) {
             session_id: activeSessionId,
             context_count: context.cards.length,
             grounded: context.grounded,
+            // Production evidence for the grounding floor (plan §3.5): the best
+            // similarity seen, above or below it.
+            top_similarity: context.topSimilarity,
             prompt_chars: message.length,
             response_chars: answer.length,
           },

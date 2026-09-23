@@ -160,3 +160,14 @@ export function groupPaletteCommands(
 
   return sections;
 }
+
+/**
+ * The palette's open state after ⌘K / Ctrl+K (KBD-01). An open palette always
+ * closes: it is itself a modal dialog, so the page-shortcut guard alone would
+ * trap it open. A closed one opens only when `blocked` — `pageShortcutBlocked`
+ * read at the keypress — says no other dialog is up and no IME composition
+ * owns the key.
+ */
+export function paletteOpenAfterHotkey(open: boolean, blocked: boolean): boolean {
+  return open ? false : !blocked;
+}

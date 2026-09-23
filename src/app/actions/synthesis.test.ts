@@ -864,7 +864,7 @@ describe('plans (execution plan D15 / D16)', () => {
         synthesis_questions: { data: [{ id: 'q1', text: 'Discuss the convoy effect.', mapped_card_ids: [CARD_A, CARD_D] }], error: null },
       },
       rpcs: {
-        search_deck_cards_by_embedding: { data: [{ id: CARD_A, similarity: 0.7 }, { id: CARD_D, similarity: 0.6 }, { id: CARD_B, similarity: 0.2 }], error: null },
+        search_deck_cards_by_embedding: { data: [{ id: CARD_A, similarity: 0.72 }, { id: CARD_D, similarity: 0.68 }, { id: CARD_B, similarity: 0.55 }], error: null },
       },
     });
     mocks.client = client;
@@ -875,7 +875,7 @@ describe('plans (execution plan D15 / D16)', () => {
     expect(result).toMatchObject({ success: true, unmapped: false, questions: [{ id: 'q1', mappedCards: 2 }] });
 
     const inserted = client.__inserted.synthesis_questions?.[0] as Array<Record<string, unknown>>;
-    // Only cards above the similarity floor are mapped.
+    // Only cards above the query floor AND within the band of the best match (0.72 - 0.06) are mapped.
     expect(inserted[0]).toMatchObject({ source: 'paper', mapped_card_ids: [CARD_A, CARD_D] });
     expect(mocks.reserveAiCall).toHaveBeenCalledWith(expect.anything(), 'user-1', 'semantic_search', expect.anything(), { calls: 1 });
   });

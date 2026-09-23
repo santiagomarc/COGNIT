@@ -33,12 +33,20 @@ export function ladderFor(kind: DrillKind, daysToExam: number | null): readonly 
   return DISTANT_LADDER_DAYS;
 }
 
-/** Whole days from `now` to the exam, negative once it has passed, null without a date. */
+/**
+ * Whole days left before the exam: 0 on the exam day, 1 the day before, -1
+ * once it has passed; null without a date. `exam_at` is stored as 23:59 local
+ * time on the exam day (ExamDateControl), so flooring the remaining time
+ * counts calendar days. `Math.ceil` read one day long: "in 2 days" for
+ * tomorrow, "in 1 day" on the day itself, and the final-days ladder engaged
+ * a day late.
+ */
 export function daysToExam(examAt: string | null | undefined, now: Date): number | null {
   if (!examAt) return null;
   const at = Date.parse(examAt);
   if (Number.isNaN(at)) return null;
-  return Math.ceil((at - now.getTime()) / (24 * 60 * 60_000));
+  const remaining = at - now.getTime();
+  return remaining < 0 ? -1 : Math.floor(remaining / (24 * 60 * 60_000));
 }
 export const MAX_STEP: Step = 2;
 export const PARTIAL_RETRY_HOURS = 24;

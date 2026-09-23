@@ -224,7 +224,10 @@ describe('exam-aware ladders (plan D19)', () => {
   it('counts whole days to the exam', () => {
     expect(daysToExam(null, NOW)).toBeNull();
     expect(daysToExam('not a date', NOW)).toBeNull();
-    expect(daysToExam(new Date(NOW.getTime() + 2.5 * DAY).toISOString(), NOW)).toBe(3);
+    expect(daysToExam(new Date(NOW.getTime() + 2.5 * DAY).toISOString(), NOW)).toBe(2);
+    // Stored as 23:59 on the exam day: the same evening is day 0, the next day's is day 1.
+    expect(daysToExam(new Date(NOW.getTime() + 6 * HOUR).toISOString(), NOW)).toBe(0);
+    expect(daysToExam(new Date(NOW.getTime() + 30 * HOUR).toISOString(), NOW)).toBe(1);
     expect(daysToExam(new Date(NOW.getTime() - DAY).toISOString(), NOW)).toBe(-1);
   });
 });

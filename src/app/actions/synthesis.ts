@@ -10,7 +10,7 @@ import { guardAction } from '@/lib/action-guard';
 import { AiServiceError, withGeminiRetry } from '@/lib/ai-retry';
 import { getServerEnv } from '@/lib/env-server';
 import { logger } from '@/lib/logger';
-import { MIN_CONTEXT_SIMILARITY } from '@/lib/rag';
+import { CONFUSABLE_FLOOR, NEIGHBOUR_FLOOR, questionMatches } from '@/lib/similarity';
 import {
   absorbOutsideClaimSchema,
   archiveSynthesisDrillSchema,
@@ -46,9 +46,9 @@ import {
   type DrillCluster,
 } from '@/lib/synthesis/clusters';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
+import { ensureSessionHeadroom } from '@/lib/supabase/session';
 import {
   DRILL_COLUMNS,
-  digestPlanExemplar,
   loadAbsorbedClaims,
   parseStoredAttempt,
   rowToDrill,
@@ -267,7 +267,7 @@ async function embeddingClusters(
     if (!seedCard) continue;
 
     const neighbourCards = neighbours
-      .filter((row) => row.id !== seedId && (row.similarity ?? 0) >= MIN_CONTEXT_SIMILARITY && !input.usedIds.has(row.id))
+      .filter((row) => row.id !== seedId && (row.similarity ?? 0) >= NEIGHBOUR_FLOOR && !input.usedIds.has(row.id))
       .map((row) => input.cardsById.get(row.id))
       .filter((card): card is ClusterCard => Boolean(card))
       .slice(0, 2);
@@ -728,7 +728,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     );
 
     const runs = await Promise.all(Array.from({ length: samples }, () => runCheck()));
-    const { output, finishReason } = runs[0];
+    const { finishReason } = runs[0];
     const usage: ModelUsage = runs.reduce<ModelUsage>(
       (sum, run) => ({
         in: sum.in === null && run.usage.in === null ? null : (sum.in ?? 0) + (run.usage.in ?? 0),
@@ -851,6 +851,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
       const repairCardId = contradictedCardIds[0];
       const excludeCardIds = drill.cardIds;
       const attemptId = attempt.id;
+      await ensureSessionHeadroom();
       after(async () => {
         try {
           await generateRepairDrill({ deckId, cardId: repairCardId, attemptId, excludeCardIds });
@@ -1066,6 +1067,7 @@ export async function absorbOutsideClaim(data: AbsorbOutsideClaimInput) {
     // their own spend; a refused reservation leaves the card plain, which the
     // deck's enrich and sync controls pick up later.
     const cardId = card.id;
+    await ensureSessionHeadroom();
     after(async () => {
       try {
         await enrichCards({ deck_id: deckId, card_ids: [cardId] });
@@ -1086,8 +1088,6 @@ export async function absorbOutsideClaim(data: AbsorbOutsideClaimInput) {
 
 /** Bounded read for plan clusters and question mapping. */
 const MAX_CARDS_FOR_PLANS = 400;
-/** Similarity floor for mapping a pasted question to cards (plan D16). */
-const QUESTION_MATCH_FLOOR = 0.45;
 const QUESTION_MATCH_LIMIT = 8;
 
 type PlanCardRow = ClusterCardRow & { explanation: string | null };
@@ -1356,7 +1356,7 @@ export async function ingestQuestions(data: IngestQuestionsInput) {
         logger.warn('ingestQuestions', 'card mapping failed', { message: error.message });
         return { text, cardIds: [] as string[] };
       }
-      return { text, cardIds: (data ?? []).filter((row) => (row.similarity ?? 0) >= QUESTION_MATCH_FLOOR).map((row) => row.id) };
+      return { text, cardIds: questionMatches(data ?? []) };
     });
 
     const { data: inserted, error: insertError } = await supabase
@@ -1493,7 +1493,7 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
       p_query_embedding: vectorRow.embedding,
       p_limit: 4,
     });
-    const near = (neighbours ?? []).find((row) => row.id !== input.cardId && (row.similarity ?? 0) >= MIN_CONTEXT_SIMILARITY && cardsById.has(row.id));
+    const near = (neighbours ?? []).find((row) => row.id !== input.cardId && (row.similarity ?? 0) >= CONFUSABLE_FLOOR && cardsById.has(row.id));
     if (near) {
       partner = cardsById.get(near.id) ?? null;
       format = 'distinguish';

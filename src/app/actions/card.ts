@@ -12,6 +12,7 @@ import {
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { recordAiUsage, requireOwnedDeck, reserveAiCall, touchDeckUpdatedAt } from './_shared';
 import { logger } from '@/lib/logger';
+import { ensureSessionHeadroom } from '@/lib/supabase/session';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 
 const BULK_DELETE_MAX_COUNT = 200;
@@ -136,6 +137,7 @@ export async function updateCard(data: UpdateCardInput) {
   const deckId = result.data.deck_id;
   const textToEmbed = `${result.data.front}\n${result.data.back}`.trim();
   if (textToEmbed) {
+    await ensureSessionHeadroom();
     after(async () => {
       const reservation = await reserveAiCall(supabase, user.id, 'sync_embeddings', { card_id: cardId, trigger: 'update_card' });
       if (!reservation.ok) {

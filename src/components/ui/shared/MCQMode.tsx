@@ -6,6 +6,7 @@ import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { Kbd } from '@/components/ui/Kbd';
 import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
+import { pageShortcutBlocked } from '@/lib/hotkeys';
 
 type MCQModeCard = {
   id: string;
@@ -74,6 +75,7 @@ export function MCQMode({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (disabled || resolved) {
         return;
       }
@@ -103,6 +105,7 @@ export function MCQMode({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (!resolved || disabled || !selectedOption) {
         return;
       }

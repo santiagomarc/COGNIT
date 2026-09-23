@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { setExamDate } from '@/app/actions/synthesis';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
+import { daysToExam } from '@/lib/synthesis/schedule';
 
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
 
@@ -16,11 +17,9 @@ function toDateInput(iso: string | null): string {
   return `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
 }
 
+/** The same count the ladder uses on the server (schedule.ts), so the two never disagree. */
 function daysUntil(iso: string | null): number | null {
-  if (!iso) return null;
-  const at = Date.parse(iso);
-  if (Number.isNaN(at)) return null;
-  return Math.ceil((at - Date.now()) / 86_400_000);
+  return daysToExam(iso, new Date());
 }
 
 /**
@@ -86,6 +85,8 @@ export function ExamDateControl({ deckId, examAt }: { deckId: string; examAt: st
         <span className={LABEL}>No exam date</span>
       ) : days < 0 ? (
         <span className={LABEL}>Exam passed</span>
+      ) : days === 0 ? (
+        <span className={LABEL}>Exam today · drills return within the day</span>
       ) : (
         <span className={`${LABEL} tnum`}>
           Exam in <span style={{ color: days <= 3 ? 'var(--state-due)' : 'var(--ink)' }}>{days}</span> {days === 1 ? 'day' : 'days'}

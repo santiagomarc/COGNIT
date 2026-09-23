@@ -15,11 +15,13 @@ import {
   buildPaletteCommands,
   filterPaletteCommands,
   groupPaletteCommands,
+  paletteOpenAfterHotkey,
   type PaletteCommand,
   type PaletteDeck,
 } from '@/lib/command-palette';
 import { OPEN_COMMAND_PALETTE_EVENT, requestOpenCreateDeck } from '@/lib/dashboard-events';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { pageShortcutBlocked } from '@/lib/hotkeys';
 import { formatActionError } from '@/lib/ai-feedback';
 import { motionTransitions } from '@/lib/motion-configs';
 import { useModalDialog } from '@/lib/use-modal-dialog';
@@ -93,13 +95,16 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
     initialFocus: (dialog) => dialog.querySelector<HTMLInputElement>('input'),
   });
 
-  // ⌘K / Ctrl+K toggles from anywhere, and the rail's search button opens it
-  // through the same event so both triggers share one dialog.
+  // ⌘K / Ctrl+K closes an open palette and opens one over any page no other
+  // dialog covers; the rail's search button opens it through the same event
+  // so both triggers share one dialog.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        setOpen((value) => !value);
+        // Read before the update: once open, the palette's own dialog blocks.
+        const blocked = pageShortcutBlocked(event);
+        setOpen((value) => paletteOpenAfterHotkey(value, blocked));
       }
     };
 

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 
 import { Kbd } from '@/components/ui/Kbd';
 import { requestOpenCreateDeck } from '@/lib/dashboard-events';
+import { pageShortcutBlocked } from '@/lib/hotkeys';
 
 /**
  * Creating a deck, as its own container rather than a button in a row
@@ -31,6 +32,7 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
    */
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||

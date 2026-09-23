@@ -2,6 +2,8 @@
 
 import { useEffect } from 'react';
 
+import { pageShortcutBlocked } from '@/lib/hotkeys';
+
 /**
  * `R` starts a review on the deck page (design system §7.3).
  *
@@ -17,6 +19,7 @@ export function DeckReviewHotkey({ formId, enabled }: { formId: string; enabled:
     if (!enabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||

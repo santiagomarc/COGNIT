@@ -11,6 +11,7 @@ import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { generateMnemonicForCard } from '@/lib/mnemonic';
 import { logger } from '@/lib/logger';
 import { requireOwnedDeck } from './_shared';
+import { ensureSessionHeadroom } from '@/lib/supabase/session';
 
 export async function gradeCard(data: GradeCardInput) {
   const result = gradeCardSchema.safeParse(data);
@@ -79,6 +80,7 @@ export async function gradeCard(data: GradeCardInput) {
   }
 
   if (shouldGenerateMnemonic) {
+    await ensureSessionHeadroom();
     // Off the response path: the grade returns now, the model call runs after
     // the response is sent. The student who just lapsed a card should never
     // wait on a mnemonic for it — the next card is what they need.

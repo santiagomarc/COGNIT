@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/lib/database.types';
 import { publicEnv } from '@/lib/env-public';
+import { verifiedClaims } from '@/lib/supabase/claims';
 
 // ── Protected path prefixes ──
 const PROTECTED_PATHS = ['/dashboard'];
@@ -46,8 +47,7 @@ export async function proxy(request: NextRequest) {
   // `getUser()` did — minus the Auth-server round-trip that used to sit in
   // front of every page. While the project still signs with the legacy HS256
   // secret it falls back to `getUser()` on its own (see `getSessionUser`).
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const claims = claimsData?.claims ?? null;
+  const claims = await verifiedClaims(supabase);
 
   const pathname = request.nextUrl.pathname;
   const isProtectedPath = PROTECTED_PATHS.some((p) => pathname.startsWith(p));

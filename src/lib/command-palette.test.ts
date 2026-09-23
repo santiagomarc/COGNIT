@@ -4,8 +4,10 @@ import {
   buildPaletteCommands,
   filterPaletteCommands,
   groupPaletteCommands,
+  paletteOpenAfterHotkey,
   type PaletteDeck,
 } from './command-palette';
+import { pageShortcutBlocked } from './hotkeys';
 
 const DECKS: PaletteDeck[] = [
   { id: 'a', title: 'Neuroanatomy', dueCount: 31 },
@@ -131,5 +133,25 @@ describe('groupPaletteCommands', () => {
 
   it('returns nothing for an empty command list', () => {
     expect(groupPaletteCommands([])).toEqual([]);
+  });
+});
+
+describe('paletteOpenAfterHotkey — ⌘K and the dialogs around it (KBD-01)', () => {
+  /** A stand-in `document` whose only question is "is a modal dialog open?". */
+  const root = (dialogOpen: boolean) =>
+    ({ querySelector: () => (dialogOpen ? ({} as Element) : null) }) as unknown as ParentNode;
+  const blocked = (dialogOpen: boolean, isComposing = false) => pageShortcutBlocked({ isComposing }, root(dialogOpen));
+
+  it('opens over a page with no dialog', () => {
+    expect(paletteOpenAfterHotkey(false, blocked(false))).toBe(true);
+  });
+
+  it('closes an open palette, although the palette is itself a modal dialog', () => {
+    expect(paletteOpenAfterHotkey(true, blocked(true))).toBe(false);
+  });
+
+  it('does not open over another dialog, or while an IME composition owns the key', () => {
+    expect(paletteOpenAfterHotkey(false, blocked(true))).toBe(false);
+    expect(paletteOpenAfterHotkey(false, blocked(false, true))).toBe(false);
   });
 });

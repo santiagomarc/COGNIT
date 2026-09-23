@@ -16,6 +16,13 @@ import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadCapstoneCandidates } from '@/lib/synthesis/loaders';
 
+/**
+ * `gradeCard` queues the lapse mnemonic with `after()`, and that work shares
+ * this route's budget. Pinned rather than left to the platform default, which
+ * is 10–15 s without Fluid compute.
+ */
+export const maxDuration = 60;
+
 type StudyPageProps = {
   params: Promise<{
     deckId: string;

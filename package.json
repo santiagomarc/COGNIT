@@ -15,7 +15,9 @@
     "ai:smoke": "vitest run --config vitest.live.config.ts src/test/live/smoke.live.ts",
     "ai:calibrate": "vitest run --config vitest.live.config.ts src/test/live/synthesis-calibration.live.ts",
     "ai:generation": "vitest run --config vitest.live.config.ts src/test/live/generation.live.ts",
-    "ai:gate": "vitest run --config vitest.live.config.ts src/test/live/smoke.live.ts src/test/live/generation.live.ts"
+    "ai:gate": "vitest run --config vitest.live.config.ts src/test/live/smoke.live.ts src/test/live/generation.live.ts",
+    "db:types": "supabase gen types typescript --linked --schema public > src/lib/database.types.ts",
+    "ai:retrieval": "vitest run --config vitest.live.config.ts src/test/live/retrieval-calibration.live.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

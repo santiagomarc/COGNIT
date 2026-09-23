@@ -2,17 +2,16 @@ import type { createClient } from '@/lib/supabase/server';
 import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 import { logger } from '@/lib/logger';
+import { QUERY_CARD_FLOOR } from '@/lib/similarity';
 
 /**
- * Cosine-similarity floor for deck-chat context.
- *
- * Starting point for text-embedding-004 on short term/definition pairs; below
- * this, matches are topically unrelated. Re-measure with
- * `scripts/calibrate-threshold.mjs` before changing it — the right value is
- * wherever the "deck covers this" and "deck does not cover this" distributions
- * separate for YOUR content.
+ * Cosine-similarity floor for deck-chat context — the query → card floor in
+ * `@/lib/similarity`, measured for gemini-embedding-001 at 768 dimensions
+ * (covered questions ≥ 0.678, uncovered same-subject questions ≤ 0.644).
+ * Re-measure with `npm run ai:retrieval` (or, against a real deck,
+ * `scripts/calibrate-threshold.mjs`) before changing it.
  */
-export const MIN_CONTEXT_SIMILARITY = 0.62;
+export const MIN_CONTEXT_SIMILARITY = QUERY_CARD_FLOOR;
 
 export type RetrievedCard = {
   id: string;

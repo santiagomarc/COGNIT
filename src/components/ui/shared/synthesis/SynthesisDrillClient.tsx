@@ -17,6 +17,7 @@ import { DrillResult } from '@/components/ui/shared/synthesis/DrillResult';
 import { DrillSessionSummary, type SessionEntry, type StoredResult } from '@/components/ui/shared/synthesis/DrillSessionSummary';
 import { GenerateSynthesisDrillsButton } from '@/components/ui/shared/synthesis/GenerateSynthesisDrillsButton';
 import { formatActionError } from '@/lib/ai-feedback';
+import { isTypingTarget, pageShortcutBlocked } from '@/lib/hotkeys';
 import { countWords, maxWordsFor, responseText } from '@/lib/synthesis/text';
 import { EMPTY_PLAN, PlanForm, type PlanDraft } from '@/components/ui/shared/synthesis/PlanForm';
 import type {
@@ -103,15 +104,6 @@ function readPersistedAnswer(key: string): PersistedAnswer | null {
   } catch {
     return null;
   }
-}
-
-function isTypingTarget(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement
-    || target instanceof HTMLTextAreaElement
-    || target instanceof HTMLSelectElement
-    || (target instanceof HTMLElement && target.isContentEditable)
-  );
 }
 
 /** A UUID for the idempotency key, or null where the platform cannot mint one (an insecure context) — the check then simply runs without one. */
@@ -546,6 +538,9 @@ export function SynthesisDrillClient({
   // 1 / 2 / 3 confidence outside inputs; Esc quit.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // A dialog above the canvas owns the keyboard: `S` here used to skip the
+      // drill behind "Leave this drill?" and delete the answer it promised to keep.
+      if (pageShortcutBlocked(event)) return;
       if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
         event.preventDefault();
         check();

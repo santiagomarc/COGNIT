@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
 import type { ForecastDay } from '@/lib/dashboard-forecast';
+import { pageShortcutBlocked } from '@/lib/hotkeys';
 
 const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' });
 
@@ -70,6 +71,7 @@ export function DueNowBand({
     if (!sessionHref) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||

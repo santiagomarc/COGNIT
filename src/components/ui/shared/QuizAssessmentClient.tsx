@@ -17,6 +17,7 @@ import { useRouter } from 'next/navigation';
 import { enrichCards } from '@/app/actions/ai-enrich';
 import { logQuizResult } from '@/app/actions/quiz';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
+import { pageShortcutBlocked } from '@/lib/hotkeys';
 import { MasteryConfetti } from '@/components/ui/shared/MasteryConfetti';
 import { fireFeedback } from '@/lib/feedback-effects';
 import { useFeedbackPrefs } from '@/lib/use-feedback-prefs';
@@ -399,6 +400,7 @@ export function QuizAssessmentClient({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event)) return;
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement
@@ -994,6 +996,7 @@ export function QuizAssessmentClient({
             <m.div
               role="dialog"
               aria-modal="true"
+              data-page-shortcuts="allow"
               aria-labelledby="quiz-paused-title"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}

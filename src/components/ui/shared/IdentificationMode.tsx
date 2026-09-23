@@ -7,6 +7,7 @@ import { Kbd } from '@/components/ui/Kbd';
 import { Input } from '@/components/ui/input';
 import { HintButton } from '@/components/ui/shared/HintButton';
 import { similarity } from '@/lib/fuzzy';
+import { isAdvanceKey } from '@/lib/hotkeys';
 import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
 
@@ -63,14 +64,7 @@ export function IdentificationMode({
     if (!result || disabled) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.target instanceof HTMLInputElement
-        || event.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      if ((event.key !== 'Enter' && event.key !== ' ') || event.repeat) return;
+      if (!isAdvanceKey(event)) return;
 
       event.preventDefault();
       onResolve(result.grade, result.score, result.answer);
