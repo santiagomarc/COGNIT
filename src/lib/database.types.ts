@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       ai_usage_logs: {
@@ -154,6 +179,13 @@ export type Database = {
           topic_tags?: string[] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cards_absorbed_from_attempt_id_fkey"
+            columns: ["absorbed_from_attempt_id"]
+            isOneToOne: false
+            referencedRelation: "synthesis_attempts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cards_deck_id_fkey"
             columns: ["deck_id"]
@@ -609,57 +641,6 @@ export type Database = {
           },
         ]
       }
-      synthesis_questions: {
-        Row: {
-          created_at: string
-          deck_id: string
-          drill_id: string | null
-          id: string
-          mapped_card_ids: string[]
-          missing_concepts: string[]
-          source: string
-          text: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          deck_id: string
-          drill_id?: string | null
-          id?: string
-          mapped_card_ids?: string[]
-          missing_concepts?: string[]
-          source?: string
-          text: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          deck_id?: string
-          drill_id?: string | null
-          id?: string
-          mapped_card_ids?: string[]
-          missing_concepts?: string[]
-          source?: string
-          text?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "synthesis_questions_deck_id_fkey"
-            columns: ["deck_id"]
-            isOneToOne: false
-            referencedRelation: "decks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "synthesis_questions_drill_id_fkey"
-            columns: ["drill_id"]
-            isOneToOne: false
-            referencedRelation: "synthesis_drills"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       synthesis_drills: {
         Row: {
           attempt_count: number
@@ -755,6 +736,57 @@ export type Database = {
           },
         ]
       }
+      synthesis_questions: {
+        Row: {
+          created_at: string
+          deck_id: string
+          drill_id: string | null
+          id: string
+          mapped_card_ids: string[]
+          missing_concepts: string[]
+          source: string
+          text: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deck_id: string
+          drill_id?: string | null
+          id?: string
+          mapped_card_ids?: string[]
+          missing_concepts?: string[]
+          source?: string
+          text: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deck_id?: string
+          drill_id?: string | null
+          id?: string
+          mapped_card_ids?: string[]
+          missing_concepts?: string[]
+          source?: string
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synthesis_questions_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "synthesis_questions_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "synthesis_drills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -784,6 +816,14 @@ export type Database = {
         Args: { p_card_ids: string[]; p_deck_id: string }
         Returns: number
       }
+      get_analytics_snapshot: {
+        Args: { p_days?: number; p_now?: string }
+        Returns: Json
+      }
+      get_card_schedule_summary: {
+        Args: { p_days?: number; p_now?: string; p_user_id: string }
+        Returns: Json
+      }
       get_deck_mastery_summary: {
         Args: { p_user_id: string }
         Returns: {
@@ -793,15 +833,6 @@ export type Database = {
           mastered_cards: number
         }[]
       }
-      get_deck_topic_tag_counts: {
-        Args: { p_deck_id: string; p_limit?: number }
-        Returns: {
-          tag_count: number
-          topic_tag: string
-        }[]
-      }
-      // Hand-added to match supabase/migrations/202609141000_schedule_summary_rpcs.sql.
-      // `supabase gen types typescript --linked` regenerates these once it is applied.
       get_deck_schedule_breakdown: {
         Args: { p_deck_id: string; p_now?: string }
         Returns: {
@@ -811,13 +842,12 @@ export type Database = {
           scheduled: number
         }[]
       }
-      get_analytics_snapshot: {
-        Args: { p_days?: number; p_now?: string }
-        Returns: Json
-      }
-      get_card_schedule_summary: {
-        Args: { p_days?: number; p_now?: string; p_user_id: string }
-        Returns: Json
+      get_deck_topic_tag_counts: {
+        Args: { p_deck_id: string; p_limit?: number }
+        Returns: {
+          tag_count: number
+          topic_tag: string
+        }[]
       }
       get_due_cards_by_deck: {
         Args: { p_now?: string; p_user_id: string }
@@ -834,6 +864,18 @@ export type Database = {
           deck_id: string
           last_quiz_at: string
           mastered_cards: number
+        }[]
+      }
+      get_quiz_history: {
+        Args: { p_before?: string; p_deck_id: string; p_limit?: number }
+        Returns: {
+          correct_cards: number
+          created_at: string
+          duration_ms: number
+          id: string
+          misses: Json
+          mode: string
+          total_cards: number
         }[]
       }
       get_study_activity_days: {
@@ -872,18 +914,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      get_quiz_history: {
-        Args: { p_before?: string | null; p_deck_id: string; p_limit?: number }
-        Returns: {
-          id: string
-          mode: string
-          total_cards: number
-          correct_cards: number
-          duration_ms: number
-          created_at: string
-          misses: Json
-        }[]
-      }
       log_quiz_result: {
         Args: {
           p_card_results: Json
@@ -894,25 +924,25 @@ export type Database = {
           p_updates: Json
         }
         Returns: {
-          quiz_result_id: string
           created_at: string
+          quiz_result_id: string
           updated_cards: number
         }[]
       }
       record_synthesis_attempt: {
         Args: {
           p_attempt: Json
-          p_client_attempt_id?: string | null
+          p_client_attempt_id: string
           p_deck_id: string
           p_drill_id: string
           p_pull_forward_card_ids: string[]
-          p_pull_forward_not_after?: string | null
+          p_pull_forward_not_after: string
           p_schedule: Json
         }
         Returns: {
           attempt_id: string
-          replayed: boolean
           pulled_forward_card_ids: string[]
+          replayed: boolean
         }[]
       }
       reserve_ai_call: {
@@ -1100,6 +1130,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       card_state: ["new", "learning", "review", "relearning"],

@@ -777,7 +777,10 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     const { data: recorded, error: recordError } = await supabase.rpc('record_synthesis_attempt', {
       p_drill_id: drillId,
       p_deck_id: deckId,
-      p_client_attempt_id: parsed.data.client_attempt_id ?? null,
+      // record_synthesis_attempt treats a null client_attempt_id as "no
+      // idempotency key" (legacy clients); the generated Args type omits
+      // `| null` even though the SQL parameter has no NOT NULL constraint.
+      p_client_attempt_id: (parsed.data.client_attempt_id ?? null) as string,
       p_attempt: {
         mode,
         response,
@@ -821,7 +824,10 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         last_links_covered: linksCovered,
       },
       p_pull_forward_card_ids: pullCandidates,
-      p_pull_forward_not_after: pullCandidates.length > 0 ? notAfterIso : null,
+      // Same generated-type gap as p_client_attempt_id above: the SQL function
+      // only pulls cards forward when this is non-null, and no candidates
+      // means there's nothing to bound.
+      p_pull_forward_not_after: (pullCandidates.length > 0 ? notAfterIso : null) as string,
     });
 
     const record = recorded?.[0];

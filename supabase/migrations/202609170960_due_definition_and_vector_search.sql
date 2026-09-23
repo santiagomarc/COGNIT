@@ -75,7 +75,6 @@ language sql
 stable
 security invoker
 set search_path = public
-set hnsw.ef_search = 100
 as $$
   select
     cards.id,
@@ -98,9 +97,18 @@ revoke all on function public.search_user_cards_by_embedding(uuid, vector, integ
 grant execute on function public.search_user_cards_by_embedding(uuid, vector, integer) to authenticated;
 grant execute on function public.search_user_cards_by_embedding(uuid, vector, integer) to service_role;
 
--- Iterative scan exists from pgvector 0.8. On an older extension the GUC is
--- unknown and the ALTER would fail, so it is attempted separately: the
--- function above is correct either way, only less complete under a filter.
+-- Both GUCs are attempted after function creation, each independently
+-- tolerant of failure: some managed Postgres hosts deny ALTER FUNCTION ... SET
+-- on these parameters to non-superuser roles (permission denied, 42501), and
+-- hnsw.iterative_scan additionally doesn't exist before pgvector 0.8. Either
+-- way the function above is correct, only less complete under a filter.
+do $$
+begin
+  execute 'alter function public.search_user_cards_by_embedding(uuid, vector, integer) set hnsw.ef_search = 100';
+exception when others then
+  raise notice 'hnsw.ef_search could not be set on function: %', sqlerrm;
+end $$;
+
 do $$
 begin
   execute 'alter function public.search_user_cards_by_embedding(uuid, vector, integer) set hnsw.iterative_scan = ''relaxed_order''';

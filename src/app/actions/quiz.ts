@@ -156,7 +156,7 @@ export async function getQuizHistory(deckId: string, options: { before?: string 
   const { data, error } = await supabase.rpc('get_quiz_history', {
     p_deck_id: deckId,
     p_limit: limit + 1,           // one extra row answers "is there another page?"
-    p_before: options.before ?? null,
+    p_before: options.before ?? undefined,
   });
 
   if (error) {
