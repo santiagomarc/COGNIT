@@ -1,6 +1,6 @@
 # Cognit — Next Horizon Plan
 
-**Revision:** 1.1 · 2026-09-23. Rev 1.1 records execution corrections: five more KBD-01 handlers (§3.4), the `synthesis.ts` line references past line 840 (§1.3–§1.5, §3.5), the tooling state (§1.2.1), and the test counts that follow (§3.9, §4.5, §7).
+**Revision:** 1.2 · 2026-09-26 (Phase 1 execution notes in §4.5). Rev 1.1 records execution corrections: five more KBD-01 handlers (§3.4), the `synthesis.ts` line references past line 840 (§1.3–§1.5, §3.5), the tooling state (§1.2.1), and the test counts that follow (§3.9, §4.5, §7).
 **Baseline:** `main` @ `bb045b3` (pushed; in sync with `origin/main`). The audit began on `f164797`; `bb045b3` landed at 08:56 +08 while it ran, and every finding below was re-verified against it.
 **Scope:** forensic verification of four flagged hazards · full-spectrum audit (design-system conformance, pedagogy, WCAG 2.2 AA, performance) · a phased roadmap whose code has been compiled, tested and — where possible — executed.
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C) · `COGNIT_MICRO_SYNTHESIS_EXECUTION_PLAN.md` (D1–D20) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md`.
@@ -3063,6 +3063,18 @@ import { DictationButton } from '@/components/ui/shared/synthesis/DictationButto
 | UAT — concept map | Insights on a deck with ≥ 3 attempted drills; Tab through nodes | Each node announces its relations; focus ring visible; Enter opens a review of that card; below `md` a list renders instead |
 | UAT — voice | Chrome desktop: **Dictate** → speak → **Stop** | Text lands at the caret (or in Claim when no slot had focus); Firefox shows no button |
 | UAT — directory | `EXPLORE_ENABLED=true`: list a shared deck; open `/explore` signed out | Listed deck visible; unsharing removes it at once; no owner identity anywhere in the payload |
+
+**Execution notes (Rev 1.2, 2026-09-26).** Phase 1 ran on `feat/phase-1`. The migrations were pushed on 2026-09-26, then `db:types` → `tsc` clean, and results were **446 tests** in 40 files, ESLint 0 problems, and the build shows both ƒ routes. Where the repo corrected the plan:
+
+- **§4.4 voice was skipped** by the owner. SEC-02 (`microphone=()`) is unchanged.
+- **Anon grants.** Supabase's default privileges grant `anon` EXECUTE directly, so `revoke all … from public` does not restrict it: `verify:deployment` shows anon reaching each function's own `Unauthorized` check. That is safe, because every Phase 1 function checks `auth.uid()` or filters to the caller's rows, and it matches the pre-existing RPCs. For real restriction, add `revoke execute … from anon` in a new migration. `verify:deployment` now probes all ten Phase 1 RPCs plus `decks.deleted_at, listed_at` and `deck_reports`.
+- **Trash scope, one more read.** The dashboard's overall assessed/mastered totals summed `get_deck_mastery_summary`, which is keyed on the user and not resolved through `decks`. They now count only visible decks. `loadDueDrillsByDeck` changed as written.
+- **`TrashPanel`** is mounted outside the dashboard's has-decks branch, so trashing your only deck does not hide the way back.
+- **Merge** lives at the foot of the Overview tab, because the header has no overflow menu. Its target query filters `user_id` explicitly: RLS also returns other people's shared decks.
+- **`DeckListingToggle`** renders only when `EXPLORE_ENABLED === 'true'`, so no one can list into a directory that is switched off.
+- **PED-05 copy.** Drills are generated only on request, so the retired message says the drill "will not come up again", not "will be regenerated".
+- **Design system §2.2c** (the synthesis mapping) was brought forward from §5.4 so the concept map ships conforming. §2.2d and §2.2e remain in Phase 2.
+- **deck-export and concept-graph tests** were written from the descriptions above: the plan lists them but does not include their code.
 
 ---
 

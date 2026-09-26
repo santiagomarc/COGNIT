@@ -48,6 +48,20 @@ const RPCS = {
   get_deck_schedule_breakdown:{ p_deck_id: DECK },
   // Analytics Hub (202609180900). An anon caller gets an empty snapshot.
   get_analytics_snapshot:     { p_now: new Date().toISOString(), p_days: 7 },
+  // Phase 1 of COGNIT_NEXT_HORIZON_PLAN.md (202609240900–0930). Supabase's
+  // default privileges grant anon EXECUTE directly, so `revoke … from public`
+  // does not stop the call: each function's own auth.uid() check refuses it
+  // ("Unauthorized"), and the readers return only the caller's rows (none).
+  trash_deck:                 { p_deck_id: DECK },
+  restore_deck:               { p_deck_id: DECK },
+  list_trashed_decks:         {},
+  purge_deck:                 { p_deck_id: DECK },
+  purge_expired_trash:        {},
+  duplicate_deck:             { p_deck_id: DECK },
+  merge_decks:                { p_source_id: DECK, p_target_id: '00000000-0000-4000-8000-000000000002' },
+  get_concept_graph:          { p_deck_id: DECK, p_max_nodes: 1 },
+  set_deck_listing:           { p_deck_id: DECK, p_listed: false },
+  list_public_decks:          { p_limit: 1 },
 };
 
 let missing = 0;
@@ -82,6 +96,9 @@ const SYNTHESIS_PROBES = [
   ['cards', 'id, absorbed_from_attempt_id, absorbed_claim_index'],
   // Exam date (202609210920).
   ['decks', 'id, exam_at'],
+  // Trash and directory (202609240900, 202609240930).
+  ['decks', 'id, deleted_at, listed_at'],
+  ['deck_reports', 'id, deck_id, reporter_id, reason'],
 ];
 for (const [table, columns] of SYNTHESIS_PROBES) {
   const probe = await supabase.from(table).select(columns).limit(1);

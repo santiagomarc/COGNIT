@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       ai_usage_logs: {
@@ -325,14 +300,48 @@ export type Database = {
           },
         ]
       }
+      deck_reports: {
+        Row: {
+          created_at: string
+          deck_id: string
+          id: string
+          reason: string
+          reporter_id: string
+        }
+        Insert: {
+          created_at?: string
+          deck_id: string
+          id?: string
+          reason: string
+          reporter_id?: string
+        }
+        Update: {
+          created_at?: string
+          deck_id?: string
+          id?: string
+          reason?: string
+          reporter_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_reports_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       decks: {
         Row: {
           clone_count: number
           created_at: string | null
+          deleted_at: string | null
           description: string | null
           exam_at: string | null
           id: string
           is_public: boolean | null
+          listed_at: string | null
           share_token: string | null
           shared_at: string | null
           title: string
@@ -342,10 +351,12 @@ export type Database = {
         Insert: {
           clone_count?: number
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           exam_at?: string | null
           id?: string
           is_public?: boolean | null
+          listed_at?: string | null
           share_token?: string | null
           shared_at?: string | null
           title: string
@@ -355,10 +366,12 @@ export type Database = {
         Update: {
           clone_count?: number
           created_at?: string | null
+          deleted_at?: string | null
           description?: string | null
           exam_at?: string | null
           id?: string
           is_public?: boolean | null
+          listed_at?: string | null
           share_token?: string | null
           shared_at?: string | null
           title?: string
@@ -816,12 +829,20 @@ export type Database = {
         Args: { p_card_ids: string[]; p_deck_id: string }
         Returns: number
       }
+      duplicate_deck: {
+        Args: { p_deck_id: string; p_keep_progress?: boolean; p_title?: string }
+        Returns: string
+      }
       get_analytics_snapshot: {
         Args: { p_days?: number; p_now?: string }
         Returns: Json
       }
       get_card_schedule_summary: {
         Args: { p_days?: number; p_now?: string; p_user_id: string }
+        Returns: Json
+      }
+      get_concept_graph: {
+        Args: { p_deck_id: string; p_max_nodes?: number }
         Returns: Json
       }
       get_deck_mastery_summary: {
@@ -914,6 +935,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      list_public_decks: {
+        Args: { p_limit?: number; p_offset?: number; p_query?: string }
+        Returns: {
+          card_count: number
+          clone_count: number
+          description: string
+          listed_at: string
+          share_token: string
+          title: string
+        }[]
+      }
+      list_trashed_decks: {
+        Args: never
+        Returns: {
+          card_count: number
+          deleted_at: string
+          id: string
+          purge_after: string
+          title: string
+        }[]
+      }
       log_quiz_result: {
         Args: {
           p_card_results: Json
@@ -929,6 +971,12 @@ export type Database = {
           updated_cards: number
         }[]
       }
+      merge_decks: {
+        Args: { p_source_id: string; p_target_id: string }
+        Returns: number
+      }
+      purge_deck: { Args: { p_deck_id: string }; Returns: undefined }
+      purge_expired_trash: { Args: never; Returns: number }
       record_synthesis_attempt: {
         Args: {
           p_attempt: Json
@@ -956,6 +1004,7 @@ export type Database = {
         }
         Returns: string
       }
+      restore_deck: { Args: { p_deck_id: string }; Returns: undefined }
       search_deck_cards_by_embedding: {
         Args: { p_deck_id: string; p_limit?: number; p_query_embedding: string }
         Returns: {
@@ -998,10 +1047,15 @@ export type Database = {
           topic_tags: Json
         }[]
       }
+      set_deck_listing: {
+        Args: { p_deck_id: string; p_listed: boolean }
+        Returns: string
+      }
       set_deck_sharing: {
         Args: { p_deck_id: string; p_enabled: boolean; p_rotate?: boolean }
         Returns: string
       }
+      trash_deck: { Args: { p_deck_id: string }; Returns: string }
     }
     Enums: {
       card_state: "new" | "learning" | "review" | "relearning"
@@ -1130,9 +1184,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       card_state: ["new", "learning", "review", "relearning"],
