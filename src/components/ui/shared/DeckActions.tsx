@@ -1,11 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { deleteDeck, updateDeck } from '@/app/actions/deck';
+import { useRouter } from 'next/navigation';
+import { updateDeck } from '@/app/actions/deck';
+import { duplicateDeck, restoreDeck, trashDeck } from '@/app/actions/deck-lifecycle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
-import { Pencil, Trash2, X, Check } from 'lucide-react';
+import { Copy, Pencil, Trash2, X, Check } from 'lucide-react';
+import { formatActionError } from '@/lib/ai-feedback';
 import { DECK_TAG_OPTIONS, parseDeckTitleMetadata } from '@/lib/deck-tags';
 import { toast } from 'sonner';
 
@@ -22,19 +25,50 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
     const [accentTag, setAccentTag] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const router = useRouter();
 
+    // Trash, not delete (plan §4.1a): the toast's Undo restores the deck and
+    // reuses the optimistic rollback to put its row back.
     async function handleDelete() {
         setIsLoading(true);
         onDeleteOptimistic?.();
-        const result = await deleteDeck(deckId);
-        if (result?.error) {
+        const result = await trashDeck(deckId);
+        if ('error' in result && result.error) {
             onDeleteRollback?.();
-            toast.error(typeof result.error === 'string' ? result.error : 'Failed to delete deck');
+            toast.error(formatActionError(result.error, 'Failed to delete the deck.'));
         } else {
-            toast.success('Deck deleted');
+            toast.success('Deck moved to the trash', {
+                description: 'You can restore it for 30 days.',
+                action: {
+                    label: 'Undo',
+                    onClick: () => {
+                        void restoreDeck(deckId).then((restored) => {
+                            if ('error' in restored && restored.error) {
+                                toast.error(formatActionError(restored.error, 'Could not restore the deck.'));
+                                return;
+                            }
+                            onDeleteRollback?.();
+                            router.refresh();
+                        });
+                    },
+                },
+            });
         }
         setIsLoading(false);
         setShowDeleteConfirm(false);
+    }
+
+    // A copy of the content, enrichment and embeddings, with fresh scheduling (plan §4.1b).
+    async function handleDuplicate() {
+        setIsLoading(true);
+        const result = await duplicateDeck({ deck_id: deckId, keep_progress: false });
+        setIsLoading(false);
+        if (!('success' in result) || !result.success) {
+            toast.error(formatActionError('error' in result ? result.error : null, 'Could not duplicate the deck.'));
+            return;
+        }
+        toast.success('Deck duplicated');
+        router.push(`/dashboard/${result.deckId}`);
     }
 
     // Toggle Edit Mode
@@ -120,6 +154,18 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
                 <Button
                     size="icon"
                     variant="ghost"
+                    onClick={handleDuplicate}
+                    disabled={isLoading}
+                    title="Duplicate deck"
+                    aria-label="Duplicate deck"
+                    className="h-8 w-8"
+                >
+                    <Copy className="h-4 w-4" />
+                </Button>
+
+                <Button
+                    size="icon"
+                    variant="ghost"
                     onClick={() => setShowDeleteConfirm(true)}
                     title="Delete deck"
                     aria-label="Delete deck"
@@ -132,9 +178,9 @@ export function DeckActions({ deckId, currentTitle, onDeleteOptimistic, onDelete
             <ConfirmDialog
                 open={showDeleteConfirm}
                 onOpenChange={setShowDeleteConfirm}
-                title="Delete this deck?"
-                description="All cards in this deck will be permanently deleted. This cannot be undone."
-                confirmLabel="Delete"
+                title="Move this deck to the trash?"
+                description="It disappears everywhere now and is deleted for good after 30 days. You can restore it until then."
+                confirmLabel="Move to trash"
                 variant="destructive"
                 loading={isLoading}
                 onConfirm={handleDelete}

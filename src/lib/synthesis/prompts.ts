@@ -305,6 +305,7 @@ export function validatePlanDraft(draft: PlanGenerationDraft, cluster: ClusterCa
     if (requiredLinks.length === MAX_PLAN_LINKS) break;
   }
   if (requiredLinks.length < 4) return { ok: false, reason: 'too_few_links' };
+  if (hasDuplicateLinks(requiredLinks)) return { ok: false, reason: 'duplicate_links' };
   if (new Set(requiredLinks.flatMap((link) => link.cardIds)).size < Math.min(4, cluster.length)) return { ok: false, reason: 'too_few_cards_cited' };
   if (!requiredLinks.some((link) => link.kind === 'evaluation')) return { ok: false, reason: 'no_evaluation_link' };
   if (requiredLinks.filter((link) => link.core).length < 3) return { ok: false, reason: 'too_few_core_links' };
@@ -380,8 +381,62 @@ function namedConceptCount(text: string, cluster: ClusterCard[]): number {
   const normalised = ` ${normaliseForQuote(text)} `;
   return cluster.filter((card) => {
     const term = normaliseForQuote(card.term);
-    return term.length > 0 && normalised.includes(term);
+    // Word-bounded, like the UI's `isNamed`: "ip" is not named by "relationship" (PED-04).
+    return term.length > 0 && normalised.includes(` ${term} `);
   }).length;
+}
+
+/* ── Key integrity (plan §4.2) ───────────────────────────────────── */
+
+const STOPWORDS = new Set(['the', 'and', 'for', 'are', 'but', 'not', 'with', 'that', 'this', 'from', 'into', 'than', 'then', 'when', 'which', 'each', 'more', 'less', 'its', 'has', 'have', 'can', 'will', 'was', 'were', 'been', 'being', 'because', 'also']);
+
+function contentWords(text: string): Set<string> {
+  return new Set(normaliseForQuote(text).split(' ').filter((word) => word.length > 2 && !STOPWORDS.has(word)));
+}
+
+/** Jaccard overlap of content words: near 1 is the same claim, reworded or not. */
+export function linkOverlap(a: string, b: string): number {
+  const left = contentWords(a);
+  const right = contentWords(b);
+  if (left.size === 0 || right.size === 0) return 0;
+  let shared = 0;
+  for (const word of left) if (right.has(word)) shared += 1;
+  return shared / (left.size + right.size - shared);
+}
+
+/** Two links this similar are one idea counted twice (PED-01). */
+export const DUPLICATE_LINK_OVERLAP = 0.7;
+
+function hasDuplicateLinks(links: RequiredLink[]): boolean {
+  for (let i = 0; i < links.length; i += 1) {
+    for (let j = i + 1; j < links.length; j += 1) {
+      if (linkOverlap(links[i].text, links[j].text) >= DUPLICATE_LINK_OVERLAP) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Core links the exemplar never touches: no shared content word and no named
+ * card. A cheap proxy for "the exemplar would fail its own key" (PED-03),
+ * recorded in generation_meta first and enforced once `npm run ai:generation`
+ * shows how often it fires on drafts the checker grades sound.
+ */
+export function exemplarGaps(links: RequiredLink[], exemplarText: string, cluster: ClusterCard[]): string[] {
+  const words = contentWords(exemplarText);
+  const text = ` ${normaliseForQuote(exemplarText)} `;
+  const termById = new Map(cluster.map((card) => [card.id, normaliseForQuote(card.term)]));
+  return links
+    .filter((link) => link.core)
+    .filter((link) => {
+      const sharesWord = [...contentWords(link.text)].some((word) => words.has(word));
+      const namesCard = link.cardIds.some((id) => {
+        const term = termById.get(id);
+        return term ? text.includes(` ${term} `) : false;
+      });
+      return !sharesWord && !namesCard;
+    })
+    .map((link) => link.id);
 }
 
 /**
@@ -434,6 +489,13 @@ export function validateDrillDraft(draft: DrillGenerationDraft, cluster: Cluster
   const cited = new Set(requiredLinks.flatMap((link) => link.cardIds));
   if (cluster.some((card) => !cited.has(card.id))) {
     return { ok: false, reason: 'card_uncited' };
+  }
+  // A synthesis key must relate cards: a key whose every link cites one card is recall (PED-02).
+  if (!requiredLinks.some((link) => link.cardIds.length >= 2)) {
+    return { ok: false, reason: 'no_cross_card_link' };
+  }
+  if (hasDuplicateLinks(requiredLinks)) {
+    return { ok: false, reason: 'duplicate_links' };
   }
   if (requiredLinks.filter((link) => link.core).length < 2) {
     return { ok: false, reason: 'too_few_core_links' };

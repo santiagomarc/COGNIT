@@ -645,7 +645,8 @@ export async function loadDueDrillsByDeck(
   const now = input.now ?? new Date();
   const { data, error } = await supabase
     .from('synthesis_drills')
-    .select('deck_id')
+    // The inner embed inherits the decks policies, so a trashed deck's drills drop out (plan §4.1a).
+    .select('deck_id, decks!inner(id)')
     .eq('user_id', input.userId)
     .eq('status', 'active')
     .lte('next_due_at', now.toISOString())

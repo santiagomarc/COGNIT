@@ -13,10 +13,14 @@ import { DrillHistory, DrillSignals, SynthesisInsightsSkeleton, WeakLinks } from
 import { QuestionBank, QuestionBankSkeleton } from '@/components/ui/shared/synthesis/QuestionBank';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
+import { ExportDeckMenu } from '@/components/ui/shared/ExportDeckMenu';
+import { DeckListingToggle } from '@/components/ui/shared/DeckListingToggle';
+import { MergeDeckDialog, type MergeTarget } from '@/components/ui/shared/MergeDeckDialog';
+import { ConceptMapPanel } from '@/components/ui/shared/synthesis/ConceptMapPanel';
 import { ShareDeckButton } from '@/components/ui/shared/ShareDeckButton';
 import { StateTick, type TickState } from '@/components/ui/shared/StateTick';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
-import { parseDeckTitleMetadata } from '@/lib/deck-tags';
+import { parseDeckTitleMetadata, removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { estimateSessionMinutes } from '@/lib/dashboard-forecast';
 import { getSessionCardBounds } from '@/lib/study';
 import { loadSynthesisReadings } from '@/lib/synthesis/loaders';
@@ -61,8 +65,11 @@ type DeckDetailSnapshot = {
     created_at: string;
     share_token: string | null;
     exam_at: string | null;
+    listed_at: string | null;
   } | null;
   deckErrorMessage: string | null;
+  /** The user's other decks, for "Merge into" (Overview only). */
+  mergeTargets: MergeTarget[];
   cards: DeckCardRow[];
   totalCards: number;
   /** Deck-wide, not derived from the paginated `cards` slice above. */
@@ -175,10 +182,10 @@ async function loadDeckDetailSnapshot(
   const wantsCards = activeTab === 'overview' || activeTab === 'cards';
   const wantsOverview = activeTab === 'overview';
 
-  const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings] = await Promise.all([
+  const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings, mergeTargetsRes] = await Promise.all([
     supabase
       .from('decks')
-      .select('id, title, description, created_at, share_token, exam_at')
+      .select('id, title, description, created_at, share_token, exam_at, listed_at')
       .eq('id', deckId)
       .single(),
     wantsCards
@@ -204,6 +211,16 @@ async function loadDeckDetailSnapshot(
     loadQuizReadyCount(supabase, deckId),
     loadTopTopics(supabase, deckId),
     wantsOverview ? loadSynthesisReadings(supabase, { deckId, userId }) : Promise.resolve(EMPTY_READINGS),
+    // `user_id` is not redundant: RLS also shows other people's shared decks.
+    wantsOverview
+      ? supabase
+        .from('decks')
+        .select('id, title, cards(count)')
+        .eq('user_id', userId)
+        .neq('id', deckId)
+        .order('updated_at', { ascending: false })
+        .limit(100)
+      : Promise.resolve({ data: [] as Array<{ id: string; title: string; cards: Array<{ count: number }> }> }),
   ]);
 
   const { data: deck, error: deckError } = deckRes;
@@ -226,9 +243,15 @@ async function loadDeckDetailSnapshot(
         created_at: deck.created_at ?? new Date().toISOString(),
         share_token: deck.share_token ?? null,
         exam_at: deck.exam_at ?? null,
+        listed_at: deck.listed_at ?? null,
       }
       : null,
     deckErrorMessage: deckError?.message ?? null,
+    mergeTargets: (mergeTargetsRes.data ?? []).map((target) => ({
+      id: target.id,
+      title: removeDeckTagFromTitle(target.title),
+      cardCount: target.cards?.[0]?.count ?? 0,
+    })),
     cards,
     totalCards,
     quizReadyCards,
@@ -287,6 +310,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
     masteryRowsErrorMessage,
     schedule,
     synthesisReadings,
+    mergeTargets,
   } = await loadDeckDetailSnapshot(supabase, user.id, deckId, activeTab);
 
   if (deckErrorMessage || !deck) {
@@ -325,7 +349,12 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
     <div className="container mx-auto flex flex-col gap-4 p-4 md:px-8 md:py-6">
       {/* ═══ Persistent header — identity, state, progress ═══════════════ */}
       <header>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {hasCards ? <ExportDeckMenu deckId={deckId} /> : null}
+          {/* Listing is off until the directory ships (plan §4.1d: EXPLORE_ENABLED, after moderation). */}
+          {deck.share_token && process.env.EXPLORE_ENABLED === 'true' ? (
+            <DeckListingToggle deckId={deckId} initialListedAt={deck.listed_at} />
+          ) : null}
           <ShareDeckButton deckId={deckId} initialToken={deck.share_token} />
         </div>
 
@@ -473,6 +502,12 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
         </>
       ) : null}
 
+      {activeTab === 'overview' && mergeTargets.length > 0 ? (
+        <section className="well px-3.5 py-3" aria-label="Merge this deck">
+          <MergeDeckDialog sourceDeckId={deckId} sourceTitle={deckTitleMeta.cleanTitle} targets={mergeTargets} />
+        </section>
+      ) : null}
+
       {/* ═══ Cards ══════════════════════════════════════════════════════ */}
       {activeTab === 'cards' ? (
         <DeckCardsManager
@@ -487,6 +522,11 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
       {activeTab === 'insights' ? (
         hasCards ? (
           <>
+            {/* The segment's one .raised object (plan §4.3, DS-01). */}
+            <Suspense fallback={<SynthesisInsightsSkeleton />}>
+              <ConceptMapPanel deckId={deckId} />
+            </Suspense>
+
             <Suspense fallback={<WeakestConceptsSkeleton />}>
               <WeakestConcepts deckId={deckId} />
             </Suspense>

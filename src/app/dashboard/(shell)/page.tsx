@@ -2,6 +2,7 @@ import type { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { getDueByDeck, getRequestClient, getRequestNow, getSessionUser } from '@/lib/supabase/session';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
+import { TrashPanel } from '@/components/ui/shared/TrashPanel';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
 import { GreetingHeader } from '@/components/ui/shared/GreetingHeader';
 import { DueNowBand } from '@/components/ui/shared/DueNowBand';
@@ -286,8 +287,13 @@ export default async function Dashboard() {
   const { forecastDays, easeByDeck, overdueDays } = schedule;
   const estimatedMinutes = estimateSessionMinutes(totalDue);
 
+  // card_mastery_state is keyed on the user, not resolved through decks, so a
+  // trashed deck's rows still come back; count only decks the user can see (plan §4.1a).
+  const visibleDeckIds = new Set(deckRows.map((deck) => deck.id));
+  const visibleMasteryRows = masterySummaryRows.filter((row) => visibleDeckIds.has(row.deck_id));
+
   const masteryByDeck = new Map<string, { assessedCards: number; masteredCards: number; lastQuizAt: string | null }>();
-  for (const row of masterySummaryRows) {
+  for (const row of visibleMasteryRows) {
     masteryByDeck.set(row.deck_id, {
       assessedCards: row.assessed_cards,
       masteredCards: row.mastered_cards,
@@ -295,8 +301,8 @@ export default async function Dashboard() {
     });
   }
 
-  const assessedCards = masterySummaryRows.reduce((sum, row) => sum + row.assessed_cards, 0);
-  const masteredCards = masterySummaryRows.reduce((sum, row) => sum + row.mastered_cards, 0);
+  const assessedCards = visibleMasteryRows.reduce((sum, row) => sum + row.assessed_cards, 0);
+  const masteredCards = visibleMasteryRows.reduce((sum, row) => sum + row.mastered_cards, 0);
   const retentionPercentage =
     assessedCards > 0 ? Math.round((masteredCards / assessedCards) * 100) : null;
 
@@ -481,6 +487,9 @@ export default async function Dashboard() {
           </div>
         </>
       )}
+
+      {/* Outside the branch above: trashing your only deck must not hide the way back (plan §4.1a). */}
+      <TrashPanel />
     </div>
   );
 }

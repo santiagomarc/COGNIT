@@ -61,6 +61,7 @@ import {
   buildDrillCheckInstruction,
   buildDrillGenerationInstruction,
   buildPlanGenerationInstruction,
+  exemplarGaps,
   promptOpening,
   renderClusterCards,
   stemFor,
@@ -522,6 +523,8 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
           tokens_in: outcome.value.usage.in,
           tokens_out: outcome.value.usage.out,
           tokens_thoughts: outcome.value.usage.thoughts,
+          // PED-03, recorded before it is enforced (plan §4.2).
+          exemplar_gaps: exemplarGaps(drill.requiredLinks, [drill.exemplar.claim, ...drill.exemplar.mechanisms, drill.exemplar.tradeoff].join(' '), cluster.cards).length,
         },
       });
     });
@@ -949,9 +952,41 @@ export async function restoreSynthesisDrill(data: ArchiveSynthesisDrillInput) {
   return guardAction('Drill restore', () => setDrillStatus(data, 'active', 'Failed to restore the drill.'));
 }
 
+/** Two "unfair" ratings on one drill's checks mean its key, not the student, is wrong (PED-05). */
+const UNFAIR_RETIRE_THRESHOLD = 2;
+
+async function retireIfRepeatedlyUnfair(
+  supabase: SupabaseServerClient,
+  input: { drillId: string; deckId: string; userId: string },
+): Promise<boolean> {
+  const { count, error } = await supabase
+    .from('synthesis_attempt_feedback')
+    .select('id, synthesis_attempts!inner(drill_id)', { count: 'exact', head: true })
+    .eq('user_id', input.userId)
+    .eq('rating', 'unfair')
+    .eq('synthesis_attempts.drill_id', input.drillId);
+  if (error || (count ?? 0) < UNFAIR_RETIRE_THRESHOLD) return false;
+
+  const { data: archived, error: archiveError } = await supabase
+    .from('synthesis_drills')
+    .update({ status: 'archived' })
+    .eq('id', input.drillId)
+    .eq('deck_id', input.deckId)
+    .eq('user_id', input.userId)
+    .eq('status', 'active')
+    .select('id');
+  if (archiveError) {
+    logger.warn('rateSynthesisAttempt', 'could not retire an unfair drill', { drill_id: input.drillId, message: archiveError.message });
+    return false;
+  }
+  if (archived?.length) logger.info('rateSynthesisAttempt', 'drill retired after repeated unfair ratings', { drill_id: input.drillId });
+  return Boolean(archived?.length);
+}
+
 /**
  * "Was this check fair?" (audit F5). One row per attempt, replaced on a
- * second answer; the attempts table itself stays append-only.
+ * second answer; the attempts table itself stays append-only. A second
+ * "unfair" on the same drill retires it (PED-05).
  */
 export async function rateSynthesisAttempt(data: RateSynthesisAttemptInput) {
   return guardAction('Check feedback', async () => {
@@ -968,7 +1003,7 @@ export async function rateSynthesisAttempt(data: RateSynthesisAttemptInput) {
 
     const { data: attempt } = await supabase
       .from('synthesis_attempts')
-      .select('id')
+      .select('id, drill_id')
       .eq('id', parsed.data.attempt_id)
       .eq('deck_id', parsed.data.deck_id)
       .eq('user_id', user.id)
@@ -995,7 +1030,12 @@ export async function rateSynthesisAttempt(data: RateSynthesisAttemptInput) {
       return { error: sanitizeDatabaseError(error, 'Failed to save your feedback.') };
     }
 
-    return { success: true as const };
+    const retired = parsed.data.rating === 'unfair'
+      ? await retireIfRepeatedlyUnfair(supabase, { drillId: attempt.drill_id, deckId: parsed.data.deck_id, userId: user.id })
+      : false;
+    if (retired) revalidatePath(`/dashboard/${parsed.data.deck_id}`);
+
+    return { success: true as const, retired };
   });
 }
 
@@ -1555,6 +1595,7 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
       format_substituted: drill.format !== format,
       repair_of: input.attemptId,
       repair_for_card: input.cardId,
+      exemplar_gaps: exemplarGaps(drill.requiredLinks, [drill.exemplar.claim, ...drill.exemplar.mechanisms, drill.exemplar.tradeoff].join(' '), cluster.cards).length,
       finish_reason: outcome.finishReason,
       tokens_in: outcome.usage.in,
       tokens_out: outcome.usage.out,

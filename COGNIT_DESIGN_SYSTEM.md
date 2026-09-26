@@ -193,9 +193,26 @@ than a courtesy.
 Concretely: a legend of bare ticks is a defect. Every state swatch ships with a word, a count or a
 position beside it. If you are about to simplify a legend down to colour alone, don't.
 
+### 2.2c Synthesis on the state channel (Rev. D, brought forward)
+
+A synthesis verdict is a fact about the student's memory of a *relation*,
+so it may use the state channel — through this mapping only:
+
+| Fact | State |
+|---|---|
+| Verdict `sound` · link `covered` · plan band `strong` · relation holds | `--state-mastered` |
+| Verdict `partial` · link `partial` · plan band `developing` · relation keeps going missing | `--state-due` |
+| Plan band `secure` | `--state-learning` |
+| Verdict `contradicted` · a contradicted card | `--state-lapsed` |
+| Verdict `off_target` · link `missing` · relation untested | no hue (neutral or an empty tick) |
+
+This records what the synthesis surfaces (`src/lib/synthesis/ui.ts`) and the
+concept map already do. The rest of Rev. D (§2.2d errors, §2.2e time is not
+memory) lands with COGNIT_NEXT_HORIZON_PLAN.md §5.4.
+
 ### 2.3 Rules
 
-- Never introduce a hue outside §2.2. No brand purple, no indigo, no cyan.
+- Never introduce a hue outside §2.2. No brand purple, no indigo, no cyan. Synthesis facts use it only through §2.2c.
 - Never use a state colour decoratively (a green heading, an orange divider). If it is not
   reporting card state, it is `--ink*`.
 - Never hard-code a hex in a component. Every colour comes from a token, so both themes resolve.

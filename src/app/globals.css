@@ -1592,3 +1592,10 @@ html {
 .code .hljs-comment {
   font-style: italic;
 }
+
+/* Concept map (plan §4.3): the node's own focus ring. CSS outranks the SVG
+   presentation attribute, so this wins over the circle's stroke. */
+.concept-node:focus-visible circle {
+  stroke: var(--accent);
+  stroke-width: 2;
+}

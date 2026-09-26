@@ -18,11 +18,13 @@ const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] t
  * "Was this check fair?" (audit F5) — the ongoing calibration signal the
  * one-time calibration set cannot give. Two ghost buttons; *Unfair* opens an
  * optional one-line note. One row per attempt, so a change of mind replaces.
+ * A second "unfair" on the same drill retires it (plan §4.2, PED-05).
  */
 export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
   const [rating, setRating] = useState<'fair' | 'unfair' | null>(null);
   const [note, setNote] = useState('');
   const [noteSent, setNoteSent] = useState(false);
+  const [retired, setRetired] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const send = (nextRating: 'fair' | 'unfair', nextNote?: string) => {
@@ -40,6 +42,7 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
         }
         setRating(nextRating);
         if (nextNote !== undefined) setNoteSent(true);
+        if (result && 'retired' in result && result.retired) setRetired(true);
       } catch {
         toast.error('Could not save your feedback. Check your connection and try again.');
       }
@@ -92,6 +95,11 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
             Send
           </Button>
         </form>
+      ) : null}
+      {retired ? (
+        <p role="status" className="w-full text-[13px] text-ink-dim">
+          Thanks — this drill has been retired, so it will not come up again.
+        </p>
       ) : null}
     </div>
   );
