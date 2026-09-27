@@ -18,7 +18,9 @@ import {
 } from './_shared';
 import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
-import { withGeminiRetry } from '@/lib/ai-retry';
+import {
+  AiServiceError, aiFailureMessage, classifyAiError, withGeminiRetry, type AiFailureKind,
+} from '@/lib/ai-retry';
 import { generateJson } from '@/lib/gemini';
 import { assessPdfQuality, chunkDocumentText, describePdfQuality } from '@/lib/pdf-chunking';
 import {
@@ -258,6 +260,9 @@ export async function generateCards(formData: FormData) {
     const usedFrontKeys = new Set<string>();
     const allCandidates: CandidateCard[] = [];
     let failedChunks = 0;
+    // Why the first section failed, so an all-failed upload can say so rather
+    // than one generic line that hides a quota or key problem.
+    let firstFailureKind: AiFailureKind | null = null;
 
     // Ask each chunk for a little more than its even share so the global
     // ranking below has a real pool to choose from.
@@ -325,8 +330,11 @@ export async function generateCards(formData: FormData) {
         if (outcome.status === 'rejected') {
           // One bad section must not lose the whole document.
           failedChunks += 1;
+          const kind = outcome.reason instanceof AiServiceError ? outcome.reason.kind : classifyAiError(outcome.reason);
+          firstFailureKind ??= kind;
           logger.warn('generateCards', 'chunk failed', {
             chunkIndex: wave[index].index,
+            kind,
             error: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
           });
           return;
@@ -350,6 +358,9 @@ export async function generateCards(formData: FormData) {
     ).map((candidate) => ({ front: candidate.front, back: candidate.back }));
 
     if (cards.length === 0) {
+      if (failedChunks > 0 && firstFailureKind && firstFailureKind !== 'unknown') {
+        return { error: aiFailureMessage(firstFailureKind, 'Card generation') };
+      }
       return {
         error: failedChunks > 0
           ? 'AI could not generate cards from this PDF — every section failed to process. Please try again, or use Bulk Import.'
