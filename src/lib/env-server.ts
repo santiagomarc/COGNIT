@@ -25,7 +25,6 @@ const serverEnvSchema = z.object({
   GEMINI_GENERATION_THINKING: z.enum(['none', 'low', 'high']).default('none'),
   GEMINI_EMBEDDING_MODEL: z.string().default('gemini-embedding-001'),
   GEMINI_MODEL_MAX_TOKENS: z.coerce.number().int().positive().default(4096),
-  CRON_SECRET: z.string().min(16).optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
@@ -43,7 +42,6 @@ export function getServerEnv(): ServerEnv {
     GEMINI_GENERATION_THINKING: process.env.GEMINI_GENERATION_THINKING,
     GEMINI_EMBEDDING_MODEL: process.env.GEMINI_EMBEDDING_MODEL,
     GEMINI_MODEL_MAX_TOKENS: process.env.GEMINI_MODEL_MAX_TOKENS,
-    CRON_SECRET: process.env.CRON_SECRET,
   });
 
   if (!parsed.success) {
@@ -51,10 +49,9 @@ export function getServerEnv(): ServerEnv {
     throw new Error(`Invalid or missing server environment variables: ${missing}`);
   }
 
-  if (process.env.NODE_ENV === 'production' && !parsed.data.CRON_SECRET) {
-    throw new Error('CRON_SECRET must be set in production (see src/app/api/keep-alive/route.ts).');
-  }
-
+  // CRON_SECRET is deliberately not here: only the keep-alive route needs it,
+  // and that route already fails closed without it. Requiring it here made
+  // every AI call throw in production while it was unset.
   cached = parsed.data;
   return cached;
 }
