@@ -65,7 +65,11 @@ jobs:
       # pretty-prints; the local CLI's does not. Both are run through one
       # pinned Prettier, then comments, blank lines and __InternalSupabase
       # (the server's PostgrestVersion, not the schema's) are dropped, so only
-      # schema differences fail the step.
+      # schema differences fail the step. The generators also differ in
+      # version: the local one spells a NOT NULL json column
+      # NonNullable<Json> and a no-argument function Record<PropertyKey,
+      # never>, where the hosted one writes Json and never; both are mapped to
+      # the hosted spelling first.
       # On a mismatch the diff goes to the run summary and to annotations
       # (the failure email and the public API show those; job logs need a
       # signed-in viewer).
@@ -73,7 +77,8 @@ jobs:
         run: |
           supabase gen types typescript --local --schema public > /tmp/types.ts
           normalize() {
-            npx -y prettier@3.6.2 --no-config --stdin-filepath types.ts < "$1" \
+            sed -e 's/NonNullable<Json>/Json/g' -e 's/Args: Record<PropertyKey, never>/Args: never/g' "$1" \
+              | npx -y prettier@3.6.2 --no-config --stdin-filepath types.ts \
               | awk '/^[[:space:]]*__InternalSupabase: \{/ { if ($0 !~ /\}/) skip = 1; next } skip { if ($0 ~ /^[[:space:]]*\}/) skip = 0; next } { print }' \
               | grep -v -e '^[[:space:]]*//' -e '^[[:space:]]*$' \
               | sed 's/[[:space:]]*$//'
