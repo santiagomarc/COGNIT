@@ -906,6 +906,10 @@ export type Database = {
           review_count: number
         }[]
       }
+      get_synthesis_insights: {
+        Args: { p_deck_id: string; p_now?: string }
+        Returns: Json
+      }
       get_weakest_concepts: {
         Args: {
           p_deck_id?: string
