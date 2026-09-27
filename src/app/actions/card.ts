@@ -144,7 +144,8 @@ export async function updateCard(data: UpdateCardInput) {
         return 'skipped';
       }
       // embedTexts already runs under withGeminiRetry.
-      const [vector] = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT' });
+      // Background work: nobody is waiting, so wait out a free-tier 429.
+      const [vector] = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT', maxServerDelayMs: 35_000 });
       const { error: embedError } = await supabase
         .from('cards')
         .update({ embedding: toVectorLiteral(vector) })

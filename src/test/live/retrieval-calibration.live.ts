@@ -40,8 +40,8 @@ describe.skipIf(!hasKey)('live retrieval — the similarity floors still separat
 
     const cards = Object.entries(set.decks).flatMap(([deck, rows]) => rows.map(([term, definition]) => ({ deck, text: `${term}\n${definition}` })));
     const questions = Object.entries(set.questions).flatMap(([deck, rows]) => rows.map((row) => ({ deck, ...row })));
-    const cardVectors = await embedTexts(cards.map((card) => card.text), { taskType: 'RETRIEVAL_DOCUMENT' });
-    const questionVectors = await embedTexts(questions.map((question) => question.text), { taskType: 'RETRIEVAL_QUERY' });
+    const cardVectors = await embedTexts(cards.map((card) => card.text), { taskType: 'RETRIEVAL_DOCUMENT', maxServerDelayMs: 65_000 });
+    const questionVectors = await embedTexts(questions.map((question) => question.text), { taskType: 'RETRIEVAL_QUERY', maxServerDelayMs: 65_000 });
 
     const topByKind: Record<Kind, number[]> = { covered: [], partial: [], near: [], off: [] };
     questions.forEach((question, qi) => {

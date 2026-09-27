@@ -87,7 +87,20 @@ export type RetryOptions = {
    * pass `(kind) => kind !== 'timeout'`. Never widens the RETRYABLE set.
    */
   shouldRetry?: (kind: AiFailureKind, attempt: number) => boolean;
+  /**
+   * Waits out the delay a 429 asks for ("retry in 30s") when it is at most
+   * this long. The free tier resets per minute, so a sub-second backoff only
+   * burns the remaining attempts. Default 0: interactive calls fail fast.
+   */
+  maxServerDelayMs?: number;
 };
+
+/** The wait a Gemini 429 asks for, in ms, or null when it names none. */
+export function serverRetryDelayMs(message: string): number | null {
+  const match = /"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/.exec(message)
+    ?? /retry in (\d+(?:\.\d+)?)s/i.exec(message);
+  return match ? Math.ceil(Number(match[1]) * 1000) : null;
+}
 
 function sleep(ms: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -137,8 +150,13 @@ export async function withGeminiRetry<T>(
         throw new AiServiceError(lastKind, lastMessage, attempt);
       }
 
+      const requested = lastKind === 'rate_limited' ? serverRetryDelayMs(lastMessage) : null;
       const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
-      const jittered = Math.floor(Math.random() * backoff);
+      // Up to 1 s of jitter on top of the server's wait keeps concurrent
+      // batches from all landing on the first instant of the new window.
+      const jittered = requested !== null && requested <= (options.maxServerDelayMs ?? 0)
+        ? requested + Math.floor(Math.random() * 1_000)
+        : Math.floor(Math.random() * backoff);
       logger.warn(`ai:${options.label}`, `${lastKind}, retry ${attempt}/${maxAttempts - 1} in ${jittered}ms`);
       await sleep(jittered, options.signal);
     }

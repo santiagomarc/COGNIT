@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AiServiceError, classifyAiError, withGeminiRetry } from './ai-retry';
+import { AiServiceError, classifyAiError, serverRetryDelayMs, withGeminiRetry } from './ai-retry';
 import { guardAction } from './action-guard';
 
 describe('classifyAiError', () => {
@@ -102,5 +102,41 @@ describe('guardAction', () => {
   it('passes success through untouched', async () => {
     await expect(guardAction('X', async () => ({ success: true as const })))
       .resolves.toEqual({ success: true });
+  });
+});
+
+describe('free-tier 429s — the server-requested wait', () => {
+  const quota429 = () => Object.assign(
+    new Error('{"error":{"code":429,"message":"Quota exceeded. Please retry in 30.322188577s.","details":[{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"30s"}]}}'),
+    { status: 429 },
+  );
+
+  it('reads retryDelay, falling back to the "retry in" text', () => {
+    expect(serverRetryDelayMs(quota429().message)).toBe(30_000);
+    expect(serverRetryDelayMs('Please retry in 12.5s.')).toBe(12_500);
+    expect(serverRetryDelayMs('503 unavailable')).toBeNull();
+  });
+
+  it('waits out the requested delay when the caller allows it', async () => {
+    vi.useFakeTimers();
+    try {
+      const op = vi.fn().mockRejectedValueOnce(quota429()).mockResolvedValueOnce('ok');
+      const result = withGeminiRetry(op, { label: 't', maxServerDelayMs: 35_000 });
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(op).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1_001);
+      await expect(result).resolves.toBe('ok');
+      expect(op).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the short backoff by default, so interactive calls still fail fast', async () => {
+    const op = vi.fn().mockRejectedValue(quota429());
+    const started = Date.now();
+    await expect(withGeminiRetry(op, { label: 't', baseDelayMs: 1 }))
+      .rejects.toMatchObject({ kind: 'rate_limited', attempts: 3 });
+    expect(Date.now() - started).toBeLessThan(1_000);
   });
 });

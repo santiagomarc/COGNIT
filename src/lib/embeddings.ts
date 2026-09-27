@@ -14,7 +14,7 @@ export type TaskType = EmbeddingTaskType;
  */
 export async function embedTexts(
   texts: string[],
-  options: { taskType: TaskType },
+  options: { taskType: TaskType; maxServerDelayMs?: number },
 ): Promise<number[][]> {
   if (texts.length === 0) return [];
   const out: number[][] = [];
@@ -23,7 +23,7 @@ export async function embedTexts(
     const slice = texts.slice(i, i + MAX_BATCH);
     const embeddings = await withGeminiRetry(
       () => embedContents(slice, { taskType: options.taskType, outputDimensionality: EMBEDDING_DIMENSIONS }),
-      { label: 'batch_embed' },
+      { label: 'batch_embed', maxServerDelayMs: options.maxServerDelayMs },
     );
 
     if (embeddings.length !== slice.length) {

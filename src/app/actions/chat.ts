@@ -104,7 +104,9 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
     if (validCards.length > 0) {
       const vectors = await embedTexts(
         validCards.map((entry) => entry.payload),
-        { taskType: 'RETRIEVAL_DOCUMENT' },
+        // A 100-card batch spends the free tier's whole per-minute quota;
+        // waiting out the reset beats failing the sync.
+        { taskType: 'RETRIEVAL_DOCUMENT', maxServerDelayMs: 35_000 },
       );
 
       const updates = validCards
