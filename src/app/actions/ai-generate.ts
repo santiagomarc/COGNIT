@@ -53,6 +53,18 @@ PDFParse.setWorker(getData());
  */
 const GENERATE_CONCURRENCY = 3;
 
+/**
+ * Generation works to a deadline. The deck page's function is killed at 60 s
+ * (`maxDuration` in dashboard/(shell)/[deckId]/page.tsx), and a killed action
+ * reaches the browser as a bare network failure ("Something went wrong").
+ * Free-tier latency has a long tail (single calls of 31 s and 61 s measured
+ * 2026-09-27), so each call gets a timeout inside what is left, no wave starts
+ * without room for a call, and the sections that finished are still saved.
+ * 48 s leaves the insert and the response well inside the 60 s.
+ */
+const GENERATION_BUDGET_MS = 48_000;
+const CALL_TIMEOUT_MS = 30_000;
+const MIN_CALL_WINDOW_MS = 8_000;
 
 
 
@@ -100,6 +112,9 @@ function sanitizePdfText(rawText: string) {
 
 export async function generateCards(formData: FormData) {
   return guardAction('Card generation', async () => {
+    const deadline = Date.now() + GENERATION_BUDGET_MS;
+    const remaining = () => deadline - Date.now();
+
     // ── 1. Auth ──
     const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
     if (!user) {
@@ -262,7 +277,9 @@ export async function generateCards(formData: FormData) {
     let failedChunks = 0;
     // Why the first section failed, so an all-failed upload can say so rather
     // than one generic line that hides a quota or key problem.
-    let firstFailureKind: AiFailureKind | null = null;
+    // (Asserted, not annotated: it is also assigned inside the forEach below,
+    // which TypeScript's narrowing cannot see.)
+    let firstFailureKind = null as AiFailureKind | null;
 
     // Ask each chunk for a little more than its even share so the global
     // ranking below has a real pool to choose from.
@@ -301,8 +318,15 @@ export async function generateCards(formData: FormData) {
                 ],
               },
             ],
+            timeoutMs: Math.max(1_000, Math.min(CALL_TIMEOUT_MS, remaining())),
           }),
-        { label: `generate_cards_chunk_${chunk.index}`, maxAttempts: 2 },
+        {
+          label: `generate_cards_chunk_${chunk.index}`,
+          maxAttempts: 2,
+          // Retry, or wait out a free-tier 429, only while a call still fits.
+          shouldRetry: () => remaining() > MIN_CALL_WINDOW_MS,
+          maxServerDelayMs: Math.max(0, remaining() - MIN_CALL_WINDOW_MS),
+        },
       );
 
       const json = JSON.parse(result.text ?? '') as { cards?: unknown };
@@ -319,6 +343,14 @@ export async function generateCards(formData: FormData) {
     for (let offset = 0; offset < chunks.length; offset += GENERATE_CONCURRENCY) {
       // Ample pool already gathered — stop early rather than spend more.
       if (allCandidates.length >= parsed.data.count * 2) {
+        break;
+      }
+      // Out of time: keep what the finished sections produced.
+      if (remaining() < MIN_CALL_WINDOW_MS) {
+        const skipped = chunks.length - offset;
+        failedChunks += skipped;
+        firstFailureKind ??= 'timeout';
+        logger.warn('generateCards', 'deadline reached; sections skipped', { skipped, chunkCount: chunks.length });
         break;
       }
 
