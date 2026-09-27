@@ -59,7 +59,7 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
         aria-pressed={rating === 'fair'}
         onClick={() => send('fair')}
         disabled={isPending}
-        className="h-[24px] px-2 text-[12px]"
+        className="h-[44px] px-2 text-[12px] sm:h-[24px]"
       >
         Fair
       </Button>
@@ -70,7 +70,7 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
         aria-pressed={rating === 'unfair'}
         onClick={() => send('unfair')}
         disabled={isPending}
-        className="h-[24px] px-2 text-[12px]"
+        className="h-[44px] px-2 text-[12px] sm:h-[24px]"
       >
         Unfair
       </Button>
@@ -89,9 +89,9 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
             maxLength={300}
             disabled={isPending}
             aria-label="What did the check get wrong?"
-            className="h-[28px] min-w-0 flex-1 text-[12px] sm:text-[12px]"
+            className="h-[44px] min-w-0 flex-1 text-base sm:h-[28px] sm:text-[12px]"
           />
-          <Button type="submit" variant="ghost" size="sm" disabled={isPending || note.trim().length === 0} className="h-[24px] px-2 text-[12px]">
+          <Button type="submit" variant="ghost" size="sm" disabled={isPending || note.trim().length === 0} className="h-[44px] px-2 text-[12px] sm:h-[24px]">
             Send
           </Button>
         </form>

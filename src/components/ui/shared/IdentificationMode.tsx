@@ -112,7 +112,7 @@ export function IdentificationMode({
           </div>
 
           {enrichmentPending && !card.id_question ? (
-            <p className="border-l-2 border-border-strong pl-3 text-xs text-muted-foreground">
+            <p className="border-l-2 border-border-strong pl-3 text-xs text-ink-dim">
               AI is preparing a cleaner question-style clue for this card. You can still answer using
               the saved description right now.
             </p>
@@ -181,12 +181,12 @@ export function IdentificationMode({
                 {result.grade === 'again' ? (
                   <span>
                     <span className="font-medium text-[var(--state-lapsed)]">Missed.</span>{' '}
-                    <span className="text-muted-foreground">{Math.round(result.score * 100)}% match</span>
+                    <span className="text-ink-dim">{Math.round(result.score * 100)}% match</span>
                   </span>
                 ) : (
                   <span>
                     <span className="font-medium text-[var(--state-mastered)]">Correct.</span>{' '}
-                    <span className="text-muted-foreground">{Math.round(result.score * 100)}% match</span>
+                    <span className="text-ink-dim">{Math.round(result.score * 100)}% match</span>
                   </span>
                 )}
               </p>

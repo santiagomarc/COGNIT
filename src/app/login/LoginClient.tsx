@@ -12,7 +12,7 @@ import { Wordmark } from '@/components/ui/shared/Wordmark';
 import { AmbientField } from '@/components/ui/shared/AmbientField';
 import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { login, signup, resetPassword, loginWithOAuth } from '@/app/auth/actions';
-import { loginSchema, signupSchema, resetPasswordSchema } from '@/lib/schemas';
+import { checkLogin, checkResetPassword, checkSignup } from '@/lib/form-checks';
 import { motionTransitions } from '@/lib/motion-configs';
 import { useHasMounted } from '@/components/motion';
 import { Eye, EyeOff, Loader2, ArrowLeft, Github } from 'lucide-react';
@@ -144,9 +144,9 @@ export default function LoginClient() {
 
     if (mode === 'forgot') {
       // ── Forgot Password ──
-      const parsed = resetPasswordSchema.safeParse({ email });
-      if (!parsed.success) {
-        setFieldErrors(parsed.error.flatten().fieldErrors as Record<string, string[]>);
+      const parsed = checkResetPassword({ email });
+      if (!parsed.ok) {
+        setFieldErrors(parsed.fieldErrors);
         return;
       }
 
@@ -168,9 +168,9 @@ export default function LoginClient() {
 
     if (mode === 'login') {
       // ── Login ──
-      const parsed = loginSchema.safeParse({ email, password });
-      if (!parsed.success) {
-        setFieldErrors(parsed.error.flatten().fieldErrors as Record<string, string[]>);
+      const parsed = checkLogin({ email, password });
+      if (!parsed.ok) {
+        setFieldErrors(parsed.fieldErrors);
         return;
       }
 
@@ -188,9 +188,9 @@ export default function LoginClient() {
       });
     } else {
       // ── Signup ──
-      const parsed = signupSchema.safeParse({ email, password });
-      if (!parsed.success) {
-        setFieldErrors(parsed.error.flatten().fieldErrors as Record<string, string[]>);
+      const parsed = checkSignup({ email, password });
+      if (!parsed.ok) {
+        setFieldErrors(parsed.fieldErrors);
         return;
       }
 
@@ -347,7 +347,7 @@ export default function LoginClient() {
                   <span className="font-mono text-ink">{email}</span>. Open it to
                   {mode === 'signup' ? ' finish signing up.' : ' choose a new password.'}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-ink-dim">
                   Nothing after a minute? Check your spam folder, then{' '}
                   <button
                     type="button"
@@ -371,7 +371,7 @@ export default function LoginClient() {
                     <button
                       type="button"
                       onClick={() => switchMode('login')}
-                      className="mb-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] text-sm text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      className="mb-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] text-sm text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                       Back to sign in
@@ -456,7 +456,7 @@ export default function LoginClient() {
                         <button
                           type="button"
                           onClick={() => setShowPassword((v) => !v)}
-                          className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                          className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                           aria-pressed={showPassword}
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
@@ -518,7 +518,7 @@ export default function LoginClient() {
                   <div className="mt-6">
                     <div className="relative flex items-center">
                       <div className="h-px flex-1 bg-border" />
-                      <span className="px-3 text-xs text-muted-foreground">or continue with</span>
+                      <span className="px-3 text-xs text-ink-dim">or continue with</span>
                       <div className="h-px flex-1 bg-border" />
                     </div>
                     <div className="mt-4 grid grid-cols-2 gap-3">
@@ -544,7 +544,7 @@ export default function LoginClient() {
 
                 {/* Mode toggle */}
                 {mode !== 'forgot' && (
-                  <p className="mt-6 text-center text-sm text-muted-foreground">
+                  <p className="mt-6 text-center text-sm text-ink-dim">
                     {mode === 'login'
                       ? "Don't have an account? "
                       : 'Already have an account? '}

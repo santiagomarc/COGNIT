@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateWeakLinks, calibrationRate, dailyLinkSeries, deckReadings, formatSoundRates, misconceptionCounts, outsideClaimsSince, type AttemptForInsights } from './insights';
+import { aggregateWeakLinks, calibrationRate, dailyLinkSeries, deckReadings, formatSoundRates, misconceptionCounts, outsideClaimsSince, sparklinePath, type AttemptForInsights } from './insights';
 import type { DrillReadingRow } from './types';
 
 const NOW = new Date('2026-09-12T12:00:00Z');
@@ -116,5 +116,21 @@ describe('drill signals (audit U6 / G7)', () => {
     expect(series[29]).toEqual({ date: '2026-09-12', attempts: 2, linksCovered: 3, linksTotal: 6 });
     expect(series.find((point) => point.date === '2026-09-01')).toEqual({ date: '2026-09-01', attempts: 1, linksCovered: 3, linksTotal: 3 });
     expect(series.filter((point) => point.attempts > 0)).toHaveLength(2);
+  });
+});
+
+describe('sparklinePath (plan §5.3, UX-05)', () => {
+  const day = (date: string, attempts: number, linksCovered: number, linksTotal: number) => ({ date, attempts, linksCovered, linksTotal });
+
+  it('breaks the line on a day with no attempts instead of drawing across it', () => {
+    const path = sparklinePath([day('d1', 1, 2, 4), day('d2', 1, 4, 4), day('d3', 0, 0, 0), day('d4', 1, 1, 4), day('d5', 1, 3, 4)], 40, 36);
+    expect(path.match(/M/g)).toHaveLength(2);
+    expect(path.startsWith('M0.0,')).toBe(true);
+    expect(path).toContain(' M30.0,');
+  });
+
+  it('draws one unbroken line across consecutive active days, and nothing when there are none', () => {
+    expect(sparklinePath([day('d1', 1, 1, 2), day('d2', 2, 2, 2)], 10, 36)).toBe('M0.0,18.0 L10.0,2.0');
+    expect(sparklinePath([day('d1', 0, 0, 0)], 10, 36)).toBe('');
   });
 });

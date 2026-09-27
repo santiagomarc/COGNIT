@@ -127,29 +127,31 @@ export default async function StatsPage() {
             Back to your decks
           </Link>
         </section>
-      ) : null}
-
-      {/* ═══ Forecast — the one raised object ══════════════════════════ */}
-      <section className="raised spec p-4 md:px-[22px] md:py-[18px]" aria-labelledby="forecast-heading">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id="forecast-heading" className={LABEL}>Forgetting curve · predicted recall now</h2>
-          <p className={`${LABEL} tnum`}>{snapshot.totals.review_state} reviewed cards</p>
-        </div>
-        <RetrievabilityHistogram bars={bars} />
-        {snapshot.totals.at_risk_now > 0 ? (
-          <p className="mt-3 text-[13px] text-ink">
-            <span className="font-mono tnum" style={{ color: 'var(--state-due)' }}>{snapshot.totals.at_risk_now}</span>{' '}
-            {snapshot.totals.at_risk_now === 1 ? 'card is' : 'cards are'} below 80% predicted recall.
-            {atRiskHref ? (
-              <>
-                {' '}
-                <Link
-                  href={atRiskHref}
-                  className="rounded-[var(--radius-sm)] underline underline-offset-[3px] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
-                >
-                  Review the deck with the most →
-                </Link>
-              </>
+      ) : (
+        // With no history the charts would all be empty beneath a panel saying so (UX-03):
+        // render them only once there is something to draw. Collection by interval stays.
+        <>
+        {/* ═══ Forecast — the one raised object ══════════════════════════ */}
+        <section className="raised spec p-4 md:px-[22px] md:py-[18px]" aria-labelledby="forecast-heading">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="forecast-heading" className={LABEL}>Forgetting curve · predicted recall now</h2>
+            <p className={`${LABEL} tnum`}>{snapshot.totals.review_state} reviewed cards</p>
+          </div>
+          <RetrievabilityHistogram bars={bars} />
+          {snapshot.totals.at_risk_now > 0 ? (
+            <p className="mt-3 text-[13px] text-ink">
+              <span className="font-mono tnum" style={{ color: 'var(--state-due)' }}>{snapshot.totals.at_risk_now}</span>{' '}
+              {snapshot.totals.at_risk_now === 1 ? 'card is' : 'cards are'} below 80% predicted recall.
+              {atRiskHref ? (
+                <>
+                  {' '}
+                  <Link
+                    href={atRiskHref}
+                    className="rounded-[var(--radius-sm)] underline underline-offset-[3px] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                  >
+                    Review the deck with the most →
+                  </Link>
+                </>
             ) : null}
           </p>
         ) : null}
@@ -194,6 +196,8 @@ export default async function StatsPage() {
           <ActivityHeatmap activity={effort} monthsToShow={3} anchorDate={todayIso} />
         </div>
       </section>
+      </>
+      )}
 
       {/* ═══ Collection ════════════════════════════════════════════════ */}
       <section aria-labelledby="collection-heading">

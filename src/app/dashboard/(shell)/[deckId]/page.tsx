@@ -11,6 +11,10 @@ import { DeckSegments, resolveDeckTab } from '@/components/ui/shared/DeckSegment
 import { DeckSessionLauncher } from '@/components/ui/shared/DeckSessionLauncher';
 import { DrillHistory, DrillSignals, SynthesisInsightsSkeleton, WeakLinks } from '@/components/ui/shared/synthesis/SynthesisInsights';
 import { QuestionBank, QuestionBankSkeleton } from '@/components/ui/shared/synthesis/QuestionBank';
+import { ExamDateControl } from '@/components/ui/shared/synthesis/ExamDateControl';
+import { PlanLauncherRow } from '@/components/ui/shared/synthesis/PlanLauncherRow';
+import { MIN_DECK_CARDS_FOR_DRILLS } from '@/lib/synthesis/clusters';
+import { daysToExam } from '@/lib/synthesis/schedule';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ExportDeckMenu } from '@/components/ui/shared/ExportDeckMenu';
@@ -70,6 +74,8 @@ type DeckDetailSnapshot = {
   deckErrorMessage: string | null;
   /** The user's other decks, for "Merge into" (Overview only). */
   mergeTargets: MergeTarget[];
+  /** Saved exam questions, for Overview's exam line (UX-01). */
+  questionCount: number;
   cards: DeckCardRow[];
   totalCards: number;
   /** Deck-wide, not derived from the paginated `cards` slice above. */
@@ -122,6 +128,14 @@ function formatNextReview(nextReviewAt: string | null): { label: string; state: 
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
+
+/** Overview's exam line (UX-01): the countdown in words, no hue (design system §2.2e). */
+function examLine(days: number | null): string {
+  if (days === null) return 'No exam date';
+  if (days < 0) return 'Exam passed';
+  if (days === 0) return 'Exam today';
+  return `Exam in ${days} ${days === 1 ? 'day' : 'days'}`;
+}
 
 const EMPTY_READINGS: SynthesisReadings = { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null, plans: { active: 0, due: 0 } };
 
@@ -181,8 +195,10 @@ async function loadDeckDetailSnapshot(
 ): Promise<DeckDetailSnapshot> {
   const wantsCards = activeTab === 'overview' || activeTab === 'cards';
   const wantsOverview = activeTab === 'overview';
+  // The Exam segment needs the plan readings too (plan §5.5, UX-01).
+  const wantsReadings = wantsOverview || activeTab === 'exam';
 
-  const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings, mergeTargetsRes] = await Promise.all([
+  const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings, mergeTargetsRes, questionCountRes] = await Promise.all([
     supabase
       .from('decks')
       .select('id, title, description, created_at, share_token, exam_at, listed_at')
@@ -210,7 +226,7 @@ async function loadDeckDetailSnapshot(
     loadScheduleBreakdown(supabase, deckId),
     loadQuizReadyCount(supabase, deckId),
     loadTopTopics(supabase, deckId),
-    wantsOverview ? loadSynthesisReadings(supabase, { deckId, userId }) : Promise.resolve(EMPTY_READINGS),
+    wantsReadings ? loadSynthesisReadings(supabase, { deckId, userId }) : Promise.resolve(EMPTY_READINGS),
     // `user_id` is not redundant: RLS also shows other people's shared decks.
     wantsOverview
       ? supabase
@@ -221,6 +237,10 @@ async function loadDeckDetailSnapshot(
         .order('updated_at', { ascending: false })
         .limit(100)
       : Promise.resolve({ data: [] as Array<{ id: string; title: string; cards: Array<{ count: number }> }> }),
+    // Overview's one exam line needs only a count (UX-01).
+    wantsOverview
+      ? supabase.from('synthesis_questions').select('id', { count: 'exact', head: true }).eq('deck_id', deckId).eq('user_id', userId)
+      : Promise.resolve({ count: 0 }),
   ]);
 
   const { data: deck, error: deckError } = deckRes;
@@ -247,6 +267,7 @@ async function loadDeckDetailSnapshot(
       }
       : null,
     deckErrorMessage: deckError?.message ?? null,
+    questionCount: questionCountRes.count ?? 0,
     mergeTargets: (mergeTargetsRes.data ?? []).map((target) => ({
       id: target.id,
       title: removeDeckTagFromTitle(target.title),
@@ -311,6 +332,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
     schedule,
     synthesisReadings,
     mergeTargets,
+    questionCount,
   } = await loadDeckDetailSnapshot(supabase, user.id, deckId, activeTab);
 
   if (deckErrorMessage || !deck) {
@@ -375,17 +397,13 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
             ) : null}
           </div>
 
-          {/* Mastery is the one reading here that is a state, so it is the only
-              one that can take a hue (§2.2). */}
+          {/* One meaning per word (plan §5.5, UX-02): this is card_mastery_state.correct —
+              proven in a quiz — not SM-2's "mastered" (interval ≥ 21 days, as on Stats),
+              so it is ink. Due is the reading here that is a memory state. */}
           <div className="flex shrink-0 flex-wrap items-baseline gap-x-6 gap-y-3 lg:pb-1">
             <Telemetry label="Cards" value={totalCards} />
             <Telemetry label="Due" value={schedule.due} tone={schedule.due > 0 ? 'due' : 'ink'} />
-            <Telemetry
-              label="Mastery"
-              value={`${masteryPercentage}%`}
-              tone={masteryPercentage >= 70 ? 'mastered' : 'ink'}
-            />
-            <Telemetry label="Proven" value={`${masteredCards}/${totalCards}`} />
+            <Telemetry label="Quiz-proven" value={`${masteryPercentage}%`} />
             <Telemetry label="Quiz-ready" value={`${quizReadyCards}/${totalCards}`} />
             <Telemetry label="Last quiz" value={formatLastQuizAge(lastQuizAt)} />
           </div>
@@ -410,14 +428,22 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
               sessionBounds={sessionBounds}
               synthesisReadings={synthesisReadings}
               synthesisTopics={topTopics.map(([tag]) => tag)}
-              examAt={deck.exam_at}
             />
           ) : null}
 
-          {hasCards ? (
-            <Suspense fallback={<QuestionBankSkeleton />}>
-              <QuestionBank deckId={deckId} />
-            </Suspense>
+          {/* One line, and only for a deck that is preparing for something (UX-01). */}
+          {deck.exam_at || questionCount > 0 ? (
+            <Link
+              href={`/dashboard/${deckId}?tab=exam`}
+              scroll={false}
+              className="well flex flex-wrap items-baseline gap-x-2 px-3.5 py-2.5 text-[13px] text-ink-dim outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            >
+              <span className="text-ink">{examLine(daysToExam(deck.exam_at, new Date()))}</span>
+              <span aria-hidden="true">·</span>
+              <span className="font-mono tnum">{questionCount}</span> {questionCount === 1 ? 'question' : 'questions'}
+              <span aria-hidden="true">·</span>
+              <span className="text-ink">Prepare →</span>
+            </Link>
           ) : null}
 
           <DeckReadings
@@ -506,6 +532,28 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
         <section className="well px-3.5 py-3" aria-label="Merge this deck">
           <MergeDeckDialog sourceDeckId={deckId} sourceTitle={deckTitleMeta.cleanTitle} targets={mergeTargets} />
         </section>
+      ) : null}
+
+      {/* ═══ Exam ═══════════════════════════════════════════════════════ */}
+      {activeTab === 'exam' ? (
+        hasCards ? (
+          <>
+            <section className="surface p-4 lg:p-5" aria-labelledby="exam-date-heading">
+              <h2 id="exam-date-heading" className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Exam date</h2>
+              {/* The exam date sets the drill cadence (plan D19): tight inside three days, stretched beyond two weeks. */}
+              <ExamDateControl deckId={deckId} examAt={deck.exam_at} />
+              {totalCards >= MIN_DECK_CARDS_FOR_DRILLS ? (
+                // Essay plans (plan D15): a set question over the topic, answered as a plan.
+                <PlanLauncherRow deckId={deckId} topics={topTopics.map(([tag]) => tag)} plans={synthesisReadings.plans} />
+              ) : null}
+            </section>
+            <Suspense fallback={<QuestionBankSkeleton />}>
+              <QuestionBank deckId={deckId} />
+            </Suspense>
+          </>
+        ) : (
+          <p className="surface p-5 text-sm text-ink-dim">Add cards first: exam questions are matched against them.</p>
+        )
       ) : null}
 
       {/* ═══ Cards ══════════════════════════════════════════════════════ */}

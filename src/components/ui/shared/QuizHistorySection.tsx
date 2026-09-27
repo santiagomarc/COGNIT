@@ -14,7 +14,7 @@ export async function QuizHistorySection({ deckId }: QuizHistorySectionProps) {
         <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
           Quiz history
         </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-ink-dim">
           Quiz history is taking longer than expected. Please refresh in a moment.
         </p>
       </section>

@@ -253,7 +253,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
           <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Chat with your deck
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-ink-dim">
             Ask concept questions grounded in your own flashcards.
           </p>
         </div>
@@ -265,7 +265,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
 
       {indexStatus && indexStatus.pending > 0 ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-l-2 border-[var(--state-learning)] py-1 pl-3 text-xs">
-          <span className="text-muted-foreground">
+          <span className="text-ink-dim">
             {indexStatus.pending} of {indexStatus.total} cards aren&apos;t indexed yet.
             Chat can only answer from indexed cards.
           </span>
@@ -300,12 +300,12 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         className="h-[22rem] overflow-y-auto overscroll-contain rounded-[var(--radius-container)] border border-border p-3"
       >
         {isLoadingMessages ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center text-sm text-ink-dim">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Loading chat history…
           </div>
         ) : showEmptyState ? (
-          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground">
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-ink-dim">
             Ask your first question to start this study conversation.
           </div>
         ) : (
@@ -323,12 +323,12 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
                   ) : null}
 
                   {state.answer ? (
-                    <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                    <p className="whitespace-pre-wrap leading-relaxed text-ink-dim">
                       {state.answer}
                       <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-ink align-text-bottom" />
                     </p>
                   ) : (
-                    <p className="flex items-center gap-2 text-muted-foreground">
+                    <p className="flex items-center gap-2 text-ink-dim">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       {state.status === 'retrieving' ? 'Searching your cards…' : 'Thinking…'}
                     </p>
@@ -342,7 +342,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                 <div className="space-y-2">
                   {state.answer ? (
-                    <p className="whitespace-pre-wrap leading-relaxed text-muted-foreground">{state.answer}</p>
+                    <p className="whitespace-pre-wrap leading-relaxed text-ink-dim">{state.answer}</p>
                   ) : null}
                   <p className="text-destructive">{state.errorMessage}</p>
                   {state.retryable ? (

@@ -53,7 +53,7 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
     <div className="space-y-2.5">
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Password strength</span>
+          <span className="text-ink-dim">Password strength</span>
           {/* Announced on change, so the meter is not a visual-only signal. */}
           <span role="status" aria-live="polite" className="font-medium" style={{ color: tier.token }}>
             {tier.label}
@@ -83,7 +83,7 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
             ) : (
               <X className="h-3 w-3 shrink-0 text-ink-dimmer" aria-hidden="true" />
             )}
-            <span className={rule.passed ? 'text-ink' : 'text-muted-foreground'}>
+            <span className={rule.passed ? 'text-ink' : 'text-ink-dim'}>
               {rule.label}
             </span>
             <span className="sr-only">{rule.passed ? '— met' : '— not met'}</span>

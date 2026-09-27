@@ -7,6 +7,8 @@ import { MAX_SESSION_CARD_COUNT } from '@/lib/study';
 import { loadSynthesisInsights, type SynthesisInsights } from '@/lib/synthesis/loaders';
 import { FORMAT_LABEL, MISCONCEPTION_LABEL, VERDICT_LABEL, VERDICT_TICK, formatAge, formatClock } from '@/lib/synthesis/ui';
 import { MISCONCEPTION_KINDS } from '@/lib/synthesis/types';
+import { sparklinePath } from '@/lib/synthesis/insights';
+import { ChartDataTable } from '@/components/ui/shared/analytics/ChartDataTable';
 
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
 
@@ -45,7 +47,7 @@ export async function WeakLinks({ deckId }: { deckId: string }) {
           ) : null}
         </p>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 text-sm text-ink-dim">
         Cards whose links went missing or were contradicted in your drills.
         {insights.calibration30d !== null ? ' Calibration is how often your confidence matched the verdict.' : null}
       </p>
@@ -148,13 +150,10 @@ export async function DrillSignals({ deckId }: { deckId: string }) {
   const height = 36;
   const points = daily.map((point, index) => {
     const x = daily.length > 1 ? (index / (daily.length - 1)) * width : 0;
-    const share = point.linksTotal > 0 ? point.linksCovered / point.linksTotal : null;
-    return { x, y: share === null ? null : height - share * (height - 4) - 2, attempts: point.attempts };
+    const share = point.attempts > 0 && point.linksTotal > 0 ? point.linksCovered / point.linksTotal : null;
+    return { x, y: share === null ? null : height - share * (height - 4) - 2, share, point };
   });
-  const path = points
-    .filter((point): point is { x: number; y: number; attempts: number } => point.y !== null)
-    .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)},${point.y.toFixed(1)}`)
-    .join(' ');
+  const path = sparklinePath(daily, width, height);
   const activeDays = daily.filter((point) => point.attempts > 0).length;
   const kinds = MISCONCEPTION_KINDS.map((kind) => ({ kind, count: insights.misconceptions30d[kind] ?? 0 })).filter((entry) => entry.count > 0);
 
@@ -167,11 +166,30 @@ export async function DrillSignals({ deckId }: { deckId: string }) {
 
       {/* Links covered per day: the climb, not the number. */}
       <div className="mt-3 flex items-end gap-4">
-        <svg viewBox={`0 0 ${width} ${height}`} className="h-9 w-full max-w-[240px]" role="img" aria-label="Share of links covered per day over the last 30 days">
-          <line x1="0" y1={height - 2} x2={width} y2={height - 2} stroke="var(--border)" strokeWidth="1" />
-          {path ? <path d={path} fill="none" stroke="var(--ink-dim)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" /> : null}
-          {points.map((point, index) => (point.y !== null ? <circle key={index} cx={point.x} cy={point.y} r="1.5" fill="var(--ink)" /> : null))}
-        </svg>
+        {/* Geometry stretches, dots and type do not (plan §5.3): the SVG draws the line with a
+            non-scaling stroke, the dots are HTML, and the numbers are in a real table. */}
+        <div className="relative h-9 w-full max-w-[240px]" aria-hidden="true">
+          <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
+            <line x1="0" y1={height - 2} x2={width} y2={height - 2} stroke="var(--border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            {path ? <path d={path} fill="none" stroke="var(--ink-dim)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" /> : null}
+          </svg>
+          {points.map((entry) => (entry.y !== null ? (
+            <span
+              key={entry.point.date}
+              className="absolute block h-[3px] w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ink)]"
+              style={{ left: `${(entry.x / width) * 100}%`, top: `${(entry.y / height) * 100}%` }}
+            />
+          ) : null))}
+        </div>
+        <ChartDataTable
+          caption="Share of drill links covered per day, last 30 days. Days without attempts have no reading."
+          columns={['Day', 'Attempts', 'Links covered']}
+          rows={points.filter((entry) => entry.share !== null).map((entry) => [
+            entry.point.date,
+            entry.point.attempts,
+            `${entry.point.linksCovered} of ${entry.point.linksTotal}`,
+          ])}
+        />
         <span className={`${LABEL} tnum shrink-0`}>Links covered / day</span>
       </div>
 

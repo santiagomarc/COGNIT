@@ -113,7 +113,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
           </h1>
 
           {deck.description ? (
-            <p className="max-w-2xl text-sm text-muted-foreground">{deck.description}</p>
+            <p className="max-w-2xl text-sm text-ink-dim">{deck.description}</p>
           ) : null}
         </div>
 
@@ -134,7 +134,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
                   Save this deck — free
                 </Link>
               </Button>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-ink-dim">
                 No account needed to preview. Flip any card below.
               </p>
             </>
@@ -151,7 +151,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
 
         {cardCount > 0 ? (
           <>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-ink-dim">
               Tap a card to flip it. Only the cards are shared — the owner&apos;s study
               history and scores stay private.
             </p>
@@ -163,7 +163,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
             </div>
 
             {remaining > 0 ? (
-              <p className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-sm text-ink-dim">
                 + {remaining} more card{remaining === 1 ? '' : 's'} when you save this deck.
               </p>
             ) : null}

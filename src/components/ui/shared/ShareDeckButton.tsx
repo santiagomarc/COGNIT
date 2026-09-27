@@ -104,7 +104,7 @@ export function ShareDeckButton({ deckId, initialToken }: ShareDeckButtonProps) 
         </Button>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">
+      <p className="text-[11px] text-ink-dim">
         Your study history, quiz scores and chat stay private — only the cards are shared.
       </p>
     </div>

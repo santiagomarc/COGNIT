@@ -126,6 +126,7 @@
      Never write a raw z-50 again; if a new layer is needed, add a token here. */
   --z-rail: 20;      /* left navigation rail            */
   --z-sticky: 40;    /* sticky headers, progress bars   */
+  --z-grain: 50;     /* landing grain tile, over content */
   --z-overlay: 100;  /* scrims, pause overlay           */
   --z-modal: 110;    /* dialogs above their scrim       */
   --z-toast: 120;    /* sonner                          */
@@ -1336,6 +1337,10 @@ button.term-chip:disabled {
   cursor: default;
   opacity: 0.5;
 }
+@media (pointer: coarse) {
+  /* 40px plus the 8px gap between chips meets the 44px target (§9, plan §5.1). */
+  .term-chip { height: 40px; padding: 0 12px; }
+}
 
 /* Every column of digits gets tabular figures — no exceptions (§3.3). */
 @utility tnum {
@@ -1599,3 +1604,28 @@ html {
   stroke: var(--accent);
   stroke-width: 2;
 }
+
+/* iOS Safari zooms any focused text field under 16px and does not zoom back
+ * (input.tsx documents it). Components keep overriding the primitives'
+ * 16px-on-mobile rule for density, so the guard lives here, where no
+ * className can undo it (plan §5.1, MOB-01). `-webkit-touch-callout` exists
+ * only in iOS Safari: nothing else changes.
+ */
+@supports (-webkit-touch-callout: none) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  textarea,
+  select {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
+/* Numeric readout steps (plan §5.4, DS-05): Geist Mono, tabular, off the serif
+   scale. Consumers keep their own leading/tracking, which override these. */
+:root {
+  --type-readout-lg: 3.25rem;  /* 52px — due-now hero number */
+  --type-readout:    2.75rem;  /* 44px — deck launcher */
+  --type-readout-sm: 2rem;     /* 32px — signal panel, quiz result */
+}
+@utility type-readout-lg { font-family: var(--font-mono); font-size: var(--type-readout-lg); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+@utility type-readout    { font-family: var(--font-mono); font-size: var(--type-readout);    line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+@utility type-readout-sm { font-family: var(--font-mono); font-size: var(--type-readout-sm); line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }

@@ -34,14 +34,14 @@ export default function NotFound() {
         <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
           Error
         </p>
-        <p className="mt-2 font-mono text-[52px] font-semibold leading-none tracking-[-0.04em] tnum text-ink">
+        <p className="mt-2 type-readout-lg font-semibold leading-none tracking-[-0.04em] text-ink">
           404
         </p>
 
         <h1 className="mt-5 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">
           This page does not exist
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-sm leading-relaxed text-ink-dim">
           The link may be mistyped, or the deck it pointed at was deleted. Shared
           deck links also stop working once the owner makes the deck private.
         </p>

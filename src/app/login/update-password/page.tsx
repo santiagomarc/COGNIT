@@ -10,7 +10,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { PasswordStrength } from '@/components/ui/shared/PasswordStrength';
 import { Wordmark } from '@/components/ui/shared/Wordmark';
 import { updatePassword } from '@/app/auth/actions';
-import { updatePasswordSchema } from '@/lib/schemas';
+import { checkUpdatePassword } from '@/lib/form-checks';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { motionTransitions } from '@/lib/motion-configs';
 import { useHasMounted } from '@/components/motion';
@@ -44,9 +44,9 @@ export default function UpdatePasswordPage() {
     setFieldErrors({});
     setGeneralError(null);
 
-    const parsed = updatePasswordSchema.safeParse({ password, confirmPassword });
-    if (!parsed.success) {
-      setFieldErrors(parsed.error.flatten().fieldErrors as Record<string, string[]>);
+    const parsed = checkUpdatePassword({ password, confirmPassword });
+    if (!parsed.ok) {
+      setFieldErrors(parsed.fieldErrors);
       return;
     }
 
@@ -140,7 +140,7 @@ export default function UpdatePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     aria-pressed={showPassword}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >

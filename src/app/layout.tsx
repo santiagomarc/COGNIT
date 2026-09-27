@@ -69,6 +69,9 @@ export const viewport = {
   viewportFit: 'cover',
   width: 'device-width',
   initialScale: 1,
+  // Android Chrome shrinks the layout viewport for the keyboard, so sticky
+  // action rows sit above it instead of under it (plan §5.1, MOB-04).
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({
@@ -111,7 +114,6 @@ export default function RootLayout({
             {children}
             <Toaster
               position="top-center"
-              richColors
               toastOptions={{
                 className: "sonner-toast",
               }}

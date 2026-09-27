@@ -175,7 +175,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
       </div>
 
       {filtered.length === 0 ? (
-        <p className="well px-4 py-8 text-center text-sm text-muted-foreground">
+        <p className="well px-4 py-8 text-center text-sm text-ink-dim">
           {localDecks.length === 0
             ? 'No decks yet. Create one to get started.'
             : `No decks match “${search}”.`}

@@ -1,0 +1,12 @@
+{
+  "/login/page": 192,
+  "/login/update-password/page": 188,
+  "/dashboard/(shell)/page": 218,
+  "/dashboard/(shell)/[deckId]/page": 240,
+  "/dashboard/(shell)/stats/page": 198,
+  "/dashboard/(focus)/[deckId]/study/page": 199,
+  "/dashboard/(focus)/[deckId]/quiz/page": 202,
+  "/dashboard/(focus)/[deckId]/synthesis/page": 213,
+  "/page": 188,
+  "/s/[token]/page": 191
+}

@@ -168,7 +168,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
           <h2 className="mt-3 text-base font-semibold tracking-[-.015em]">
             Unable to load cards right now
           </h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+          <p className="mx-auto mt-2 max-w-md text-sm text-ink-dim">
             There was a temporary network issue loading this deck&apos;s cards. Your data is safe.
           </p>
           <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
@@ -189,7 +189,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
           Cards
         </p>
         <h2 className="mt-3 text-base font-semibold tracking-[-.015em]">No cards in this deck yet</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+        <p className="mx-auto mt-2 max-w-md text-sm text-ink-dim">
           Add cards by hand, paste your notes, or generate them from a PDF.
         </p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { archiveSynthesisDrill, checkSynthesisAttempt, restoreSynthesisDrill } from '@/app/actions/synthesis';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
+import { ShortcutHint } from '@/components/ui/ShortcutHint';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { StateTick } from '@/components/ui/shared/StateTick';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
@@ -106,6 +107,18 @@ function readPersistedAnswer(key: string): PersistedAnswer | null {
   }
 }
 
+/*
+ * iOS Safari (plan §5.1, MOB-04): its on-screen keyboard covers the sticky
+ * action row, and it ignores `interactive-widget`, which fixes the same thing
+ * on Android. `-webkit-touch-callout` exists only there — the same test the
+ * globals.css zoom guard uses. It never changes, so there is nothing to subscribe to.
+ */
+const noSubscription = () => () => {};
+const isIosSafari = () => typeof CSS !== 'undefined' && CSS.supports('-webkit-touch-callout', 'none');
+const isIosOnServer = () => false;
+/** Long enough for a tap on Check to land before the row changes back under it. */
+const TYPING_RELEASE_MS = 200;
+
 /** A UUID for the idempotency key, or null where the platform cannot mint one (an insecure context) — the check then simply runs without one. */
 function newClientAttemptId(): string | null {
   return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : null;
@@ -162,6 +175,13 @@ export function SynthesisDrillClient({
   const [workedExampleOpen, setWorkedExampleOpen] = useState(true);
   const [previousResponse, setPreviousResponse] = useState<AttemptResponse | null>(null);
   const [timeLeftMs, setTimeLeftMs] = useState(sprintMinutes * 60_000);
+  // One persistent live region for the canvas (A11Y-03): phase changes are
+  // announced once each, never the ticking counter.
+  const [announcement, setAnnouncement] = useState('');
+  const [typing, setTyping] = useState(false);
+  const iosKeyboard = useSyncExternalStore(noSubscription, isIosSafari, isIosOnServer);
+  const typingReleaseRef = useRef<number | null>(null);
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [isChecking, startCheck] = useTransition();
   const [isArchiving, startArchive] = useTransition();
   // Set in an effect: Date.now() during render is impure (react-hooks/purity).
@@ -239,6 +259,21 @@ export function SynthesisDrillClient({
     return () => window.clearInterval(intervalId);
   }, [phase]);
 
+  useEffect(() => () => {
+    if (typingReleaseRef.current !== null) window.clearTimeout(typingReleaseRef.current);
+  }, []);
+
+  // The slow thresholds, announced once each instead of every second (A11Y-03).
+  useEffect(() => {
+    if (phase !== 'checking') return;
+    const slow = window.setTimeout(() => setAnnouncement('Still checking.'), SLOW_CHECK_MS);
+    const verySlow = window.setTimeout(() => setAnnouncement('Taking longer than usual. Your answer is saved in this tab.'), VERY_SLOW_CHECK_MS);
+    return () => {
+      window.clearTimeout(slow);
+      window.clearTimeout(verySlow);
+    };
+  }, [phase]);
+
   // Sprint countdown (plan D13). The deadline is set once, on the first
   // tick; zero ends the launch as soon as no check is in flight — what was
   // not reached counts as skipped, like an exam paper.
@@ -275,6 +310,16 @@ export function SynthesisDrillClient({
   useEffect(() => {
     if (index > 0) promptRef.current?.focus();
   }, [index]);
+
+  // Focus back where the student was writing when a check fails (A11Y-02):
+  // the slots stay mounted and read-only during a check, so the element is
+  // still there to return to.
+  const restoreFocus = useCallback(() => {
+    requestAnimationFrame(() => restoreFocusRef.current?.focus());
+  }, []);
+  const focusFirstSlot = useCallback(() => {
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-slot="first"]')?.focus());
+  }, []);
 
   const response: AttemptResponse = useMemo(
     () => (mode === 'plan'
@@ -341,12 +386,28 @@ export function SynthesisDrillClient({
   const showingWorkedExample = Boolean(workedExample) && index === 0 && workedExampleOpen && phase === 'answering';
 
   const check = useCallback(() => {
-    if (!drill || phase !== 'answering' || !hasAnswer || overLimit || isChecking) return;
+    if (!drill || phase !== 'answering' || isChecking) return;
+    // ⌘⏎ reaches here even when the Check button is disabled: say why (A11Y-11).
+    if (!hasAnswer) {
+      const reason = mode === 'plan' ? 'Write a thesis first.' : mode === 'free' ? 'Write your answer first.' : 'Write a claim first.';
+      setAnnouncement(reason);
+      toast.info(reason);
+      return;
+    }
+    if (overLimit) {
+      const reason = `Over the word limit — trim to ${wordLimit} words.`;
+      setAnnouncement(reason);
+      toast.info(reason);
+      return;
+    }
     if (confidence === null) {
       setConfidenceMissing(true);
+      setAnnouncement('How sure are you? Pick one before checking.');
       confidenceRef.current?.focus();
       return;
     }
+    restoreFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setAnnouncement('Checking your answer.');
     setCheckError(null);
     setCheckElapsedMs(0);
     setPhase('checking');
@@ -376,6 +437,8 @@ export function SynthesisDrillClient({
         // answer stays, the key stays, and the retry is one tap (audit R1).
         setPhase('answering');
         setCheckError('The check did not come back. Your answer is still here — try again.');
+        setAnnouncement('The check did not come back. Your answer is still here.');
+        restoreFocus();
         if (isSprint && timeUpRef.current) endSprint(false);
         return;
       }
@@ -383,6 +446,8 @@ export function SynthesisDrillClient({
       if (!outcome || !('success' in outcome) || !outcome.success) {
         setPhase('answering');
         setCheckError(formatActionError('error' in outcome ? outcome.error : null, 'The check failed. Please try again.'));
+        setAnnouncement('The check failed. Your answer is still here.');
+        restoreFocus();
         if (isSprint && timeUpRef.current) endSprint(false);
         return;
       }
@@ -443,7 +508,7 @@ export function SynthesisDrillClient({
         else goNext();
       }
     });
-  }, [anchors, confidence, deckId, drill, endSprint, goNext, hasAnswer, isChecking, isSprint, mode, overLimit, phase, pullForward, recordEntry, response, revisionOf, showingWorkedExample, storageKey]);
+  }, [anchors, confidence, deckId, drill, endSprint, goNext, hasAnswer, isChecking, isSprint, mode, overLimit, phase, pullForward, recordEntry, response, restoreFocus, revisionOf, showingWorkedExample, storageKey, wordLimit]);
 
   const skip = useCallback(() => {
     if (phase !== 'answering') return;
@@ -463,7 +528,8 @@ export function SynthesisDrillClient({
     setPhase('answering');
     setResult(null);
     startedAtRef.current = 0;
-  }, []);
+    focusFirstSlot();
+  }, [focusFirstSlot]);
 
   const canRevise = Boolean(
     drill
@@ -486,7 +552,8 @@ export function SynthesisDrillClient({
     setPhase('answering');
     setCheckError(null);
     startedAtRef.current = 0;
-  }, [canRevise, drill, result]);
+    focusFirstSlot();
+  }, [canRevise, drill, focusFirstSlot, result]);
 
   const requestQuit = useCallback(() => {
     if (phase === 'checking') {
@@ -606,7 +673,8 @@ export function SynthesisDrillClient({
           </div>
           <div className="rule" aria-hidden="true" />
         </header>
-        <main className="flex flex-1 items-start justify-center p-4 md:p-8">
+        {/* (focus)/layout.tsx is the main landmark; a second <main> here nested one inside it (A11Y-01). */}
+        <div className="flex flex-1 items-start justify-center p-4 md:p-8">
           <DrillSessionSummary
             deckId={deckId}
             entries={sessionEntries}
@@ -614,7 +682,7 @@ export function SynthesisDrillClient({
             elapsedMs={sessionElapsedMs}
             results={isSprint ? sprintResults : undefined}
           />
-        </main>
+        </div>
       </div>
     );
   }
@@ -652,6 +720,21 @@ export function SynthesisDrillClient({
     ? `${result.diagnostic.linksCovered}/${result.diagnostic.linksTotal}`
     : null;
   const checkSeconds = Math.floor(checkElapsedMs / 1000);
+  // Held through the check too: the slot keeps focus (read-only), so the layout must not jump under it.
+  const compactActions = iosKeyboard && typing && (phase === 'answering' || phase === 'checking');
+  const checkButton = (
+    <Button
+      type="button"
+      variant="primary"
+      onClick={check}
+      disabled={phase === 'checking' || !hasAnswer || overLimit}
+      aria-keyshortcuts="Meta+Enter Control+Enter"
+      className="gap-2"
+    >
+      {phase === 'checking' ? 'Checking…' : 'Check'}
+      <ShortcutHint apple="⌘⏎" other="Ctrl ⏎" />
+    </Button>
+  );
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -686,13 +769,15 @@ export function SynthesisDrillClient({
             {phase === 'checking' ? (
               <div className="flex items-center gap-2">
                 <StateTick state="streak" label="Checking" />
-                <span className={`${LABEL} tnum`} aria-live="polite">
+                {/* The counter ticks every second: hidden from assistive technology, which hears the live region instead (A11Y-03). */}
+                <span className={`${LABEL} tnum`} aria-hidden="true">
                   {checkElapsedMs >= SLOW_CHECK_MS ? 'Still checking' : 'Checking'} · {checkSeconds}s
                 </span>
               </div>
             ) : (
               isSprint
-                ? <Telemetry label="Left" value={formatClock(timeLeftMs)} tone={timeLeftMs < 60_000 ? 'due' : 'ink'} />
+                // Time is not memory (design system §2.2e): urgency is a word, not a hue (DS-02).
+                ? <Telemetry label="Left" value={timeLeftMs < 60_000 ? `${formatClock(timeLeftMs)} · last minute` : formatClock(timeLeftMs)} />
                 : <Telemetry label={phase === 'diagnosed' ? 'Time' : 'Elapsed'} value={formatClock(elapsedMs)} />
             )}
           </div>
@@ -700,7 +785,18 @@ export function SynthesisDrillClient({
         <div className="rule" aria-hidden="true" />
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 pb-8 md:px-8">
+      <div
+        className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 pb-8 md:px-8"
+        onFocus={(event) => {
+          if (typingReleaseRef.current !== null) window.clearTimeout(typingReleaseRef.current);
+          setTyping(isTypingTarget(event.target));
+        }}
+        onBlur={() => {
+          // Deferred: a tap on Check blurs the slot first, and the row must not move before the tap lands.
+          typingReleaseRef.current = window.setTimeout(() => setTyping(false), TYPING_RELEASE_MS);
+        }}
+      >
+        <p className="sr-only" aria-live="polite">{announcement}</p>
         {/* The prompt: one thing to read, on the flat ground. */}
         <section aria-labelledby={`${promptId}-prompt`}>
           {drill.scenario ? (
@@ -762,7 +858,7 @@ export function SynthesisDrillClient({
               <section className="well p-4" aria-label="Worked example">
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className={LABEL}>Worked example · your first drill here</h3>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setWorkedExampleOpen(false)} className="h-[24px] px-2 text-[12px]">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setWorkedExampleOpen(false)} className="h-[44px] px-2 text-[12px] sm:h-[24px]">
                     Hide
                   </Button>
                 </div>
@@ -803,14 +899,27 @@ export function SynthesisDrillClient({
           </>
         )}
 
+        {compactActions ? (
+          <ConfidencePicker
+            ref={confidenceRef}
+            value={confidence}
+            onChange={(value) => {
+              setConfidence(value);
+              setConfidenceMissing(false);
+            }}
+            disabled={phase === 'checking'}
+            missing={confidenceMissing}
+          />
+        ) : null}
+
         {phase === 'checking' && checkElapsedMs >= VERY_SLOW_CHECK_MS ? (
-          <p className="text-[13px] text-ink-dim" aria-live="polite">
+          <p className="text-[13px] text-ink-dim">
             Taking longer than usual — your answer is saved in this tab.
           </p>
         ) : null}
 
         {checkError ? (
-          <p role="alert" className="text-[13px]" style={{ color: 'var(--state-lapsed)' }}>
+          <p role="alert" className="text-[13px]" style={{ color: 'var(--destructive)' }}>
             {checkError}
           </p>
         ) : null}
@@ -842,6 +951,10 @@ export function SynthesisDrillClient({
                 <Kbd>N</Kbd>
               </Button>
             </>
+          ) : compactActions ? (
+            // iOS ignores `interactive-widget`: while a slot has the keyboard up,
+            // the sticky row carries only Check, and the picker sits after the form (MOB-04).
+            checkButton
           ) : (
             <>
               <ConfidencePicker
@@ -859,20 +972,11 @@ export function SynthesisDrillClient({
                 Skip
                 <Kbd>S</Kbd>
               </Button>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={check}
-                disabled={phase === 'checking' || !hasAnswer || overLimit}
-                className="gap-2"
-              >
-                {phase === 'checking' ? 'Checking…' : 'Check'}
-                <Kbd>⌘⏎</Kbd>
-              </Button>
+              {checkButton}
             </>
           )}
         </div>
-      </main>
+      </div>
 
       <ConfirmDialog
         open={quitDialogOpen}

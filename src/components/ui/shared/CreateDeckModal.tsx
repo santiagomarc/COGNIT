@@ -5,7 +5,7 @@ import { AnimatePresence, m, useReducedMotion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
 import { createDeck } from '@/app/actions/deck';
-import { createDeckSchema } from '@/lib/schemas';
+import { checkCreateDeck } from '@/lib/form-checks';
 import { DECK_TAG_OPTIONS } from '@/lib/deck-tags';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,13 +64,12 @@ export function CreateDeckModal() {
     setFieldError(null);
     const title = draftTitle.trim();
 
-    const parsed = createDeckSchema.safeParse({
+    const parsed = checkCreateDeck({
       title,
       accent_tag: accentTag || undefined,
-      is_public: false,
     });
-    if (!parsed.success) {
-      const msg = parsed.error.issues.find((e) => e.path.includes('title'))?.message;
+    if (!parsed.ok) {
+      const msg = parsed.fieldErrors.title?.[0];
       setFieldError(msg ?? 'Invalid input');
       return;
     }

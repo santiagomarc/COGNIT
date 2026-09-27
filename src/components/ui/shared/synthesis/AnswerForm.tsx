@@ -30,7 +30,7 @@ type AnswerFormProps = {
 };
 
 const SLOT_CLASS =
-  'border-0 bg-transparent px-0 shadow-none focus-visible:outline-0 rounded-none text-[15px] sm:text-[15px] leading-relaxed';
+  'border-0 bg-transparent px-0 shadow-none focus-visible:outline-0 rounded-none text-base sm:text-[15px] leading-relaxed';
 
 /**
  * The four slots (spec §10.3): Claim · Mechanism 1 · Mechanism 2 · Trade-off,
@@ -55,6 +55,7 @@ export function AnswerForm({
   const labels = SLOT_LABELS[format];
   const placeholders = SLOT_PLACEHOLDERS[format];
   const lastFocused = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // What the answer already names (audit U2): a chip dims once its term is in
   // the text, and the meter says which slots hold anything. Both are computed
@@ -80,7 +81,12 @@ export function AnswerForm({
   // A term chip inserts the card's term at the caret of the last-focused
   // slot — the fast-entry affordance that makes the outline thumb-typeable.
   const insertTerm = useCallback((term: string) => {
-    const target = lastFocused.current;
+    // No slot focused yet (or the remembered one left with a mode switch):
+    // the chip still does something — it lands in the first slot (UX-04).
+    const remembered = lastFocused.current;
+    const target = remembered?.isConnected
+      ? remembered
+      : containerRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-slot="first"]') ?? null;
     if (!target || disabled) return;
     const start = target.selectionStart ?? target.value.length;
     const end = target.selectionEnd ?? start;
@@ -113,7 +119,7 @@ export function AnswerForm({
   const locked = disabled;
 
   return (
-    <div className="raised spec relative flex flex-col gap-4 p-4 md:p-5">
+    <div ref={containerRef} aria-busy={locked} className="raised spec relative flex flex-col gap-4 p-4 md:p-5">
       <CornerBrackets />
 
       {revisingFrom ? (
@@ -137,7 +143,7 @@ export function AnswerForm({
               type="button"
               className="term-chip"
               style={named ? { color: 'var(--ink-dimmer)', borderColor: 'var(--border)' } : undefined}
-              aria-pressed={named}
+              aria-label={named ? `Insert ${anchor.term} — already in your answer` : `Insert ${anchor.term}`}
               onClick={() => insertTerm(anchor.term)}
               disabled={locked}
               title={named ? `"${anchor.term}" is in your answer` : `Insert "${anchor.term}"`}
@@ -169,12 +175,13 @@ export function AnswerForm({
             <span className="slot-label">{labels.claim}</span>
             <Input
               name="claim"
+              data-slot="first"
               value={outline.claim}
               onChange={(event) => onOutlineChange({ ...outline, claim: event.target.value })}
               onFocus={rememberFocus}
               placeholder={placeholders.claim}
               maxLength={200}
-              disabled={locked}
+              readOnly={locked}
               aria-describedby={`${promptId}-prompt`}
               className={cn(SLOT_CLASS, 'h-auto py-1')}
             />
@@ -190,7 +197,7 @@ export function AnswerForm({
               placeholder={placeholders.mechanism1}
               maxLength={220}
               rows={2}
-              disabled={locked}
+              readOnly={locked}
               className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
             />
           </label>
@@ -205,7 +212,7 @@ export function AnswerForm({
               placeholder={placeholders.mechanism2}
               maxLength={220}
               rows={2}
-              disabled={locked}
+              readOnly={locked}
               className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
             />
           </label>
@@ -220,7 +227,7 @@ export function AnswerForm({
               placeholder={placeholders.tradeoff}
               maxLength={220}
               rows={2}
-              disabled={locked}
+              readOnly={locked}
               className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
             />
           </label>
@@ -237,7 +244,7 @@ export function AnswerForm({
                   placeholder={EVIDENCE_SLOT.placeholder}
                   maxLength={220}
                   rows={2}
-                  disabled={locked}
+                  readOnly={locked}
                   className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
                 />
               </label>
@@ -249,12 +256,13 @@ export function AnswerForm({
           <span className="slot-label">Answer</span>
           <Textarea
             name="free"
+            data-slot="first"
             value={freeText}
             onChange={(event) => onFreeTextChange(event.target.value)}
             onFocus={rememberFocus}
             placeholder={FREE_TEXT_PLACEHOLDER}
             maxLength={1500}
-            disabled={locked}
+            readOnly={locked}
             aria-describedby={`${promptId}-prompt`}
             className={cn(SLOT_CLASS, 'drill-editor min-h-[22vh]')}
           />

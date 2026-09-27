@@ -388,7 +388,7 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
                 ) : null}
 
                 {rows.length === 0 ? (
-                  <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  <p className="px-3 py-6 text-center text-sm text-ink-dim">
                     Nothing matches “{query.trim()}”.
                   </p>
                 ) : null}
@@ -424,14 +424,14 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
                 </div>
 
                 {status === 'done' && results.length === 0 && canSearch ? (
-                  <p className="px-3 py-3 text-xs text-muted-foreground">
+                  <p className="px-3 py-3 text-xs text-ink-dim">
                     No matching cards. Search only covers cards indexed for deck chat — open a
                     deck&apos;s chat panel once to index it.
                   </p>
                 ) : null}
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-5 py-3 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-5 py-3 text-xs text-ink-dim">
                 <span className="inline-flex items-center gap-1.5">
                   <Kbd>↑</Kbd>
                   <Kbd>↓</Kbd> move
@@ -477,7 +477,7 @@ function PaletteRowView({
     >
       <div className="min-w-0">
         <p className="truncate text-sm text-ink">{row.label}</p>
-        {row.detail ? <p className="truncate text-xs text-muted-foreground">{row.detail}</p> : null}
+        {row.detail ? <p className="truncate text-xs text-ink-dim">{row.detail}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {row.hint ? (

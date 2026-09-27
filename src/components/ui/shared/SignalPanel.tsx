@@ -93,7 +93,7 @@ export function SignalPanel({
           </p>
         </div>
 
-        <p className="mt-2.5 font-mono text-[32px] font-semibold leading-none tracking-[-0.03em] tnum text-ink">
+        <p className="mt-2.5 type-readout-sm font-semibold leading-none tracking-[-0.03em] text-ink">
           {retentionPercentage === null ? '—' : `${retentionPercentage}%`}
         </p>
 
@@ -149,7 +149,7 @@ export function SignalPanel({
 
         <div className="mt-2.5 flex items-baseline gap-2">
           <p
-            className="font-mono text-[32px] font-semibold leading-none tracking-[-0.03em] tnum"
+            className="type-readout-sm font-semibold leading-none tracking-[-0.03em]"
             style={{ color: streak > 0 ? 'var(--state-streak)' : 'var(--ink)' }}
           >
             {streak}

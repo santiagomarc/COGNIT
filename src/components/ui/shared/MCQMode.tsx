@@ -137,7 +137,7 @@ export function MCQMode({
             Multiple choice
           </p>
           <p className="mt-3 text-base font-semibold">Preparing quiz data</p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-ink-dim">
             {enrichmentPending
               ? 'AI is generating plausible distractors for this card.'
               : 'This card does not have enough distractors yet.'}
@@ -230,7 +230,7 @@ export function MCQMode({
                 ) : (
                   <span>
                     <span className="font-medium text-[var(--state-lapsed)]">Incorrect.</span>{' '}
-                    <span className="text-muted-foreground">The answer is marked above.</span>
+                    <span className="text-ink-dim">The answer is marked above.</span>
                   </span>
                 )}
               </p>

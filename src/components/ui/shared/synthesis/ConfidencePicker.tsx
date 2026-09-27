@@ -45,7 +45,7 @@ export const ConfidencePicker = forwardRef<HTMLDivElement, ConfidencePickerProps
           aria-pressed={value === option}
           onClick={() => onChange(option)}
           disabled={disabled}
-          className="h-[28px] gap-1.5 px-2 text-[12px]"
+          className="h-[44px] gap-1.5 px-2 text-[12px] sm:h-[28px]"
         >
           {CONFIDENCE_LABEL[option]}
           <Kbd>{option}</Kbd>

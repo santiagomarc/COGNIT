@@ -163,7 +163,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                   <h2 id="bulk-import-title" className="text-base font-semibold tracking-[-.015em]">
                     Paste your notes
                   </h2>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-ink-dim">
                     Exact Term-Description lines, previewed live. Quiz data is enriched in the
                     background after import.
                   </p>
@@ -219,7 +219,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                       className="min-h-[22rem]"
                       placeholder={'Mitochondria - The powerhouse of the cell\nPhotosynthesis - Process plants use to convert sunlight into energy'}
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-ink-dim">
                       Import preserves your exact parsed term and description text. AI only fills quiz helper fields after save.
                     </p>
                   </div>
@@ -229,7 +229,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
-                <div className="text-sm text-muted-foreground">
+                <div className="text-sm text-ink-dim">
                   Only valid preview rows will be imported.
                 </div>
                 <div className="flex items-center gap-2">

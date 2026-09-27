@@ -67,7 +67,7 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs, resul
       <section className="surface p-6 text-center md:p-8">
         <p className={LABEL}>{results ? 'Sprint' : 'Session'}</p>
         <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">{results ? 'Sprint over' : 'Drills complete'}</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-ink-dim">
           <span className="font-mono tnum">{entries.length}</span> {entries.length === 1 ? 'drill' : 'drills'} ·{' '}
           <span className="font-mono tnum">{linksCovered}/{linksTotal}</span> links
           {skipped > 0 ? <> · <span className="font-mono tnum">{skipped}</span> skipped</> : null}
@@ -75,11 +75,11 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs, resul
         </p>
       </section>
 
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([['sound', 'Sound'], ['partial', 'Partial'], ['contradicted', 'Contradicted'], ['off_target', 'Off target']] as const).map(([verdict, word]) => (
           <div key={verdict} className="surface p-4 text-center">
             <p className="font-mono text-2xl font-semibold tnum text-ink">{counts[verdict]}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{word}</p>
+            <p className="mt-1 text-xs text-ink-dim">{word}</p>
           </div>
         ))}
       </div>
@@ -128,6 +128,8 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs, resul
                       isRevision={stored.result.isRevision}
                       previousResponse={null}
                       history={[]}
+                      idPrefix={`sprint-${stored.drill.id}`}
+                      plane="well"
                     />
                   </div>
                 </details>

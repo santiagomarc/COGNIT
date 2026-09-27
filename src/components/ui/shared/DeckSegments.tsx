@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export const DECK_TABS = ['overview', 'cards', 'insights', 'chat'] as const;
+export const DECK_TABS = ['overview', 'cards', 'insights', 'exam', 'chat'] as const;
 export type DeckTab = (typeof DECK_TABS)[number];
 
 /** Anything unrecognised resolves to overview rather than 404ing a deep link. */
@@ -19,6 +19,7 @@ const LABELS: Record<DeckTab, string> = {
   overview: 'Overview',
   cards: 'Cards',
   insights: 'Insights',
+  exam: 'Exam',
   chat: 'Chat',
 };
 

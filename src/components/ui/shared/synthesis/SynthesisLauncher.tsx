@@ -1,8 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { TopicGenerateRow } from '@/components/ui/shared/synthesis/TopicGenerateRow';
-import { PlanLauncherRow } from '@/components/ui/shared/synthesis/PlanLauncherRow';
-import { ExamDateControl } from '@/components/ui/shared/synthesis/ExamDateControl';
 import { MAX_ACTIVE_DRILLS_PER_DECK, MIN_DECK_CARDS_FOR_DRILLS } from '@/lib/synthesis/clusters';
 import type { SynthesisReadings } from '@/lib/synthesis/types';
 import { formatAge } from '@/lib/synthesis/ui';
@@ -13,8 +11,6 @@ type SynthesisLauncherProps = {
   cardCount: number;
   /** The deck's most common topic tags, for topic-directed generation (audit F3). */
   topics?: string[];
-  /** The deck's exam date (plan D19). */
-  examAt?: string | null;
 };
 
 const COUNT_OPTIONS = [1, 3, 5] as const;
@@ -28,9 +24,10 @@ const CHIP =
  * and the pull-forward switch. The review form stays the page's one `.raised`.
  *
  * `DUE` is informational, never a lock: the form starts a drill whenever the
- * deck has any (B.1 "drill anytime").
+ * deck has any (B.1 "drill anytime"). The exam date and essay plans live in
+ * the deck's Exam segment (plan §5.5, UX-01).
  */
-export function SynthesisLauncher({ deckId, readings, cardCount, topics = [], examAt = null }: SynthesisLauncherProps) {
+export function SynthesisLauncher({ deckId, readings, cardCount, topics = [] }: SynthesisLauncherProps) {
   const tooFewCards = cardCount < MIN_DECK_CARDS_FOR_DRILLS;
   const hasDrills = readings.activeDrills > 0;
   const linksPct = readings.linksTotal > 0 ? readings.linksCovered / readings.linksTotal : 0;
@@ -49,9 +46,6 @@ export function SynthesisLauncher({ deckId, readings, cardCount, topics = [], ex
       <p className="mt-2 text-xs leading-relaxed text-ink-dim">
         Argue the mechanism between concepts. Two to three minutes each; playable any time.
       </p>
-
-      {/* The exam date sets the cadence (plan D19): tight inside three days, stretched beyond two weeks. */}
-      <ExamDateControl deckId={deckId} examAt={examAt} />
 
       {hasDrills ? (
         <>
@@ -112,9 +106,6 @@ export function SynthesisLauncher({ deckId, readings, cardCount, topics = [], ex
               Sprint · 8 min
             </Button>
           </fieldset>
-
-          {/* Essay plans (plan D15): a set question over the topic, answered as a plan. */}
-          <PlanLauncherRow deckId={deckId} topics={topics} plans={readings.plans} />
         </>
       ) : tooFewCards ? (
         <p className="mt-3 text-[13px] text-ink-dim">

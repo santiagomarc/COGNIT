@@ -67,14 +67,14 @@ export function ExamDateControl({ deckId, examAt }: { deckId: string; examAt: st
             value={value}
             onChange={(event) => setValue(event.target.value)}
             disabled={isPending}
-            className="h-[28px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-transparent px-2 text-xs text-ink outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+            className="h-[44px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-transparent px-2 text-base text-ink sm:h-[28px] sm:text-xs outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
           />
         </label>
-        <Button type="submit" size="sm" disabled={isPending || !value} className="h-[26px] px-2 text-[12px]">Save</Button>
+        <Button type="submit" size="sm" disabled={isPending || !value} className="h-[44px] px-2 text-[12px] sm:h-[26px]">Save</Button>
         {examAt ? (
-          <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => save(null)} className="h-[26px] px-2 text-[12px]">Clear</Button>
+          <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => save(null)} className="h-[44px] px-2 text-[12px] sm:h-[26px]">Clear</Button>
         ) : null}
-        <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => setEditing(false)} className="h-[26px] px-2 text-[12px]">Cancel</Button>
+        <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={() => setEditing(false)} className="h-[44px] px-2 text-[12px] sm:h-[26px]">Cancel</Button>
       </form>
     );
   }
@@ -89,11 +89,11 @@ export function ExamDateControl({ deckId, examAt }: { deckId: string; examAt: st
         <span className={LABEL}>Exam today · drills return within the day</span>
       ) : (
         <span className={`${LABEL} tnum`}>
-          Exam in <span style={{ color: days <= 3 ? 'var(--state-due)' : 'var(--ink)' }}>{days}</span> {days === 1 ? 'day' : 'days'}
+          Exam in <span className="text-ink">{days}</span> {days === 1 ? 'day' : 'days'}
           {days <= 3 ? ' · drills return within the day' : days > 14 ? ' · ladder stretched' : ''}
         </span>
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-[24px] px-2 text-[12px]">
+      <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-[44px] px-2 text-[12px] sm:h-[24px]">
         {days === null ? 'Set exam date' : 'Change'}
       </Button>
     </div>

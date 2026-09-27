@@ -80,7 +80,7 @@ export function DashboardOnboarding({
         <h2 className="font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">
           Cognit schedules what you review, and when
         </h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-sm leading-relaxed text-ink-dim">
           Turn your material into flashcards, grade each one as you recall it, and the SM-2
           scheduler decides when it comes back — sooner for what you find hard, later for what you
           already know. Three ways to start, fastest first.
@@ -171,7 +171,7 @@ function OnboardingStep({
 
       <div className="space-y-1">
         <h3 className="text-sm font-semibold tracking-[-.015em] text-foreground">{title}</h3>
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{body}</p>
+        <p className="text-[13px] leading-relaxed text-ink-dim">{body}</p>
       </div>
 
       <div className="mt-auto pt-1">{children}</div>

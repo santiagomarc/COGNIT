@@ -1,11 +1,13 @@
 'use client';
 
-import { LazyMotion, domMax } from 'framer-motion';
+import { LazyMotion } from 'framer-motion';
 import type { ReactNode } from 'react';
 
 /**
  * Loads Framer Motion's feature set lazily so it is not part of the initial
- * bundle.
+ * bundle. It must be a dynamic import: a static `domMax` import (what this
+ * file used to do) ships the whole set in every first load (plan §5.6, PERF-01).
+ * Drag works once the features resolve, milliseconds after hydration.
  *
  * `domMax`, not `domAnimation`: this app uses drag — swipe-to-grade in the
  * study view — which does not exist in domAnimation, and the failure is silent:
@@ -18,9 +20,11 @@ import type { ReactNode } from 'react';
  * `strict` makes any remaining `motion.*` throw instead of quietly loading the
  * full bundle, which is how a missed conversion gets caught.
  */
+const loadFeatures = () => import('./motion-features').then((mod) => mod.default);
+
 export function MotionProvider({ children }: { children: ReactNode }) {
   return (
-    <LazyMotion features={domMax} strict>
+    <LazyMotion features={loadFeatures} strict>
       {children}
     </LazyMotion>
   );

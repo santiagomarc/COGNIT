@@ -59,7 +59,7 @@ export function QuestionBankForm({ deckId }: { deckId: string }) {
           rows={3}
           maxLength={12_000}
           disabled={isPending}
-          className="text-[13px]"
+          className="text-base sm:text-[13px]"
         />
       </label>
       <div className="flex items-center justify-between gap-3">
@@ -76,10 +76,12 @@ type QuestionRowActionsProps = {
   deckId: string;
   questionId: string;
   drillId: string | null;
+  /** Names the row's buttons: every row's used to read "Remove question" (A11Y-09). */
+  questionText: string;
 };
 
 /** Per question: plan it (one generation), open the plan once it exists, or remove it. */
-export function QuestionRowActions({ deckId, questionId, drillId }: QuestionRowActionsProps) {
+export function QuestionRowActions({ deckId, questionId, drillId, questionText }: QuestionRowActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -101,13 +103,13 @@ export function QuestionRowActions({ deckId, questionId, drillId }: QuestionRowA
   return (
     <span className="flex shrink-0 items-center gap-1">
       {drillId ? (
-        <Button asChild variant="default" size="sm" className="h-[26px] px-2 text-[12px]">
+        <Button asChild variant="default" size="sm" className="h-[44px] px-2 text-[12px] sm:h-[26px]">
           <Link href={`/dashboard/${deckId}/synthesis?kind=plan&drill=${drillId}&count=1`}>Plan it</Link>
         </Button>
       ) : (
-        <GeneratePlanQuestionButton deckId={deckId} questionId={questionId} label="Make a plan" className="h-[26px] px-2 text-[12px]" />
+        <GeneratePlanQuestionButton deckId={deckId} questionId={questionId} label="Make a plan" className="h-[44px] px-2 text-[12px] sm:h-[26px]" />
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={isPending} aria-label="Remove question" className="h-[26px] px-2 text-[12px]">
+      <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={isPending} aria-label={`Remove question: ${questionText.slice(0, 60)}`} className="h-[44px] px-2 text-[12px] sm:h-[26px]">
         Remove
       </Button>
     </span>

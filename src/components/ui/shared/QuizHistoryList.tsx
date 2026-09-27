@@ -69,7 +69,7 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
         <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
           Quiz history
         </h2>
-        <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+        <p className="mx-auto mt-3 max-w-md text-sm text-ink-dim">
           No quiz history yet. Take your first quiz to start your mastery timeline.
         </p>
         <Button asChild className="mt-4">
@@ -137,13 +137,13 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
                             </span>
                             <p className="text-sm font-medium text-foreground">{mistake.prompt}</p>
                           </div>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-ink-dim">
                             You answered:{' '}
                             <span className="text-[var(--state-lapsed)]">
                               {mistake.user_answer ?? 'Not recorded for this attempt'}
                             </span>
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-ink-dim">
                             Correct term: <span className="text-ink">{mistake.correct_answer}</span>
                           </p>
                         </div>

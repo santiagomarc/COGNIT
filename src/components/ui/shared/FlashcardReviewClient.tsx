@@ -709,10 +709,10 @@ export function FlashcardReviewClient({
             Study
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">You&apos;re all caught up!</h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-ink-dim">
             {emptyMessage}
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-ink-dim">
             {totalInDeck} card{totalInDeck !== 1 ? 's' : ''} total in this deck
           </p>
 
@@ -748,10 +748,10 @@ export function FlashcardReviewClient({
             Study
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous session?</h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-ink-dim">
             Pick up from card {Math.min(resumeState.index + 1, resumeState.queueCardIds.length)} of {resumeState.queueCardIds.length}.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-ink-dim">
             Last recorded progress: {formatDuration(resumeState.sessionDurationMs)} of active study time.
           </p>
 
@@ -843,7 +843,8 @@ export function FlashcardReviewClient({
         </div>
 
         {/* Part 2: Centered stage (§5 Task 3.2) */}
-        <main className="flex flex-1 items-center justify-center p-4 md:p-8">
+        {/* The focus layout is the main landmark; a nested <main> duplicated it (A11Y-01). */}
+        <div className="flex flex-1 items-center justify-center p-4 md:p-8">
           <AnimatePresence mode="wait">
             {completed ? (
               <m.div
@@ -858,7 +859,7 @@ export function FlashcardReviewClient({
                     Session
                   </p>
                   <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Review complete</h2>
-                  <p className="mt-1 text-muted-foreground">
+                  <p className="mt-1 text-ink-dim">
                     You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
                   </p>
                 </div>
@@ -872,24 +873,24 @@ export function FlashcardReviewClient({
                   ].map((stat) => (
                     <div key={stat.label} className="surface p-4 text-center">
                       <p className={`font-mono text-2xl font-semibold tnum ${stat.color}`}>{stat.count}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{stat.label}</p>
+                      <p className="mt-1 text-xs text-ink-dim">{stat.label}</p>
                     </div>
                   ))}
                 </div>
 
                 <div className="surface divide-y divide-border">
                   <div className="flex items-center justify-between px-5 py-3">
-                    <span className="text-sm text-muted-foreground">Session duration</span>
+                    <span className="text-sm text-ink-dim">Session duration</span>
                     <span className="font-mono text-sm font-medium tnum">{formatDuration(sessionDuration)}</span>
                   </div>
                   <div className="flex items-center justify-between px-5 py-3">
-                    <span className="text-sm text-muted-foreground">Avg. per review</span>
+                    <span className="text-sm text-ink-dim">Avg. per review</span>
                     <span className="font-mono text-sm font-medium tnum">
                       {effectiveAttemptCount > 0 ? formatDuration(Math.round(sessionDuration / effectiveAttemptCount)) : '—'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-5 py-3">
-                    <span className="text-sm text-muted-foreground">Retention rate</span>
+                    <span className="text-sm text-ink-dim">Retention rate</span>
                     <span className="font-mono text-sm font-medium tnum">
                       {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
                     </span>
@@ -897,7 +898,7 @@ export function FlashcardReviewClient({
 
                   {nextReviewSummary ? (
                     <div className="flex items-center justify-between gap-3 px-5 py-3">
-                      <span className="text-sm text-muted-foreground">Next review</span>
+                      <span className="text-sm text-ink-dim">Next review</span>
                       <span className="text-right font-mono text-sm font-medium tnum">{nextReviewSummary}</span>
                     </div>
                   ) : null}
@@ -1002,7 +1003,7 @@ export function FlashcardReviewClient({
               </m.div>
             )}
           </AnimatePresence>
-        </main>
+        </div>
 
         {/* Part 3: Pinned bottom grade band (§5 Task 3.2) */}
         {!completed ? (
@@ -1054,7 +1055,7 @@ export function FlashcardReviewClient({
                 Session paused
               </p>
               <h2 className="mt-3 text-xl font-semibold tracking-[-.025em]">Timer is on hold</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-ink-dim">
                 Your place in the deck is kept. Paused time is not counted toward the session.
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

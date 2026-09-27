@@ -20,8 +20,6 @@ type DeckSessionLauncherProps = {
   synthesisReadings: SynthesisReadings;
   /** The deck's most common topic tags, for topic-directed generation (audit F3). */
   synthesisTopics?: string[];
-  /** The deck's exam date; drives the drill ladder (plan D19). */
-  examAt?: string | null;
 };
 
 const SCOPE_OPTIONS = [
@@ -65,7 +63,6 @@ export function DeckSessionLauncher({
   sessionBounds,
   synthesisReadings,
   synthesisTopics = [],
-  examAt = null,
 }: DeckSessionLauncherProps) {
   const hasDue = dueCount > 0;
 
@@ -82,7 +79,7 @@ export function DeckSessionLauncher({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-4">
             <p
-              className="shrink-0 font-mono text-[38px] font-semibold leading-[0.86] tracking-[-0.045em] tnum md:text-[44px]"
+              className="shrink-0 type-readout-sm font-semibold leading-[0.86] tracking-[-0.045em] md:type-readout"
               style={{ color: hasDue ? 'var(--state-due)' : 'var(--ink)' }}
             >
               {dueCount}
@@ -211,7 +208,7 @@ export function DeckSessionLauncher({
       </form>
 
       {/* ── Synthesis drills ── */}
-      <SynthesisLauncher deckId={deckId} readings={synthesisReadings} cardCount={totalCards} topics={synthesisTopics} examAt={examAt} />
+      <SynthesisLauncher deckId={deckId} readings={synthesisReadings} cardCount={totalCards} topics={synthesisTopics} />
       </div>
     </section>
   );

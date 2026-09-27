@@ -107,7 +107,7 @@ export function DueNowBand({
         <div className="flex min-w-0 items-center gap-4">
           {/* The one hero figure on the screen. */}
           <p
-            className="shrink-0 font-mono text-[44px] font-semibold leading-[0.86] tracking-[-0.045em] tnum md:text-[52px]"
+            className="shrink-0 type-readout font-semibold leading-[0.86] tracking-[-0.045em] md:type-readout-lg"
             style={{ color: hasWork ? 'var(--state-due)' : 'var(--ink)' }}
           >
             {totalDue}

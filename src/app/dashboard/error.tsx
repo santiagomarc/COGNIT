@@ -47,7 +47,7 @@ export default function DashboardError({
         <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">
           This deck failed to load
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-sm leading-relaxed text-ink-dim">
           Your cards and review history are stored server-side and are unaffected.
           Retry, or go back to the deck index and open it again.
         </p>

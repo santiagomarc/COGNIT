@@ -143,7 +143,7 @@ export function HeroSection() {
               <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                 cognit.app/dashboard
               </span>
-              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
                 Search <Kbd>⌘K</Kbd>
               </span>
             </div>
@@ -153,12 +153,12 @@ export function HeroSection() {
                 Due now
               </p>
               <p
-                className="mt-2 font-mono text-[52px] font-semibold leading-none tracking-[-0.04em] tnum"
+                className="mt-2 type-readout-lg font-semibold leading-none tracking-[-0.04em]"
                 style={{ color: 'var(--state-due)' }}
               >
                 10
               </p>
-              <p className="mt-3 text-sm text-muted-foreground">
+              <p className="mt-3 text-sm text-ink-dim">
                 across <span className="font-mono tnum text-ink-dim">2</span> decks · about{' '}
                 <span className="font-mono tnum text-ink-dim">4</span> min
               </p>

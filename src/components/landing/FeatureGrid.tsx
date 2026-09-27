@@ -64,7 +64,7 @@ export function FeatureGrid() {
           <h2 className="mt-3 font-serif text-[clamp(3rem,4.5vw,3.75rem)] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
             Everything you need to ace every exam
           </h2>
-          <p className="mt-3 text-muted-foreground">
+          <p className="mt-3 text-ink-dim">
             Built for serious students who want real results.
           </p>
         </div>
@@ -82,7 +82,7 @@ export function FeatureGrid() {
               <h3 className="mt-4 text-base font-semibold tracking-[-.015em] text-ink">
                 {feature.title}
               </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-2 text-sm leading-relaxed text-ink-dim">
                 {feature.description}
               </p>
             </RevealOnScroll>

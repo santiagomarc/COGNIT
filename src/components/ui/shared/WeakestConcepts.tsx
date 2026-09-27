@@ -70,7 +70,7 @@ export async function WeakestConcepts({ deckId }: WeakestConceptsProps) {
           Missed / attempts
         </p>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 text-sm text-ink-dim">
         Topics with the highest quiz miss rate across your attempts on this deck.
       </p>
 

@@ -135,7 +135,7 @@ export function ConfirmDialog({
                   {title}
                 </h3>
                 {description && (
-                  <p id="confirm-desc" className="text-sm leading-relaxed text-muted-foreground">
+                  <p id="confirm-desc" className="text-sm leading-relaxed text-ink-dim">
                     {description}
                   </p>
                 )}

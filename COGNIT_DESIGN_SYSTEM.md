@@ -1,7 +1,7 @@
 # Cognit — Design System
 
 **Codename:** Obsidian Telemetry
-**Status:** Approved 2026-09-10 · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`)
+**Status:** Approved 2026-09-10 · Rev. D (2026-09-26: synthesis on the state channel, errors, time is not memory, readout steps, `--z-grain` — COGNIT_NEXT_HORIZON_PLAN.md §5.4) · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`)
 **Applies to:** Next.js 16 (App Router) · React 19 · Tailwind v4 (CSS-first) · Framer Motion 12
 
 > **Changelog (Rev. C):** Added the plane system — `.raised`, `.well` and the recessed `--elevate-inset` step — plus the monochromatic ambient field, gradient-masked rules, and display-type utilities that finally consume the type tokens. Scoped the anti-pattern ban on orbs and grain to *chromatic* decoration. Recorded the state channel's measured CVD separation. Source: `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`.
@@ -193,7 +193,7 @@ than a courtesy.
 Concretely: a legend of bare ticks is a defect. Every state swatch ships with a word, a count or a
 position beside it. If you are about to simplify a legend down to colour alone, don't.
 
-### 2.2c Synthesis on the state channel (Rev. D, brought forward)
+### 2.2c Synthesis on the state channel (Rev. D)
 
 A synthesis verdict is a fact about the student's memory of a *relation*,
 so it may use the state channel — through this mapping only:
@@ -207,8 +207,18 @@ so it may use the state channel — through this mapping only:
 | Verdict `off_target` · link `missing` · relation untested | no hue (neutral or an empty tick) |
 
 This records what the synthesis surfaces (`src/lib/synthesis/ui.ts`) and the
-concept map already do. The rest of Rev. D (§2.2d errors, §2.2e time is not
-memory) lands with COGNIT_NEXT_HORIZON_PLAN.md §5.4.
+concept map already do.
+
+### 2.2d Errors (Rev. D)
+
+Error text and destructive confirmations use `--destructive` (= `--state-lapsed`).
+Nothing else borrows it.
+
+### 2.2e Time is not memory (Rev. D)
+
+Timers, countdowns and dates stay `--ink`. Urgency is a word ("last minute",
+"exam today"), never a hue. An edit (a revision diff) is not a fact about
+memory either: `<ins>`/`<del>` with ink decoration.
 
 ### 2.3 Rules
 
@@ -261,7 +271,14 @@ Base is **14px** for application chrome. Instrument Serif display headings and s
 --type-sm:   0.8125rem; /* 13px              */
 --type-cap:  0.75rem;   /* 12px              */
 --type-label:0.625rem;  /* 10px, mono, uppercase, 0.16em */
+
+/* readout steps (Rev. D) — Geist Mono, tabular: a number read as data, not a heading */
+--type-readout-lg: 3.25rem; /* 52px — due-now hero number   */
+--type-readout:    2.75rem; /* 44px — deck launcher         */
+--type-readout-sm: 2rem;    /* 32px — signal panel, results */
 ```
+
+Large numbers use the `type-readout*` utilities, never a restated `text-[44px]`.
 
 **These tokens are live in `globals.css` and components consume them through the
 `type-display-xl` / `-lg` / `type-display` / `-sm` utilities** (Rev. C). Before Rev. C the tokens
@@ -333,6 +350,7 @@ Replaces the current ad-hoc `50 / 100 / 110 / 140 / 200`. **This scale is the fi
 ```css
 --z-rail:    20;   /* left navigation rail            */
 --z-sticky:  40;   /* sticky headers, progress bars    */
+--z-grain:   50;   /* landing grain tile (Rev. D)       */
 --z-overlay: 100;  /* scrims, pause overlay            */
 --z-modal:   110;  /* dialogs above their scrim        */
 --z-toast:   120;  /* sonner                           */

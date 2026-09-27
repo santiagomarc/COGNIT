@@ -24,7 +24,7 @@ type PlanFormProps = {
 };
 
 const SLOT_CLASS =
-  'border-0 bg-transparent px-0 shadow-none focus-visible:outline-0 rounded-none text-[15px] sm:text-[15px] leading-relaxed';
+  'border-0 bg-transparent px-0 shadow-none focus-visible:outline-0 rounded-none text-base sm:text-[15px] leading-relaxed';
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
 
 const POINT_FIELDS: { key: keyof PlanPoint; label: string; placeholder: string; rows: number }[] = [
@@ -42,6 +42,7 @@ const POINT_FIELDS: { key: keyof PlanPoint; label: string; placeholder: string; 
  */
 export function PlanForm({ plan, onChange, anchors, disabled, promptId, revisingFrom = null }: PlanFormProps) {
   const lastFocused = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const rememberFocus = useCallback((event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     lastFocused.current = event.currentTarget;
   }, []);
@@ -53,7 +54,12 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
 
   // A term chip inserts the card's term at the caret of the last-focused field.
   const insertTerm = useCallback((term: string) => {
-    const target = lastFocused.current;
+    // No slot focused yet (or the remembered one left with a mode switch):
+    // the chip still does something — it lands in the first slot (UX-04).
+    const remembered = lastFocused.current;
+    const target = remembered?.isConnected
+      ? remembered
+      : containerRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>('[data-slot="first"]') ?? null;
     if (!target || disabled) return;
     const start = target.selectionStart ?? target.value.length;
     const end = target.selectionEnd ?? start;
@@ -86,7 +92,7 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
   const evidenceGiven = plan.points.filter((point) => point.evidence.trim().length > 0).length;
 
   return (
-    <div className="raised spec relative flex flex-col gap-4 p-4 md:p-5">
+    <div ref={containerRef} aria-busy={disabled} className="raised spec relative flex flex-col gap-4 p-4 md:p-5">
       <CornerBrackets />
 
       {revisingFrom ? (
@@ -106,7 +112,7 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
               type="button"
               className="term-chip"
               style={named ? { color: 'var(--ink-dimmer)', borderColor: 'var(--border)' } : undefined}
-              aria-pressed={named}
+              aria-label={named ? `Insert ${anchor.term} — already in your plan` : `Insert ${anchor.term}`}
               onClick={() => insertTerm(anchor.term)}
               disabled={disabled}
               title={named ? `"${anchor.term}" is in your plan` : `Insert "${anchor.term}"`}
@@ -130,12 +136,13 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
         <span className="slot-label">Thesis · answers the question in one line</span>
         <Input
           name="thesis"
+          data-slot="first"
           value={plan.thesis}
           onChange={(event) => onChange({ ...plan, thesis: event.target.value })}
           onFocus={rememberFocus}
           placeholder="your position on the question as set — a judgement, not a topic"
           maxLength={300}
-          disabled={disabled}
+          readOnly={disabled}
           aria-describedby={`${promptId}-prompt`}
           className={cn(SLOT_CLASS, 'h-auto py-1')}
         />
@@ -156,7 +163,7 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
                   placeholder={field.placeholder}
                   maxLength={300}
                   rows={field.rows}
-                  disabled={disabled}
+                  readOnly={disabled}
                   className={cn(SLOT_CLASS, 'min-h-[3.25rem] py-1')}
                 />
               ) : (
@@ -167,7 +174,7 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
                   onFocus={rememberFocus}
                   placeholder={field.placeholder}
                   maxLength={220}
-                  disabled={disabled}
+                  readOnly={disabled}
                   className={cn(SLOT_CLASS, 'h-auto py-1')}
                 />
               )}
@@ -185,7 +192,7 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
           onFocus={rememberFocus}
           placeholder="how far, on what condition — answer the question again, now that the points are made"
           maxLength={300}
-          disabled={disabled}
+          readOnly={disabled}
           className={cn(SLOT_CLASS, 'h-auto py-1')}
         />
       </label>

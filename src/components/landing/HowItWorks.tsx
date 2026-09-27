@@ -43,7 +43,7 @@ export function HowItWorks() {
           <h2 className="mt-3 font-serif text-[clamp(3rem,4.5vw,3.75rem)] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
             Three steps to mastery
           </h2>
-          <p className="mt-3 text-muted-foreground">
+          <p className="mt-3 text-ink-dim">
             From raw material to lasting knowledge in minutes, not hours.
           </p>
         </div>
@@ -67,7 +67,7 @@ export function HowItWorks() {
               <h3 className="mt-2 text-lg font-semibold tracking-[-.02em] text-ink sm:text-xl">
                 {step.title}
               </h3>
-              <p className="mt-2 leading-relaxed text-muted-foreground">{step.description}</p>
+              <p className="mt-2 leading-relaxed text-ink-dim">{step.description}</p>
             </RevealOnScroll>
           ))}
         </ol>

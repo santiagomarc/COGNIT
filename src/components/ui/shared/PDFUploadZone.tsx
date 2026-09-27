@@ -172,7 +172,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Generate from PDF
           </h2>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-ink-dim">
             Upload lecture slides, a chapter or your own notes. Cards are written from the text and
             saved to this deck.
           </p>
@@ -287,7 +287,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 Working
               </p>
               <p className="mt-2 text-sm font-medium">Reading your PDF and writing cards</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-ink-dim">
                 This usually takes under a minute for a chapter.
               </p>
 
@@ -320,7 +320,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Answer
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{card.back}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink-dim">{card.back}</p>
               </div>
             ))}
           </div>

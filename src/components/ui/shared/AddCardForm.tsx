@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createCard } from '@/app/actions/card';
-import { createCardSchema } from '@/lib/schemas';
+import { checkCreateCard } from '@/lib/form-checks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,14 +35,10 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
     const back = String(formData.get('back') ?? '').trim();
 
     // Client-side validation
-    const parsed = createCardSchema.safeParse({ deck_id: deckId, front, back });
-    if (!parsed.success) {
-      const fieldErrors: { front?: string; back?: string } = {};
-      for (const err of parsed.error.issues) {
-        const key = err.path[0] as string;
-        if (key === 'front' || key === 'back') fieldErrors[key] = err.message;
-      }
-      setErrors(fieldErrors);
+    const parsed = checkCreateCard({ deck_id: deckId, front, back });
+    if (!parsed.ok) {
+      // The last message per field, as the issue loop that used to sit here kept.
+      setErrors({ front: parsed.fieldErrors.front?.at(-1), back: parsed.fieldErrors.back?.at(-1) });
       return;
     }
 
@@ -67,7 +63,7 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
         <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
           Add a card
         </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-sm text-ink-dim">
           Write one flashcard by hand. The question is what you are shown; the answer is what you
           are trying to recall.
         </p>

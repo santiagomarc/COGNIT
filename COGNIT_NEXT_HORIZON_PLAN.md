@@ -1,6 +1,6 @@
 # Cognit — Next Horizon Plan
 
-**Revision:** 1.2 · 2026-09-26 (Phase 1 execution notes in §4.5). Rev 1.1 records execution corrections: five more KBD-01 handlers (§3.4), the `synthesis.ts` line references past line 840 (§1.3–§1.5, §3.5), the tooling state (§1.2.1), and the test counts that follow (§3.9, §4.5, §7).
+**Revision:** 1.3 · 2026-09-26 (Phase 1 notes in §4.5, Phase 2 notes in §5.7). Rev 1.1 records execution corrections: five more KBD-01 handlers (§3.4), the `synthesis.ts` line references past line 840 (§1.3–§1.5, §3.5), the tooling state (§1.2.1), and the test counts that follow (§3.9, §4.5, §7).
 **Baseline:** `main` @ `bb045b3` (pushed; in sync with `origin/main`). The audit began on `f164797`; `bb045b3` landed at 08:56 +08 while it ran, and every finding below was re-verified against it.
 **Scope:** forensic verification of four flagged hazards · full-spectrum audit (design-system conformance, pedagogy, WCAG 2.2 AA, performance) · a phased roadmap whose code has been compiled, tested and — where possible — executed.
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C) · `COGNIT_MICRO_SYNTHESIS_EXECUTION_PLAN.md` (D1–D20) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md`.
@@ -3555,6 +3555,31 @@ These budgets are the measured post-PERF-01 sizes plus 5–8 kB, and they pass o
 | Touch | Confidence picker, Fair/Unfair, exam controls on a phone | Each ≥ 44 px tall |
 | Swipe | Study: swipe to grade immediately after load | Works (async motion features) |
 | Visual, both themes | Stats (HTML-typed charts), Insights (concept map as `.raised`), exam segment | Matches the design system; no state hue on a timer, countdown or error-free text |
+
+**Execution notes (Rev 1.3, 2026-09-26).** Phase 2 ran on `feat/phase-2`, branched from `feat/phase-1`. Automated results: `tsc` clean · ESLint and contrast clean · **453 tests** in 41 files (446 + `sparklinePath` 2 + `form-checks` 5) · build ✓ · bundle budgets pass on the new build and fail on the Phase 1 build. Where the repo corrected the plan:
+
+- **Bundle, measured (gzip first-load JS).** PERF-01 alone saves about 27 kB on every route, as §5.6 measured. PERF-02 plus PERF-03 save another ~62 kB on the login and shell groups:
+
+  | Route | Before | After | Δ |
+  |---|---|---|---|
+  | `/dashboard/[deckId]` | 318.8 | 234.9 | −83.9 |
+  | `/dashboard` | 301.6 | 212.4 | −89.2 |
+  | `/dashboard/stats` | 281.8 | 192.7 | −89.1 |
+  | `/login` | 275.4 | 186.3 | −89.1 |
+  | `/dashboard/[deckId]/synthesis` | 233.4 | 207.2 | −26.2 |
+  | `/dashboard/[deckId]/study` | 219.2 | 193.5 | −25.7 |
+  | `/` | 209.8 | 182.7 | −27.1 |
+
+  `scripts/bundle-budgets.json` holds these sizes + 5 kB for ten routes, not the plan's pre-PERF-02 numbers.
+- **PERF-02** uses hand-written checks, `src/lib/form-checks.ts`, not `zod/mini`. `form-checks.test.ts` runs every check against its zod schema on the same inputs. It caught two real differences, both now mirrored: zod v4 runs the password-match `.refine` even when a field has already failed, and `createCardSchema` adds `source: 'manual'`.
+- **PERF-03.** `button.tsx` and `label.tsx` import from `radix-ui`, as `accordion.tsx` already did. `@radix-ui/react-label` and `@radix-ui/react-slot` were removed from `package.json`; they remain installed as dependencies of `radix-ui`.
+- **MOB-04** compact actions apply to **iOS Safari only** (`CSS.supports('-webkit-touch-callout', 'none')`), not to every coarse pointer: Android is covered by `interactive-widget`, and there a focused button would re-lay the row between focus and click. Losing focus releases the compact row after 200 ms, so a tap on Check lands before the row changes. The compact row also holds through `checking`, because the slot keeps focus there and the layout must not jump under it.
+- **UX-04** was listed as "fixed with dictation"; §4.4 was skipped, so the chips were fixed directly. With no focused slot, or a remembered slot a mode switch unmounted, a chip inserts into `[data-slot="first"]`.
+- **A11Y-11** messages: "Write a claim first." / "Write a thesis first." / "Write your answer first." and "Over the word limit — trim to N words.", in the live region and a toast. A missing confidence is also announced.
+- **UX-01.** The Exam segment holds the exam date, the plan launcher (once the deck has enough cards for drills) and the question bank. Overview's line reads "Exam in N days · M questions · Prepare →" and links to `?tab=exam`. `SynthesisLauncher` and `DeckSessionLauncher` no longer take `examAt`.
+- **UX-02.** "Proven x/y" is dropped, and "Mastery" is renamed "Quiz-proven", in ink.
+- **DS-05, partly.** Only the numeric readouts moved onto the readout steps: `DueNowBand`, `DeckSessionLauncher` (38 → 32 px below `md`), `SignalPanel` ×2, the quiz result (28 → 32 px), the landing hero and `not-found`. Nine sizes remain, all serif headings, card faces or the wordmark; each needs a display step, which is a design decision: `LoginClient` 31 px, `GreetingHeader` and the deck `h1` 29 px, the drill prompt 24 px, `Flashcard` 27 px ×2, and `Wordmark` sm/xl/2xl.
+- **Design system Rev. D** is written into `COGNIT_DESIGN_SYSTEM.md`: §2.2c–§2.2e, the readout steps in §3.3, and `--z-grain` in §4.4.
 
 ---
 

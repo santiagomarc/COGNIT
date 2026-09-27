@@ -34,6 +34,10 @@ type DrillResultProps = {
   previousResponse: AttemptResponse | null;
   /** Past attempts on this drill, newest first (audit U4). */
   history: DrillAttemptHistoryEntry[];
+  /** Unique per instance: the sprint summary renders several (A11Y-04). `drill` keeps `#drill-verdict`. */
+  idPrefix?: string;
+  /** The canvas's one `.raised` result; a summary lists its results as wells (A11Y-04). */
+  plane?: 'raised' | 'well';
 };
 
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
@@ -65,7 +69,10 @@ export function DrillResult({
   isRevision,
   previousResponse,
   history,
+  idPrefix = 'drill',
+  plane = 'raised',
 }: DrillResultProps) {
+  const verdictId = `${idPrefix}-verdict`;
   const termById = new Map(anchors.map((anchor) => [anchor.id, anchor.term]));
   const linkById = new Map(reveal.requiredLinks.map((link) => [link.id, link]));
   const labels = SLOT_LABELS[drill.format];
@@ -79,11 +86,11 @@ export function DrillResult({
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="raised spec relative p-4 md:p-5" aria-labelledby="drill-verdict">
+      <section className={plane === 'raised' ? 'raised spec relative p-4 md:p-5' : 'well relative p-4 md:p-5'} aria-labelledby={verdictId}>
         {/* Verdict: a tick, the word, and the counts — colour is never alone. */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <StateTick state={headlineTick} />
-          <h2 id="drill-verdict" tabIndex={-1} className="text-[15px] font-semibold text-ink outline-hidden">
+          <h2 id={verdictId} tabIndex={-1} className="text-[15px] font-semibold text-ink outline-hidden">
             {headline}
             {isPlan && diagnostic.band ? <span className="ml-2 font-normal text-ink-dim">· {VERDICT_LABEL[diagnostic.verdict].toLowerCase()}</span> : null}
             {isRevision ? <span className="ml-2 font-normal text-ink-dim">· revised</span> : null}
@@ -259,19 +266,16 @@ export function DrillResult({
               {isRevision && previousResponse ? (
                 // The repair, not two blocks of prose: removed words struck, added words underlined.
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
+                  {/* <ins>/<del> so assistive technology can announce the change; ink, not a
+                      state hue, because an edit is not a fact about memory (§2.2c, DS-02). */}
                   {wordDiff(responseText(previousResponse), responseText(response)).map((token, index) => (
-                    <span
-                      key={index}
-                      className={
-                        token.kind === 'added'
-                          ? 'underline decoration-[var(--state-mastered)] decoration-2 underline-offset-[3px]'
-                          : token.kind === 'removed'
-                            ? 'text-ink-dimmer line-through'
-                            : undefined
-                      }
-                    >
-                      {token.text}{' '}
-                    </span>
+                    token.kind === 'added' ? (
+                      <ins key={index} className="underline decoration-[var(--ink)] decoration-2 underline-offset-[3px]">{token.text}{' '}</ins>
+                    ) : token.kind === 'removed' ? (
+                      <del key={index} className="text-ink-dimmer line-through">{token.text}{' '}</del>
+                    ) : (
+                      <span key={index}>{token.text}{' '}</span>
+                    )
                   ))}
                 </p>
               ) : mode === 'plan' && isPlanResponse(response) ? (

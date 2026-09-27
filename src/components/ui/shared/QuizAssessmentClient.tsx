@@ -18,7 +18,6 @@ import { enrichCards } from '@/app/actions/ai-enrich';
 import { logQuizResult } from '@/app/actions/quiz';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { pageShortcutBlocked } from '@/lib/hotkeys';
-import { MasteryConfetti } from '@/components/ui/shared/MasteryConfetti';
 import { fireFeedback } from '@/lib/feedback-effects';
 import { useFeedbackPrefs } from '@/lib/use-feedback-prefs';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
@@ -543,10 +542,10 @@ export function QuizAssessmentClient({
             Quiz
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">No cards available for a quiz yet</h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-ink-dim">
             Add cards to this deck first, then come back to test your recall.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-ink-dim">
             {totalInDeck} card{totalInDeck !== 1 ? 's' : ''} currently in this deck
           </p>
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
@@ -570,10 +569,10 @@ export function QuizAssessmentClient({
             Quiz
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous quiz?</h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-ink-dim">
             Pick up from question {Math.min(resumeState.index + 1, resumeState.sessionCards.length)} of {resumeState.sessionCards.length}.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-ink-dim">
             Last recorded progress: <span className="font-mono tnum">{formatDuration(resumeState.sessionDurationMs)}</span> of quiz time.
           </p>
 
@@ -707,8 +706,9 @@ export function QuizAssessmentClient({
           : `Question ${index + 1} of ${sessionCards.length}. ${getModeLabel(quizMode)} mode.`}
       </div>
 
+      {/* The focus layout is the main landmark; a nested <main> duplicated it (A11Y-01). */}
       {completed ? (
-        <main className="flex flex-1 items-start justify-center p-4 md:p-8">
+        <div className="flex flex-1 items-start justify-center p-4 md:p-8">
           <m.div
             key="summary"
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
@@ -718,17 +718,11 @@ export function QuizAssessmentClient({
           >
             <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
               <div className="surface relative overflow-hidden p-8">
-                {/* Fires at a strong pass, harder at a perfect score. Suppressed
-                    entirely under prefers-reduced-motion. */}
-                <MasteryConfetti
-                  active={completed && scoreSummary.percentage >= 80}
-                  intensity={scoreSummary.percentage === 100 ? 1.6 : 1}
-                />
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz Result</p>
-                    <h2 className="mt-3 font-mono text-[28px] font-semibold leading-[1.15] tracking-[-.03em] tnum">{scoreSummary.percentage}%</h2>
-                    <p className="mt-2 text-sm text-muted-foreground">
+                    <h2 className="mt-3 type-readout-sm font-semibold leading-[1.15] tracking-[-.03em]">{scoreSummary.percentage}%</h2>
+                    <p className="mt-2 text-sm text-ink-dim">
                       <span className="font-mono tnum">{scoreSummary.correctCount}</span> of <span className="font-mono tnum">{results.length}</span> answered correctly in <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>.
                     </p>
                   </div>
@@ -741,15 +735,15 @@ export function QuizAssessmentClient({
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   <div className="surface p-4">
                     <p className="font-mono text-2xl font-semibold tnum text-[var(--state-mastered)]">{scoreSummary.correctCount}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Correct</p>
+                    <p className="mt-1 text-xs text-ink-dim">Correct</p>
                   </div>
                   <div className="surface p-4">
                     <p className="font-mono text-2xl font-semibold tnum text-[var(--state-lapsed)]">{scoreSummary.incorrectCount}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Missed</p>
+                    <p className="mt-1 text-xs text-ink-dim">Missed</p>
                   </div>
                   <div className="surface p-4">
                     <p className="font-mono text-2xl font-semibold tnum">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Avg. per Question</p>
+                    <p className="mt-1 text-xs text-ink-dim">Avg. per Question</p>
                   </div>
                 </div>
 
@@ -776,7 +770,7 @@ export function QuizAssessmentClient({
                   </div>
                 ) : null}
 
-                <div className="mt-6 border-t border-border pt-4 text-sm text-muted-foreground">
+                <div className="mt-6 border-t border-border pt-4 text-sm text-ink-dim">
                   <p className="text-foreground">
                     Mastery is updated from quiz performance. Daily streaks still come from flashcard review.
                   </p>
@@ -805,7 +799,7 @@ export function QuizAssessmentClient({
                     {incorrectResults.length} missed
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-sm text-ink-dim">
                   {incorrectResults.length > 0
                     ? 'Use flashcards to reinforce the misses before re-testing.'
                     : 'You cleared every question. A review pass keeps the streak moving.'}
@@ -821,7 +815,7 @@ export function QuizAssessmentClient({
                         />
                         <div>
                           <p className="text-sm font-medium text-foreground">{entry.prompt}</p>
-                          <p className="mt-1.5 text-xs text-muted-foreground">
+                          <p className="mt-1.5 text-xs text-ink-dim">
                             Your answer: {entry.userAnswer || 'No answer recorded'}
                           </p>
                           <p className="mt-0.5 text-xs text-[var(--state-lapsed)]">
@@ -832,7 +826,7 @@ export function QuizAssessmentClient({
                     ))}
                   </div>
                 ) : (
-                  <p className="mt-5 border-t border-border pt-4 text-sm text-muted-foreground">
+                  <p className="mt-5 border-t border-border pt-4 text-sm text-ink-dim">
                     Strong pass. You can re-run the quiz in the other mode or move back into review to keep your daily streak active.
                   </p>
                 )}
@@ -881,7 +875,7 @@ export function QuizAssessmentClient({
 
             <div className="surface p-6">
               <h3 className="text-base font-semibold tracking-[-.015em]">Question diagnostics</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-sm text-ink-dim">
                 Misses are listed with your answer so the next review pass has a clear target.
               </p>
 
@@ -914,14 +908,14 @@ export function QuizAssessmentClient({
                           {entry.correct ? 'Correct' : 'Missed'}
                         </span>
                       </div>
-                      <p className="mt-1.5 text-xs text-muted-foreground">
+                      <p className="mt-1.5 text-xs text-ink-dim">
                         Your answer: {entry.userAnswer || 'No answer recorded'}
                       </p>
                       <p className="mt-0.5 text-xs text-foreground/90">
                         Correct answer: {entry.correctAnswer}
                       </p>
                       {typeof entry.score === 'number' ? (
-                        <p className="mt-0.5 font-mono text-xs tnum text-muted-foreground">
+                        <p className="mt-0.5 font-mono text-xs tnum text-ink-dim">
                           Similarity score: {Math.round(entry.score * 100)}%
                         </p>
                       ) : null}
@@ -931,7 +925,7 @@ export function QuizAssessmentClient({
               </div>
             </div>
           </m.div>
-        </main>
+        </div>
       ) : (
         <div className="flex flex-1 flex-col">
           {quizMode === 'mcq' ? (
@@ -1010,7 +1004,7 @@ export function QuizAssessmentClient({
               <h3 id="quiz-paused-title" className="mt-3 text-xl font-semibold tracking-[-.025em]">
                 Timer is on hold
               </h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-ink-dim">
                 Resume when you are ready to continue. Your progress is preserved.
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">

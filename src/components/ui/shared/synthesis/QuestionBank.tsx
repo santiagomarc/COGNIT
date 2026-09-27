@@ -21,7 +21,7 @@ export async function QuestionBank({ deckId }: { deckId: string }) {
         <h2 className={LABEL}>Exam questions</h2>
         <p className={`${LABEL} tnum`}>{questions.length} saved</p>
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">
+      <p className="mt-2 text-sm text-ink-dim">
         Paste questions from past papers. Each is matched to your cards; a plan made from it tells you what the deck still lacks.
       </p>
 
@@ -43,12 +43,12 @@ export async function QuestionBank({ deckId }: { deckId: string }) {
                   <p className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <span className={LABEL}>Deck lacks</span>
                     {question.missingConcepts.map((concept) => (
-                      <span key={concept} className="term-chip cursor-default" style={{ color: 'var(--state-due)' }}>{concept}</span>
+                      <span key={concept} className="term-chip cursor-default">{concept}</span>
                     ))}
                   </p>
                 ) : null}
               </div>
-              <QuestionRowActions deckId={deckId} questionId={question.id} drillId={question.drillId} />
+              <QuestionRowActions deckId={deckId} questionId={question.id} drillId={question.drillId} questionText={question.text} />
             </li>
           ))}
         </ul>

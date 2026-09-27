@@ -52,11 +52,11 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                     Line {card.lineNumber}
                   </div>
                   <p className="text-sm font-medium text-ink">{card.front}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{card.back}</p>
+                  <p className="mt-1 text-sm text-ink-dim">{card.back}</p>
                 </div>
               ))
             ) : (
-              <div className="rounded-[var(--radius-container)] border border-dashed border-border p-4 text-sm text-muted-foreground">
+              <div className="rounded-[var(--radius-container)] border border-dashed border-border p-4 text-sm text-ink-dim">
                 Valid parsed cards will appear here as you type.
               </div>
             )}
@@ -90,11 +90,11 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                       {FLAG_LABELS[line.reason]}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{line.text}</p>
+                  <p className="text-sm text-ink-dim">{line.text}</p>
                 </div>
               ))
             ) : (
-              <div className="rounded-[var(--radius-container)] border border-dashed border-border p-4 text-sm text-muted-foreground">
+              <div className="rounded-[var(--radius-container)] border border-dashed border-border p-4 text-sm text-ink-dim">
                 No parsing issues detected.
               </div>
             )}

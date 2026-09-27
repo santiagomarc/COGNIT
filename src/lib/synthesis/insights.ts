@@ -22,6 +22,29 @@ export type AttemptForInsights = {
 export type FormatRateRow = { format: SynthesisFormat; attempts: number; sound: number };
 export type DailyPoint = { date: string; attempts: number; linksCovered: number; linksTotal: number };
 
+/**
+ * The links-covered sparkline as an SVG path in a `width` × `height` box
+ * (plan §5.3, UX-05). A day with no attempts has no reading, so the line
+ * breaks there — a new `M` segment — instead of drawing straight across and
+ * claiming a continuity the student did not have. A lone reading between two
+ * gaps is a one-point segment: the dot shows it, the path adds nothing.
+ */
+export function sparklinePath(daily: readonly DailyPoint[], width: number, height: number): string {
+  const segments: string[] = [];
+  let open = false;
+  daily.forEach((point, index) => {
+    if (point.attempts === 0 || point.linksTotal === 0) {
+      open = false;
+      return;
+    }
+    const x = daily.length > 1 ? (index / (daily.length - 1)) * width : 0;
+    const y = height - (point.linksCovered / point.linksTotal) * (height - 4) - 2;
+    segments.push(`${open ? 'L' : 'M'}${x.toFixed(1)},${y.toFixed(1)}`);
+    open = true;
+  });
+  return segments.join(' ');
+}
+
 export const WEAK_LINK_MIN_SIGNALS = 2;
 
 /**

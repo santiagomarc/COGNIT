@@ -50,11 +50,11 @@ export function HintButton({ cardId, deckId, disabled = false }: HintButtonProps
       >
         {isLoading ? 'Thinking…' : hint ? 'Hide hint' : 'Get a hint'}
       </Button>
-      <p className="max-w-sm text-xs text-muted-foreground">
+      <p className="max-w-sm text-xs text-ink-dim">
         The hint is AI-generated from the card&apos;s answer and description, and it tries not to reveal the term directly.
       </p>
       {hint ? (
-        <div className="rounded-[var(--radius-container)] border border-border px-3 py-2 text-sm text-muted-foreground">
+        <div className="rounded-[var(--radius-container)] border border-border px-3 py-2 text-sm text-ink-dim">
           {hint}
         </div>
       ) : null}

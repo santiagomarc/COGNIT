@@ -47,7 +47,7 @@ export default function GlobalError({
         <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">
           This page failed to load
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-sm leading-relaxed text-ink-dim">
           The error has been logged. Retrying usually works — if it does not, the
           problem is on our side rather than with anything you did.
         </p>

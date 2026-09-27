@@ -30,7 +30,7 @@ export function Footer() {
           {/* Brand column */}
           <div className="lg:col-span-2">
             <Wordmark href="/" />
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-dim">
               The universal active recall engine. Transform any study material into
               an interactive learning experience powered by AI.
             </p>
@@ -61,7 +61,7 @@ export function Footer() {
                   <li key={link.label}>
                     <a
                       href={link.href}
-                      className="rounded-[var(--radius-control)] text-sm text-muted-foreground outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      className="rounded-[var(--radius-control)] text-sm text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       {link.label}
                     </a>

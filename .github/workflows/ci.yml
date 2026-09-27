@@ -35,3 +35,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
           NEXT_PUBLIC_SITE_URL: https://example.com
+
+      # First-load JS per route, gzip; exits 1 on any overrun or unknown route
+      # (COGNIT_NEXT_HORIZON_PLAN.md §5.6). Budgets move down, never up, without a written reason.
+      - name: Bundle budgets
+        run: node scripts/bundle-report.mjs .next --budgets scripts/bundle-budgets.json
