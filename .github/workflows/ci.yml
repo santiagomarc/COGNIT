@@ -59,8 +59,20 @@ jobs:
 
       # PostgrestVersion is the server's, not the schema's: the local image
       # and the hosted project can differ there without any drift.
+      # On a mismatch the diff goes to the run summary and to annotations
+      # (the failure email and the public API show those; job logs need a
+      # signed-in viewer).
       - name: Types match the replayed schema
         run: |
           supabase gen types typescript --local --schema public > /tmp/types.ts
           normalize() { sed 's/[[:space:]]*$//' "$1" | grep -v 'PostgrestVersion'; }
-          diff <(normalize src/lib/database.types.ts) <(normalize /tmp/types.ts)
+          if diff -u <(normalize src/lib/database.types.ts) <(normalize /tmp/types.ts) > /tmp/types.diff; then
+            exit 0
+          fi
+          { echo '### database.types.ts differs from the replayed schema'; echo '```diff'; cat /tmp/types.diff; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          split -l 60 /tmp/types.diff /tmp/types.diff.part.
+          for part in $(ls /tmp/types.diff.part.* | head -9); do
+            body=$(sed -e 's/%/%25/g' "$part" | awk '{printf "%s%%0A", $0}')
+            echo "::error title=database.types.ts drift ($(basename "$part"))::$body"
+          done
+          exit 1
