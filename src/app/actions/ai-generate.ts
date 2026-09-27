@@ -4,6 +4,11 @@ import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { generateCardsSchema } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { Type, type Schema } from '@/lib/gemini';
+// Must stay above 'pdf-parse': it installs the DOMMatrix / ImageData / Path2D
+// globals pdfjs needs in Node, and its static import of @napi-rs/canvas is
+// what gets that native package traced into the Vercel function. Without it
+// production failed every upload with "Cannot find module '@napi-rs/canvas'".
+import { CanvasFactory, getData } from 'pdf-parse/worker';
 import { PDFParse } from 'pdf-parse';
 import { randomUUID } from 'node:crypto';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
@@ -33,6 +38,10 @@ const MIN_PDF_HEADER_BYTES = 5;
 const MAX_TEXT_CHARS = 600_000;
 
 const PDF_CARD_GENERATION_MAX_COUNT = 30;
+
+// The library's documented serverless setup: the worker as a data URL, so it
+// needs no file path inside the function bundle.
+PDFParse.setWorker(getData());
 
 /**
  * Chunks in flight at once. Sequential processing put a 12-chunk document at
@@ -145,7 +154,7 @@ export async function generateCards(formData: FormData) {
     let pageCount = 0;
     let pdf: InstanceType<typeof PDFParse> | null = null;
     try {
-      pdf = new PDFParse({ data: pdfBytes });
+      pdf = new PDFParse({ data: pdfBytes, CanvasFactory });
       const textResult = await pdf.getText();
       extractedText = textResult.text;
       pageCount = Array.isArray(textResult.pages) ? textResult.pages.length : 0;

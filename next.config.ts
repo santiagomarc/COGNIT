@@ -5,7 +5,8 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   // pdf-parse and pdfjs-dist use native Node.js APIs and dynamic requires
   // that break when Turbopack tries to bundle them. Keep them external.
-  serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+  // @napi-rs/canvas is native (pdf-parse/worker's DOMMatrix polyfill).
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', '@napi-rs/canvas'],
   experimental: {
     serverActions: {
       // Both limits must sit ABOVE the app's own 10MB PDF cap
