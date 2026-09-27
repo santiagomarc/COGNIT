@@ -29,9 +29,12 @@ vi.mock('./chat', () => ({ syncEmbeddings: mocks.syncEmbeddings }));
 vi.mock('@/lib/env-server', () => ({
   getServerEnv: () => ({ GEMINI_API_KEY: 'test', GEMINI_MODEL: 'gemini-test', GEMINI_EMBEDDING_MODEL: 'embed-test', GEMINI_MODEL_MAX_TOKENS: 4096 }),
 }));
+vi.mock('@/lib/gemini', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/gemini')>()),
+  generateJson: mocks.generateContent,
+}));
 vi.mock('@/app/actions/_shared', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./_shared')>()),
-  getGeminiJsonModel: () => ({ generateContent: mocks.generateContent }),
   reserveAiCall: mocks.reserveAiCall,
   recordAiUsage: mocks.recordAiUsage,
 }));
@@ -84,10 +87,8 @@ function modelOutput(overrides: Record<string, unknown> = {}) {
 
 function respondWith(output: unknown) {
   mocks.generateContent.mockImplementation(async () => ({
-    response: {
-      text: () => (typeof output === 'string' ? output : JSON.stringify(output)),
-      usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 300, totalTokenCount: 1500 },
-    },
+    text: typeof output === 'string' ? output : JSON.stringify(output),
+    usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 300, totalTokenCount: 1500 },
   }));
 }
 
@@ -353,11 +354,9 @@ describe('checkSynthesisAttempt', () => {
   it('treats a response cut off at the output cap as a non-retryable failure', async () => {
     mocks.client = buildClient();
     mocks.generateContent.mockImplementation(async () => ({
-      response: {
-        text: () => '{"coverage":[{"link_id":"m1","status":"cov',
-        candidates: [{ finishReason: 'MAX_TOKENS' }],
-        usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 640, totalTokenCount: 1840, thoughtsTokenCount: 600 },
-      },
+      text: '{"coverage":[{"link_id":"m1","status":"cov',
+      candidates: [{ finishReason: 'MAX_TOKENS' }],
+      usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 640, totalTokenCount: 1840, thoughtsTokenCount: 600 },
     }));
 
     const result = await check();

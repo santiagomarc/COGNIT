@@ -2,16 +2,17 @@
 
 import { enrichCardsSchema, EnrichCardsInput } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
-import { SchemaType, type Schema } from '@google/generative-ai';
+import { Type, type Schema } from '@/lib/gemini';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import {
-  chunkArray, getGeminiJsonModel, jsonGenerationConfig,
+  chunkArray,
   recordAiUsage, requireOwnedDeck, reserveAiCall, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
 import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
 import { withGeminiRetry } from '@/lib/ai-retry';
+import { generateJson } from '@/lib/gemini';
 import { selectUsableDistractors } from '@/lib/distractors';
 
 type EnrichmentRow = {
@@ -24,35 +25,32 @@ type EnrichmentRow = {
 const ENRICH_BATCH_SIZE = 25;
 
 const ENRICHMENT_RESPONSE_SCHEMA: Schema = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT,
   required: ['cards'],
   properties: {
     cards: {
-      type: SchemaType.ARRAY,
+      type: Type.ARRAY,
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         required: ['id', 'id_question', 'mcq_distractors', 'topic_tags'],
         // A fixed emission order measurably reduces schema drift on Flash.
-        // `propertyOrdering` is a documented Gemini structured-output field but
-        // is missing from @google/generative-ai 0.24's ObjectSchema type, so it
-        // is spread in. Drop the cast once the SDK types catch up.
-        ...({ propertyOrdering: ['id', 'id_question', 'mcq_distractors', 'topic_tags'] } as object),
+        propertyOrdering: ['id', 'id_question', 'mcq_distractors', 'topic_tags'],
         properties: {
-          id: { type: SchemaType.STRING },
-          id_question: { type: SchemaType.STRING },
+          id: { type: Type.STRING },
+          id_question: { type: Type.STRING },
           // Exactly 3. Previously unbounded, and the parser accepted 2 — which
           // rendered a 3-option MCQ with a 33% guess floor instead of 25%.
           mcq_distractors: {
-            type: SchemaType.ARRAY,
-            minItems: 3,
-            maxItems: 3,
-            items: { type: SchemaType.STRING },
+            type: Type.ARRAY,
+            minItems: '3',
+            maxItems: '3',
+            items: { type: Type.STRING },
           },
           topic_tags: {
-            type: SchemaType.ARRAY,
-            minItems: 2,
-            maxItems: 5,
-            items: { type: SchemaType.STRING },
+            type: Type.ARRAY,
+            minItems: '2',
+            maxItems: '5',
+            items: { type: Type.STRING },
           },
         },
       },
@@ -157,7 +155,6 @@ export async function enrichCards(data: EnrichCardsInput) {
     // model's echo of it.
     const correctAnswerByCardId = new Map(pendingCards.map((card) => [card.id, card.front]));
 
-    const model = getGeminiJsonModel();
     const batches = chunkArray(pendingCards, ENRICH_BATCH_SIZE);
     let enrichedCount = 0;
     const failedCardIds: string[] = [];
@@ -200,9 +197,9 @@ export async function enrichCards(data: EnrichCardsInput) {
       try {
         const response = await withGeminiRetry(
           () =>
-            model.generateContent({
+            generateJson({
               systemInstruction: buildBatchSystemInstruction(),
-              generationConfig: jsonGenerationConfig({ responseSchema: ENRICHMENT_RESPONSE_SCHEMA }),
+              responseSchema: ENRICHMENT_RESPONSE_SCHEMA,
               contents: [
                 {
                   role: 'user',
@@ -216,7 +213,7 @@ export async function enrichCards(data: EnrichCardsInput) {
           { label: 'enrich_cards', maxAttempts: 2 },
         );
 
-        const enrichedRows = parseEnrichmentPayload(response.response.text(), correctAnswerByCardId);
+        const enrichedRows = parseEnrichmentPayload(response.text ?? '', correctAnswerByCardId);
         const enrichedIds = new Set(enrichedRows.map((row) => row.id));
         const batchFailedIds = batch
           .filter((card) => !enrichedIds.has(card.id))

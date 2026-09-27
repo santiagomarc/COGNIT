@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import * as fs from 'node:fs';
 
 // Load .env.local
@@ -23,7 +23,7 @@ if (!apiKey) {
   process.exit(1);
 }
 
-const genai = new GoogleGenerativeAI(apiKey);
+const genai = new GoogleGenAI({ apiKey });
 
 const models = [
   { name: 'gemini-2.5-flash (Old Default)', id: 'gemini-2.5-flash' },
@@ -70,22 +70,22 @@ async function runBenchmark() {
 
     for (const task of benchmarkTasks) {
       process.stdout.write(`  • ${task.name}... `);
-      const model = genai.getGenerativeModel({
-        model: m.id,
-        generationConfig: {
-          temperature: task.isJson ? 0.1 : 0.4,
-          maxOutputTokens: 1024,
-          ...(task.isJson ? { responseMimeType: 'application/json' } : {}),
-        },
-      });
 
       const startTime = performance.now();
       try {
-        const response = await model.generateContent(task.prompt);
+        const response = await genai.models.generateContent({
+          model: m.id,
+          contents: task.prompt,
+          config: {
+            temperature: task.isJson ? 0.1 : 0.4,
+            maxOutputTokens: 1024,
+            ...(task.isJson ? { responseMimeType: 'application/json' } : {}),
+          },
+        });
         const endTime = performance.now();
         const durationMs = Math.round(endTime - startTime);
-        const text = response.response.text();
-        const usage = response.response.usageMetadata || {};
+        const text = response.text ?? '';
+        const usage = response.usageMetadata || {};
 
         let validJson = true;
         if (task.isJson) {

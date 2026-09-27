@@ -1,0 +1,39 @@
+name: Live AI gates
+
+# Model drift is caught on a schedule, not by a student (plan §6.5). Each run
+# makes real, paid Gemini calls (a few cents), so the job stays off until the
+# repository variable LIVE_AI_ENABLED is 'true' and the GEMINI_API_KEY secret
+# is set: Settings → Secrets and variables → Actions.
+on:
+  schedule:
+    - cron: '0 3 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  live:
+    if: ${{ vars.LIVE_AI_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-3.5-flash-lite' }}
+      # env-public.ts validates these at import; the live tests never call Supabase.
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # The live tests skip without a key; here a missing key is a setup error.
+      - name: Require the API key
+        run: test -n "$GEMINI_API_KEY" || { echo "GEMINI_API_KEY secret is not set"; exit 1; }
+
+      - run: npm run ai:smoke
+      - run: npm run ai:retrieval
+      - run: npm run ai:generation
+      - run: npm run ai:calibrate

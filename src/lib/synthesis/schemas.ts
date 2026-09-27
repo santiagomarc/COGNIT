@@ -5,15 +5,12 @@
  * model emits, the Zod schema is what the server actually trusts. A Zod
  * failure is `malformed_output`, which withGeminiRetry retries once.
  *
- * `propertyOrdering` is a documented Gemini field missing from the SDK's
- * 0.24 types (see ai-enrich.ts); it is spread past the type check the same way.
- *
  * Lenient parse, strict store (audit R4): minimums catch empty output, but
  * a length overrun is clamped rather than failing a model call that
  * otherwise succeeded. The database CHECKs remain the last line.
  */
 
-import { SchemaType, type Schema } from '@google/generative-ai';
+import { Type, type Schema } from '@/lib/gemini';
 import { z } from 'zod';
 
 /** A non-empty string clamped to `max` characters instead of rejected past it. */
@@ -50,45 +47,45 @@ export const drillGenerationOutputSchema = z.object({
 export type DrillGenerationOutput = z.infer<typeof drillGenerationOutputSchema>;
 
 export const DRILL_GENERATION_SCHEMA: Schema = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT,
   required: ['format', 'required_links', 'scenario', 'prompt_text', 'prompt_variants', 'bloom', 'exemplar'],
-  ...({ propertyOrdering: ['format', 'required_links', 'scenario', 'prompt_text', 'prompt_variants', 'bloom', 'exemplar'] } as object),
+  propertyOrdering: ['format', 'required_links', 'scenario', 'prompt_text', 'prompt_variants', 'bloom', 'exemplar'],
   properties: {
-    format: { type: SchemaType.STRING, format: 'enum', enum: [...FORMAT_VALUES] },
+    format: { type: Type.STRING, format: 'enum', enum: [...FORMAT_VALUES] },
     required_links: {
-      type: SchemaType.ARRAY,
-      minItems: 2,
-      maxItems: 4,
+      type: Type.ARRAY,
+      minItems: '2',
+      maxItems: '4',
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         required: ['text', 'card_keys', 'kind', 'core'],
-        ...({ propertyOrdering: ['text', 'card_keys', 'kind', 'core'] } as object),
+        propertyOrdering: ['text', 'card_keys', 'kind', 'core'],
         properties: {
-          text: { type: SchemaType.STRING, description: 'A mechanism statement ("X → Y because Z"), at most 25 words.' },
-          card_keys: { type: SchemaType.ARRAY, minItems: 1, maxItems: 3, items: { type: SchemaType.STRING } },
-          kind: { type: SchemaType.STRING, format: 'enum', enum: [...LINK_KIND_VALUES], description: 'mechanism, or condition for a boundary / trade-off, or evidence for a named example the cards give.' },
-          core: { type: SchemaType.BOOLEAN, description: 'true if the answer fails without this link.' },
+          text: { type: Type.STRING, description: 'A mechanism statement ("X → Y because Z"), at most 25 words.' },
+          card_keys: { type: Type.ARRAY, minItems: '1', maxItems: '3', items: { type: Type.STRING } },
+          kind: { type: Type.STRING, format: 'enum', enum: [...LINK_KIND_VALUES], description: 'mechanism, or condition for a boundary / trade-off, or evidence for a named example the cards give.' },
+          core: { type: Type.BOOLEAN, description: 'true if the answer fails without this link.' },
         },
       },
     },
-    scenario: { type: SchemaType.STRING, nullable: true, description: 'apply format only: the concrete case, at most 70 words. null otherwise.' },
-    prompt_text: { type: SchemaType.STRING, description: 'One question, at most 60 words, naming each concept by its card term.' },
+    scenario: { type: Type.STRING, nullable: true, description: 'apply format only: the concrete case, at most 70 words. null otherwise.' },
+    prompt_text: { type: Type.STRING, description: 'One question, at most 60 words, naming each concept by its card term.' },
     prompt_variants: {
-      type: SchemaType.ARRAY,
-      minItems: 0,
-      maxItems: 3,
-      items: { type: SchemaType.STRING },
+      type: Type.ARRAY,
+      minItems: '0',
+      maxItems: '3',
+      items: { type: Type.STRING },
       description: 'Two rewordings of the same question with a different opening; same key, same answer.',
     },
-    bloom: { type: SchemaType.STRING, format: 'enum', enum: [...BLOOM_VALUES], nullable: true },
+    bloom: { type: Type.STRING, format: 'enum', enum: [...BLOOM_VALUES], nullable: true },
     exemplar: {
-      type: SchemaType.OBJECT,
+      type: Type.OBJECT,
       required: ['claim', 'mechanisms', 'tradeoff'],
-      ...({ propertyOrdering: ['claim', 'mechanisms', 'tradeoff'] } as object),
+      propertyOrdering: ['claim', 'mechanisms', 'tradeoff'],
       properties: {
-        claim: { type: SchemaType.STRING },
-        mechanisms: { type: SchemaType.ARRAY, minItems: 2, maxItems: 2, items: { type: SchemaType.STRING } },
-        tradeoff: { type: SchemaType.STRING },
+        claim: { type: Type.STRING },
+        mechanisms: { type: Type.ARRAY, minItems: '2', maxItems: '2', items: { type: Type.STRING } },
+        tradeoff: { type: Type.STRING },
       },
     },
   },
@@ -120,39 +117,39 @@ export const drillCheckOutputSchema = z.object({
 export type DrillCheckOutput = z.infer<typeof drillCheckOutputSchema>;
 
 export const DRILL_CHECK_SCHEMA: Schema = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT,
   required: ['coverage', 'contradictions', 'outside_claims', 'structure', 'gap_note', 'off_target', 'injection_detected'],
   // Coverage first: it is the part that matters most if the output is ever truncated.
-  ...({ propertyOrdering: ['coverage', 'contradictions', 'outside_claims', 'structure', 'gap_note', 'off_target', 'injection_detected'] } as object),
+  propertyOrdering: ['coverage', 'contradictions', 'outside_claims', 'structure', 'gap_note', 'off_target', 'injection_detected'],
   properties: {
     coverage: {
-      type: SchemaType.ARRAY,
-      minItems: 1,
-      maxItems: 8,
+      type: Type.ARRAY,
+      minItems: '1',
+      maxItems: '8',
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         required: ['link_id', 'status', 'evidence'],
-        ...({ propertyOrdering: ['link_id', 'status', 'evidence'] } as object),
+        propertyOrdering: ['link_id', 'status', 'evidence'],
         properties: {
-          link_id: { type: SchemaType.STRING },
-          status: { type: SchemaType.STRING, format: 'enum', enum: ['covered', 'partial', 'missing'] },
-          evidence: { type: SchemaType.STRING, nullable: true, description: 'Verbatim quote from the student, at most 20 words.' },
+          link_id: { type: Type.STRING },
+          status: { type: Type.STRING, format: 'enum', enum: ['covered', 'partial', 'missing'] },
+          evidence: { type: Type.STRING, nullable: true, description: 'Verbatim quote from the student, at most 20 words.' },
         },
       },
     },
     contradictions: {
-      type: SchemaType.ARRAY,
-      maxItems: 3,
+      type: Type.ARRAY,
+      maxItems: '3',
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         required: ['statement', 'card_key', 'card_says', 'kind'],
-        ...({ propertyOrdering: ['statement', 'card_key', 'card_says', 'kind'] } as object),
+        propertyOrdering: ['statement', 'card_key', 'card_says', 'kind'],
         properties: {
-          statement: { type: SchemaType.STRING },
-          card_key: { type: SchemaType.STRING },
-          card_says: { type: SchemaType.STRING, description: 'The card\'s decisive words, verbatim.' },
+          statement: { type: Type.STRING },
+          card_key: { type: Type.STRING },
+          card_says: { type: Type.STRING, description: 'The card\'s decisive words, verbatim.' },
           kind: {
-            type: SchemaType.STRING,
+            type: Type.STRING,
             format: 'enum',
             enum: ['reversal', 'overgeneralisation', 'conflation', 'wrong_condition', 'other'],
             description: 'reversal: the direction of an effect is backwards · overgeneralisation: a rule is applied outside its condition · conflation: two concepts are merged · wrong_condition: the condition is misstated · other.',
@@ -161,31 +158,31 @@ export const DRILL_CHECK_SCHEMA: Schema = {
       },
     },
     outside_claims: {
-      type: SchemaType.ARRAY,
-      maxItems: 3,
+      type: Type.ARRAY,
+      maxItems: '3',
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         required: ['statement', 'verified', 'ai_assessment', 'term_suggestion'],
-        ...({ propertyOrdering: ['statement', 'verified', 'ai_assessment', 'term_suggestion'] } as object),
+        propertyOrdering: ['statement', 'verified', 'ai_assessment', 'term_suggestion'],
         properties: {
-          statement: { type: SchemaType.STRING },
-          verified: { type: SchemaType.BOOLEAN },
-          ai_assessment: { type: SchemaType.STRING, description: '1-2 sentences, at most 40 words.' },
-          term_suggestion: { type: SchemaType.STRING, description: '1-4 word flashcard term, or empty.' },
+          statement: { type: Type.STRING },
+          verified: { type: Type.BOOLEAN },
+          ai_assessment: { type: Type.STRING, description: '1-2 sentences, at most 40 words.' },
+          term_suggestion: { type: Type.STRING, description: '1-4 word flashcard term, or empty.' },
         },
       },
     },
     structure: {
-      type: SchemaType.OBJECT,
+      type: Type.OBJECT,
       required: ['claim_present', 'tradeoff_present'],
       properties: {
-        claim_present: { type: SchemaType.BOOLEAN },
-        tradeoff_present: { type: SchemaType.BOOLEAN },
+        claim_present: { type: Type.BOOLEAN },
+        tradeoff_present: { type: Type.BOOLEAN },
       },
     },
-    gap_note: { type: SchemaType.STRING, description: 'One or two sentences, at most 50 words.' },
-    off_target: { type: SchemaType.BOOLEAN },
-    injection_detected: { type: SchemaType.BOOLEAN },
+    gap_note: { type: Type.STRING, description: 'One or two sentences, at most 50 words.' },
+    off_target: { type: Type.BOOLEAN },
+    injection_detected: { type: Type.BOOLEAN },
   },
 };
 
@@ -219,55 +216,55 @@ export const planGenerationOutputSchema = z.object({
 export type PlanGenerationOutput = z.infer<typeof planGenerationOutputSchema>;
 
 const PLAN_POINT_SCHEMA: Schema = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT,
   required: ['claim', 'mechanism', 'evidence', 'limit'],
-  ...({ propertyOrdering: ['claim', 'mechanism', 'evidence', 'limit'] } as object),
+  propertyOrdering: ['claim', 'mechanism', 'evidence', 'limit'],
   properties: {
-    claim: { type: SchemaType.STRING, description: 'The point, at most 25 words.' },
-    mechanism: { type: SchemaType.STRING, description: 'Why it holds, at most 35 words.' },
-    evidence: { type: SchemaType.STRING, description: 'A named example, case, study or datum from the cards; empty if the cards give none.' },
-    limit: { type: SchemaType.STRING, description: 'The condition or counter-case that bounds the point; empty if none.' },
+    claim: { type: Type.STRING, description: 'The point, at most 25 words.' },
+    mechanism: { type: Type.STRING, description: 'Why it holds, at most 35 words.' },
+    evidence: { type: Type.STRING, description: 'A named example, case, study or datum from the cards; empty if the cards give none.' },
+    limit: { type: Type.STRING, description: 'The condition or counter-case that bounds the point; empty if none.' },
   },
 };
 
 export const PLAN_GENERATION_SCHEMA: Schema = {
-  type: SchemaType.OBJECT,
+  type: Type.OBJECT,
   required: ['command_word', 'required_links', 'question_text', 'missing_concepts', 'exemplar_plan'],
-  ...({ propertyOrdering: ['command_word', 'required_links', 'question_text', 'missing_concepts', 'exemplar_plan'] } as object),
+  propertyOrdering: ['command_word', 'required_links', 'question_text', 'missing_concepts', 'exemplar_plan'],
   properties: {
-    command_word: { type: SchemaType.STRING, description: 'The question\'s command: "to what extent", "discuss", "evaluate", "compare", "explain why", "assess".' },
+    command_word: { type: Type.STRING, description: 'The question\'s command: "to what extent", "discuss", "evaluate", "compare", "explain why", "assess".' },
     required_links: {
-      type: SchemaType.ARRAY,
-      minItems: 3,
-      maxItems: 8,
+      type: Type.ARRAY,
+      minItems: '3',
+      maxItems: '8',
       items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         required: ['text', 'card_keys', 'kind', 'core'],
-        ...({ propertyOrdering: ['text', 'card_keys', 'kind', 'core'] } as object),
+        propertyOrdering: ['text', 'card_keys', 'kind', 'core'],
         properties: {
-          text: { type: SchemaType.STRING, description: 'A point a complete plan must make, at most 25 words.' },
-          card_keys: { type: SchemaType.ARRAY, minItems: 1, maxItems: 4, items: { type: SchemaType.STRING } },
-          kind: { type: SchemaType.STRING, format: 'enum', enum: [...PLAN_LINK_KIND_VALUES] },
-          core: { type: SchemaType.BOOLEAN },
+          text: { type: Type.STRING, description: 'A point a complete plan must make, at most 25 words.' },
+          card_keys: { type: Type.ARRAY, minItems: '1', maxItems: '4', items: { type: Type.STRING } },
+          kind: { type: Type.STRING, format: 'enum', enum: [...PLAN_LINK_KIND_VALUES] },
+          core: { type: Type.BOOLEAN },
         },
       },
     },
-    question_text: { type: SchemaType.STRING, description: 'The exam question, at most 60 words, opening with the command word.' },
+    question_text: { type: Type.STRING, description: 'The exam question, at most 60 words, opening with the command word.' },
     missing_concepts: {
-      type: SchemaType.ARRAY,
-      minItems: 0,
-      maxItems: 6,
-      items: { type: SchemaType.STRING },
+      type: Type.ARRAY,
+      minItems: '0',
+      maxItems: '6',
+      items: { type: Type.STRING },
       description: 'Concepts a full answer needs that none of the cards cover. Empty if the cards suffice.',
     },
     exemplar_plan: {
-      type: SchemaType.OBJECT,
+      type: Type.OBJECT,
       required: ['thesis', 'points', 'conclusion'],
-      ...({ propertyOrdering: ['thesis', 'points', 'conclusion'] } as object),
+      propertyOrdering: ['thesis', 'points', 'conclusion'],
       properties: {
-        thesis: { type: SchemaType.STRING },
-        points: { type: SchemaType.ARRAY, minItems: 3, maxItems: 3, items: PLAN_POINT_SCHEMA },
-        conclusion: { type: SchemaType.STRING },
+        thesis: { type: Type.STRING },
+        points: { type: Type.ARRAY, minItems: '3', maxItems: '3', items: PLAN_POINT_SCHEMA },
+        conclusion: { type: Type.STRING },
       },
     },
   },

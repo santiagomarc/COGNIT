@@ -3,7 +3,6 @@
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import {
   createCardSchema, CreateCardInput,
   updateCardSchema, UpdateCardInput,
@@ -12,8 +11,9 @@ import {
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { recordAiUsage, requireOwnedDeck, reserveAiCall, touchDeckUpdatedAt } from './_shared';
 import { logger } from '@/lib/logger';
-import { ensureSessionHeadroom } from '@/lib/supabase/session';
+import { ensureSessionHeadroom, getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
+import { runBackground } from '@/lib/background';
 
 const BULK_DELETE_MAX_COUNT = 200;
 
@@ -74,8 +74,7 @@ export async function updateCard(data: UpdateCardInput) {
     return { error: result.error.flatten().fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     return { error: 'You must be logged in to update a card.' };
@@ -138,32 +137,25 @@ export async function updateCard(data: UpdateCardInput) {
   const textToEmbed = `${result.data.front}\n${result.data.back}`.trim();
   if (textToEmbed) {
     await ensureSessionHeadroom();
-    after(async () => {
+    after(() => runBackground('update_card_embedding', async () => {
       const reservation = await reserveAiCall(supabase, user.id, 'sync_embeddings', { card_id: cardId, trigger: 'update_card' });
       if (!reservation.ok) {
         logger.info('updateCard', 'embedding deferred to the next sync', { cardId, reason: reservation.error });
-        return;
+        return 'skipped';
       }
-      try {
-        // embedTexts already runs under withGeminiRetry.
-        const [vector] = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT' });
-        if (!vector) return;
-        const { error: embedError } = await supabase
-          .from('cards')
-          .update({ embedding: toVectorLiteral(vector) })
-          .eq('id', cardId)
-          .eq('deck_id', deckId);
-        if (embedError) {
-          logger.warn('updateCard', 'embedding write failed', { cardId, message: embedError.message });
-        }
-        await recordAiUsage(supabase, user.id, 'sync_embeddings', { card_id: cardId, synced_cards: embedError ? 0 : 1 }, reservation.reservationId);
-      } catch (embedErr) {
-        logger.warn('updateCard', 'embedding skipped', {
-          cardId,
-          message: embedErr instanceof Error ? embedErr.message : String(embedErr),
-        });
+      // embedTexts already runs under withGeminiRetry.
+      const [vector] = await embedTexts([textToEmbed], { taskType: 'RETRIEVAL_DOCUMENT' });
+      const { error: embedError } = await supabase
+        .from('cards')
+        .update({ embedding: toVectorLiteral(vector) })
+        .eq('id', cardId)
+        .eq('deck_id', deckId);
+      if (embedError) {
+        logger.warn('updateCard', 'embedding write failed', { cardId, message: embedError.message });
       }
-    });
+      await recordAiUsage(supabase, user.id, 'sync_embeddings', { card_id: cardId, synced_cards: embedError ? 0 : 1 }, reservation.reservationId);
+      return embedError ? 'failed' : 'ok';
+    }, { cardId }));
   }
 
   return { success: true };

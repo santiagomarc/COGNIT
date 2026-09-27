@@ -69,7 +69,8 @@ const pct = (n: number, d: number) => (d === 0 ? '—' : `${Math.round((n / d) *
  */
 describe.skipIf(!hasKey)('live calibration — spec §11.3 on the configured model', () => {
   it('meets the calibration targets', async () => {
-    const { getGeminiJsonModel, jsonGenerationConfig, resolveModelName, sanitizeAiInputText } = await import('@/app/actions/_shared');
+    const { sanitizeAiInputText } = await import('@/app/actions/_shared');
+    const { generateJson, resolveModelName } = await import('@/lib/gemini');
     const { SYNTHESIS_PROMPT_VERSION, buildCheckUserTurn, buildDrillCheckInstruction } = await import('@/lib/synthesis/prompts');
     const { DRILL_CHECK_SCHEMA, drillCheckOutputSchema } = await import('@/lib/synthesis/schemas');
     const { renderResponseForModel, isOutlineResponse } = await import('@/lib/synthesis/text');
@@ -77,7 +78,6 @@ describe.skipIf(!hasKey)('live calibration — spec §11.3 on the configured mod
 
     const set = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'src/test/live/synthesis-calibration.json'), 'utf8')) as CalibrationSet;
     const drillById = new Map(set.drills.map((drill) => [drill.id, drill]));
-    const model = getGeminiJsonModel({ temperature: 0.1 });
 
     const jobs = set.answers.flatMap((answer) => Array.from({ length: RUNS }, (_, run) => ({ answer, run: run + 1 })));
     const results = await mapWithConcurrency(jobs, CONCURRENCY, async ({ answer, run }): Promise<RunResult> => {
@@ -89,19 +89,18 @@ describe.skipIf(!hasKey)('live calibration — spec §11.3 on the configured mod
       const nonce = `cal${run}${answer.id.replace(/[^a-z0-9]/gi, '').slice(0, 5)}`;
       const renderedAnswer = sanitizeAiInputText(renderResponseForModel(answer.mode, answer.response), 1_500);
       const started = Date.now();
-      const result = await model.generateContent(
-        {
-          systemInstruction: buildDrillCheckInstruction(nonce),
-          generationConfig: jsonGenerationConfig({ responseSchema: DRILL_CHECK_SCHEMA, temperature: 0.1 }),
-          contents: [{ role: 'user', parts: [{ text: buildCheckUserTurn({
-            format: drill.format, promptText: drill.promptText, anchors, requiredLinks: drill.requiredLinks,
-            exemplar: drill.exemplar, mode: answer.mode, renderedAnswer, nonce,
-          }) }] }],
-        },
-        { timeout: 60_000 },
-      );
+      const result = await generateJson({
+        systemInstruction: buildDrillCheckInstruction(nonce),
+        responseSchema: DRILL_CHECK_SCHEMA,
+        temperature: 0.1,
+        contents: [{ role: 'user', parts: [{ text: buildCheckUserTurn({
+          format: drill.format, promptText: drill.promptText, anchors, requiredLinks: drill.requiredLinks,
+          exemplar: drill.exemplar, mode: answer.mode, renderedAnswer, nonce,
+        }) }] }],
+        timeoutMs: 60_000,
+      });
       const ms = Date.now() - started;
-      const output = drillCheckOutputSchema.parse(JSON.parse(result.response.text()));
+      const output = drillCheckOutputSchema.parse(JSON.parse(result.text ?? ''));
       const slots = answer.mode === 'outline' && isOutlineResponse(answer.response)
         ? { claim: answer.response.claim.trim().length > 0, tradeoff: answer.response.tradeoff.trim().length > 0 }
         : undefined;

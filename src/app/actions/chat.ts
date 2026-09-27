@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import {
   syncEmbeddingsSchema, SyncEmbeddingsInput,
   createDeckChatSessionSchema, CreateDeckChatSessionInput,
@@ -288,8 +288,7 @@ export async function semanticSearchCards(data: SemanticSearchInput) {
       return { error: parsed.error.flatten().fieldErrors as never };
     }
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
     if (!user) {
       return { error: 'You must be logged in.' };
     }

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { getSessionUser } from '@/lib/supabase/session';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { CloneDeckButton } from '@/components/ui/shared/CloneDeckButton';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
@@ -68,7 +69,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
   const [
     { data: previewCards },
     { count: totalCards },
-    { data: { user } },
+    user,
   ] = await Promise.all([
     supabase
       .from('cards')
@@ -80,7 +81,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
       .from('cards')
       .select('id', { count: 'exact', head: true })
       .eq('deck_id', deck.id),
-    supabase.auth.getUser(),
+    getSessionUser(),
   ]);
 
   const title = removeDeckTagFromTitle(deck.title);

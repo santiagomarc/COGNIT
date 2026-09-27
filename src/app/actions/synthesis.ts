@@ -3,13 +3,14 @@
 import { randomUUID } from 'node:crypto';
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { FinishReason, type GenerateContentResult } from '@google/generative-ai';
 import type { z } from 'zod';
 import type { Json } from '@/lib/database.types';
 import { guardAction } from '@/lib/action-guard';
 import { AiServiceError, withGeminiRetry } from '@/lib/ai-retry';
 import { getServerEnv } from '@/lib/env-server';
+import { FinishReason, generateJson, resolveModelName, type GenerateContentResponse } from '@/lib/gemini';
 import { logger } from '@/lib/logger';
+import { runBackground, type BackgroundOutcome } from '@/lib/background';
 import { CONFUSABLE_FLOOR, NEIGHBOUR_FLOOR, questionMatches } from '@/lib/similarity';
 import {
   absorbOutsideClaimSchema,
@@ -81,12 +82,9 @@ import { countWords, isOutlineResponse, isPlanResponse, renderResponseForModel, 
 import { promptForAttempt, type AnchorCard, type Diagnostic, type DrillReveal, type Exemplar, type SynthesisDrill, type SynthesisFormat } from '@/lib/synthesis/types';
 import { computeBand, computeVerdict, countCovered, deriveCardIdSets, mergeReconciled, reconcileDiagnostic } from '@/lib/synthesis/verdict';
 import {
-  getGeminiJsonModel,
-  jsonGenerationConfig,
   recordAiUsage,
   requireOwnedDeck,
   reserveAiCall,
-  resolveModelName,
   sanitizeAiInputText,
   touchDeckUpdatedAt,
 } from './_shared';
@@ -154,8 +152,8 @@ function parseModelJson<T>(raw: string, schema: z.ZodType<T>): T {
 
 type ModelUsage = { in: number | null; out: number | null; thoughts: number | null };
 
-function usageOf(result: GenerateContentResult): ModelUsage {
-  const usage = result.response.usageMetadata as (typeof result.response.usageMetadata & { thoughtsTokenCount?: number }) | undefined;
+function usageOf(result: GenerateContentResponse): ModelUsage {
+  const usage = result.usageMetadata;
   return {
     in: usage?.promptTokenCount ?? null,
     out: usage?.candidatesTokenCount ?? null,
@@ -163,8 +161,8 @@ function usageOf(result: GenerateContentResult): ModelUsage {
   };
 }
 
-function finishReasonOf(result: GenerateContentResult): string | null {
-  return result.response.candidates?.[0]?.finishReason ?? null;
+function finishReasonOf(result: GenerateContentResponse): string | null {
+  return result.candidates?.[0]?.finishReason ?? null;
 }
 
 /**
@@ -172,7 +170,7 @@ function finishReasonOf(result: GenerateContentResult): string | null {
  * not be retried at the same cap (audit R3): it is raised as `bad_request`,
  * which withGeminiRetry never retries, with the budget in the log line.
  */
-function assertComplete(result: GenerateContentResult, label: string): void {
+function assertComplete(result: GenerateContentResponse, label: string): void {
   if (finishReasonOf(result) === FinishReason.MAX_TOKENS) {
     const usage = usageOf(result);
     throw new AiServiceError(
@@ -287,30 +285,23 @@ async function generateDrillForCluster(cluster: DrillCluster, format: SynthesisF
   // Generation may run on a stronger model than checks (plan D2): the key is
   // the ceiling of everything downstream and this call is not latency-bound.
   const modelName = resolveModelName('generation');
-  const model = getGeminiJsonModel({ temperature: GENERATION_TEMPERATURE, purpose: 'generation' });
   const label = `synthesis_generate_${index}`;
 
   return withGeminiRetry(
     async () => {
-      const result = await model.generateContent(
-        {
-          // The exam stem rotates across the batch (plan D5).
-          systemInstruction: buildDrillGenerationInstruction(format, { stem: stemFor(format, stemIndex) }),
-          // jsonGenerationConfig restates temperature and the output cap: a
-          // request-level config REPLACES the model-level one in the 0.24 SDK.
-          generationConfig: jsonGenerationConfig({
-            responseSchema: DRILL_GENERATION_SCHEMA,
-            temperature: GENERATION_TEMPERATURE,
-            thinking: getServerEnv().GEMINI_GENERATION_THINKING,
-            model: modelName,
-          }),
-          contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster.cards)}` }] }],
-        },
-        { timeout: GENERATION_TIMEOUT_MS },
-      );
+      const result = await generateJson({
+        purpose: 'generation',
+        // The exam stem rotates across the batch (plan D5).
+        systemInstruction: buildDrillGenerationInstruction(format, { stem: stemFor(format, stemIndex) }),
+        responseSchema: DRILL_GENERATION_SCHEMA,
+        temperature: GENERATION_TEMPERATURE,
+        thinking: getServerEnv().GEMINI_GENERATION_THINKING,
+        contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster.cards)}` }] }],
+        timeoutMs: GENERATION_TIMEOUT_MS,
+      });
       assertComplete(result, label);
       return {
-        draft: parseModelJson(result.response.text(), drillGenerationOutputSchema),
+        draft: parseModelJson(result.text ?? '', drillGenerationOutputSchema),
         finishReason: finishReasonOf(result),
         usage: usageOf(result),
         model: modelName,
@@ -686,41 +677,36 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
     const nonce = randomUUID().slice(0, 8);
     const renderedAnswer = sanitizeAiInputText(renderResponseForModel(mode, response), isPlan ? MAX_PLAN_ANSWER_CHARS : MAX_ANSWER_CHARS);
     const env = getServerEnv();
-    const model = getGeminiJsonModel({ temperature: CHECK_TEMPERATURE });
     const startedAt = Date.now();
 
     const runCheck = () => withGeminiRetry(
       async () => {
-        const result = await model.generateContent(
-          {
-            systemInstruction: buildDrillCheckInstruction(nonce, { plan: isPlan }),
-            generationConfig: jsonGenerationConfig({
-              responseSchema: DRILL_CHECK_SCHEMA,
-              temperature: CHECK_TEMPERATURE,
-            }),
-            contents: [{
-              role: 'user',
-              parts: [{
-                text: buildCheckUserTurn({
-                  format: drill.format,
-                  promptText: isPlan ? (drill.questionText ?? drill.promptText) : servedPrompt,
-                  scenario: drill.scenario,
-                  anchors,
-                  requiredLinks: drill.requiredLinks,
-                  exemplar: drill.exemplar,
-                  planExemplar: drill.planExemplar,
-                  mode,
-                  renderedAnswer,
-                  nonce,
-                }),
-              }],
+        const result = await generateJson({
+          systemInstruction: buildDrillCheckInstruction(nonce, { plan: isPlan }),
+          responseSchema: DRILL_CHECK_SCHEMA,
+          temperature: CHECK_TEMPERATURE,
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: buildCheckUserTurn({
+                format: drill.format,
+                promptText: isPlan ? (drill.questionText ?? drill.promptText) : servedPrompt,
+                scenario: drill.scenario,
+                anchors,
+                requiredLinks: drill.requiredLinks,
+                exemplar: drill.exemplar,
+                planExemplar: drill.planExemplar,
+                mode,
+                renderedAnswer,
+                nonce,
+              }),
             }],
-          },
-          { timeout: CHECK_TIMEOUT_MS },
-        );
+          }],
+          timeoutMs: CHECK_TIMEOUT_MS,
+        });
         assertComplete(result, 'synthesis_check');
         return {
-          output: parseModelJson(result.response.text(), drillCheckOutputSchema),
+          output: parseModelJson(result.text ?? '', drillCheckOutputSchema),
           usage: usageOf(result),
           finishReason: finishReasonOf(result),
         };
@@ -855,15 +841,11 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
       const excludeCardIds = drill.cardIds;
       const attemptId = attempt.id;
       await ensureSessionHeadroom();
-      after(async () => {
-        try {
-          await generateRepairDrill({ deckId, cardId: repairCardId, attemptId, excludeCardIds });
-        } catch (repairError) {
-          logger.warn('checkSynthesisAttempt', 'repair drill skipped', {
-            message: repairError instanceof Error ? repairError.message : String(repairError),
-          });
-        }
-      });
+      after(() => runBackground(
+        'repair_drill',
+        () => generateRepairDrill({ deckId, cardId: repairCardId, attemptId, excludeCardIds }),
+        { deckId, cardId: repairCardId },
+      ));
     }
 
     revalidatePath(`/dashboard/${deckId}`);
@@ -1108,17 +1090,11 @@ export async function absorbOutsideClaim(data: AbsorbOutsideClaimInput) {
     // deck's enrich and sync controls pick up later.
     const cardId = card.id;
     await ensureSessionHeadroom();
-    after(async () => {
-      try {
-        await enrichCards({ deck_id: deckId, card_ids: [cardId] });
-        await syncEmbeddings({ deck_id: deckId });
-      } catch (loopError) {
-        logger.warn('absorbOutsideClaim', 'post-absorb enrichment skipped', {
-          cardId,
-          message: loopError instanceof Error ? loopError.message : String(loopError),
-        });
-      }
-    });
+    after(() => runBackground('absorb_enrich', async () => {
+      const enriched = await enrichCards({ deck_id: deckId, card_ids: [cardId] });
+      const synced = await syncEmbeddings({ deck_id: deckId });
+      return 'error' in enriched || 'error' in synced ? 'failed' : 'ok';
+    }, { deckId, cardId }));
 
     return { success: true as const, cardId, duplicate: false };
   });
@@ -1230,24 +1206,19 @@ export async function generatePlanQuestions(data: GeneratePlanQuestionsInput) {
 
     // ── One call per question ──
     const modelName = resolveModelName('generation');
-    const model = getGeminiJsonModel({ temperature: GENERATION_TEMPERATURE, purpose: 'generation' });
     const settled = await Promise.allSettled(clusters.map((cluster, index) => withGeminiRetry(
       async () => {
-        const result = await model.generateContent(
-          {
-            systemInstruction: buildPlanGenerationInstruction({ questionText: setQuestion?.text ?? null }),
-            generationConfig: jsonGenerationConfig({
-              responseSchema: PLAN_GENERATION_SCHEMA,
-              temperature: GENERATION_TEMPERATURE,
-              thinking: getServerEnv().GEMINI_GENERATION_THINKING,
-              model: modelName,
-            }),
-            contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster.cards)}` }] }],
-          },
-          { timeout: GENERATION_TIMEOUT_MS },
-        );
+        const result = await generateJson({
+          purpose: 'generation',
+          systemInstruction: buildPlanGenerationInstruction({ questionText: setQuestion?.text ?? null }),
+          responseSchema: PLAN_GENERATION_SCHEMA,
+          temperature: GENERATION_TEMPERATURE,
+          thinking: getServerEnv().GEMINI_GENERATION_THINKING,
+          contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster.cards)}` }] }],
+          timeoutMs: GENERATION_TIMEOUT_MS,
+        });
         assertComplete(result, `synthesis_plan_${index}`);
-        return { draft: parseModelJson(result.response.text(), planGenerationOutputSchema), finishReason: finishReasonOf(result), usage: usageOf(result) };
+        return { draft: parseModelJson(result.text ?? '', planGenerationOutputSchema), finishReason: finishReasonOf(result), usage: usageOf(result) };
       },
       { label: `synthesis_plan_${index}`, maxAttempts: 2 },
     )));
@@ -1486,9 +1457,9 @@ const REPAIR_DUE_HOURS = PULL_FORWARD_HOURS + 24;
  * confusable), `elaborate` otherwise. Not exported: it runs after a check's
  * response, never from a client.
  */
-async function generateRepairDrill(input: { deckId: string; cardId: string; attemptId: string; excludeCardIds: string[] }): Promise<void> {
+async function generateRepairDrill(input: { deckId: string; cardId: string; attemptId: string; excludeCardIds: string[] }): Promise<BackgroundOutcome> {
   const deckAccess = await requireOwnedDeck(input.deckId);
-  if ('error' in deckAccess) return;
+  if ('error' in deckAccess) return 'skipped';
   const { supabase, user } = deckAccess;
 
   const [{ count: activeCount }, { data: existing }, { data: cardRows }] = await Promise.all([
@@ -1513,13 +1484,13 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
       .limit(MAX_CARDS_FOR_CLUSTERING),
   ]);
 
-  if ((activeCount ?? 0) >= MAX_ACTIVE_DRILLS_PER_DECK) return;
-  if (Array.isArray(existing) && existing.length > 0) return;
+  if ((activeCount ?? 0) >= MAX_ACTIVE_DRILLS_PER_DECK) return 'skipped';
+  if (Array.isArray(existing) && existing.length > 0) return 'skipped';
 
   const cards = ((cardRows ?? []) as PlanCardRow[]).map((row) => ({ ...toClusterCard(row), explanation: typeof row.explanation === 'string' ? row.explanation : null }));
   const cardsById = new Map(cards.map((card) => [card.id, card]));
   const anchor = cardsById.get(input.cardId);
-  if (!anchor) return;
+  if (!anchor) return 'skipped';
 
   // The partner: an embedding neighbour first (confusable → distinguish),
   // then a card sharing a tag, then another anchor of the drill that caught
@@ -1548,10 +1519,10 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
       .map((id) => cardsById.get(id))
       .find((card): card is ClusterCard => card !== undefined && card.id !== anchor.id) ?? null;
   }
-  if (!partner) return;
+  if (!partner) return 'skipped';
 
   const reservation = await reserveAiCall(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId }, { calls: 1 });
-  if (!reservation.ok) return;
+  if (!reservation.ok) return 'skipped';
 
   const cluster: DrillCluster = { cards: [anchor, partner], topicTag: null, clustering: format === 'distinguish' ? 'embedding' : 'tags' };
   let outcome: Awaited<ReturnType<typeof generateDrillForCluster>>;
@@ -1561,13 +1532,13 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
     // The reservation was spent; the failure is logged the way a batch logs a lost cluster.
     logger.warn('generateRepairDrill', 'generation failed', { message: generationError instanceof Error ? generationError.message : String(generationError) });
     await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: 0 }, reservation.reservationId);
-    return;
+    return 'failed';
   }
   const validation = validateDrillDraft(outcome.draft, cluster.cards);
   if (!validation.ok) {
     logger.warn('generateRepairDrill', 'draft rejected', { reason: validation.reason });
     await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: 0 }, reservation.reservationId);
-    return;
+    return 'failed';
   }
 
   const { drill } = validation;
@@ -1609,4 +1580,5 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
     revalidatePath(`/dashboard/${input.deckId}`);
   }
   await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: error ? 0 : 1 }, reservation.reservationId);
+  return error ? 'failed' : 'ok';
 }

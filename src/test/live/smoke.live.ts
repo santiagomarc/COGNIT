@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: async () => { throw new 
  */
 describe.skipIf(!hasKey)('live smoke — production JSON config on the configured model', () => {
   it('returns a complete, schema-valid check response', async () => {
-    const { getGeminiJsonModel, jsonGenerationConfig, resolveModelName } = await import('@/app/actions/_shared');
+    const { generateJson, resolveModelName } = await import('@/lib/gemini');
     const { buildCheckUserTurn, buildDrillCheckInstruction } = await import('@/lib/synthesis/prompts');
     const { DRILL_CHECK_SCHEMA, drillCheckOutputSchema } = await import('@/lib/synthesis/schemas');
 
@@ -37,25 +37,23 @@ describe.skipIf(!hasKey)('live smoke — production JSON config on the configure
       nonce,
     });
 
-    const model = getGeminiJsonModel({ temperature: 0.1 });
     const started = Date.now();
-    const result = await model.generateContent(
-      {
-        systemInstruction: buildDrillCheckInstruction(nonce),
-        generationConfig: jsonGenerationConfig({ responseSchema: DRILL_CHECK_SCHEMA, temperature: 0.1 }),
-        contents: [{ role: 'user', parts: [{ text: userTurn }] }],
-      },
-      { timeout: 30_000 },
-    );
+    const result = await generateJson({
+      systemInstruction: buildDrillCheckInstruction(nonce),
+      responseSchema: DRILL_CHECK_SCHEMA,
+      temperature: 0.1,
+      contents: [{ role: 'user', parts: [{ text: userTurn }] }],
+      timeoutMs: 30_000,
+    });
     const elapsed = Date.now() - started;
 
-    const finish = result.response.candidates?.[0]?.finishReason;
+    const finish = result.candidates?.[0]?.finishReason;
     expect(finish).toBe('STOP');
-    const parsed = drillCheckOutputSchema.safeParse(JSON.parse(result.response.text()));
+    const parsed = drillCheckOutputSchema.safeParse(JSON.parse(result.text ?? ''));
     expect(parsed.success).toBe(true);
     if (parsed.success) {
       expect(parsed.data.coverage.length).toBeGreaterThan(0);
     }
-    console.log(`smoke ok · model ${resolveModelName('check')} · ${elapsed} ms · in ${result.response.usageMetadata?.promptTokenCount} out ${result.response.usageMetadata?.candidatesTokenCount}`);
+    console.log(`smoke ok · model ${resolveModelName('check')} · ${elapsed} ms · in ${result.usageMetadata?.promptTokenCount} out ${result.usageMetadata?.candidatesTokenCount}`);
   });
 });

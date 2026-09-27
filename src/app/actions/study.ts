@@ -3,15 +3,15 @@
 import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { gradeCardSchema, GradeCardInput } from '@/lib/schemas';
 import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import type { CardState } from '@/index';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { generateMnemonicForCard } from '@/lib/mnemonic';
+import { runBackground } from '@/lib/background';
 import { logger } from '@/lib/logger';
 import { requireOwnedDeck } from './_shared';
-import { ensureSessionHeadroom } from '@/lib/supabase/session';
+import { ensureSessionHeadroom, getRequestClient, getSessionUser } from '@/lib/supabase/session';
 
 export async function gradeCard(data: GradeCardInput) {
   const result = gradeCardSchema.safeParse(data);
@@ -19,8 +19,7 @@ export async function gradeCard(data: GradeCardInput) {
     return { error: result.error.flatten().fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
   if (!user) {
     return { error: 'You must be logged in.' };
   }
@@ -84,18 +83,16 @@ export async function gradeCard(data: GradeCardInput) {
     // Off the response path: the grade returns now, the model call runs after
     // the response is sent. The student who just lapsed a card should never
     // wait on a mnemonic for it — the next card is what they need.
-    after(() =>
-      generateMnemonicForCard(supabase, user.id, result.data.deck_id, {
+    after(() => runBackground(
+      'lapse_mnemonic',
+      () => generateMnemonicForCard(supabase, user.id, result.data.deck_id, {
         id: card.id,
         front: card.front,
         back: card.back,
         mnemonic: card.mnemonic,
-      }).catch((mnemonicError: unknown) => {
-        logger.warn('gradeCard', 'mnemonic generation skipped', {
-          error: mnemonicError instanceof Error ? mnemonicError.message : String(mnemonicError),
-        });
       }),
-    );
+      { cardId: card.id },
+    ));
   }
 
   // Deck path only. Revalidating /dashboard here fired once per graded card —

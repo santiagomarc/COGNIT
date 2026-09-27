@@ -27,7 +27,9 @@ import {
  * quiz that bypassed `requestQuit()` (F-01).
  *
  * The layout waits for exactly one thing before the frame goes out: the
- * session, which `getSessionUser` verifies locally from the cookie. The deck
+ * session, which `getSessionUser` verifies from the cookie — locally once the
+ * project signs with ES256, by an Auth round-trip while it is still HS256
+ * (plan §6.3). The deck
  * list the breadcrumb and palette need is read behind the two Suspense
  * boundaries in the header, so the rail, the header bar and the page's own
  * skeleton reach the browser on the first flush and the titles stream in

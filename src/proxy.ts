@@ -3,18 +3,36 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/lib/database.types';
 import { publicEnv } from '@/lib/env-public';
 import { verifiedClaims } from '@/lib/supabase/claims';
+import { CSP_ENFORCE, newNonce, strictCspHeaders, wantsNonce } from '@/lib/csp';
 
 // ── Protected path prefixes ──
 const PROTECTED_PATHS = ['/dashboard'];
 // ── Paths that require a session but aren't "dashboard" ──
 const SESSION_REQUIRED_PATHS = ['/login/update-password'];
 
+const SUPABASE_ORIGIN = new URL(publicEnv.NEXT_PUBLIC_SUPABASE_URL).origin;
+const DEV = process.env.NODE_ENV !== 'production';
+
 // Proxy runs BEFORE every request (renamed from middleware in Next.js 16)
 // Purpose: Refresh auth tokens, protect routes, enforce redirects
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  const csp = wantsNonce(request.nextUrl.pathname)
+    ? strictCspHeaders({ nonce: newNonce(), supabaseOrigin: SUPABASE_ORIGIN, dev: DEV, enforce: CSP_ENFORCE })
+    : null;
+
+  // Next reads the nonce from the REQUEST's CSP header and stamps it on its
+  // own scripts; the browser enforces the RESPONSE header (plan §6.2).
+  // Rebuilt after a cookie refresh so Server Components see the refreshed
+  // cookies as well.
+  const forward = () => {
+    const headers = new Headers(request.headers);
+    if (csp) headers.set('content-security-policy', csp.request);
+    const response = NextResponse.next({ request: { headers } });
+    if (csp) response.headers.set(csp.responseName, csp.response);
+    return response;
+  };
+
+  let supabaseResponse = forward();
 
   const supabase = createServerClient<Database>(
     publicEnv.NEXT_PUBLIC_SUPABASE_URL,
@@ -28,9 +46,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          supabaseResponse = forward();
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );

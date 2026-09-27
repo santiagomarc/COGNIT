@@ -15,7 +15,7 @@
  * the environment or .env.local.
  */
 import { readFileSync } from 'node:fs';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
 function loadEnvLocal() {
@@ -70,23 +70,20 @@ async function main() {
     { global: { headers: { Authorization: `Bearer ${accessToken}` } } },
   );
 
-  const genai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const genai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const embeddingModel = process.env.GEMINI_EMBEDDING_MODEL ?? 'gemini-embedding-001';
-  const model = genai.getGenerativeModel({
-    model: embeddingModel,
-  });
 
   async function topSimilarity(question) {
     // taskType MUST match the app: RETRIEVAL_QUERY for questions,
     // RETRIEVAL_DOCUMENT for cards. Mismatched task types collapse the
     // separation between the two distributions and make the floor unusable.
-    const embedding = await model.embedContent({
-      content: { role: 'user', parts: [{ text: question }] },
-      taskType: 'RETRIEVAL_QUERY',
-      outputDimensionality: 768,
+    const embedding = await genai.models.embedContent({
+      model: embeddingModel,
+      contents: [{ role: 'user', parts: [{ text: question }] }],
+      config: { taskType: 'RETRIEVAL_QUERY', outputDimensionality: 768 },
     });
 
-    const vector = embedding.embedding.values;
+    const vector = embedding.embeddings?.[0]?.values ?? [];
     const literal = `[${vector.map((v) => Number(v.toFixed(8))).join(',')}]`;
 
     const { data, error } = await supabase.rpc('search_deck_cards_by_embedding', {

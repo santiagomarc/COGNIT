@@ -17,6 +17,7 @@ import {
   type FormatRateRow,
 } from '@/lib/synthesis/insights';
 import { orderQueue } from '@/lib/synthesis/schedule';
+import { loadSynthesisInsightsRpc } from '@/lib/synthesis/insights-rpc';
 import { cardKey } from '@/lib/synthesis/prompts';
 import {
   isBand,
@@ -531,7 +532,22 @@ export type SynthesisInsights = {
   daily: DailyPoint[];
 };
 
+/**
+ * Insights for one deck: `get_synthesis_insights` first (plan §6.4) — the
+ * same readings computed in Postgres, uncapped, in one round trip — and the
+ * Node aggregation below when the RPC fails or is not deployed yet. The Node
+ * path is deleted once production decks with >= 20 attempts show the two
+ * agree.
+ */
 export async function loadSynthesisInsights(
+  supabase: SupabaseServerClient,
+  input: { deckId: string; userId: string; now?: Date },
+): Promise<SynthesisInsights> {
+  return (await loadSynthesisInsightsRpc(supabase, input)) ?? loadSynthesisInsightsNode(supabase, input);
+}
+
+/** The bounded Node aggregation: the fallback, and the RPC's parity oracle. */
+export async function loadSynthesisInsightsNode(
   supabase: SupabaseServerClient,
   input: { deckId: string; userId: string; now?: Date },
 ): Promise<SynthesisInsights> {

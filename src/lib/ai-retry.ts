@@ -11,7 +11,7 @@ export type AiFailureKind =
   | 'unavailable'       // 5xx / network — retryable
   | 'timeout'           // deadline exceeded — retryable
   | 'bad_request'       // 400 — NOT retryable (prompt/schema bug)
-  | 'unauthenticated'   // 401/403 — NOT retryable (config)
+  | 'unauthenticated'   // 401/402/403 — NOT retryable (key or billing config)
   | 'malformed_output'  // JSON.parse or schema mismatch — retry once
   | 'unknown';
 
@@ -30,11 +30,31 @@ const RETRYABLE: ReadonlySet<AiFailureKind> = new Set([
   'rate_limited', 'unavailable', 'timeout', 'malformed_output',
 ]);
 
+/**
+ * The HTTP status when the SDK error carries one — both the legacy
+ * GoogleGenerativeAIFetchError and @google/genai's ApiError do (plan §6.1).
+ */
+function statusOf(error: unknown): number | null {
+  const status = typeof error === 'object' && error !== null ? (error as { status?: unknown }).status : undefined;
+  return typeof status === 'number' ? status : null;
+}
+
 export function classifyAiError(error: unknown): AiFailureKind {
   const raw = error instanceof Error ? error.message : String(error);
   const message = raw.toLowerCase();
 
   if (error instanceof SyntaxError) return 'malformed_output';
+  // @google/genai aborts a request that passes httpOptions.timeout, and its
+  // error says neither "timeout" nor "deadline". Without this the check's
+  // `shouldRetry: kind !== 'timeout'` would retry it as `unknown`.
+  if (error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError')) return 'timeout';
+  const status = statusOf(error);
+  if (status === 429) return 'rate_limited';
+  // 402: the project's prepaid credits are spent — a billing fix, not a retry.
+  if (status === 401 || status === 402 || status === 403) return 'unauthenticated';
+  if (status === 400) return 'bad_request';
+  if (status === 408 || status === 504) return 'timeout';
+  if (status !== null && status >= 500) return 'unavailable';
   if (message.includes('429') || message.includes('quota') || message.includes('too many requests')) {
     return 'rate_limited';
   }
@@ -107,7 +127,11 @@ export async function withGeminiRetry<T>(
       lastMessage = error instanceof Error ? error.message : String(error);
 
       const isLastAttempt = attempt === maxAttempts;
-      const retryable = RETRYABLE.has(lastKind) && (options.shouldRetry?.(lastKind, attempt) ?? true);
+      // A caller that cancelled (the chat reader left) is never retried; its
+      // abort would otherwise read as a `timeout`.
+      const retryable = !options.signal?.aborted
+        && RETRYABLE.has(lastKind)
+        && (options.shouldRetry?.(lastKind, attempt) ?? true);
       if (!retryable || isLastAttempt) {
         logger.error(`ai:${options.label}`, `${lastKind} after ${attempt} attempt(s)`, { error: lastMessage });
         throw new AiServiceError(lastKind, lastMessage, attempt);

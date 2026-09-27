@@ -40,3 +40,27 @@ jobs:
       # (COGNIT_NEXT_HORIZON_PLAN.md §5.6). Budgets move down, never up, without a written reason.
       - name: Bundle budgets
         run: node scripts/bundle-report.mjs .next --budgets scripts/bundle-budgets.json
+
+  # Every migration replayed on a fresh Postgres, and the committed types
+  # compared with what that schema generates (plan §6.5). It proves ordering
+  # and syntax, not hosted permissions: the local `postgres` role may hold
+  # privileges the hosted one lacks, which production-assertions.sql covers.
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Replay every migration on a fresh database
+        run: supabase db start && supabase db reset --local
+
+      # PostgrestVersion is the server's, not the schema's: the local image
+      # and the hosted project can differ there without any drift.
+      - name: Types match the replayed schema
+        run: |
+          supabase gen types typescript --local --schema public > /tmp/types.ts
+          normalize() { sed 's/[[:space:]]*$//' "$1" | grep -v 'PostgrestVersion'; }
+          diff <(normalize src/lib/database.types.ts) <(normalize /tmp/types.ts)

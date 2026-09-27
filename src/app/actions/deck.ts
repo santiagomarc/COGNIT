@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { createDeckSchema, CreateDeckInput } from '@/lib/schemas';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { buildDeckTitleWithTag, normalizeDeckTag, removeDeckTagFromTitle } from '@/lib/deck-tags';
@@ -25,8 +25,7 @@ export async function createDeck(data: CreateDeckInput) {
     return { error: result.error.flatten().fieldErrors };
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     return { error: 'You must be logged in to create a deck.' };
@@ -69,8 +68,7 @@ export async function deleteDeck(deckId: string) {
     return { error: 'Invalid deck id.' };
   }
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     return { error: 'Unauthorized' };
@@ -110,8 +108,7 @@ export async function updateDeck(deckId: string, title: string, accentTag?: stri
 
   const persistedTitle = buildDeckTitleWithTag(normalizedTitle, normalizeDeckTag(parsed.data.accent_tag));
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
 
   if (!user) {
     return { error: 'Unauthorized' };

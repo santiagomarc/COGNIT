@@ -61,6 +61,38 @@ describe('withGeminiRetry', () => {
   });
 });
 
+describe('classifyAiError — status and abort first (plan §6.1)', () => {
+  const apiError = (status: number) => Object.assign(new Error('{"error":{"message":"…"}}'), { status });
+
+  it('reads a numeric status the way @google/genai ApiError carries it', () => {
+    expect(classifyAiError(apiError(429))).toBe('rate_limited');
+    expect(classifyAiError(apiError(403))).toBe('unauthenticated');
+    expect(classifyAiError(apiError(400))).toBe('bad_request');
+    expect(classifyAiError(apiError(504))).toBe('timeout');
+    expect(classifyAiError(apiError(503))).toBe('unavailable');
+  });
+
+  it('treats spent prepaid credits (402) as a non-retryable config failure', () => {
+    expect(classifyAiError(apiError(402))).toBe('unauthenticated');
+  });
+
+  it('treats an aborted request as a timeout, so the check still does not retry it', () => {
+    const abort = Object.assign(new Error('This operation was aborted'), { name: 'AbortError' });
+    expect(classifyAiError(abort)).toBe('timeout');
+  });
+
+  it('never retries once the caller has cancelled', async () => {
+    const controller = new AbortController();
+    const op = vi.fn(async () => {
+      controller.abort();
+      throw Object.assign(new Error('This operation was aborted'), { name: 'AbortError' });
+    });
+    await expect(withGeminiRetry(op, { label: 't', maxAttempts: 3, signal: controller.signal }))
+      .rejects.toMatchObject({ kind: 'timeout', attempts: 1 });
+    expect(op).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('guardAction', () => {
   it('converts a throw into an error result', async () => {
     const result = await guardAction('Deck chat', async () => { throw new Error('429 quota'); });

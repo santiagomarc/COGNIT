@@ -1,19 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { NextResponse, type NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import type { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { chatWithDeckSchema } from '@/lib/schemas';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { createDeckChatSession } from '@/app/actions/chat';
 import {
-  getGeminiJsonModel,
-  getGeminiTextModel,
-  jsonGenerationConfig,
   recordAiUsage,
   reserveAiCall,
   sanitizeAiInputText,
 } from '@/app/actions/_shared';
 import { buildDeckChatSystemInstruction, retrieveDeckContext } from '@/lib/rag';
 import { AiServiceError, aiFailureMessage, classifyAiError, withGeminiRetry } from '@/lib/ai-retry';
+import { generateJson, streamText } from '@/lib/gemini';
 import { logger } from '@/lib/logger';
 
 /**
@@ -52,8 +51,7 @@ function sse(event: string, data: unknown) {
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
   if (!user) {
     return NextResponse.json({ error: 'You must be logged in.' }, { status: 401 });
   }
@@ -187,33 +185,29 @@ export async function POST(request: NextRequest) {
           .join('\n');
 
         // ── 3. Stream the answer ──
-        const textModel = getGeminiTextModel({ temperature: 0.4 });
-        const result = await withGeminiRetry(
-          () => textModel.generateContentStream(
-            {
-              systemInstruction: buildDeckChatSystemInstruction({
-                deckTitle,
-                contextText,
-                grounded: context.grounded,
-                nonce: randomUUID().slice(0, 8),
-              }),
-              contents: [
-                ...history.map((entry) => ({
-                  role: entry.role === 'assistant' ? 'model' : 'user',
-                  parts: [{ text: entry.content }],
-                })),
-                { role: 'user', parts: [{ text: message }] },
-              ],
-            },
-            { signal: abort.signal },
-          ),
+        const stream = await withGeminiRetry(
+          () => streamText({
+            systemInstruction: buildDeckChatSystemInstruction({
+              deckTitle,
+              contextText,
+              grounded: context.grounded,
+              nonce: randomUUID().slice(0, 8),
+            }),
+            contents: [
+              ...history.map((entry) => ({
+                role: entry.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: entry.content }],
+              })),
+              { role: 'user', parts: [{ text: message }] },
+            ],
+            temperature: 0.4,
+            signal: abort.signal,
+          }),
           { label: 'deck_chat_stream', maxAttempts: 2, signal: abort.signal },
         );
 
-        for await (const chunk of result.stream) {
+        for await (const text of stream) {
           if (abort.signal.aborted) break;
-          const text = chunk.text();
-          if (!text) continue;
           answer += text;
           send('delta', { text });
         }
@@ -376,24 +370,21 @@ async function persistTurn(
 
 /** Cheap second call. Failure is non-fatal — the answer has already streamed. */
 async function generateFollowups(question: string, answer: string, signal: AbortSignal): Promise<string[]> {
-  const model = getGeminiJsonModel({ temperature: 0.4 });
-
   const response = await withGeminiRetry(
-    () => model.generateContent(
-      {
-        systemInstruction: [
-          'Given a study question and its answer, propose up to 3 short follow-up questions the learner could ask next.',
-          'Under 12 words each. Return JSON: {"suggestions":[...]}',
-        ].join('\n'),
-        generationConfig: jsonGenerationConfig({ temperature: 0.4, maxOutputTokens: 256 }),
-        contents: [{ role: 'user', parts: [{ text: `Q: ${question}\nA: ${answer}` }] }],
-      },
-      { signal },
-    ),
+    () => generateJson({
+      systemInstruction: [
+        'Given a study question and its answer, propose up to 3 short follow-up questions the learner could ask next.',
+        'Under 12 words each. Return JSON: {"suggestions":[...]}',
+      ].join('\n'),
+      temperature: 0.4,
+      maxOutputTokens: 256,
+      contents: [{ role: 'user', parts: [{ text: `Q: ${question}\nA: ${answer}` }] }],
+      signal,
+    }),
     { label: 'deck_chat_followups', maxAttempts: 1, signal },
   );
 
-  const parsed = JSON.parse(response.response.text()) as { suggestions?: unknown };
+  const parsed = JSON.parse(response.text ?? '') as { suggestions?: unknown };
   return Array.isArray(parsed.suggestions)
     ? parsed.suggestions.filter((s): s is string => typeof s === 'string').slice(0, 3)
     : [];

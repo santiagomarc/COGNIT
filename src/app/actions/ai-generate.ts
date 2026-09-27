@@ -1,19 +1,20 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { generateCardsSchema } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
-import { SchemaType, type Schema } from '@google/generative-ai';
+import { Type, type Schema } from '@/lib/gemini';
 import { PDFParse } from 'pdf-parse';
 import { randomUUID } from 'node:crypto';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import {
-  getGeminiJsonModel, jsonGenerationConfig, normalizeWhitespace,
+  normalizeWhitespace,
   recordAiUsage, reserveAiCall, sanitizeAiInputText, touchDeckUpdatedAt,
 } from './_shared';
 import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
 import { withGeminiRetry } from '@/lib/ai-retry';
+import { generateJson } from '@/lib/gemini';
 import { assessPdfQuality, chunkDocumentText, describePdfQuality } from '@/lib/pdf-chunking';
 import {
   normalizeFrontKey, parseAndRankGeneratedCards, pickBalancedCards,
@@ -89,8 +90,7 @@ function sanitizePdfText(rawText: string) {
 export async function generateCards(formData: FormData) {
   return guardAction('Card generation', async () => {
     // ── 1. Auth ──
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
     if (!user) {
       return { error: 'You must be logged in.' };
     }
@@ -218,26 +218,25 @@ export async function generateCards(formData: FormData) {
     ].join('\n');
 
     const responseSchema: Schema = {
-      type: SchemaType.OBJECT,
+      type: Type.OBJECT,
       required: ['cards'],
       properties: {
         cards: {
-          type: SchemaType.ARRAY,
-          minItems: 1,
-          maxItems: PDF_CARD_GENERATION_MAX_COUNT,
+          type: Type.ARRAY,
+          minItems: '1',
+          maxItems: String(PDF_CARD_GENERATION_MAX_COUNT),
           items: {
-            type: SchemaType.OBJECT,
+            type: Type.OBJECT,
             required: ['front', 'back'],
-            // See the note in ai-enrich.ts: propertyOrdering is a real Gemini
-            // field that @google/generative-ai 0.24 has not typed yet.
-            ...({ propertyOrdering: ['front', 'back'] } as object),
+            // A fixed emission order, as in ai-enrich.ts.
+            propertyOrdering: ['front', 'back'],
             properties: {
               front: {
-                type: SchemaType.STRING,
+                type: Type.STRING,
                 description: `The term. 1-${TERM_MAX_WORDS} words. Never a question or a full sentence.`,
               },
               back: {
-                type: SchemaType.STRING,
+                type: Type.STRING,
                 description: 'A factual 1-3 sentence definition drawn only from the provided text.',
               },
             },
@@ -250,8 +249,6 @@ export async function generateCards(formData: FormData) {
     const usedFrontKeys = new Set<string>();
     const allCandidates: CandidateCard[] = [];
     let failedChunks = 0;
-
-    const model = getGeminiJsonModel();
 
     // Ask each chunk for a little more than its even share so the global
     // ranking below has a real pool to choose from.
@@ -266,9 +263,9 @@ export async function generateCards(formData: FormData) {
     const requestChunk = async (chunk: (typeof chunks)[number], knownTerms: string[]) => {
       const result = await withGeminiRetry(
         () =>
-          model.generateContent({
+          generateJson({
             systemInstruction: systemPrompt,
-            generationConfig: jsonGenerationConfig({ responseSchema }),
+            responseSchema,
             contents: [
               {
                 role: 'user',
@@ -294,7 +291,7 @@ export async function generateCards(formData: FormData) {
         { label: `generate_cards_chunk_${chunk.index}`, maxAttempts: 2 },
       );
 
-      const json = JSON.parse(result.response.text()) as { cards?: unknown };
+      const json = JSON.parse(result.text ?? '') as { cards?: unknown };
       if (!Array.isArray(json.cards)) {
         throw new Error('Model returned no cards array.');
       }

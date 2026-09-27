@@ -4489,7 +4489,16 @@ A `failed` share above a few percent is a timeout budget (LC-01) or a model regr
 | Insights RPC | three decks with ≥ 20 attempts: RPC vs Node aggregation | equal |
 | Drift | CI `database` job | replay green; types diff empty |
 | Load | k6 against preview | thresholds met; no PostgREST pool exhaustion |
-| Background | the §6.6 query | `failed` < 2 % of background runs |
+| Background | Vercel logs, `scope:background` by `task`, `background` | `failed` < 2 % of background runs |
+
+**Implementation notes (2026-09-27, branch `feat/phase-3`).** Where the build departs from the sections above:
+
+- **§6.1** The adapter is `src/lib/gemini.ts` (the flat `src/lib` layout), and it keeps the existing dialect rules (`jsonGenerationConfig`, the 3.x temperature pin, `GEMINI_MODEL_FAMILY`) rather than taking a `family` argument. The SDK's own retry stays off, so `withGeminiRetry` is the only retry layer. `streamText` resolves once the stream has opened, so a 429 on the opening request is retried: as a bare async generator the request would not start until the caller's first iteration, outside the retry. `@google/genai` types `minItems`/`maxItems` as strings, so every schema now passes `'3'` and not `3`. `classifyAiError` also maps **402** (spent prepaid credits) to `unauthenticated`, and `withGeminiRetry` never retries once the caller's signal has aborted. The migration landed as one change, not eight PRs. It still needs the live gate. Not done: evaluating `ThinkingLevel.MINIMAL` (step 8).
+- **§6.2** As written. Verified on `next start`: report-only gives 15/15 on `/s/<token>` with the baseline still enforced, and `CSP_ENFORCE=true` gives one enforced strict policy with 15/15.
+- **§6.3** AUTH-04: every identity-only `getUser()` now calls `getSessionUser()`. The two that remain are `updatePassword` (the authoritative check before a password change) and the proxy's fallback for tokens without the `email_verified` flag. AUTH-03 (the custom claim hook) is not done because it is optional.
+- **§6.4** The migration is `202609270900_synthesis_insights_rpc.sql`: the next free timestamp, not a future-dated one. It also revokes EXECUTE from `anon`, because Supabase's default privileges grant anon EXECUTE directly (§4.5). The one-off parity script waits for production decks with at least 20 attempts. PERF-04 is not built because nothing has measured the need.
+- **§6.5** The CI types diff ignores the `PostgrestVersion` line, since the local image and the hosted project may differ there. The live-AI workflow runs only when the repository variable `LIVE_AI_ENABLED` is `'true'`.
+- **§6.6** Background outcomes are structured log lines (`runBackground`, `src/lib/background.ts`), not `ai_usage_logs` metadata. A completed call under a reservation writes no row of its own, and extra rows would count against the user's AI limits.
 
 ---
 

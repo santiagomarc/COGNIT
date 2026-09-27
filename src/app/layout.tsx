@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/MotionProvider";
 import { Toaster } from "sonner";
+import { THEME_BOOTSTRAP } from "@/lib/theme-script";
 import "./globals.css";
 
 /*
@@ -86,17 +87,8 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
     >
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            /*
-             * Runs before first paint to prevent a theme flash (F-10).
-             * An explicit stored choice always wins; with no stored value we
-             * follow the OS, because light is a first-class theme now and a
-             * light-OS visitor was previously shown the wrong one.
-             */
-            __html: `(function(){try{var t=localStorage.getItem('cognit-theme');var d=t==='dark'||(t!=='light'&&!window.matchMedia('(prefers-color-scheme: light)').matches);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){document.documentElement.classList.add('dark')}})()`,
-          }}
-        />
+        {/* Allowed by hash in the CSP: see src/lib/theme-script.ts. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
       </head>
       <body
         className="antialiased relative min-h-screen bg-background"

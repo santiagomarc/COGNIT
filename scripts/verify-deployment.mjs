@@ -62,6 +62,8 @@ const RPCS = {
   get_concept_graph:          { p_deck_id: DECK, p_max_nodes: 1 },
   set_deck_listing:           { p_deck_id: DECK, p_listed: false },
   list_public_decks:          { p_limit: 1 },
+  // Phase 3 (202609270900). anon's EXECUTE is revoked, so expect "guarded".
+  get_synthesis_insights:     { p_deck_id: DECK },
 };
 
 let missing = 0;

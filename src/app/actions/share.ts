@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { requireOwnedDeck } from './_shared';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { guardAction } from '@/lib/action-guard';
@@ -54,8 +54,7 @@ export async function cloneSharedDeck(shareToken: string) {
       return { error: 'That share link is not valid.' };
     }
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
     if (!user) {
       return { error: 'Sign in to save this deck to your library.' };
     }

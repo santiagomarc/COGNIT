@@ -17,7 +17,8 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: async () => { throw new 
  */
 describe.skipIf(!hasKey)('live generation — drills and plan questions clear their own keys', () => {
   it('generates a drill whose exemplar is sound against its key', async () => {
-    const { getGeminiJsonModel, jsonGenerationConfig, resolveModelName, sanitizeAiInputText } = await import('@/app/actions/_shared');
+    const { sanitizeAiInputText } = await import('@/app/actions/_shared');
+    const { generateJson } = await import('@/lib/gemini');
     const { buildCheckUserTurn, buildDrillCheckInstruction, buildDrillGenerationInstruction, renderClusterCards, stemFor, validateDrillDraft } = await import('@/lib/synthesis/prompts');
     const { DRILL_CHECK_SCHEMA, DRILL_GENERATION_SCHEMA, drillCheckOutputSchema, drillGenerationOutputSchema } = await import('@/lib/synthesis/schemas');
     const { renderResponseForModel } = await import('@/lib/synthesis/text');
@@ -28,16 +29,15 @@ describe.skipIf(!hasKey)('live generation — drills and plan questions clear th
     };
     const cluster: ClusterCard[] = set.clusters.sched.cards.map((card) => ({ id: card.id, term: card.term, definition: card.definition, explanation: card.explanation, tags: ['scheduling'] }));
 
-    const generator = getGeminiJsonModel({ temperature: 0.6, purpose: 'generation' });
-    const generated = await generator.generateContent(
-      {
-        systemInstruction: buildDrillGenerationInstruction('causal', { stem: stemFor('causal', 1) }),
-        generationConfig: jsonGenerationConfig({ responseSchema: DRILL_GENERATION_SCHEMA, temperature: 0.6, model: resolveModelName('generation') }),
-        contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster)}` }] }],
-      },
-      { timeout: 60_000 },
-    );
-    const draft = drillGenerationOutputSchema.parse(JSON.parse(generated.response.text()));
+    const generated = await generateJson({
+      purpose: 'generation',
+      systemInstruction: buildDrillGenerationInstruction('causal', { stem: stemFor('causal', 1) }),
+      responseSchema: DRILL_GENERATION_SCHEMA,
+      temperature: 0.6,
+      contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster)}` }] }],
+      timeoutMs: 60_000,
+    });
+    const draft = drillGenerationOutputSchema.parse(JSON.parse(generated.text ?? ''));
     const validation = validateDrillDraft(draft, cluster);
     console.log(`drill · ${validation.ok ? 'valid' : validation.reason} · links ${draft.required_links.length} · variants ${draft.prompt_variants.length} · bloom ${draft.bloom}\n  prompt: ${draft.prompt_text}\n  key: ${draft.required_links.map((link) => `[${link.kind}${link.core ? ',core' : ''}] ${link.text}`).join(' | ')}`);
     expect(validation.ok).toBe(true);
@@ -50,19 +50,17 @@ describe.skipIf(!hasKey)('live generation — drills and plan questions clear th
     const anchors: AnchorCard[] = cluster.map((card, index) => ({ id: card.id, key: `c${index + 1}`, term: card.term, definition: card.definition, explanation: card.explanation, state: 'review' }));
     const nonce = 'gen00001';
     const renderedAnswer = sanitizeAiInputText(renderResponseForModel('outline', validation.drill.exemplar), 1_500);
-    const checker = getGeminiJsonModel({ temperature: 0.1 });
-    const checked = await checker.generateContent(
-      {
-        systemInstruction: buildDrillCheckInstruction(nonce),
-        generationConfig: jsonGenerationConfig({ responseSchema: DRILL_CHECK_SCHEMA, temperature: 0.1 }),
-        contents: [{ role: 'user', parts: [{ text: buildCheckUserTurn({
+    const checked = await generateJson({
+      systemInstruction: buildDrillCheckInstruction(nonce),
+      responseSchema: DRILL_CHECK_SCHEMA,
+      temperature: 0.1,
+      contents: [{ role: 'user', parts: [{ text: buildCheckUserTurn({
           format: validation.drill.format, promptText: validation.drill.promptText, scenario: validation.drill.scenario, anchors,
           requiredLinks: validation.drill.requiredLinks, exemplar: validation.drill.exemplar, mode: 'outline', renderedAnswer, nonce,
         }) }] }],
-      },
-      { timeout: 60_000 },
-    );
-    const output = drillCheckOutputSchema.parse(JSON.parse(checked.response.text()));
+      timeoutMs: 60_000,
+    });
+    const output = drillCheckOutputSchema.parse(JSON.parse(checked.text ?? ''));
     const reconciled = reconcileDiagnostic(output, { requiredLinks: validation.drill.requiredLinks, anchors, answerText: renderedAnswer });
     const verdict = computeVerdict(reconciled, validation.drill.requiredLinks);
     console.log(`  exemplar verdict: ${verdict} · ${reconciled.coverage.map((entry) => `${entry.linkId}:${entry.status}`).join(' ')} · demoted ${reconciled.demotedCovered}`);
@@ -71,7 +69,8 @@ describe.skipIf(!hasKey)('live generation — drills and plan questions clear th
   });
 
   it('generates a plan question whose exemplar plan bands secure or strong against its key', async () => {
-    const { getGeminiJsonModel, jsonGenerationConfig, resolveModelName, sanitizeAiInputText } = await import('@/app/actions/_shared');
+    const { sanitizeAiInputText } = await import('@/app/actions/_shared');
+    const { generateJson } = await import('@/lib/gemini');
     const { buildCheckUserTurn, buildDrillCheckInstruction, buildPlanGenerationInstruction, renderClusterCards, validatePlanDraft } = await import('@/lib/synthesis/prompts');
     const { DRILL_CHECK_SCHEMA, PLAN_GENERATION_SCHEMA, drillCheckOutputSchema, planGenerationOutputSchema } = await import('@/lib/synthesis/schemas');
     const { renderResponseForModel } = await import('@/lib/synthesis/text');
@@ -84,16 +83,15 @@ describe.skipIf(!hasKey)('live generation — drills and plan questions clear th
     // Six cards across the two calibration clusters: enough for a plan's 4–8.
     const cluster: ClusterCard[] = [...set.clusters.sched.cards, ...set.clusters.vm.cards].map((card) => ({ id: card.id, term: card.term, definition: card.definition, explanation: card.explanation, tags: ['os'] }));
 
-    const generator = getGeminiJsonModel({ temperature: 0.6, purpose: 'generation' });
-    const generated = await generator.generateContent(
-      {
-        systemInstruction: buildPlanGenerationInstruction(),
-        generationConfig: jsonGenerationConfig({ responseSchema: PLAN_GENERATION_SCHEMA, temperature: 0.6, model: resolveModelName('generation') }),
-        contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster)}` }] }],
-      },
-      { timeout: 60_000 },
-    );
-    const draft = planGenerationOutputSchema.parse(JSON.parse(generated.response.text()));
+    const generated = await generateJson({
+      purpose: 'generation',
+      systemInstruction: buildPlanGenerationInstruction(),
+      responseSchema: PLAN_GENERATION_SCHEMA,
+      temperature: 0.6,
+      contents: [{ role: 'user', parts: [{ text: `CARDS\n${renderClusterCards(cluster)}` }] }],
+      timeoutMs: 60_000,
+    });
+    const draft = planGenerationOutputSchema.parse(JSON.parse(generated.text ?? ''));
     const validation = validatePlanDraft(draft, cluster);
     console.log(`plan · ${validation.ok ? 'valid' : validation.reason} · links ${draft.required_links.length} · missing ${JSON.stringify(draft.missing_concepts)}\n  question: ${draft.question_text}\n  key: ${draft.required_links.map((link) => `[${link.kind}${link.core ? ',core' : ''}] ${link.text}`).join(' | ')}`);
     expect(validation.ok).toBe(true);
@@ -104,19 +102,17 @@ describe.skipIf(!hasKey)('live generation — drills and plan questions clear th
     const answer: PlanResponse = plan.planExemplar;
     const nonce = 'plan0001';
     const renderedAnswer = sanitizeAiInputText(renderResponseForModel('plan', answer), 3_500);
-    const checker = getGeminiJsonModel({ temperature: 0.1 });
-    const checked = await checker.generateContent(
-      {
-        systemInstruction: buildDrillCheckInstruction(nonce, { plan: true }),
-        generationConfig: jsonGenerationConfig({ responseSchema: DRILL_CHECK_SCHEMA, temperature: 0.1 }),
-        contents: [{ role: 'user', parts: [{ text: buildCheckUserTurn({
+    const checked = await generateJson({
+      systemInstruction: buildDrillCheckInstruction(nonce, { plan: true }),
+      responseSchema: DRILL_CHECK_SCHEMA,
+      temperature: 0.1,
+      contents: [{ role: 'user', parts: [{ text: buildCheckUserTurn({
           format: 'evaluate', promptText: plan.questionText, anchors, requiredLinks: plan.requiredLinks,
           exemplar: digestPlanExemplar(plan.planExemplar), planExemplar: plan.planExemplar, mode: 'plan', renderedAnswer, nonce,
         }) }] }],
-      },
-      { timeout: 60_000 },
-    );
-    const output = drillCheckOutputSchema.parse(JSON.parse(checked.response.text()));
+      timeoutMs: 60_000,
+    });
+    const output = drillCheckOutputSchema.parse(JSON.parse(checked.text ?? ''));
     const reconciled = reconcileDiagnostic(output, {
       requiredLinks: plan.requiredLinks, anchors, answerText: renderedAnswer,
       slots: { claim: answer.thesis.trim().length > 0, tradeoff: answer.conclusion.trim().length > 0 || answer.points.some((point) => point.limit.trim().length > 0) },

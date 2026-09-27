@@ -20,7 +20,7 @@
     "ai:retrieval": "vitest run --config vitest.live.config.ts src/test/live/retrieval-calibration.live.ts"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.24.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.89.0",
     "class-variance-authority": "^0.7.1",
