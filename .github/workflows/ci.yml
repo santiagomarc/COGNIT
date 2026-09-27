@@ -57,15 +57,27 @@ jobs:
       - name: Replay every migration on a fresh database
         run: supabase db start && supabase db reset --local
 
-      # PostgrestVersion is the server's, not the schema's: the local image
-      # and the hosted project can differ there without any drift.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # The committed file comes from the hosted project's generator, which
+      # pretty-prints; the local CLI's does not. Both are run through one
+      # pinned Prettier, then comments, blank lines and __InternalSupabase
+      # (the server's PostgrestVersion, not the schema's) are dropped, so only
+      # schema differences fail the step.
       # On a mismatch the diff goes to the run summary and to annotations
       # (the failure email and the public API show those; job logs need a
       # signed-in viewer).
       - name: Types match the replayed schema
         run: |
           supabase gen types typescript --local --schema public > /tmp/types.ts
-          normalize() { sed 's/[[:space:]]*$//' "$1" | grep -v 'PostgrestVersion'; }
+          normalize() {
+            npx -y prettier@3.6.2 --no-config --stdin-filepath types.ts < "$1" \
+              | awk '/^[[:space:]]*__InternalSupabase: \{/ { if ($0 !~ /\}/) skip = 1; next } skip { if ($0 ~ /^[[:space:]]*\}/) skip = 0; next } { print }' \
+              | grep -v -e '^[[:space:]]*//' -e '^[[:space:]]*$' \
+              | sed 's/[[:space:]]*$//'
+          }
           if diff -u <(normalize src/lib/database.types.ts) <(normalize /tmp/types.ts) > /tmp/types.diff; then
             exit 0
           fi
