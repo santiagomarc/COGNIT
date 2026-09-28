@@ -26,7 +26,10 @@ export async function proxy(request: NextRequest) {
   // cookies as well.
   const forward = () => {
     const headers = new Headers(request.headers);
-    if (csp) headers.set('content-security-policy', csp.request);
+    if (csp) {
+      headers.set('content-security-policy', csp.request);
+      headers.set('x-cognit-nonce', '1');
+    }
     const response = NextResponse.next({ request: { headers } });
     if (csp) response.headers.set(csp.responseName, csp.response);
     return response;
