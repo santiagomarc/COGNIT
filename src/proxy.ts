@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@/lib/database.types';
 import { publicEnv } from '@/lib/env-public';
 import { verifiedClaims } from '@/lib/supabase/claims';
-import { CSP_ENFORCE, newNonce, strictCspHeaders, wantsNonce } from '@/lib/csp';
+import { CSP_ENFORCE, newNonce, nonceRouteCsp, wantsNonce } from '@/lib/csp';
 
 // ── Protected path prefixes ──
 const PROTECTED_PATHS = ['/dashboard'];
@@ -17,26 +17,19 @@ const DEV = process.env.NODE_ENV !== 'production';
 // Purpose: Refresh auth tokens, protect routes, enforce redirects
 export async function proxy(request: NextRequest) {
   const csp = wantsNonce(request.nextUrl.pathname)
-    ? strictCspHeaders({ nonce: newNonce(), supabaseOrigin: SUPABASE_ORIGIN, dev: DEV, enforce: CSP_ENFORCE })
+    ? nonceRouteCsp({ nonce: newNonce(), supabaseOrigin: SUPABASE_ORIGIN, dev: DEV, enforce: CSP_ENFORCE })
     : null;
 
   // Next reads the nonce from the REQUEST's CSP header and stamps it on its
-  // own scripts; the browser enforces the RESPONSE header (plan §6.2).
-  // Rebuilt after a cookie refresh so Server Components see the refreshed
-  // cookies as well.
+  // own scripts; the browser enforces the RESPONSE headers. Both carry the
+  // same policies, because the response's are copied onto the request anyway
+  // (plan §6.2, src/lib/csp.ts). Rebuilt after a cookie refresh so Server
+  // Components see the refreshed cookies as well.
   const forward = () => {
     const headers = new Headers(request.headers);
-    if (csp) {
-      headers.set('content-security-policy', csp.request);
-      headers.set('x-cognit-nonce', '1');
-    }
+    if (csp) for (const [name, value] of Object.entries(csp)) headers.set(name, value);
     const response = NextResponse.next({ request: { headers } });
-    if (csp) response.headers.set(csp.responseName, csp.response);
-    // TEMPORARY probe variant: an enforcing response CSP whose nonce differs
-    // from the request's, to see which one the render receives.
-    if (request.nextUrl.pathname === '/s/csp-probe/enf') {
-      response.headers.set('Content-Security-Policy', "script-src 'self' 'nonce-RESPONSECOPY'");
-    }
+    if (csp) for (const [name, value] of Object.entries(csp)) response.headers.set(name, value);
     return response;
   };
 

@@ -16,7 +16,9 @@ const html = await response.text();
 const policies = [...response.headers.entries()].filter(([name]) => name.startsWith('content-security-policy'));
 for (const [name, value] of policies) console.log(`${name}: ${value.slice(0, 110)}…`);
 
-const strict = policies.map(([, value]) => value).find((value) => value.includes("'nonce-"));
+// The strict policy is the one with 'strict-dynamic'; during the report-only
+// week the enforced bridge policy carries the same nonce (src/lib/csp.ts).
+const strict = policies.map(([, value]) => value).find((value) => value.includes("'strict-dynamic'"));
 if (!strict) {
   console.error(`No nonce policy on ${url} (status ${response.status}).`);
   process.exit(1);

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { buildBaselineCsp, NON_NONCE_ROUTES_SOURCE } from "./src/lib/csp";
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -31,41 +32,21 @@ const nextConfig: NextConfig = {
     staleTimes: { dynamic: 30 },
   },
   async headers() {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://*.supabase.co';
-    let supabaseHost = '';
+    let supabaseOrigin = 'https://*.supabase.co';
     try {
-      supabaseHost = new URL(supabaseUrl).origin;
+      supabaseOrigin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').origin;
     } catch {
-      supabaseHost = 'https://*.supabase.co';
+      // keep the wildcard
     }
-
-    // 'unsafe-eval' is required by the Turbopack dev runtime and React Refresh.
-    // A production build needs neither, so it is scoped to development rather
-    // than shipped to users.
-    const isDev = process.env.NODE_ENV !== 'production';
-    const scriptSrc = isDev
-      ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
-      : "script-src 'self' 'unsafe-inline'";
-
-    const cspHeader = [
-      "default-src 'self'",
-      scriptSrc,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com data:",
-      "img-src 'self' data: blob: https:",
-      `connect-src 'self' ${supabaseHost} https://*.supabase.co wss://*.supabase.co`,
-      "frame-ancestors 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-      "object-src 'none'",
-    ].join('; ');
+    const baseline = buildBaselineCsp({ supabaseOrigin, dev: process.env.NODE_ENV !== 'production' });
 
     return [
       {
-        // TEMPORARY: the CSP probe paths are left out to see what reaches the
-        // render without this header.
-        source: '/:path((?!s/csp-probe).*)',
-        headers: [{ key: 'Content-Security-Policy', value: cspHeader }],
+        // Not on the nonce routes: there the proxy sets the only CSP. On
+        // Vercel this header is also copied onto the request Next renders
+        // from, over the proxy's, and would hide the nonce (src/lib/csp.ts).
+        source: NON_NONCE_ROUTES_SOURCE,
+        headers: [{ key: 'Content-Security-Policy', value: baseline }],
       },
       {
         source: '/:path*',
