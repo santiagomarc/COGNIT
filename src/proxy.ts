@@ -32,6 +32,11 @@ export async function proxy(request: NextRequest) {
     }
     const response = NextResponse.next({ request: { headers } });
     if (csp) response.headers.set(csp.responseName, csp.response);
+    // TEMPORARY probe variant: an enforcing response CSP whose nonce differs
+    // from the request's, to see which one the render receives.
+    if (request.nextUrl.pathname === '/s/csp-probe/enf') {
+      response.headers.set('Content-Security-Policy', "script-src 'self' 'nonce-RESPONSECOPY'");
+    }
     return response;
   };
 

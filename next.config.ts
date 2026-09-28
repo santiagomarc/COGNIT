@@ -62,9 +62,14 @@ const nextConfig: NextConfig = {
 
     return [
       {
+        // TEMPORARY: the CSP probe paths are left out to see what reaches the
+        // render without this header.
+        source: '/:path((?!s/csp-probe).*)',
+        headers: [{ key: 'Content-Security-Policy', value: cspHeader }],
+      },
+      {
         source: '/:path*',
         headers: [
-          { key: 'Content-Security-Policy', value: cspHeader },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },

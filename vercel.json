@@ -5,5 +5,11 @@
       "path": "/api/keep-alive",
       "schedule": "0 6 * * *"
     }
+  ],
+  "headers": [
+    {
+      "source": "/s/csp-probe/vj",
+      "headers": [{ "key": "Content-Security-Policy", "value": "script-src 'self' 'unsafe-inline' 'sha256-VERCELJSON'" }]
+    }
   ]
 }
