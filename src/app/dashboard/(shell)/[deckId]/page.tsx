@@ -14,7 +14,7 @@ import { QuestionBank, QuestionBankSkeleton } from '@/components/ui/shared/synth
 import { ExamDateControl } from '@/components/ui/shared/synthesis/ExamDateControl';
 import { PlanLauncherRow } from '@/components/ui/shared/synthesis/PlanLauncherRow';
 import { MIN_DECK_CARDS_FOR_DRILLS } from '@/lib/synthesis/clusters';
-import { daysToExam } from '@/lib/synthesis/schedule';
+import { daysToExam, examLine } from '@/lib/synthesis/schedule';
 import { QuizHistorySection, QuizHistorySkeleton } from '@/components/ui/shared/QuizHistorySection';
 import { WeakestConcepts, WeakestConceptsSkeleton } from '@/components/ui/shared/WeakestConcepts';
 import { ExportDeckMenu } from '@/components/ui/shared/ExportDeckMenu';
@@ -128,14 +128,6 @@ function formatNextReview(nextReviewAt: string | null): { label: string; state: 
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
-
-/** Overview's exam line (UX-01): the countdown in words, no hue (design system §2.2e). */
-function examLine(days: number | null): string {
-  if (days === null) return 'No exam date';
-  if (days < 0) return 'Exam passed';
-  if (days === 0) return 'Exam today';
-  return `Exam in ${days} ${days === 1 ? 'day' : 'days'}`;
-}
 
 const EMPTY_READINGS: SynthesisReadings = { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null, plans: { active: 0, due: 0 } };
 

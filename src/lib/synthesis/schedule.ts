@@ -48,6 +48,18 @@ export function daysToExam(examAt: string | null | undefined, now: Date): number
   const remaining = at - now.getTime();
   return remaining < 0 ? -1 : Math.floor(remaining / (24 * 60 * 60_000));
 }
+
+/**
+ * The exam countdown in words, from `daysToExam` (UX-01). Time is not memory
+ * (design system §2.2e): callers render this in ink, never in a state hue.
+ * Shared by the deck page's Overview and the Drills page (sidebar plan §4.2).
+ */
+export function examLine(days: number | null): string {
+  if (days === null) return 'No exam date';
+  if (days < 0) return 'Exam passed';
+  if (days === 0) return 'Exam today';
+  return `Exam in ${days} ${days === 1 ? 'day' : 'days'}`;
+}
 export const MAX_STEP: Step = 2;
 export const PARTIAL_RETRY_HOURS = 24;
 export const CONTRADICTED_RETRY_HOURS = 12;

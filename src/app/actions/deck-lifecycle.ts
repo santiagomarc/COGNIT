@@ -11,6 +11,10 @@ import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
  * duplicate, merge, and directory listing. Every write is one SECURITY
  * INVOKER RPC (202609240900–0930); these actions validate, call it once and
  * revalidate.
+ *
+ * They revalidate the /dashboard LAYOUT, not just the page: the shell reads
+ * deck, trash and shared counts (COGNIT_SIDEBAR_SETTINGS_PLAN.md §4.6), and a
+ * page-only revalidation would leave those stale on every other route.
  */
 
 const deckId = z.uuid();
@@ -36,7 +40,7 @@ export async function trashDeck(id: string) {
     const { data, error } = await session.supabase.rpc('trash_deck', { p_deck_id: parsed.data });
     if (error) return { error: sanitizeDatabaseError(error, 'Failed to delete the deck.') };
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard', 'layout');
     return { success: true as const, deletedAt: data };
   });
 }
@@ -51,7 +55,7 @@ export async function restoreDeck(id: string) {
     const { error } = await session.supabase.rpc('restore_deck', { p_deck_id: parsed.data });
     if (error) return { error: sanitizeDatabaseError(error, 'Failed to restore the deck.') };
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard', 'layout');
     revalidatePath(`/dashboard/${parsed.data}`);
     return { success: true as const };
   });
@@ -87,6 +91,7 @@ export async function purgeDeck(id: string) {
 
     const { error } = await session.supabase.rpc('purge_deck', { p_deck_id: parsed.data });
     if (error) return { error: sanitizeDatabaseError(error, 'Failed to delete the deck.') };
+    revalidatePath('/dashboard', 'layout');
     return { success: true as const };
   });
 }
@@ -105,7 +110,7 @@ export async function duplicateDeck(input: z.input<typeof duplicateSchema>) {
     });
     if (error || !newDeckId) return { error: sanitizeDatabaseError(error, 'Failed to duplicate the deck.') };
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard', 'layout');
     return { success: true as const, deckId: newDeckId };
   });
 }
@@ -123,7 +128,7 @@ export async function mergeDecks(input: z.input<typeof mergeSchema>) {
     });
     if (error) return { error: sanitizeDatabaseError(error, 'Failed to merge the decks.') };
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard', 'layout');
     revalidatePath(`/dashboard/${parsed.data.target_id}`);
     return { success: true as const, movedCards: Number(moved ?? 0) };
   });
@@ -143,6 +148,7 @@ export async function setDeckListing(input: z.input<typeof listingSchema>) {
     if (error) return { error: sanitizeDatabaseError(error, 'Failed to update the listing.') };
 
     revalidatePath(`/dashboard/${parsed.data.deck_id}`);
+    revalidatePath('/dashboard', 'layout');
     revalidatePath('/explore');
     return { success: true as const, listedAt: data ?? null };
   });

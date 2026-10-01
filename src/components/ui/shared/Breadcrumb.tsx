@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { dashboardLocation } from '@/lib/sidebar-nav';
+
 type BreadcrumbProps = {
   /**
    * Titles already stripped of their `[tag]` prefix by the caller. Null while
@@ -25,13 +27,17 @@ type BreadcrumbProps = {
  */
 export function Breadcrumb({ decks }: BreadcrumbProps) {
   const pathname = usePathname();
-  const segment = pathname.match(/^\/dashboard\/([^/]+)/)?.[1];
-  // Named chromed routes sit beside the deck ids; a UUID is a deck.
-  const isStats = segment === 'stats';
-  const deckId = segment && !isStats ? segment : undefined;
+  /*
+   * Named chromed routes (Statistics, Drills, Shared, Trash, Settings) sit
+   * beside the deck ids. The map lives in sidebar-nav.ts, so a new route is
+   * named in one place; testing for `stats` alone here read /dashboard/drills
+   * as a deck called "Deck" (sidebar plan §4.2).
+   */
+  const location = dashboardLocation(pathname);
+  const deckId = location.kind === 'deck' ? location.deckId : undefined;
   const deck = deckId && decks ? decks.find((entry) => entry.id === deckId) : undefined;
-  const trailLabel = isStats ? 'Statistics' : deck?.title ?? 'Deck';
-  const hasTrail = Boolean(deckId) || isStats;
+  const trailLabel = location.kind === 'named' ? location.label : deck?.title ?? 'Deck';
+  const hasTrail = location.kind === 'named' || location.kind === 'deck';
   const trailPending = Boolean(deckId) && decks === null;
 
   return (

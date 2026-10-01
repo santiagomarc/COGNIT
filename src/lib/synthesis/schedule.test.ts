@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LADDER_DAYS, PLAN_LADDER_DAYS, daysToExam, ladderFor, nextSchedule, orderQueue, pickCapstoneDrill } from './schedule';
+import { LADDER_DAYS, PLAN_LADDER_DAYS, daysToExam, examLine, ladderFor, nextSchedule, orderQueue, pickCapstoneDrill } from './schedule';
 import type { SynthesisDrill } from './types';
 
 const NOW = new Date('2026-09-12T12:00:00Z');
@@ -279,5 +279,23 @@ describe('pickCapstoneDrill', () => {
     const picked = pickCapstoneDrill({ drills: candidates, gradeLog: [good('x'), good('y')], now: NOW });
     expect(picked?.id).toBe('lean');
     expect(picked?.promptText).toBe('p');
+  });
+});
+
+describe('examLine', () => {
+  it('names no date and a passed exam', () => {
+    expect(examLine(null)).toBe('No exam date');
+    expect(examLine(-1)).toBe('Exam passed');
+  });
+
+  it('counts calendar days, singular and plural', () => {
+    expect(examLine(0)).toBe('Exam today');
+    expect(examLine(1)).toBe('Exam in 1 day');
+    expect(examLine(12)).toBe('Exam in 12 days');
+  });
+
+  it('reads daysToExam as the deck page always has', () => {
+    const tomorrowNight = new Date(NOW.getTime() + 30 * HOUR).toISOString();
+    expect(examLine(daysToExam(tomorrowNight, NOW))).toBe('Exam in 1 day');
   });
 });

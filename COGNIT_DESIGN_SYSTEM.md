@@ -1,9 +1,11 @@
 # Cognit — Design System
 
 **Codename:** Obsidian Telemetry
-**Status:** Approved 2026-09-10 · Rev. D (2026-09-26: synthesis on the state channel, errors, time is not memory, readout steps, `--z-grain` — COGNIT_NEXT_HORIZON_PLAN.md §5.4) · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`)
+**Status:** Approved 2026-09-10 · Rev. D (2026-09-26: synthesis on the state channel, errors, time is not memory, readout steps, `--z-grain` — COGNIT_NEXT_HORIZON_PLAN.md §5.4) · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`) · Rev. E (2026-10: sidebar navigation, settings controls, planes on management screens — COGNIT_SIDEBAR_SETTINGS_PLAN.md)
 **Applies to:** Next.js 16 (App Router) · React 19 · Tailwind v4 (CSS-first) · Framer Motion 12
 
+> **Changelog (Rev. E):** The 48 px rail becomes a 256 px sidebar that collapses to the rail and becomes a drawer on phones (§8, §7.11). Adds settings controls (§7.12). Scopes "exactly one `.raised`" to screens with a primary object (§1b). Adds three CSS marks and a minus sign to §6. The sidebar ships in Phase 3 of COGNIT_SIDEBAR_SETTINGS_PLAN.md; until then the 48 px rail of Rev. D is what runs.
+>
 > **Changelog (Rev. C):** Added the plane system — `.raised`, `.well` and the recessed `--elevate-inset` step — plus the monochromatic ambient field, gradient-masked rules, and display-type utilities that finally consume the type tokens. Scoped the anti-pattern ban on orbs and grain to *chromatic* decoration. Recorded the state channel's measured CVD separation. Source: `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`.
 >
 > **Changelog (Rev. B):** Refined 5-step radius scale, 3-step elevation scale, widened Instrument Serif to display headings ≥24px, added `.panel` for sparse surfaces, confirmed unfilled bracketed card canvas, and adjusted button primary budget.
@@ -48,6 +50,8 @@ On dense operational screens (dashboard, tables), structure is carried by 1px ru
 The system has five planes and a screen should use three of them. Exactly one object per screen is `.raised` — the thing the screen is *for*. Content that is contained but subordinate goes *below* the surface in a `.well`. Everything else stays flat. Behind all of it, a monochromatic ambient field.
 
 This is the correction Rev. C exists for: the palette was never the problem. Every container on every screen sat on `--surface` with `--elevate-flat`, so six blocks on the deck page read at identical weight and nothing was primary. A screen that reads flat is almost always a screen spending one step of a three-step ladder — reach for the plane, not for a hue.
+
+> *Rev. E.* "Exactly one `.raised`" applies to screens that have a primary object: Today's due band, the study card, the Drills launcher. Management screens (Settings, Shared, Trash) are lists of equal controls and have **no** `.raised`. They use rules and, where content is contained, a `.well`.
 
 **2. Colour is a state channel, not decoration.**
 The accent is white (dark theme) / near-black (light theme). Hue is reserved *exclusively* for SM-2
@@ -387,9 +391,11 @@ Every animation must be disabled under `prefers-reduced-motion: reduce`. The exi
 
 - **Functional or absent.** If a label is clearer than a glyph, ship the label.
 - Stroke `1.5`, size `15px` in the rail / `16px` inline. Lucide is fine as a source.
-- Permitted: arrows, chevrons, search, settings, plus, close, pause, play, check, alert.
+- Permitted: arrows, chevrons, search, settings, plus, minus (steppers, Rev. E), close, pause, play, check, alert.
 - Banned: sparkles, brains, robots, wands, rockets, trophies, flames, lightbulbs, orbs.
 - **A number is a better badge than an icon.** "31 due" beats a flame glyph.
+
+*CSS marks (Rev. E).* Where §6 has no glyph for a destination, the mark is a miniature of the page it opens, drawn in CSS at 15 × 15 in `currentColor`, as the deck-index mark always was. **Today:** three rules (the index). **Statistics:** three bars. **Drills:** two ring nodes joined by an edge (the concept map). **Explore:** a 2 × 2 grid (the directory). **Trash:** an open bin outline. **Shared:** Lucide `arrow-up-right`. **Settings:** Lucide `settings`. Nothing else joins without a Rev.
 
 ---
 
@@ -759,6 +765,30 @@ light ground it means the periphery recedes. Same role, opposite implementation 
 and a z-index above it. Never give `.amb` a negative z-index: that puts it behind the `body`
 background and it vanishes.
 
+### 7.11 Sidebar (Rev. E)
+
+> Ships in Phase 3 of COGNIT_SIDEBAR_SETTINGS_PLAN.md. Until then the 48 px rail (§8, Rev. D) is what runs.
+
+- **Geometry:** 256 px expanded, 48 px rail, drawer `min(320px, 100vw − 56px)` below 768 px. With no stored choice it is a rail at 768–1023 px and expanded from 1024 px. A choice is stored in the `cognit-sidebar` cookie and rendered by the server.
+- **Boundary:** a 1 px `--border` right rule; no fill, no shadow. The drawer uses `--surface`, a `--border-strong` right edge, `--elevate-2`, and the §7.8 scrim.
+- **Order:** wordmark · Search (control edge, ⌘K keycap) · New deck (ghost, ⌘N keycap) · *Study*: Today, Drills, Statistics · *Library*: decks, Shared, Explore (flagged), Trash · account row with the settings link.
+- **Item:** 30 px (44 px in the drawer), `--radius-control`, 13 px/500, `--ink-dimmer`. Hover: `--ink` with a `--border-strong` edge. Current: `--surface`, `--elevate`, a `--border` edge, `--ink`.
+- **Count:** mono 12 px, right-aligned, `--state-due` only when the number is due work, otherwise `--ink-dimmer`. A zero prints nothing. Never a pill or a dot.
+- **Deck row:** 28 px, a 2 px × 12 px state tick (§7.5 rule), title in `--ink-dim`, due count in mono.
+- **Group label:** the label step.
+- **Settings mode:** Back to Cognit, the heading, then sections under group labels. The current section is `aria-current="location"`.
+
+### 7.12 Settings controls (Rev. E)
+
+- **Section:** a 240 px heading column and the controls column, 48 px apart; stacked below `md`. `h2` at 16 px/600 with a 13 px `--ink-dim` description. Sections are separated by a 1 px `--border` rule. No card.
+- **Row:** at least 56 px; label 14 px, hint 12 px `--ink-dim`, control right-aligned; a 1 px rule between rows.
+- **Switch:** a 36 × 20 track. Off: a `--border-control` edge with an `--ink-dimmer` knob. On: an `--ink` track with a `--bg` knob. `role="switch"`.
+- **Segmented control** (radio group): a `--border-control` edge, 2 px inset; the selected option is `--surface-raised` and `--ink`, the others `--ink-dim`; 28 px (44 px below `md`); arrow keys move the selection.
+- **Stepper:** − and + buttons around a mono value, all inside one `--border-control` edge; 32 px (44 px below `md`).
+- **Meter:** 4 px, track `--surface-raised`, fill `--ink-dim`. `--destructive` only at a hard limit (an error, §2.2d).
+- **Destructive button:** `--destructive` text and edge, transparent fill. Never primary.
+- **Saving:** explicit Save buttons (default variant). Switches and the theme apply at once. Confirmation is a toast; errors go in a live region under the field.
+
 ---
 
 ## 8. Navigation architecture
@@ -767,13 +797,22 @@ background and it vanishes.
 (Dashboard, Sign out) — its other two slots were permanently `disabled` — and it sat at the same
 z-index as the quiz pause overlay while bypassing the quit guard (F-01, F-04).
 
-Replacement:
+Replacement (Rev. D, what runs until the Rev. E sidebar ships):
 
 | Viewport | Chrome |
 |---|---|
 | Desktop | 48px collapsible left **rail** (`--z-rail`) + telemetry header + `⌘K` |
 | Mobile | Header breadcrumb + account sheet. **No bottom bar.** |
 | `/study`, `/quiz` | **No navigation chrome at all.** The grade deck owns the bottom band. |
+
+Rev. E (COGNIT_SIDEBAR_SETTINGS_PLAN.md Phase 3) replaces it with:
+
+| Viewport | Chrome |
+|---|---|
+| ≥ 1024 px | 256 px sidebar (collapsible to the 48 px rail, persisted by cookie) + header breadcrumb |
+| 768–1023 px | 48 px rail by default (expandable, persisted) + header breadcrumb |
+| < 768 px | Header: drawer button + breadcrumb. The sidebar is a drawer. **No bottom bar.** |
+| Focus routes (study, quiz, synthesis) | **No navigation chrome at all** (unchanged) |
 
 Rules:
 - On mobile study/quiz, the grade deck **is** the bottom chrome: 64px keys inside
@@ -783,6 +822,9 @@ Rules:
   applied `pb-28` in the layout *and* again in each page: 224px of dead space (F-03).
 - The `⌘K` palette is built over the existing `SemanticSearchModal`, which already has the overlay,
   focus trap and search plumbing.
+- *Rev. E.* Search lives in the sidebar and opens the ⌘K palette; there is no header search.
+- *Rev. E.* The account menu opens beside the sidebar on desktop and inline inside the drawer on
+  phones; never a modal inside a modal.
 
 ---
 
@@ -847,3 +889,6 @@ Non-negotiable. Verify before calling any UI task done.
 11. Does the screen use three planes, and exactly one `.raised`? Three `.surface` blocks and no
     `.raised` means the hierarchy is missing (§1, §7.1).
 12. Do display sizes read the `type-display*` utilities rather than restating a value?
+13. Does every sidebar count that is not due work stay out of `--state-due`? (Rev. E)
+14. Does a new `/dashboard/<name>` route appear in `NAMED_DASHBOARD_SEGMENTS`? (Rev. E)
+15. Is every device-only preference labelled "Saved to this browser"? (Rev. E)

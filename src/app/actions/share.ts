@@ -44,6 +44,8 @@ export async function setDeckSharing(data: SetDeckSharingInput) {
     }
 
     revalidatePath(`/dashboard/${parsed.data.deck_id}`);
+    // The shell counts shared decks (sidebar plan §4.6).
+    revalidatePath('/dashboard', 'layout');
     return { success: true as const, shareToken: token ?? null };
   });
 }
@@ -76,7 +78,7 @@ export async function cloneSharedDeck(shareToken: string) {
       };
     }
 
-    revalidatePath('/dashboard');
+    revalidatePath('/dashboard', 'layout');
     return { success: true as const, deckId };
   });
 }

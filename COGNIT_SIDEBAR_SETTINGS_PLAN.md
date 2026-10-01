@@ -461,6 +461,16 @@ Once the sidebar shows counts (Phase 3), an action that changes them must re-ren
 | Export all | download both formats | the Excel, Sheets and Anki checks in §4.5 |
 | Both themes | each page | matches Rev. E; hue only on due counts |
 
+**Execution notes (2026-10-01, on `0a386ab`, uncommitted).** Automated: `tsc` clean · ESLint and contrast clean · **566 tests in 55 files** (554 + `examLine` 3, `sharing` 5, export route 4) · build ✓ with `ƒ /dashboard/drills`, `ƒ /dashboard/shared`, `ƒ /dashboard/trash`, `ƒ /api/export` · bundle budgets pass (new pages 193.5–196.6 kB gz). Signed out on `next start`: the three pages redirect to `/login?redirectTo=…` and `/api/export` returns 401. **Not yet checked:** everything signed in (no test account), Excel, Sheets and Anki. Where the repo corrected the plan:
+
+- **Breadcrumb moved up from NAV-07.** It read any segment that wasn't `stats` as a deck id, so `/dashboard/drills` showed "Decks / Deck". It now reads `dashboardLocation`, and the root label stays "Decks" until NAV-07 renames it to Today.
+- **Drills empty state.** Drills are started from a deck's **Overview** (`DeckSessionLauncher` → `SynthesisLauncher`), not its Insights tab, so the copy says Overview.
+- **Rev. E applied with a guard.** §7.11 and §8 say the sidebar ships in Phase 3, and Rev. D's rail table is kept beside Rev. E's until then, so the design system never describes chrome that isn't running.
+- **`src/components/ui/switch.tsx`** is a small native `role="switch"` button rather than Radix's Switch. SET-05 reuses it.
+- **Budgets** gained the three new pages at measured + 5 kB: drills 199, shared 202, trash 202.
+- **`purgeDeck`** had no revalidation at all; it now revalidates the layout too.
+- **Export test:** `Response.text()` strips a leading BOM, so the test reads bytes.
+
 ---
 
 ## 5. Phase 2 — Settings

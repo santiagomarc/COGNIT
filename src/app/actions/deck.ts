@@ -52,7 +52,7 @@ export async function createDeck(data: CreateDeckInput) {
     return { error: sanitizeDatabaseError(error, 'Failed to create deck.') };
   }
 
-  revalidatePath('/dashboard');
+  revalidatePath('/dashboard', 'layout');
   return { success: true, deckId: deck.id };
 }
 
@@ -91,7 +91,7 @@ export async function deleteDeck(deckId: string) {
     return { error: 'Deck not found or access denied.' };
   }
 
-  revalidatePath('/dashboard');
+  revalidatePath('/dashboard', 'layout');
   return { success: true as const };
 }
 
@@ -131,7 +131,7 @@ export async function updateDeck(deckId: string, title: string, accentTag?: stri
     return { error: 'Deck not found or access denied.' };
   }
 
-  revalidatePath('/dashboard');
+  revalidatePath('/dashboard', 'layout');
   revalidatePath(`/dashboard/${parsed.data.deck_id}`);
   return { success: true as const };
 }
