@@ -221,6 +221,33 @@ where a.created_at > now() - interval '30 days'
 group by a.mode, a.usage->>'prompt_version'
 order by attempts desc;
 
+-- 18. Account deletion reaches every row (sidebar plan §5.11, SET-10).
+--     Deleting an auth user must remove every row it owns. A row passes when
+--     on_delete = 'c' (user_id cascades from auth.users), or when
+--     cascades_from names a parent that is itself removed with the user
+--     (decks, cards, a synthesis table). Anything else keeps rows after an
+--     account is deleted and blocks SET-10 until a migration fixes it.
+select cl.relname as table_name,
+       a.attname as column_name,
+       coalesce(con.confdeltype::text, 'none') as on_delete,
+       (select string_agg(ref.relname, ', ' order by ref.relname)
+          from pg_constraint fk
+          join pg_class ref on ref.oid = fk.confrelid
+         where fk.conrelid = cl.oid
+           and fk.contype = 'f'
+           and fk.confdeltype = 'c') as cascades_from
+from pg_attribute a
+join pg_class cl on cl.oid = a.attrelid and cl.relkind = 'r'
+join pg_namespace n on n.oid = cl.relnamespace and n.nspname = 'public'
+left join pg_constraint con
+  on con.conrelid = cl.oid
+ and con.contype = 'f'
+ and a.attnum = any (con.conkey)
+ and con.confrelid = 'auth.users'::regclass
+where a.attname in ('user_id', 'reporter_id')
+  and not a.attisdropped
+order by on_delete, table_name;
+
 -- ── Query plans ────────────────────────────────────────────────────
 -- Substitute a real deck id. Expect "Index Scan using
 -- cards_embedding_hnsw_idx", NOT "Seq Scan on cards".

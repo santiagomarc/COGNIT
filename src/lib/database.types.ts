@@ -800,6 +800,33 @@ export type Database = {
           },
         ]
       }
+      user_settings: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          new_cards_per_session: number
+          session_card_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          new_cards_per_session?: number
+          session_card_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          new_cards_per_session?: number
+          session_card_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -832,6 +859,13 @@ export type Database = {
       duplicate_deck: {
         Args: { p_deck_id: string; p_keep_progress?: boolean; p_title?: string }
         Returns: string
+      }
+      get_ai_usage_summary: {
+        Args: never
+        Returns: {
+          calls_used: number
+          oldest_call_at: string
+        }[]
       }
       get_analytics_snapshot: {
         Args: { p_days?: number; p_now?: string }
@@ -897,6 +931,13 @@ export type Database = {
           misses: Json
           mode: string
           total_cards: number
+        }[]
+      }
+      get_sidebar_counts: {
+        Args: never
+        Returns: {
+          shared_count: number
+          trashed_count: number
         }[]
       }
       get_study_activity_days: {

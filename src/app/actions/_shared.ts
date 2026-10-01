@@ -2,6 +2,10 @@ import type { createClient } from '@/lib/supabase/server';
 import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import type { Json } from '@/lib/database.types';
 import { logger } from '@/lib/logger';
+import { DAILY_AI_CALL_CEILING } from '@/lib/ai-usage';
+
+// Moved to src/lib/ai-usage.ts so client components can read it (sidebar plan §5.8).
+export { DAILY_AI_CALL_CEILING };
 
 export type AiActionName =
   | 'generate_cards'
@@ -60,12 +64,6 @@ export function sanitizeAiInputText(rawText: string, maxChars = 50_000) {
   return sanitized.length > 0 ? sanitized : bounded.trim();
 }
 
-/**
- * The daily ceiling on model calls per user, across every action. Enforced
- * inside `reserve_ai_call` under the same advisory lock as the per-action
- * window, so it can neither race nor fail open.
- */
-export const DAILY_AI_CALL_CEILING = 300;
 
 type ReservationOutcome =
   | { ok: true; reservationId: string }

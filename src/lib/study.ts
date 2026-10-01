@@ -52,7 +52,12 @@ export type StudySessionCard = {
   mnemonic: string | null;
 };
 
-export function getSessionCardBounds(availableCount: number) {
+/**
+ * `preferredCount` is the account's "cards per session" (Settings → Study,
+ * sidebar plan §5.5). It moves the default only; an explicit `?count=` still
+ * wins, and both are clamped to what the deck holds.
+ */
+export function getSessionCardBounds(availableCount: number, preferredCount = DEFAULT_SESSION_CARD_COUNT) {
   const safeAvailableCount = Math.max(0, availableCount);
 
   if (safeAvailableCount === 0) {
@@ -61,15 +66,32 @@ export function getSessionCardBounds(availableCount: number) {
 
   const max = Math.min(MAX_SESSION_CARD_COUNT, safeAvailableCount);
   const min = Math.min(MIN_SESSION_CARD_COUNT, max);
-  const defaultCount = Math.min(DEFAULT_SESSION_CARD_COUNT, max);
+  const preferred = Number.isFinite(preferredCount)
+    ? Math.min(MAX_SESSION_CARD_COUNT, Math.max(MIN_SESSION_CARD_COUNT, Math.round(preferredCount)))
+    : DEFAULT_SESSION_CARD_COUNT;
+  const defaultCount = Math.min(preferred, max);
 
   return { min, max, defaultCount };
 }
 
-export function normalizeSessionCardCount(rawCount: string | string[] | undefined, availableCount = MAX_SESSION_CARD_COUNT): number {
+/**
+ * How many unseen cards a session may take. At least `perSession`, and more
+ * when fewer reviews are due than the session holds — a brand-new deck still
+ * fills its session. Extracted from the study page unchanged, with the
+ * constant made a parameter.
+ */
+export function newCardAllowance(sessionCardCount: number, scheduledCount: number, perSession = NEW_CARDS_PER_SESSION): number {
+  return Math.max(Math.max(0, perSession), sessionCardCount - scheduledCount);
+}
+
+export function normalizeSessionCardCount(
+  rawCount: string | string[] | undefined,
+  availableCount = MAX_SESSION_CARD_COUNT,
+  preferredCount = DEFAULT_SESSION_CARD_COUNT,
+): number {
   const countValue = Array.isArray(rawCount) ? rawCount[0] : rawCount;
   const parsedCount = Number.parseInt(countValue ?? '', 10);
-  const { min, max, defaultCount } = getSessionCardBounds(availableCount);
+  const { min, max, defaultCount } = getSessionCardBounds(availableCount, preferredCount);
 
   if (max === 0) {
     return 0;

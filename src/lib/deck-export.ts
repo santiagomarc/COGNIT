@@ -132,3 +132,39 @@ export function exportFilename(title: string, format: ExportFormat): string {
     .slice(0, 60);
   return `${base || 'deck'}.${format === 'anki' ? 'anki.txt' : 'csv'}`;
 }
+
+/* ── Every deck in one file (sidebar plan §4.5, DST-04) ───────────── */
+
+/** The CSV header with a leading `deck` column; the rest is CSV_HEADER unchanged. */
+export const CSV_HEADER_ALL = `deck,${CSV_HEADER}`;
+
+export function toCsvRowWithDeck(deckTitle: string, card: ExportCard): string {
+  return `${csvCell(deckTitle)},${toCsvRow(card)}`;
+}
+
+/**
+ * Anki's per-row deck column (`#deck column:N`, Anki ≥ 2.1.55) files every
+ * note under its own `Cognit::<deck>`, so one import rebuilds the library.
+ * GUIDs are the same `cognit-<card id>` as the single-deck export, so
+ * importing both never duplicates a note.
+ */
+export function ankiHeaderAll(): string {
+  return [
+    '#separator:tab',
+    '#html:true',
+    '#notetype:Basic',
+    '#columns:Front\tBack\tTags\tGUID\tDeck',
+    '#tags column:3',
+    '#guid column:4',
+    '#deck column:5',
+  ].join('\n') + '\n';
+}
+
+export function toAnkiRowWithDeck(deckTitle: string, card: ExportCard): string {
+  return `${toAnkiRow(card).replace(/\n$/, '')}\t${ankiDeckName(deckTitle)}\n`;
+}
+
+/** `cognit-decks-2026-10-01.csv`: dated, since the whole library changes daily. */
+export function exportAllFilename(format: ExportFormat, now: Date): string {
+  return `cognit-decks-${now.toISOString().slice(0, 10)}.${format === 'anki' ? 'anki.txt' : 'csv'}`;
+}

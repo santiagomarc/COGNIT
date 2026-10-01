@@ -44,7 +44,16 @@ function firstWord(value: unknown): string | null {
  * evening," with nothing after the comma is a bug, not a degraded state. It is
  * why the greeting carries no information and the sub-line carries all of it.
  */
-export function resolveDisplayName(user: NameSource | null | undefined): string | null {
+export function resolveDisplayName(
+  user: NameSource | null | undefined,
+  /**
+   * The name set in Settings → Profile (`user_settings.display_name`, sidebar
+   * plan §5.2). Already normalised and address-free by settingsFromRow; a
+   * chosen name is used whole, not cut to its first word.
+   */
+  chosen?: string | null,
+): string | null {
+  if (typeof chosen === 'string' && chosen.trim() && !chosen.includes('@')) return chosen.trim();
   if (!user) return null;
 
   const meta = user.user_metadata ?? {};

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SESSION_CARD_COUNT, interleaveNewCards, parseSessionCardIds } from './study';
+import {
+  DEFAULT_SESSION_CARD_COUNT,
+  MAX_SESSION_CARD_COUNT,
+  MIN_SESSION_CARD_COUNT,
+  NEW_CARDS_PER_SESSION,
+  getSessionCardBounds,
+  interleaveNewCards,
+  newCardAllowance,
+  normalizeSessionCardCount,
+  parseSessionCardIds,
+} from './study';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -32,5 +42,36 @@ describe('interleaveNewCards', () => {
 
   it('treats a non-positive stride as one', () => {
     expect(interleaveNewCards(['r1', 'r2'], ['n1', 'n2'], { every: 0 })).toEqual(['r1', 'n1', 'r2', 'n2']);
+  });
+});
+
+describe('session size from the account default (sidebar plan §5.5)', () => {
+  it('uses the preferred count when there is no ?count=', () => {
+    expect(normalizeSessionCardCount(undefined, 200, 25)).toBe(25);
+    expect(normalizeSessionCardCount(undefined, 200)).toBe(DEFAULT_SESSION_CARD_COUNT);
+  });
+
+  it('lets an explicit ?count= win over the preference', () => {
+    expect(normalizeSessionCardCount('15', 200, 25)).toBe(15);
+  });
+
+  it('clamps the preference to the deck and to the global bounds', () => {
+    expect(normalizeSessionCardCount(undefined, 12, 25)).toBe(12);
+    expect(getSessionCardBounds(200, 500).defaultCount).toBe(MAX_SESSION_CARD_COUNT);
+    expect(getSessionCardBounds(200, 1).defaultCount).toBe(MIN_SESSION_CARD_COUNT);
+    expect(getSessionCardBounds(200, Number.NaN).defaultCount).toBe(DEFAULT_SESSION_CARD_COUNT);
+  });
+});
+
+describe('newCardAllowance', () => {
+  it('keeps the old formula at the old constant', () => {
+    expect(newCardAllowance(10, 20)).toBe(NEW_CARDS_PER_SESSION);
+    expect(newCardAllowance(10, 2)).toBe(8);
+  });
+
+  it('takes the account value, and zero means none while reviews fill the session', () => {
+    expect(newCardAllowance(10, 20, 0)).toBe(0);
+    expect(newCardAllowance(10, 4, 0)).toBe(6);
+    expect(newCardAllowance(10, 20, 12)).toBe(12);
   });
 });

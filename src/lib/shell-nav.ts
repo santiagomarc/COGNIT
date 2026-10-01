@@ -1,7 +1,10 @@
 import 'server-only';
 import { cache } from 'react';
-import { getDueByDeck, getRequestClient } from '@/lib/supabase/session';
+import { getDueByDeck, getDueDrills, getRequestClient, getUserSettings } from '@/lib/supabase/session';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
+import { logger } from '@/lib/logger';
+import type { SidebarCounts } from '@/lib/sidebar-nav';
+import type { UserSettings } from '@/lib/user-settings';
 
 /**
  * How many decks the rail's palette and breadcrumb can name. Past this the
@@ -66,4 +69,45 @@ export const loadShellNav = cache(async (userId: string): Promise<ShellNav> => {
         : null;
 
   return { decks, totalDue, sessionHref };
+});
+
+// ── The sidebar (sidebar plan §6.3, NAV-03) ─────────────────────────
+
+export type SidebarData = ShellNav & {
+  counts: SidebarCounts;
+  settings: UserSettings;
+};
+
+/**
+ * Everything the sidebar's streamed slots need, off one cached promise: the
+ * shell nav (decks, due), due drills, the trash/shared counts and the
+ * settings. One wave of reads, behind the sidebar's Suspense boundaries, so
+ * the frame still goes out on the first flush.
+ */
+export const loadSidebar = cache(async (userId: string): Promise<SidebarData> => {
+  const supabase = await getRequestClient();
+
+  const [nav, drills, countsResult, settings] = await Promise.all([
+    loadShellNav(userId),
+    getDueDrills(userId),
+    supabase.rpc('get_sidebar_counts'),
+    getUserSettings(userId),
+  ]);
+
+  if (countsResult.error) {
+    logger.error('sidebar', 'get_sidebar_counts failed', { message: countsResult.error.message });
+  }
+  const countRow = countsResult.data?.[0];
+
+  return {
+    ...nav,
+    settings,
+    counts: {
+      due: nav.totalDue,
+      drillsDue: drills.total,
+      drillsTruncated: drills.truncated,
+      shared: countRow?.shared_count ?? 0,
+      trashed: countRow?.trashed_count ?? 0,
+    },
+  };
 });

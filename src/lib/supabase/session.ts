@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { loadDueByDeckRows } from '@/lib/dashboard-due';
 import { logger } from '@/lib/logger';
 import { verifiedClaims } from '@/lib/supabase/claims';
+import { loadDueDrillsByDeck } from '@/lib/synthesis/loaders';
+import { settingsFromRow, type UserSettings } from '@/lib/user-settings';
 
 /**
  * Per-request memoisation of the reads every chromed route repeats.
@@ -28,6 +30,12 @@ export type SessionUser = {
   id: string;
   email: string | null;
   user_metadata: Record<string, unknown> | null;
+  /**
+   * The sign-in methods on the account (`app_metadata.providers`: 'email',
+   * 'google', 'github'). Settings shows a password row only for 'email'
+   * (sidebar plan §5.3).
+   */
+  providers: string[];
 };
 
 /**
@@ -54,6 +62,9 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     id: claims.sub,
     email: claims.email ?? null,
     user_metadata: claims.user_metadata ?? null,
+    providers: Array.isArray(claims.app_metadata?.providers)
+      ? claims.app_metadata.providers.filter((provider): provider is string => typeof provider === 'string')
+      : [],
   };
 });
 
@@ -91,4 +102,30 @@ export async function ensureSessionHeadroom(minSeconds = 180): Promise<void> {
 export const getDueByDeck = cache(async (userId: string) => {
   const supabase = await getRequestClient();
   return loadDueByDeckRows(supabase, userId, getRequestNow().toISOString());
+});
+
+/**
+ * The account's settings, once per request (sidebar plan §3.3, DATA-04).
+ * No row is every default. A failed read is logged and also reads as defaults:
+ * a settings outage must not take the dashboard down with it.
+ */
+export const getUserSettings = cache(async (userId: string): Promise<UserSettings> => {
+  const supabase = await getRequestClient();
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('display_name, session_card_count, new_cards_per_session')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) logger.error('settings', 'user_settings read failed', { message: error.message });
+  return settingsFromRow(data);
+});
+
+/**
+ * Due drills by deck, shared by the sidebar badge, Today's due band and the
+ * Drills page within one request, as getDueByDeck is.
+ */
+export const getDueDrills = cache(async (userId: string) => {
+  const supabase = await getRequestClient();
+  return loadDueDrillsByDeck(supabase, { userId, now: getRequestNow() });
 });

@@ -64,6 +64,9 @@ const RPCS = {
   list_public_decks:          { p_limit: 1 },
   // Phase 3 (202609270900). anon's EXECUTE is revoked, so expect "guarded".
   get_synthesis_insights:     { p_deck_id: DECK },
+  // Sidebar and Settings (COGNIT_SIDEBAR_SETTINGS_PLAN.md, 202610010910). anon's EXECUTE is revoked.
+  get_sidebar_counts:         {},
+  get_ai_usage_summary:       {},
 };
 
 let missing = 0;
@@ -101,6 +104,8 @@ const SYNTHESIS_PROBES = [
   // Trash and directory (202609240900, 202609240930).
   ['decks', 'id, deleted_at, listed_at'],
   ['deck_reports', 'id, deck_id, reporter_id, reason'],
+  // Per-account settings (202610010900).
+  ['user_settings', 'user_id, display_name, session_card_count, new_cards_per_session'],
 ];
 for (const [table, columns] of SYNTHESIS_PROBES) {
   const probe = await supabase.from(table).select(columns).limit(1);

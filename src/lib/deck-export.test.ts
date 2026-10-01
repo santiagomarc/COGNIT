@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   CSV_HEADER,
+  CSV_HEADER_ALL,
   ankiHeader,
+  ankiHeaderAll,
   csvCell,
+  exportAllFilename,
   exportFilename,
   toAnkiField,
   toAnkiRow,
+  toAnkiRowWithDeck,
   toAnkiTags,
   toCsvRow,
+  toCsvRowWithDeck,
   type ExportCard,
 } from '@/lib/deck-export';
 
@@ -90,5 +95,39 @@ describe('deck export — file names', () => {
   it('produces an ASCII name safe inside Content-Disposition', () => {
     expect(exportFilename('Café "Biology" 101', 'csv')).toBe('cafe-biology-101.csv');
     expect(exportFilename('日本語', 'anki')).toBe('deck.anki.txt');
+  });
+});
+
+describe('export all decks (sidebar plan §4.5)', () => {
+  const card: ExportCard = {
+    id: 'c1',
+    front: 'Mitochondria',
+    back: 'Site of the Krebs cycle?',
+    explanation: null,
+    topic_tags: ['cell'],
+    state: 'review',
+    interval: 4,
+    ease_factor: 2.5,
+    next_review_at: '2026-10-02T00:00:00Z',
+  };
+
+  it('prefixes the single-deck CSV row with a deck cell, escaped like any other', () => {
+    expect(CSV_HEADER_ALL.startsWith('deck,question,answer')).toBe(true);
+    expect(toCsvRowWithDeck('Bio, Ch. 4', card)).toBe(`"Bio, Ch. 4",${toCsvRow(card)}`);
+    expect(toCsvRowWithDeck('=HYPERLINK()', card).startsWith("'=HYPERLINK()")).toBe(true);
+  });
+
+  it('adds a fifth Anki column naming the deck, with the header that points at it', () => {
+    expect(ankiHeaderAll()).toContain('#deck column:5');
+    expect(ankiHeaderAll()).not.toContain('#deck:');
+    const row = toAnkiRowWithDeck('Cell Biology', card);
+    expect(row.endsWith('\tCognit::Cell Biology\n')).toBe(true);
+    expect(row.split('\t')).toHaveLength(5);
+    expect(row.split('\t')[3]).toBe('cognit-c1');
+  });
+
+  it('dates the file name', () => {
+    expect(exportAllFilename('csv', new Date('2026-10-01T12:00:00Z'))).toBe('cognit-decks-2026-10-01.csv');
+    expect(exportAllFilename('anki', new Date('2026-10-01T12:00:00Z'))).toBe('cognit-decks-2026-10-01.anki.txt');
   });
 });

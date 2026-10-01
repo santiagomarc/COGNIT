@@ -89,3 +89,21 @@ describe('greetingForHour', () => {
     expect(greetingForHour(23)).toBe('evening');
   });
 });
+
+describe('a name chosen in Settings (sidebar plan §5.2)', () => {
+  const user = { email: 'santiagomarcstephen@gmail.com', user_metadata: { full_name: 'Marc Santiago' } };
+
+  it('wins over metadata and the address, and is used whole', () => {
+    expect(resolveDisplayName(user, 'Dr. Santiago')).toBe('Dr. Santiago');
+  });
+
+  it('falls through when unset, blank or address-shaped', () => {
+    expect(resolveDisplayName(user, null)).toBe('Marc');
+    expect(resolveDisplayName(user, '  ')).toBe('Marc');
+    expect(resolveDisplayName(user, 'me@example.com')).toBe('Marc');
+  });
+
+  it('works with no user at all', () => {
+    expect(resolveDisplayName(null, 'Marc')).toBe('Marc');
+  });
+});
