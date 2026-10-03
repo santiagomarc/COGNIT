@@ -6,6 +6,12 @@ import {
   MIN_SESSION_CARD_COUNT,
   NEW_CARDS_PER_SESSION,
 } from '@/lib/study';
+import {
+  DEFAULT_USER_SETTINGS,
+  DISPLAY_NAME_MAX,
+  MAX_NEW_CARDS_PER_SESSION,
+  type UserSettings,
+} from '@/lib/user-settings-limits';
 
 /**
  * Per-account settings (sidebar plan §3.1, DATA-01): the values that follow a
@@ -17,21 +23,13 @@ import {
  * (202610010900) repeat them; a test pins the two together.
  */
 
-export const DISPLAY_NAME_MAX = 40;
-export const MAX_NEW_CARDS_PER_SESSION = 20;
-
-export type UserSettings = {
-  /** Null means "derive it" — resolveDisplayName's metadata and email chain. */
-  displayName: string | null;
-  sessionCardCount: number;
-  newCardsPerSession: number;
-};
-
-export const DEFAULT_USER_SETTINGS: UserSettings = {
-  displayName: null,
-  sessionCardCount: DEFAULT_SESSION_CARD_COUNT,
-  newCardsPerSession: NEW_CARDS_PER_SESSION,
-};
+export {
+  DEFAULT_USER_SETTINGS,
+  DISPLAY_NAME_MAX,
+  MAX_NEW_CARDS_PER_SESSION,
+  type StudyDefaults,
+  type UserSettings,
+} from '@/lib/user-settings-limits';
 
 /** The `user_settings` columns this module reads. */
 export type UserSettingsRow = {
@@ -71,8 +69,6 @@ export const studyDefaultsSchema = z.object({
   sessionCardCount: z.number().int().min(MIN_SESSION_CARD_COUNT).max(MAX_SESSION_CARD_COUNT),
   newCardsPerSession: z.number().int().min(0).max(MAX_NEW_CARDS_PER_SESSION),
 });
-
-export type StudyDefaults = z.infer<typeof studyDefaultsSchema>;
 
 function clampInt(value: unknown, min: number, max: number, fallback: number): number {
   const number = typeof value === 'number' ? value : Number.NaN;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { ArrowRight, Search, X } from 'lucide-react';
+import { ArrowRight, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 import { semanticSearchCards, type SemanticSearchResult } from '@/app/actions/chat';
@@ -19,7 +19,7 @@ import {
   type PaletteCommand,
   type PaletteDeck,
 } from '@/lib/command-palette';
-import { OPEN_COMMAND_PALETTE_EVENT, requestOpenCreateDeck } from '@/lib/dashboard-events';
+import { OPEN_COMMAND_PALETTE_EVENT, requestOpenCreateDeck, requestOpenShortcuts } from '@/lib/dashboard-events';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { pageShortcutBlocked } from '@/lib/hotkeys';
 import { formatActionError } from '@/lib/ai-feedback';
@@ -58,10 +58,11 @@ type PaletteRow = {
  * the ones that were already here. What is new is the command list above the
  * results and the keyboard traversal through it.
  *
- * It matters more than it looks. With the floating dock deleted (F-04) the rail
- * is the visible fallback for anyone who never discovers `⌘K` — but the palette
- * is the only place that reaches *every* deck without a round trip through the
- * index, and the only place `sign out` lives on a route with no rail.
+ * It has no trigger of its own (sidebar plan §6.8): the sidebar's Search
+ * control and ⌘K open it, through OPEN_COMMAND_PALETTE_EVENT and the hotkey
+ * below. It matters more than it looks — it is the only place that reaches
+ * *every* deck without a round trip through the index, and the only place
+ * `sign out` lives on a route with no chrome.
  *
  * Interaction model is combobox + listbox: focus stays in the input and the
  * active row is tracked with `aria-activedescendant`. Arrow keys would fight a
@@ -77,7 +78,8 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
   const [results, setResults] = useState<SemanticSearchResult[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  /** Whatever had focus when the palette opened: the sidebar's Search, or the page. */
+  const openerRef = useRef<HTMLElement | null>(null);
   const reduced = useReducedMotion();
 
   const close = useCallback(() => {
@@ -95,9 +97,16 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
     initialFocus: (dialog) => dialog.querySelector<HTMLInputElement>('input'),
   });
 
+  // Remember the opener before useModalDialog moves focus into the input (it
+  // does so a frame later), so an effect that opens a second dialog can hand
+  // focus back to it: the sidebar's Search button, or wherever ⌘K was pressed.
+  useEffect(() => {
+    if (open) openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }, [open]);
+
   // ⌘K / Ctrl+K closes an open palette and opens one over any page no other
-  // dialog covers; the rail's search button opens it through the same event
-  // so both triggers share one dialog.
+  // dialog covers; the sidebar's Search control opens it through the event
+  // below, so every trigger shares one dialog.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
@@ -148,26 +157,34 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
     (effect: NonNullable<PaletteCommand['effect']>) => {
       close();
 
-      if (effect === 'toggle-theme') {
-        toggleTheme();
-        return;
+      /*
+       * Exhaustive on purpose. This used to end in a bare `void logout()`, so
+       * any effect it did not name signed the user out — adding one would
+       * have made "Keyboard shortcuts" a sign-out button (sidebar plan §5.12).
+       */
+      switch (effect) {
+        case 'toggle-theme':
+          toggleTheme();
+          return;
+        case 'new-deck':
+        case 'show-shortcuts':
+          /*
+           * Hand focus back to whatever opened the palette *before* asking for
+           * the next dialog, which restores focus to the element active when
+           * it opened; by then this palette's input has unmounted.
+           */
+          openerRef.current?.focus();
+          if (effect === 'new-deck') requestOpenCreateDeck();
+          else requestOpenShortcuts();
+          return;
+        case 'sign-out':
+          void logout();
+          return;
+        default: {
+          const unhandled: never = effect;
+          throw new Error(`Unhandled palette effect: ${String(unhandled)}`);
+        }
       }
-
-      if (effect === 'new-deck') {
-        /*
-         * Hand focus back to this palette's own trigger *before* asking for the
-         * next dialog. The create-deck dialog restores focus to whatever was
-         * active when it opened, and by then this palette's input has
-         * unmounted — without this the chain ends with focus on <body>.
-         */
-        triggerRef.current?.focus();
-        // The dialog is mounted by the shell layout, so this reaches it from
-        // any chromed route — including a deck page, where it did not exist.
-        requestOpenCreateDeck();
-        return;
-      }
-
-      void logout();
     },
     [close, toggleTheme]
   );
@@ -311,19 +328,6 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
 
   return (
     <>
-      <Button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen(true)}
-        className="gap-2"
-        aria-label="Open the command palette"
-        aria-haspopup="dialog"
-      >
-        <Search className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className="hidden sm:inline">Search</span>
-        <Kbd>⌘K</Kbd>
-      </Button>
-
       <AnimatePresence>
         {open ? (
           <div className="fixed inset-0 z-[var(--z-modal)] flex items-start justify-center px-4 py-6 pb-[max(1.5rem,env(keyboard-inset-height,0px))] sm:items-center">

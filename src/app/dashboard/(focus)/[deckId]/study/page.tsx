@@ -1,11 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
-import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { getRequestClient, getSessionUser, getUserSettings } from '@/lib/supabase/session';
 import { FlashcardReviewClient } from '@/components/ui/shared/FlashcardReviewClient';
 import {
   MAX_SESSION_CARD_COUNT,
-  NEW_CARDS_PER_SESSION,
   NEW_CARD_INTERLEAVE_EVERY,
   interleaveNewCards,
+  newCardAllowance,
   normalizeSessionCardCount,
   normalizeStudyScope,
   parseSessionCardIds,
@@ -44,6 +44,9 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
   if (!user) {
     redirect('/login');
   }
+
+  // The account's session size and new-card allowance (sidebar plan §5.5), read beside the wave below.
+  const settingsPromise = getUserSettings(user.id);
 
   const explicitCardIds = parseSessionCardIds(resolvedSearchParams?.cards);
   // An explicit card list is a review of exactly those cards, due or not.
@@ -96,14 +99,15 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     notFound();
   }
 
+  const settings = await settingsPromise;
   const sessionCardCount = explicitCardIds.length > 0
     ? explicitCardIds.length
-    : normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0);
+    : normalizeSessionCardCount(resolvedSearchParams?.count, totalInDeck ?? 0, settings.sessionCardCount);
 
   const [scheduledRows, freshRows] = [cardReads[0]?.data ?? [], cardReads[1]?.data ?? []];
   // New cards trickle in beside reviews, but never displace them; when there
   // is nothing scheduled (a brand-new deck) they fill the session instead.
-  const newAllowance = Math.max(NEW_CARDS_PER_SESSION, sessionCardCount - scheduledRows.length);
+  const newAllowance = newCardAllowance(sessionCardCount, scheduledRows.length, settings.newCardsPerSession);
   const dueCards = explicitCardIds.length > 0
     ? scheduledRows
     : interleaveNewCards(scheduledRows, freshRows.slice(0, newAllowance), { every: NEW_CARD_INTERLEAVE_EVERY })

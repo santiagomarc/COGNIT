@@ -63,7 +63,7 @@ export function DashboardOnboarding({
       }
 
       toast.success(`"${starter.title}" is ready — ${starter.cards.length} cards.`);
-      router.push(`/dashboard/${deck.deckId}/study?count=10&scope=due`);
+      router.push(`/dashboard/${deck.deckId}/study?scope=due`);
     } catch {
       toast.error('Something went wrong setting up that deck. Please try again.');
     } finally {

@@ -22,7 +22,7 @@ type UseModalDialogOptions = {
  * The navigation layer has two dialogs — the command palette and the account
  * sheet — and they must behave identically. Sharing the behaviour is also the
  * only way "focus returns to the trigger" can be true for a dialog opened from
- * the rail *and* from the header, since the trigger differs by viewport.
+ * the sidebar *and* from the keyboard, since the trigger differs by route and viewport.
  *
  * A dialog that leaks focus to the page behind its scrim is not modal.
  */

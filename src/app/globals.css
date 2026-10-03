@@ -124,7 +124,7 @@
 
   /* Z-scale — the single source of stacking order. This is the fix for F-01.
      Never write a raw z-50 again; if a new layer is needed, add a token here. */
-  --z-rail: 20;      /* left navigation rail            */
+  --z-rail: 20;      /* the sidebar column (≥768px)     */
   --z-sticky: 40;    /* sticky headers, progress bars   */
   --z-grain: 50;     /* landing grain tile, over content */
   --z-overlay: 100;  /* scrims, pause overlay           */
@@ -132,14 +132,15 @@
   --z-toast: 120;    /* sonner                          */
   --z-skip: 200;     /* skip-to-content                 */
 
-  /* Navigation geometry (§8). The floating dock is gone; a 48px left rail
-     replaces it. `--dock-clearance` is deliberately kept at 0 rather than
-     deleted: bottom clearance is owned by exactly one element (the dashboard
-     route layout), so a future bottom-anchored element re-uses this token
-     instead of re-scattering a bottom pad across every page — which is what
-     produced 224px of dead space in the first place (F-03). */
-  --rail-w: 48px;
-  --rail-w-expanded: 184px;
+  /* Navigation geometry (§8, Rev. E §7.11). The sidebar is 256px, collapses
+     to the 48px rail, and is a drawer below 768px. `--dock-clearance` is
+     deliberately kept at 0 rather than deleted: bottom clearance is owned by
+     exactly one element (the dashboard route layout), so a future
+     bottom-anchored element re-uses this token instead of re-scattering a
+     bottom pad across every page — which is what produced 224px of dead
+     space in the first place (F-03). */
+  --sidebar-w: 256px;
+  --sidebar-w-rail: 48px;
   --dock-clearance: 0px;
 
   /* Motion (§5) — instruments do not bounce. One spring survives, in JS. */
@@ -1378,134 +1379,507 @@ button.term-chip:disabled {
 }
 
 /*
- * ─── Navigation rail (§8) ───
+ * ─── Sidebar (§8, Rev. E §7.11) ───
  *
- * Replaces the floating dock (F-04), which occluded content on every screen in
- * order to offer two live destinations and two permanently `disabled` slots.
+ * One DOM tree, three presentations, chosen by CSS so nothing reflows after
+ * hydration (COGNIT_SIDEBAR_SETTINGS_PLAN.md §6):
  *
- * The rail does not float and does not overlay: it is a column in the shell's
- * flex row, so expanding it reflows the content beside it rather than covering
- * it. No fill and no shadow — a 1px right rule is the whole boundary (§4.3).
+ *   < 768px            a drawer, off-canvas until the header button opens it
+ *   ≥ 768px            a column in the shell's flex row — never over content;
+ *                      256px expanded or the 48px rail
+ *
+ * Which width a ≥768px column takes comes from `.shell[data-sidebar]`, the
+ * preference the server read from the `cognit-sidebar` cookie: `expanded`,
+ * `collapsed`, or `auto` (no choice yet: the rail from 768 to 1023px,
+ * expanded from 1024px).
+ *
+ * Inside, the rail presentation responds to the sidebar's OWN width through a
+ * container query rather than to the viewport — the same rules serve
+ * "collapsed at 1440px" and "auto at 900px" without being written twice.
+ * Container sizing applies layout containment, which makes the sidebar the
+ * containing block for fixed descendants: anything that must sit over the
+ * page (the account menu) is portalled out.
  */
-.rail {
-  width: var(--rail-w);
-  border-right: 1px solid var(--border);
-  transition: width var(--dur-panel) var(--ease-out);
-}
-
-.rail[data-expanded='true'] {
-  width: var(--rail-w-expanded);
-}
-
-/* A rail control. 30px tall, per §8; the 48px column is the touch target's
-   own width, and the rail is desktop-only so ≥44px does not apply here. */
-.rail__btn {
+.sidebar {
+  container-type: inline-size;
+  container-name: sidebar;
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 10px 10px;
+
+  /* The drawer: off-canvas and out of the tab order until opened. */
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--z-modal);
+  width: min(320px, calc(100vw - 56px));
+  background: var(--surface);
+  border-right: 1px solid var(--border-strong);
+  box-shadow: var(--elevate-2);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--dur-panel) var(--ease-out), visibility 0s linear var(--dur-panel);
+}
+
+.sidebar[data-open='true'] {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--dur-panel) var(--ease-out), visibility 0s;
+}
+
+/* The head's icon buttons (collapse, expand, close). Declared before the
+   breakpoint rules below so those can hide them. */
+.sidebar__icon-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 30px;
-  width: 100%;
-  padding: 0 9px;
-  border: 1px solid transparent;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-control);
-  /*
-   * --ink-dimmer, not --ink-faint. The collapsed rail shows only a glyph, and
-   * --ink-faint is legal for a non-text mark — but the expanded rail reveals a
-   * text label inheriting this colour, and --ink-faint is 2.57:1 dark /
-   * 2.48:1 light. §9 is unconditional: --ink-faint is never text.
-   */
   color: var(--ink-dimmer);
-  background: transparent;
-  transition: color var(--dur-hover) ease, background-color var(--dur-hover) ease,
-    border-color var(--dur-hover) ease;
+  transition: color var(--dur-hover) ease, background-color var(--dur-hover) ease;
 }
 
-.rail__btn:hover {
+.sidebar__icon-btn:hover {
   color: var(--ink);
-  border-color: var(--border-strong);
+  background: var(--surface-raised);
 }
 
-.rail__btn:focus-visible {
+.sidebar__icon-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
-/* Active is a surface with the system's one elevation, not a coloured pill:
-   position in the rail already says which destination this is. */
-.rail__btn[aria-current='page'] {
+@media (max-width: 767.98px) {
+  .sidebar__icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* The drawer's scrim (§7.8): the one permitted blur, over content out of use. */
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+@media (min-width: 768px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-rail);
+    flex: none;
+    height: 100dvh;
+    width: var(--sidebar-w);
+    /* No fill and no shadow — a 1px right rule is the whole boundary (§4.3). */
+    background: transparent;
+    border-right: 1px solid var(--border);
+    box-shadow: none;
+    transform: none;
+    visibility: visible;
+    transition: width var(--dur-panel) var(--ease-out);
+  }
+
+  .shell[data-sidebar='collapsed'] .sidebar {
+    width: var(--sidebar-w-rail);
+  }
+
+  .sidebar-scrim,
+  .sidebar__close {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .shell[data-sidebar='auto'] .sidebar {
+    width: var(--sidebar-w-rail);
+  }
+}
+
+@media (max-width: 767.98px) {
+  .sidebar__collapse,
+  .sidebar__expand {
+    display: none !important;
+  }
+}
+
+.sidebar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding: 0 2px 0 9px;
+  margin-bottom: 10px;
+}
+
+/* The scroll region between the two actions and the account row. The 2px
+   inset keeps a control's focus ring from being clipped by the overflow. */
+.sidebar__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 -2px;
+  padding: 2px;
+}
+
+.sidebar__foot {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  margin-top: 6px;
+}
+
+/* The account row: the account button, and the settings link beside it. */
+.sidebar__account {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/*
+ * A sidebar control: 30px tall on desktop, where the column is the target's
+ * width and ≥44px does not apply; 44px in the drawer, where it does (§9).
+ *
+ * --ink-dimmer, not --ink-faint: the label inherits this colour, and
+ * --ink-faint is 2.57:1 dark / 2.48:1 light. §9 is unconditional: --ink-faint
+ * is never text.
+ */
+.sidebar__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--ink-dimmer);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-hover) ease, background-color var(--dur-hover) ease,
+    border-color var(--dur-hover) ease;
+}
+
+.sidebar__item:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.sidebar__item:focus-visible,
+.sidebar__deck:focus-visible,
+.sidebar__search:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Current is a surface with the system's one elevation, not a coloured pill:
+   position in the list already says which destination this is. */
+.sidebar__item[aria-current],
+.sidebar__deck[aria-current] {
   color: var(--ink);
   background: var(--surface);
   box-shadow: var(--elevate);
   border-color: var(--border);
 }
 
-/* The label is revealed by width, so it must not wrap or force the column
-   open while the rail is collapsed. */
-.rail__label {
+/* Search is a control, so its edge is a control edge (3:1, WCAG 1.4.11). */
+.sidebar__search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 7px 0 10px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  color: var(--ink-dimmer);
+  background: transparent;
   font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity var(--dur-hover) ease;
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--dur-hover) ease, background-color var(--dur-hover) ease;
 }
 
-.rail[data-expanded='true'] .rail__label {
-  opacity: 1;
+.sidebar__search:hover {
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+
+.sidebar__item--account {
+  height: 40px;
+  padding: 0 6px;
+}
+
+.sidebar__item--icon {
+  flex: none;
+  width: 32px;
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebar__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A badge is a number, never a pill (§6). Hue only when the number is due work. */
+.sidebar__count {
+  margin-left: auto;
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dimmer);
+}
+
+.sidebar__count[data-tone='due'] {
+  color: var(--state-due);
+}
+
+.sidebar__deck {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 28px;
+  padding: 0 9px 0 15px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  color: var(--ink-dim);
+  font-size: 13px;
+  transition: color var(--dur-hover) ease, border-color var(--dur-hover) ease;
+}
+
+.sidebar__deck:hover {
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+
+.sidebar__tick {
+  flex: none;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: var(--ink-faint);
+}
+
+.sidebar__tick[data-due='true'] {
+  background: var(--state-due);
+}
+
+.sidebar__expand {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .sidebar__item,
+  .sidebar__deck,
+  .sidebar__search {
+    height: 44px;
+  }
+
+  .sidebar__item--icon {
+    width: 44px;
+  }
 }
 
 /*
- * The deck-index mark. §6's icon allowlist has no glyph for "index", and a
- * metaphor would be worse than none — so the affordance is a 3-rule miniature
- * of the deck index itself (§7.5), drawn in CSS rather than imported.
+ * The CSS marks (§6, Rev. E): where §6 has no glyph for a destination, the
+ * mark is a miniature of the page it opens, 15 × 15 in currentColor.
  */
-.rail__rows {
+.sidebar__mark {
+  position: relative;
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+/* Today: three rules — the deck index in miniature. */
+.sidebar__mark--today {
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  width: 15px;
-  height: 15px;
-  flex: none;
 }
 
-.rail__rows span {
+.sidebar__mark--today span {
   display: block;
   height: 1.5px;
   border-radius: 1px;
   background: currentColor;
 }
 
-.rail__rows span:nth-child(1) { width: 100%; }
-.rail__rows span:nth-child(2) { width: 72%; }
-.rail__rows span:nth-child(3) { width: 86%; }
+.sidebar__mark--today span:nth-child(1) { width: 100%; }
+.sidebar__mark--today span:nth-child(2) { width: 72%; }
+.sidebar__mark--today span:nth-child(3) { width: 86%; }
 
-/* The statistics mark: the page's own histogram in miniature — three bars,
-   bottom-aligned, rising. Same 15px box and 1.5px strokes as the index mark. */
-.rail__bars {
+/* Statistics: three bars, rising — the page's histogram in miniature. */
+.sidebar__mark--stats {
   display: flex;
   align-items: flex-end;
   justify-content: center;
   gap: 3px;
-  width: 15px;
-  height: 15px;
-  flex: none;
 }
 
-.rail__bars span {
+.sidebar__mark--stats span {
   display: block;
   width: 1.5px;
   border-radius: 1px;
   background: currentColor;
 }
 
-.rail__bars span:nth-child(1) { height: 40%; }
-.rail__bars span:nth-child(2) { height: 100%; }
-.rail__bars span:nth-child(3) { height: 66%; }
+.sidebar__mark--stats span:nth-child(1) { height: 40%; }
+.sidebar__mark--stats span:nth-child(2) { height: 100%; }
+.sidebar__mark--stats span:nth-child(3) { height: 66%; }
+
+/* Drills: two nodes joined by an edge — the concept map in miniature. */
+.sidebar__mark--drills::before,
+.sidebar__mark--drills::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+}
+
+.sidebar__mark--drills::before { left: 0; top: 9px; }
+.sidebar__mark--drills::after { left: 9px; top: 0; }
+
+.sidebar__mark--drills span {
+  position: absolute;
+  left: 4px;
+  top: 6.75px;
+  width: 7px;
+  height: 1.5px;
+  background: currentColor;
+  transform: rotate(-45deg);
+}
+
+/* Explore: a 2 × 2 grid — the directory in miniature. */
+.sidebar__mark--explore {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5px;
+  padding: 1px;
+}
+
+.sidebar__mark--explore span {
+  display: block;
+  border: 1.5px solid currentColor;
+  border-radius: 1.5px;
+}
+
+/* Trash: an open bin under its lid. */
+.sidebar__mark--trash::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 2px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.sidebar__mark--trash span {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 4.5px;
+  bottom: 1px;
+  border: 1.5px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 2px 2px;
+}
+
+/*
+ * The rail presentation: the sidebar's own width, not the viewport's. Labels
+ * stay in the accessibility tree (visually hidden, never display:none), so a
+ * 48px column of marks still reads "Today, 47 due". What has no mark — the
+ * deck list, group labels, keycaps, the settings sections — leaves the rail;
+ * all of it is one click away on the page itself.
+ */
+@container sidebar (max-width: 120px) {
+  .sidebar__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .sidebar__count,
+  .sidebar__kbd,
+  .sidebar__group-label,
+  .sidebar__decks,
+  .sidebar__wordmark,
+  .sidebar__heading,
+  .sidebar__sections,
+  .sidebar__collapse {
+    display: none;
+  }
+
+  .sidebar__expand {
+    display: flex;
+  }
+
+  .sidebar__head {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar__item,
+  .sidebar__search {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .sidebar__search {
+    height: 30px;
+    border-color: transparent;
+  }
+
+  .sidebar__group + .sidebar__group {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+
+  .sidebar__account {
+    flex-direction: column-reverse;
+  }
+}
+
+/* Settings carries its own section index for any presentation that cannot
+   show the sections: the drawer (opened on demand) and the rail. */
+@media (min-width: 768px) {
+  .shell[data-sidebar='expanded'] .settings-index {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) {
+  .shell[data-sidebar='auto'] .settings-index {
+    display: none;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .rail,
-  .rail__label {
+  .sidebar,
+  .sidebar[data-open='true'] {
     transition: none;
   }
 }

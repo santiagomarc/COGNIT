@@ -1,10 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-
 import { Kbd } from '@/components/ui/Kbd';
 import { requestOpenCreateDeck } from '@/lib/dashboard-events';
-import { pageShortcutBlocked } from '@/lib/hotkeys';
 
 /**
  * Creating a deck, as its own container rather than a button in a row
@@ -26,32 +23,10 @@ import { pageShortcutBlocked } from '@/lib/hotkeys';
  */
 export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
   /*
-   * ⌘N opens the same dialog the panel does. Bound here rather than drawn,
-   * because a keycap the product does not honour is a lie — the same reason
-   * the due-now band implements `S` rather than illustrating it (§7.3).
+   * ⌘N is bound by CreateDeckModal, which the shell mounts on every chromed
+   * route, so the keycap below is honoured everywhere it is shown — not only
+   * on Today, where this panel lives (sidebar plan §5.7).
    */
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (pageShortcutBlocked(event)) return;
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        event.target instanceof HTMLSelectElement ||
-        (event.target instanceof HTMLElement && event.target.isContentEditable)
-      ) {
-        return;
-      }
-
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      if (event.key.toLowerCase() !== 'n') return;
-
-      event.preventDefault();
-      requestOpenCreateDeck();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
 
   return (
     <button

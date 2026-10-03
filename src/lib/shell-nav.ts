@@ -7,7 +7,7 @@ import type { SidebarCounts } from '@/lib/sidebar-nav';
 import type { UserSettings } from '@/lib/user-settings';
 
 /**
- * How many decks the rail's palette and breadcrumb can name. Past this the
+ * How many decks the sidebar, palette and breadcrumb can name. Past this the
  * breadcrumb falls back to "Deck" and the palette stops listing — both degrade
  * to something honest rather than to a blank.
  */

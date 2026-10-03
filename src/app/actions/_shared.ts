@@ -114,7 +114,8 @@ export async function reserveAiCall(
   if (message.includes('AI_DAILY_CEILING') || code === 'P0002') {
     return {
       ok: false,
-      error: 'You have reached your daily AI limit. It resets 24 hours after your first request today.',
+      // A rolling window, not a midnight reset (sidebar plan §5.8).
+      error: `You've reached your AI limit: ${DAILY_AI_CALL_CEILING} calls in 24 hours. Calls free up as they pass 24 hours old.`,
     };
   }
   if (code === '28000' || message.includes('Unauthorized')) {

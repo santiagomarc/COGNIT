@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Dashboard - Cognit',
+  // Each chromed page names itself (Today, Drills, Settings…); this is the fallback.
+  title: 'Cognit',
   description: 'Manage your study decks and track your progress.',
 };
 
@@ -17,10 +18,10 @@ export const metadata: Metadata = {
  *
  * Chrome is chosen structurally one level down, not by a `usePathname()` test:
  *
- *   (shell)  — rail + header + `⌘K`   → /dashboard, /dashboard/[deckId]
- *   (focus)  — no navigation chrome    → …/study, …/quiz
+ *   (shell)  — sidebar + header        → /dashboard, /dashboard/[deckId], drills, …
+ *   (focus)  — no navigation chrome    → …/study, …/quiz, …/synthesis
  *
- * A route in `(focus)` cannot acquire a rail by accident, which is the property
+ * A route in `(focus)` cannot acquire a sidebar by accident, which is the property
  * the deleted dock's `CHROMELESS_ROUTE` regex could only approximate.
  */
 export default function DashboardLayout({

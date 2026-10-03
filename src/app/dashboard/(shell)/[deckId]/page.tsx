@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import type { createClient } from '@/lib/supabase/server';
-import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { getRequestClient, getSessionUser, getUserSettings } from '@/lib/supabase/session';
 import { AddContentPanel } from '@/components/ui/shared/AddContentPanel';
 import { DeckCardsManager } from '@/components/ui/shared/DeckCardsManager';
 import { DeckChatWidget } from '@/components/ui/shared/DeckChatWidget';
@@ -310,6 +310,9 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
     redirect('/login');
   }
 
+  // The launcher opens on the account's cards-per-session (sidebar plan §5.5).
+  const settingsPromise = getUserSettings(user.id);
+
   const {
     deck,
     deckErrorMessage,
@@ -336,7 +339,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
   }
 
   const deckTitleMeta = parseDeckTitleMetadata(deck.title);
-  const sessionBounds = getSessionCardBounds(totalCards);
+  const sessionBounds = getSessionCardBounds(totalCards, (await settingsPromise).sessionCardCount);
 
   let lastQuizAt: string | null = null;
   let masteredCards = 0;

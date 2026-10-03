@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motionTransitions } from '@/lib/motion-configs';
 import { OPEN_CREATE_DECK_EVENT } from '@/lib/dashboard-events';
+import { isTypingTarget, pageShortcutBlocked } from '@/lib/hotkeys';
 import { useModalDialog } from '@/lib/use-modal-dialog';
 import { toast } from 'sonner';
 
@@ -58,6 +59,25 @@ export function CreateDeckModal() {
     const handleOpenRequest = () => setOpen(true);
     window.addEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
     return () => window.removeEventListener(OPEN_CREATE_DECK_EVENT, handleOpenRequest);
+  }, []);
+
+  /*
+   * ⌘N / Ctrl+N, on every chromed route (sidebar plan §5.7). It lived in
+   * CreateDeckPanel, which only Today renders, so the keycap shown beside
+   * "New deck" was a lie everywhere else (design system §11 item 7).
+   */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (pageShortcutBlocked(event) || isTypingTarget(event.target)) return;
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+      if (event.key.toLowerCase() !== 'n') return;
+
+      event.preventDefault();
+      setOpen(true);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   async function handleSubmit() {

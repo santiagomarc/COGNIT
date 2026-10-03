@@ -1,8 +1,8 @@
+import type { Metadata } from 'next';
 import type { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { getDueByDeck, getRequestClient, getRequestNow, getSessionUser } from '@/lib/supabase/session';
+import { getDueByDeck, getDueDrills, getRequestClient, getRequestNow, getSessionUser, getUserSettings } from '@/lib/supabase/session';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
-import { TrashPanel } from '@/components/ui/shared/TrashPanel';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
 import { GreetingHeader } from '@/components/ui/shared/GreetingHeader';
 import { DueNowBand } from '@/components/ui/shared/DueNowBand';
@@ -20,7 +20,12 @@ import {
 } from '@/lib/dashboard-forecast';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { logger } from '@/lib/logger';
-import { loadDueDrillsByDeck, type DueDrillsByDeck } from '@/lib/synthesis/loaders';
+import { drillSessionHref } from '@/lib/synthesis/links';
+import type { DueDrillsByDeck } from '@/lib/synthesis/loaders';
+
+export const metadata: Metadata = {
+  title: 'Today - Cognit',
+};
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 type DashboardDeckRow = {
@@ -228,7 +233,7 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
       .eq('user_id', userId),
     loadMasterySummary(supabase, userId),
     loadScheduleSummary(supabase, userId, now),
-    loadDueDrillsByDeck(supabase, { userId, now }),
+    getDueDrills(userId),   // shared with the sidebar's badge via React.cache
   ]);
 
   return {
@@ -250,6 +255,9 @@ export default async function Dashboard() {
   if (!user) {
     redirect('/login');
   }
+
+  // Started now and awaited for the greeting, so it rides the snapshot's wave (sidebar plan §5.2).
+  const settingsPromise = getUserSettings(user.id);
 
   const {
     deckRows,
@@ -379,7 +387,7 @@ export default async function Dashboard() {
    * client. `null` is a real answer and GreetingHeader renders correctly for
    * it — see resolveDisplayName and audit finding F-06.
    */
-  const greetingName = resolveDisplayName(user);
+  const greetingName = resolveDisplayName(user, (await settingsPromise).displayName);
 
   // With nothing due, prefer the deck holding the most unseen cards over the
   // most recently touched one: that is where studying ahead does the most.
@@ -398,9 +406,7 @@ export default async function Dashboard() {
   const dueDrillsReading = {
     total: dueDrills.total,
     deckCount: dueDrills.decks.length,
-    href: topDrillDeck
-      ? `/dashboard/${topDrillDeck.deckId}/synthesis?count=${Math.min(3, Math.max(1, topDrillDeck.dueCount))}&pull=1`
-      : null,
+    href: topDrillDeck ? drillSessionHref(topDrillDeck.deckId, topDrillDeck.dueCount) : null,
   };
   const dueDrillsByDeck = new Map(dueDrills.decks.map((deck) => [deck.deckId, deck.dueCount]));
 
@@ -488,8 +494,9 @@ export default async function Dashboard() {
         </>
       )}
 
-      {/* Outside the branch above: trashing your only deck must not hide the way back (plan §4.1a). */}
-      <TrashPanel />
+      {/* The trash used to sit here so that trashing your only deck could not
+          hide the way back (plan §4.1a). The sidebar's Trash item now does that
+          job from every page (sidebar plan §4.4). */}
     </div>
   );
 }

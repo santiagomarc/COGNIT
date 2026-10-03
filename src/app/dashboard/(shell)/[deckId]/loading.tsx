@@ -8,7 +8,7 @@
  * session forms and a row-based card list since Phase 7 — so every element
  * moved when the content landed.
  *
- * It renders inside the shell, so the rail and header are already on screen and
+ * It renders inside the shell, so the sidebar and header are already on screen and
  * are not drawn again here, and it carries no bottom padding: the dashboard
  * route layout owns that (F-03).
  */

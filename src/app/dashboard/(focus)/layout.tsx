@@ -1,7 +1,7 @@
 /**
  * Focus routes — study and quiz (§8).
  *
- * **No navigation chrome at all.** No rail, no header nav, no bottom bar. The
+ * **No navigation chrome at all.** No sidebar, no header nav, no bottom bar. The
  * grade deck owns the bottom band, and on mobile it *is* the bottom chrome.
  *
  * This layout exists to say that structurally. Run 1 approximated it with a

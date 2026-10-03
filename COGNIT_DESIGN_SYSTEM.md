@@ -776,7 +776,7 @@ background and it vanishes.
 - **Count:** mono 12 px, right-aligned, `--state-due` only when the number is due work, otherwise `--ink-dimmer`. A zero prints nothing. Never a pill or a dot.
 - **Deck row:** 28 px, a 2 px × 12 px state tick (§7.5 rule), title in `--ink-dim`, due count in mono.
 - **Group label:** the label step.
-- **Settings mode:** Back to Cognit, the heading, then sections under group labels. The current section is `aria-current="location"`.
+- **Settings mode:** Back to Cognit, the heading, then sections under group labels. The current section is `aria-current="location"`. Search and New deck step aside there (⌘K and ⌘N still work); in the rail and the drawer, which cannot list the sections, the page shows its own section index.
 
 ### 7.12 Settings controls (Rev. E)
 

@@ -49,11 +49,11 @@ export function Breadcrumb({ decks }: BreadcrumbProps) {
               href="/dashboard"
               className="rounded-[var(--radius-control)] text-ink-dim outline-hidden transition-colors duration-[120ms] hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
-              Decks
+              Today
             </Link>
           ) : (
             <span aria-current="page" className="text-ink">
-              Decks
+              Today
             </span>
           )}
         </li>

@@ -719,10 +719,10 @@ export function FlashcardReviewClient({
           {totalInDeck > 0 ? (
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Button asChild>
-                <Link href={`/dashboard/${deckId}/quiz?count=10&mode=mcq`}>Take a quiz instead</Link>
+                <Link href={`/dashboard/${deckId}/quiz?mode=mcq`}>Take a quiz instead</Link>
               </Button>
               <Button asChild>
-                <Link href={`/dashboard/${deckId}/study?count=10&scope=include_reviewed`}>
+                <Link href={`/dashboard/${deckId}/study?scope=include_reviewed`}>
                   Study ahead anyway
                 </Link>
               </Button>

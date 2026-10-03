@@ -1,46 +1,46 @@
 import { Suspense } from 'react';
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { getSessionUser } from '@/lib/supabase/session';
-import { AccountControl } from '@/components/ui/shared/AccountControl';
+import { SIDEBAR_COOKIE, parseSidebarPreference } from '@/lib/sidebar-nav';
 import { AmbientField } from '@/components/ui/shared/AmbientField';
-import { AppRail } from '@/components/ui/shared/AppRail';
 import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
-import {
-  ShellBreadcrumb,
-  ShellBreadcrumbFallback,
-  ShellCommandPalette,
-  ShellCommandPaletteFallback,
-} from '@/components/ui/shared/ShellNav';
+import { KeyboardShortcutsDialog } from '@/components/ui/shared/KeyboardShortcutsDialog';
+import { ShellBreadcrumb, ShellBreadcrumbFallback, ShellCommandPalette } from '@/components/ui/shared/ShellNav';
+import { AccountRow } from '@/components/ui/shared/sidebar/AccountRow';
+import { Sidebar, SidebarToggle } from '@/components/ui/shared/sidebar/Sidebar';
+import { SidebarProvider } from '@/components/ui/shared/sidebar/SidebarProvider';
+import { AccountRowSlot, SidebarNavFallback, SidebarNavSlot } from '@/components/ui/shared/sidebar/SidebarSlots';
 
 /**
- * Chromed routes — the deck index and deck detail (design system §8).
+ * Chromed routes — Today, decks, Drills, Shared, Trash, Statistics, Settings
+ * (design system §8, Rev. E; COGNIT_SIDEBAR_SETTINGS_PLAN.md §6).
  *
- * The chrome is: a 48px rail on the left, a header carrying the breadcrumb and
- * the `⌘K` trigger, and the two dialogs those triggers open. What it is *not*
- * is a floating bar: the rail is a column in this flex row, so nothing here
- * ever sits on top of the page, and no page below has to reserve space for it.
+ * The chrome is the sidebar, a header carrying the breadcrumb (and, on a
+ * phone, the button that opens the sidebar as a drawer), and the dialogs the
+ * sidebar and the keyboard open. What it is *not* is a floating bar: from
+ * 768px the sidebar is a column in this flex row, so nothing here sits on top
+ * of the page and no page below has to reserve space for it. There is no
+ * header search any more; Search lives in the sidebar and opens ⌘K.
  *
  * Being a route group rather than a `usePathname()` test is the whole point.
- * Study and quiz resolve into `(focus)` instead and cannot pick this up by
- * accident — which is what let the old dock keep a Dashboard link on a paused
- * quiz that bypassed `requestQuit()` (F-01).
+ * Study, quiz and drills resolve into `(focus)` instead and cannot pick this
+ * up by accident — which is what let the old dock keep a Dashboard link on a
+ * paused quiz that bypassed `requestQuit()` (F-01).
  *
  * The layout waits for exactly one thing before the frame goes out: the
  * session, which `getSessionUser` verifies from the cookie — locally once the
  * project signs with ES256, by an Auth round-trip while it is still HS256
- * (plan §6.3). The deck
- * list the breadcrumb and palette need is read behind the two Suspense
- * boundaries in the header, so the rail, the header bar and the page's own
- * skeleton reach the browser on the first flush and the titles stream in
- * after. Reading it up here used to hold back the entire response — skeleton
- * included — for the layout's queries.
+ * (plan §6.3). The sidebar preference comes from a cookie, read here so the
+ * first paint is already the right width. Everything that needs the database
+ * — the sidebar's lists and counts, the account name, the breadcrumb's deck
+ * title, the palette — streams behind its own Suspense boundary, off one
+ * cached wave of reads (`loadSidebar`), so the frame, the header and the
+ * page's own skeleton reach the browser on the first flush.
  *
- * The two dialogs are mounted here rather than on the page so every chromed
- * route can reach them. That also repairs a real gap: `CreateDeckModal` used to
- * be rendered inside the due-now band, which is not rendered when the account
- * has no decks — so the onboarding panel's "write your own" dispatched its
- * open event at a component that was not mounted.
+ * The dialogs are mounted here rather than on a page so every chromed route
+ * can reach them, and so ⌘N and ? are honoured wherever their keycaps show.
  */
 export default async function ShellLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -49,35 +49,40 @@ export default async function ShellLayout({ children }: { children: React.ReactN
     redirect('/login');
   }
 
+  const preference = parseSidebarPreference((await cookies()).get(SIDEBAR_COOKIE)?.value);
+  // Read at request time: /explore is notFound() without it, so the sidebar must not link there (D10).
+  const exploreEnabled = process.env.EXPLORE_ENABLED === 'true';
+
   return (
-    <div className="flex min-h-dvh">
+    <SidebarProvider initialPreference={preference}>
       {/*
         Mounted once for the whole chromed subtree, and deliberately not in the
         root layout: `(focus)` — study and quiz — is a single card on a flat
-        ground and must stay that way (§8). The rail and header already carry
+        ground and must stay that way (§8). The sidebar and header already carry
         --z-rail / --z-sticky, so only #main-content needs lifting off z-0.
       */}
       <AmbientField />
 
-      <AppRail email={user.email} />
+      <Sidebar
+        nav={
+          <Suspense fallback={<SidebarNavFallback exploreEnabled={exploreEnabled} />}>
+            <SidebarNavSlot userId={user.id} exploreEnabled={exploreEnabled} />
+          </Suspense>
+        }
+        account={
+          <Suspense fallback={<AccountRow name={null} email={user.email} />}>
+            <AccountRowSlot user={user} />
+          </Suspense>
+        }
+      />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-[var(--z-sticky)] border-b border-border bg-[var(--bg)]">
-          <div className="flex h-12 items-center justify-between gap-4 px-4 md:px-6">
+          <div className="flex h-12 items-center gap-1 px-2 md:px-6">
+            <SidebarToggle />
             <Suspense fallback={<ShellBreadcrumbFallback />}>
               <ShellBreadcrumb userId={user.id} />
             </Suspense>
-
-            <div className="flex shrink-0 items-center gap-2">
-              <Suspense fallback={<ShellCommandPaletteFallback />}>
-                <ShellCommandPalette userId={user.id} />
-              </Suspense>
-              {/* Desktop keeps the account in the rail foot (§8); this is the
-                  mobile anchor for the same sheet. */}
-              <div className="md:hidden">
-                <AccountControl email={user.email} placement="header" />
-              </div>
-            </div>
           </div>
         </header>
 
@@ -86,9 +91,14 @@ export default async function ShellLayout({ children }: { children: React.ReactN
         </div>
       </div>
 
-      {/* Mounted once for the whole chromed subtree; opened by the palette, the
-          due-now band and the onboarding panel through a named event. */}
+      {/* Opened by the sidebar's New deck, ⌘N, the due-now band, the onboarding panel and the palette. */}
       <CreateDeckModal />
-    </div>
+      {/* `?`, the account menu and the palette's "Keyboard shortcuts" row (sidebar plan §5.7). */}
+      <KeyboardShortcutsDialog />
+      {/* Headless: the sidebar's Search and ⌘K open it (sidebar plan §6.8). */}
+      <Suspense fallback={null}>
+        <ShellCommandPalette userId={user.id} />
+      </Suspense>
+    </SidebarProvider>
   );
 }

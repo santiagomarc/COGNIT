@@ -4,11 +4,13 @@ import { SocialProof } from '@/components/landing/SocialProof';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { Footer } from '@/components/landing/Footer';
 import { LandingBackground } from '@/components/landing/LandingBackground';
+import { AccountDeletedNotice } from '@/components/landing/AccountDeletedNotice';
 
 export default async function HomePage() {
   return (
     <div className="relative min-h-screen flex flex-col overflow-x-hidden">
       <LandingBackground />
+      <AccountDeletedNotice />
       {/* Hero is always in the initial viewport — no content-visibility skip */}
       <HeroSection />
       {/* Below-the-fold sections: skip paint/layout until near viewport (CWV improvement) */}

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { DashboardSearch } from '@/components/ui/shared/DashboardSearch';
 import { DeckRow, DeckRowLegend, type DeckRowData } from '@/components/ui/shared/DeckRow';
 import { Button } from '@/components/ui/button';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
@@ -107,7 +106,6 @@ function sortDecks(items: DeckWithCount[], sortMode: DeckSortMode) {
  * spring per row is fine for four tiles and is noise for twenty rows.
  */
 export function DeckGrid({ decks }: DeckGridProps) {
-  const [search, setSearch] = useState('');
   /*
    * Most-due by default (Run 6, Task 2.6). Newest-first is the right order for
    * an account with three decks and the wrong one for an account with twelve and
@@ -121,12 +119,6 @@ export function DeckGrid({ decks }: DeckGridProps) {
   }, [decks]);
 
   const orderedDecks = useMemo(() => sortDecks(localDecks, sortMode), [localDecks, sortMode]);
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return orderedDecks;
-    const q = search.toLowerCase();
-    return orderedDecks.filter((d) => parseDeckTitleMetadata(d.title).cleanTitle.toLowerCase().includes(q));
-  }, [orderedDecks, search]);
 
   const totalCards = useMemo(
     () => localDecks.reduce((sum, d) => sum + (d.cards?.[0]?.count ?? 0), 0),
@@ -146,16 +138,8 @@ export function DeckGrid({ decks }: DeckGridProps) {
           </span>
         </div>
 
+        {/* No filter box: Search in the sidebar (⌘K) reaches every deck by name (sidebar plan D2). */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="w-36 sm:w-48">
-            <DashboardSearch
-              value={search}
-              onChange={setSearch}
-              resultCount={filtered.length}
-              totalCount={orderedDecks.length}
-            />
-          </div>
-
           <div className="inline-flex gap-1" role="group" aria-label="Deck sort mode">
             {SORT_MODES.map((mode) => (
               <Button
@@ -174,17 +158,13 @@ export function DeckGrid({ decks }: DeckGridProps) {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
-        <p className="well px-4 py-8 text-center text-sm text-ink-dim">
-          {localDecks.length === 0
-            ? 'No decks yet. Create one to get started.'
-            : `No decks match “${search}”.`}
-        </p>
+      {orderedDecks.length === 0 ? (
+        <p className="well px-4 py-8 text-center text-sm text-ink-dim">No decks yet. Create one to get started.</p>
       ) : (
         <div className="well overflow-hidden px-3.5">
           <DeckRowLegend />
 
-          {filtered.map((deck) => {
+          {orderedDecks.map((deck) => {
             const { cleanTitle, tag } = parseDeckTitleMetadata(deck.title);
             const row: DeckRowData = {
               id: deck.id,

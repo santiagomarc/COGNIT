@@ -13,7 +13,8 @@ import { publicEnv } from '@/lib/env-public';
  * It bypasses RLS entirely. Nothing but `deleteAccount` may import it, which
  * the settings test pins; never pass it to a loader or return it from a helper.
  *
- * Null when SUPABASE_SERVICE_ROLE_KEY is unset: Settings then shows account
+ * Null when SUPABASE_SERVICE_ROLE_KEY is unset (`accountDeletionAvailable` in
+ * account-deletion.ts asks the same question): Settings then shows account
  * deletion as unavailable instead of offering a button that fails.
  */
 export function createAdminClient() {
@@ -23,8 +24,4 @@ export function createAdminClient() {
   return createClient<Database>(publicEnv.NEXT_PUBLIC_SUPABASE_URL, key, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
-}
-
-export function accountDeletionAvailable(): boolean {
-  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }

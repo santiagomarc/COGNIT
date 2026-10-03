@@ -29,9 +29,14 @@ describe('buildPaletteCommands', () => {
     const ids = build().map((command) => command.id);
     expect(ids).toEqual([
       'start-session',
-      'decks',
+      'today',
+      'drills',
       'stats',
+      'shared',
+      'trash',
+      'settings',
       'new-deck',
+      'show-shortcuts',
       'toggle-theme',
       'sign-out',
       'deck:a',
@@ -78,6 +83,7 @@ describe('buildPaletteCommands', () => {
       .map((c) => [c.id, c.effect, c.href]);
     expect(effects).toEqual([
       ['new-deck', 'new-deck', undefined],
+      ['show-shortcuts', 'show-shortcuts', undefined],
       ['toggle-theme', 'toggle-theme', undefined],
       ['sign-out', 'sign-out', undefined],
     ]);
@@ -108,7 +114,7 @@ describe('filterPaletteCommands', () => {
 
   it('never reorders the rows it keeps', () => {
     const ids = filterPaletteCommands(build(), 'deck').map((c) => c.id);
-    expect(ids).toEqual(['decks', 'new-deck', 'deck:a', 'deck:b']);
+    expect(ids).toEqual(['today', 'new-deck', 'deck:a', 'deck:b']);
   });
 
   it('does not surface a destructive command for a single unrelated letter', () => {
@@ -122,7 +128,7 @@ describe('groupPaletteCommands', () => {
   it('collects consecutive rows under one heading', () => {
     const sections = groupPaletteCommands(build());
     expect(sections.map((s) => s.group)).toEqual(['Actions', 'Decks']);
-    expect(sections[0].commands).toHaveLength(6);
+    expect(sections[0].commands).toHaveLength(11);
     expect(sections[1].commands.map((c) => c.id)).toEqual(['deck:a', 'deck:b']);
   });
 

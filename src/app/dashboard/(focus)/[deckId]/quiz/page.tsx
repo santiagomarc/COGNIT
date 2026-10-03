@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { getRequestClient, getSessionUser, getUserSettings } from '@/lib/supabase/session';
 import { QuizAssessmentClient } from '@/components/ui/shared/QuizAssessmentClient';
 import {
   getSessionCardBounds,
@@ -78,6 +78,9 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
     redirect('/login');
   }
 
+  // The account's cards-per-session default (sidebar plan §5.5); read beside the wave below.
+  const settingsPromise = getUserSettings(user.id);
+
   // One wave: the deck, the deck-wide count and — in focus mode — the proven
   // count are independent reads. This page used to await them in sequence.
   const [{ data: deck }, { count: totalInDeck }, provenResult] = await Promise.all([
@@ -98,8 +101,9 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   }
 
   const availableCardCount = totalInDeck ?? 0;
-  const { max: maxQuizCards } = getSessionCardBounds(availableCardCount);
-  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, availableCardCount);
+  const { sessionCardCount: preferredCount } = await settingsPromise;
+  const { max: maxQuizCards } = getSessionCardBounds(availableCardCount, preferredCount);
+  const sessionCardCount = normalizeSessionCardCount(resolvedSearchParams?.count, availableCardCount, preferredCount);
 
   // The deck page advertises "Force include all unproven cards (N)" with N =
   // every unproven card in the deck. Fetching a fixed small pool and filtering

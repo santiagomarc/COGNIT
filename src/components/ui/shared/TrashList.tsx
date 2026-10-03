@@ -21,7 +21,7 @@ function useHasMounted() {
 }
 
 /**
- * The trash as a page (sidebar plan §4.4, DST-03): `TrashPanel`'s restore and
+ * The trash as a page (sidebar plan §4.4, DST-03): the old `TrashPanel`'s restore and
  * delete-forever logic without the `<details>`. The server page has already
  * purged anything past its 30 days and passes what is left.
  *

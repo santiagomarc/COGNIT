@@ -4,13 +4,13 @@
  * old two-tile layout would have re-introduced the layout shift on load that
  * the rest of this redesign removes.
  *
- * It renders inside the shell, so the rail and the header are already on screen
+ * It renders inside the shell, so the sidebar and the header are already on screen
  * and are not drawn again here. It carries no bottom padding either: the
  * dashboard route layout is the single owner of that (F-03).
  *
  * The telemetry strip lost its right-hand controls when search and the theme
- * toggle moved into the shell header and the account sheet (§8), so this
- * skeleton is four readings and a rule — matching what lands.
+ * moved into the sidebar and its account menu (§8, Rev. E), so this skeleton
+ * is four readings and a rule — matching what lands.
  */
 export default function DashboardLoading() {
   return (

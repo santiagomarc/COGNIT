@@ -21,7 +21,7 @@ export type PaletteCommand = {
   /** Where a navigation command goes. Absent on commands that are not routes. */
   href?: string;
   /** Non-navigation commands name their effect for the dialog to dispatch. */
-  effect?: 'new-deck' | 'toggle-theme' | 'sign-out';
+  effect?: 'new-deck' | 'show-shortcuts' | 'toggle-theme' | 'sign-out';
 };
 
 export type PaletteDeck = {
@@ -68,12 +68,20 @@ export function buildPaletteCommands({
 
   commands.push(
     {
-      id: 'decks',
-      label: 'Go to decks',
+      id: 'today',
+      label: 'Today',
       hint: '/dashboard',
       group: 'Actions',
-      keywords: 'dashboard index home library',
+      keywords: 'dashboard index home library decks due',
       href: '/dashboard',
+    },
+    {
+      id: 'drills',
+      label: 'Drills',
+      hint: '/dashboard/drills',
+      group: 'Actions',
+      keywords: 'synthesis drill connect connections exam practice',
+      href: '/dashboard/drills',
     },
     {
       id: 'stats',
@@ -84,11 +92,42 @@ export function buildPaletteCommands({
       href: '/dashboard/stats',
     },
     {
+      id: 'shared',
+      label: 'Shared',
+      hint: '/dashboard/shared',
+      group: 'Actions',
+      keywords: 'share shared link links public directory',
+      href: '/dashboard/shared',
+    },
+    {
+      id: 'trash',
+      label: 'Trash',
+      hint: '/dashboard/trash',
+      group: 'Actions',
+      keywords: 'trash deleted restore recently removed bin',
+      href: '/dashboard/trash',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      hint: '/dashboard/settings',
+      group: 'Actions',
+      keywords: 'settings preferences profile account options name password export',
+      href: '/dashboard/settings',
+    },
+    {
       id: 'new-deck',
       label: 'New deck',
       group: 'Actions',
       keywords: 'create add deck new',
       effect: 'new-deck',
+    },
+    {
+      id: 'show-shortcuts',
+      label: 'Keyboard shortcuts',
+      group: 'Actions',
+      keywords: 'keyboard shortcuts keys hotkeys help',
+      effect: 'show-shortcuts',
     },
     {
       id: 'toggle-theme',

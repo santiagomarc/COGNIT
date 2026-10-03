@@ -605,6 +605,16 @@ The palette keeps its own header trigger until NAV-08.
 | Accessibility | axe on `/dashboard/settings` | 0 violations of `label`, `aria-*`, `landmark-*`, `color-contrast` |
 | Both themes | Settings | matches Rev. E §7.12 |
 
+**Execution notes (2026-10-02, on `c032f10`, uncommitted).** Automated: `tsc` clean · ESLint and contrast clean · **574 tests in 57 files** (566 + C2's shortcuts 5 + `auth-providers` 3; `shortcuts.test.ts` green) · build ✓ with `ƒ /dashboard/settings`; `/` stays static · bundle budgets pass, Settings at 207.5 kB gz (budget 213). Signed out on `next start`: `/dashboard/settings` redirects to login. **Not yet checked:** everything signed in, axe, and both themes on the page. Where the repo corrected the plan:
+
+- **Assertion 18 failed on production, as §3.6 allowed for.** `decks.user_id` and `study_logs.user_id` are `NO ACTION`: both tables predate the migrations that declare them cascading. Deleting any user with a deck would fail. `202610020900_account_deletion_cascade.sql` moves both to `ON DELETE CASCADE` under the same names. **It is written but not pushed**: the push needs the owner. Until it lands and assertion 18 passes, `SUPABASE_SERVICE_ROLE_KEY` must stay unset, which keeps SET-10's button hidden.
+- **Zod leaked into the client.** The Settings forms imported constants from `user-settings.ts`, which imports zod: 270 kB gz. The constants and defaults moved to a zod-free `user-settings-limits.ts`, which `user-settings.ts` re-exports. Now 207.5 kB.
+- **`accountDeletionAvailable`** moved to `src/lib/account-deletion.ts`, so the page never imports `supabase/admin.ts`. The single-importer test stays true.
+- **The theme provider used to store the resolved theme on every mount**, so "follow the OS" became a fixed choice after one visit. System is now real, and it tracks OS changes live.
+- **The AI-limit message** reads its number from `DAILY_AI_CALL_CEILING`; `_shared.test.ts` was updated to match.
+- **Primitives:** `ThemePreferenceControl` and `Stepper` are small native components, not Radix, matching `switch.tsx`.
+- **`?account=deleted`** is read in an effect, not with `useSearchParams`, so the landing page stays static.
+
 ---
 
 ## 6. Phase 3 — The sidebar
@@ -749,6 +759,29 @@ The skeletons need no layout change: they render inside the shell.
 | axe | Today, Settings, Drills, and the drawer open | 0 violations of `landmark-*`, `region`, `aria-*`, `label`, `color-contrast` |
 | Both themes | all of the above | matches Rev. E; no hue except due counts and state ticks |
 | Mockup parity | canvas boards 1 and 2 | layout, order and copy match. Differences allowed: no ⌘, (D9), and Settings' sound copy (§5.6) |
+
+**Execution notes (2026-10-03, on `c032f10` + uncommitted Phase 2).** Automated: `tsc` clean · ESLint and contrast clean · **574 tests in 57 files** · build ✓ · the NAV-09 `rg` is empty · bundle budgets pass after the one allowed raise. Signed out on `next start`: every shell route redirects to login.
+
+**Rendered checks.** These ran on a scratch-clone-only `/sidebar-preview` route that rendered the real sidebar components with sample data (no session available), driven by Playwright with system Chrome:
+- Widths: 256 px on `auto` at 1440, 48 px with `collapsed`, 48 px on `auto` at 900. Expanding from the rail writes `cognit-sidebar=expanded`.
+- Phone: the drawer is `role=dialog`, focus lands on Close, items are 44 px, body scroll is locked, Tab stays inside, and Escape returns focus to the header button.
+- Account popover: sits at x = 264 beside the sidebar, takes focus, and returns it on Escape.
+- `?`, ⌘K, the sidebar's Search and ⌘N each open their dialog. A deck route marks its deck row current.
+- Settings mode marks the section at the top, and the last section at the page's end. The page's own index hides only where the expanded sidebar lists the sections.
+- axe: 0 violations on the expanded sidebar, the rail, the phone drawer and the account menu.
+
+Where the repo corrected the plan:
+
+- **Container query for the rail presentation.** It responds to the sidebar's own width, so one rule set serves "collapsed at 1440" and "auto at 900". Size containment makes the sidebar the containing block for fixed descendants, so the account popover is portalled to `<body>`.
+- **Settings mode hides Search and New deck,** matching approved board 2. ⌘K and ⌘N still work there. Rev. E §7.11 now says so.
+- **Two bugs found in the rendered check and fixed:**
+  - An open inline account panel turned into the desktop popover when the drawer closed, stealing focus. The menu now belongs to the presentation it opened in.
+  - The scroll-spy's IntersectionObserver band reported the previous section while its bottom edge touched the band. It now reads section positions on scroll, and the last section is current at the page's end.
+- **Drawer state** resets during render when the route changes (React's "adjust state to a changed input" pattern). An effect would trip `react-hooks/set-state-in-effect`.
+- **Bundle:** each shell route grew about 6–7 kB gz. Lazy-loading the account menu body made first-load JS *larger* (+2.5 kB, the dynamic-import runtime), so it was reverted. Budgets were raised once to measured + 5 kB: Today 226, deck 250, settings 219, trash 211, shared 210, drills 208, stats 208. The written reason, per §6.9: "Sidebar navigation, account menu and drawer replace the rail (COGNIT_SIDEBAR_SETTINGS_PLAN.md §6)."
+- **Wordmark at 24 px,** not the mockup's 23: Instrument Serif never goes below 24 px (design system §3.3).
+
+**Still owed (signed in, by the owner):** the S3 table's device rows (iOS and Android), VoiceOver, axe on the real Today/Settings/Drills, and counts updating after a trash, with no reload.
 
 ---
 
