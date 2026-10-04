@@ -519,6 +519,101 @@
 }
 
 /*
+ * ─── Create-deck panel (dashboard) ───
+ *
+ * Its hover lives here, not in utilities. `.surface` and `.brk` are unlayered,
+ * and an unlayered declaration beats every Tailwind utility regardless of
+ * specificity — so `hover:border-ink`, `hover:shadow-*` and
+ * `group-hover:border-ink` on this panel compiled and never applied, leaving
+ * a 1px hairline as the only hover. This block comes after `.surface` and
+ * `.brk` in source order, so it wins by position.
+ *
+ * What hover now does, in one move: the panel lifts 3px and takes a deeper
+ * shadow, the face steps up to --surface-raised under a soft top-down light,
+ * the edge goes to full ink, the reticle brackets open outward, and the plus
+ * turns a quarter. Ease-out throughout — it settles, it does not bounce (§5).
+ * Keyboard focus gets the same emphasis, so the affordance is not mouse-only.
+ */
+.create-deck {
+  isolation: isolate;
+  transition:
+    transform var(--dur-panel) var(--ease-out),
+    box-shadow var(--dur-panel) var(--ease-out),
+    border-color var(--dur-hover) ease,
+    background-color var(--dur-hover) ease;
+}
+/* The light: sits above the face, below the content (isolation makes -1 safe).
+   White in both themes — light falls as a highlight; an ink wash on the pale
+   face would read as a smudge. */
+.create-deck::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(120% 95% at 50% 0%, rgb(255 255 255 / 0.95), transparent 70%);
+  transition: opacity var(--dur-panel) var(--ease-out);
+}
+.dark .create-deck::after {
+  background: radial-gradient(120% 95% at 50% 0%, rgb(255 255 255 / 0.1), transparent 70%);
+}
+.create-deck:is(:hover, :focus-visible) {
+  transform: translateY(-3px);
+  border-color: var(--ink);
+  background: var(--surface-raised);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 18px 36px -14px rgb(24 24 27 / 0.28),
+    0 2px 6px rgb(24 24 27 / 0.08);
+}
+.dark .create-deck:is(:hover, :focus-visible) {
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
+    0 20px 40px -14px rgb(0 0 0 / 0.9),
+    0 0 0 1px rgb(255 255 255 / 0.06);
+}
+.create-deck:is(:hover, :focus-visible)::after {
+  opacity: 1;
+}
+.create-deck:active {
+  transform: translateY(0);
+  box-shadow: var(--elevate-1);
+  transition-duration: var(--dur-key);
+}
+
+.create-deck .brk {
+  transition:
+    border-color var(--dur-hover) ease,
+    transform var(--dur-panel) var(--ease-out);
+}
+.create-deck:is(:hover, :focus-visible) .brk {
+  border-color: var(--ink);
+}
+.create-deck:is(:hover, :focus-visible) .brk--tl { transform: translate(-3px, -3px); }
+.create-deck:is(:hover, :focus-visible) .brk--tr { transform: translate(3px, -3px); }
+.create-deck:is(:hover, :focus-visible) .brk--bl { transform: translate(-3px, 3px); }
+.create-deck:is(:hover, :focus-visible) .brk--br { transform: translate(3px, 3px); }
+
+.create-deck__plus {
+  transition: transform var(--dur-panel) var(--ease-out);
+}
+.create-deck:is(:hover, :focus-visible) .create-deck__plus {
+  transform: rotate(90deg) scale(1.12);
+}
+
+/* Reduced motion keeps the colour and shadow change; it drops the travel. */
+@media (prefers-reduced-motion: reduce) {
+  .create-deck:is(:hover, :focus-visible),
+  .create-deck:active,
+  .create-deck:is(:hover, :focus-visible) .brk,
+  .create-deck:is(:hover, :focus-visible) .create-deck__plus {
+    transform: none;
+  }
+}
+
+/*
  * ─── Gradient-masked rules (Run 6) ───
  *
  * A hairline that fades at both ends. This is the cheapest single fix for
