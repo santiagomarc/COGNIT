@@ -536,6 +536,11 @@
  */
 .create-deck {
   isolation: isolate;
+  /* The panel is one operable control, so its edge is --border-control (3:1,
+     WCAG 1.4.11), not the decorative --border `.surface` paints. The
+     `border-[var(--border-control)]` utility that used to say this lost to
+     `.surface` and never applied. */
+  border-color: var(--border-control);
   transition:
     transform var(--dur-panel) var(--ease-out),
     box-shadow var(--dur-panel) var(--ease-out),
@@ -595,6 +600,17 @@
 .create-deck:is(:hover, :focus-visible) .brk--tr { transform: translate(3px, -3px); }
 .create-deck:is(:hover, :focus-visible) .brk--bl { transform: translate(-3px, 3px); }
 .create-deck:is(:hover, :focus-visible) .brk--br { transform: translate(3px, 3px); }
+
+/* `.kbd` is unlayered too, so the keycap's own hover utilities were dead. */
+.create-deck .kbd {
+  transition:
+    border-color var(--dur-hover) ease,
+    color var(--dur-hover) ease;
+}
+.create-deck:is(:hover, :focus-visible) .kbd {
+  border-color: var(--ink-dim);
+  color: var(--ink);
+}
 
 .create-deck__plus {
   transition: transform var(--dur-panel) var(--ease-out);

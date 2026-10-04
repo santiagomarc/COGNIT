@@ -34,7 +34,7 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
       onClick={requestOpenCreateDeck}
       aria-haspopup="dialog"
       aria-keyshortcuts="Meta+N Control+N"
-      className="surface spec create-deck group relative flex w-full cursor-pointer flex-col items-start border-[var(--border-control)] p-4 text-left outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] lg:w-[340px] lg:p-5"
+      className="surface spec create-deck group relative flex w-full cursor-pointer flex-col items-start p-4 text-left outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] lg:w-[340px] lg:p-5"
     >
       {/* Specular hairline highlight that illuminates on hover. The hover
           treatment as a whole is `.create-deck` in globals.css. */}
@@ -63,9 +63,7 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
         <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer transition-colors duration-[120ms] group-hover:text-ink-dim">
           {deckCount === 1 ? '1 deck' : `${deckCount} decks`} so far
         </span>
-        <Kbd className="transition-colors duration-[120ms] group-hover:border-ink-dim group-hover:text-ink">
-          ⌘N
-        </Kbd>
+        <Kbd>⌘N</Kbd>
       </span>
     </button>
   );
