@@ -267,7 +267,9 @@ Base is **14px** for application chrome. Instrument Serif display headings and s
 --type-display-xl: 4.125rem;  /* 66px — page hero, login brand      */
 --type-display-lg: 3rem;      /* 48px — page title (h1), modal head */
 --type-display:    2.25rem;   /* 36px — section heading (h2)        */
---type-study-body: clamp(2.35rem, 3.6vw, 3.25rem); /* ~38-52px card text */
+--type-study-lg: clamp(2rem, 3.2vw, 2.75rem);      /* card text ≤ 110 chars: 32-44px */
+--type-study-md: clamp(1.625rem, 2.4vw, 2.125rem); /* 111-240 chars: 26-34px */
+--type-study-sm: 1.5rem;                           /* > 240 chars: 24px, the serif floor */
 
 /* chrome steps — Geist Sans */
 --type-h3:   1rem;      /* 16px, weight 600  */

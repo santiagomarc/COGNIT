@@ -1,7 +1,11 @@
-import type { ReactNode } from 'react';
+'use client';
+
+import { useRef, type ReactNode } from 'react';
 
 import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import type { StudyGrade } from '@/lib/sm2';
+import type { StudyLength } from '@/lib/study-type';
+import { useOverflowBelow } from '@/lib/use-overflow';
 import { cn } from '@/lib/utils';
 
 /**
@@ -28,6 +32,9 @@ type FlipCardProps = {
   prompt: ReactNode;
   /** What the user is trying to recall. */
   answer: ReactNode;
+  /** Type step for each face, from `studyLength()` of its text. Omit for the large step. */
+  promptLength?: StudyLength;
+  answerLength?: StudyLength;
   state: FlipState;
   /** Colours the 160ms commit flash. Only meaningful while `state` is `graded`. */
   grade?: StudyGrade;
@@ -38,6 +45,43 @@ type FlipCardProps = {
   ariaLabel?: string;
   className?: string;
 };
+
+type FlipFaceProps = {
+  side: 'prompt' | 'answer';
+  /** Hidden from assistive technology, because the face is turned away. */
+  hidden: boolean;
+  length?: StudyLength;
+  aside?: ReactNode;
+  children: ReactNode;
+};
+
+/**
+ * One face of the card. It owns its scroll container so it can tell when the
+ * text runs past the fold and cue it (`.flip__more` in `globals.css`).
+ */
+function FlipFace({ side, hidden, length, aside, children }: FlipFaceProps) {
+  const scrollRef = useRef<HTMLSpanElement>(null);
+  const overflowing = useOverflowBelow(scrollRef);
+
+  return (
+    <span className={`flip__face flip__face--${side}`} aria-hidden={hidden}>
+      <span
+        ref={scrollRef}
+        className="flip__scroll"
+        data-overflow={overflowing ? 'below' : undefined}
+      >
+        <span className="flip__body" data-length={length}>
+          {children}
+        </span>
+        {aside}
+      </span>
+      {/* Must directly follow .flip__scroll: the CSS reveals it with `+`. */}
+      <span className="flip__more" aria-hidden="true">
+        More below ↓
+      </span>
+    </span>
+  );
+}
 
 /**
  * The study canvas card.
@@ -54,6 +98,8 @@ type FlipCardProps = {
 export function FlipCard({
   prompt,
   answer,
+  promptLength,
+  answerLength,
   state,
   grade,
   answerAside,
@@ -72,17 +118,17 @@ export function FlipCard({
           answer while the card still reads "question" — the reveal is the
           whole interaction, so leaking it defeats the exercise.
         */}
-        <span className="flip__face flip__face--prompt" aria-hidden={showingAnswer}>
-          <span className="flip__scroll">
-            <span className="flip__body">{prompt}</span>
-          </span>
-        </span>
-        <span className="flip__face flip__face--answer" aria-hidden={!showingAnswer}>
-          <span className="flip__scroll">
-            <span className="flip__body">{answer}</span>
-            {answerAside}
-          </span>
-        </span>
+        <FlipFace side="prompt" hidden={showingAnswer} length={promptLength}>
+          {prompt}
+        </FlipFace>
+        <FlipFace
+          side="answer"
+          hidden={!showingAnswer}
+          length={answerLength}
+          aside={answerAside}
+        >
+          {answer}
+        </FlipFace>
       </span>
       {/* Focus is four corner rules on the card's bounds (§7.7), never a ring. */}
       <CornerBrackets />

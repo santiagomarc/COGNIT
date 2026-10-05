@@ -122,6 +122,13 @@
   --type-cap:  0.75rem;   /* 12px              */
   --type-label:0.625rem;  /* 10px, mono, uppercase, 0.16em */
 
+  /* Study card text, chosen by length (`studyLength()` in lib/study-type.ts).
+     Serif never goes below 24px, so long text gets a smaller step and a wider
+     measure instead of a smaller floor. */
+  --type-study-lg: clamp(2rem, 3.2vw, 2.75rem);      /* ≤ 110 chars: 32 → 44px */
+  --type-study-md: clamp(1.625rem, 2.4vw, 2.125rem); /* 111–240:     26 → 34px */
+  --type-study-sm: 1.5rem;                           /* > 240:       24px, the floor */
+
   /* Z-scale — the single source of stacking order. This is the fix for F-01.
      Never write a raw z-50 again; if a new layer is needed, add a token here. */
   --z-rail: 20;      /* the sidebar column (≥768px)     */
@@ -896,6 +903,7 @@ button.flip {
 }
 
 .flip__face {
+  position: relative;
   grid-area: 1 / 1;
   min-height: 0;
   display: flex;
@@ -974,13 +982,53 @@ button.flip {
   margin-inline: auto;
   max-width: 36ch;
   font-family: var(--font-serif);
-  font-size: clamp(2.35rem, 3.6vw, 3.25rem);
+  font-size: var(--type-study-lg);
   /* 400, never higher. Instrument Serif has no bold weight, so 500 was a
      browser-synthesised smear on the single largest text in the product. */
   font-weight: 400;
   line-height: 1.25;
   letter-spacing: -0.02em;
   text-wrap: balance;
+}
+
+/* The step follows the text's length (`data-length`, set by FlipCard from
+   `studyLength()`): a 300-character definition at the large step is 13 lines on
+   a phone and half of it sits behind an inner scroll. */
+.flip__body[data-length='md'] {
+  max-width: 44ch;
+  font-size: var(--type-study-md);
+  line-height: 1.3;
+}
+.flip__body[data-length='sm'] {
+  max-width: 52ch;
+  font-size: var(--type-study-sm);
+  line-height: 1.35;
+  text-wrap: pretty;
+}
+
+/* When the text still overflows its face, say so: fade the last 32px (a mask,
+   so it reads the same in both themes) and label it. The label is aria-hidden;
+   a screen reader reads the whole text anyway. */
+.flip__scroll[data-overflow='below'] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+}
+.flip__more {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0.5rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dimmer);
+  opacity: 0;
+  pointer-events: none;
+}
+.flip__scroll[data-overflow='below'] + .flip__more {
+  opacity: 1;
 }
 
 /* A mnemonic belongs to the answer, so it scrolls with it — mounting it as a

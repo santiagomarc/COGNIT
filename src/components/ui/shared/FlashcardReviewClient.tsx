@@ -16,6 +16,7 @@ import { gradeCard, finishStudySession } from '@/app/actions/study';
 import { cardLeaveSpring, motionTransitions } from '@/lib/motion-configs';
 import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
 import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/lib/study';
+import { studyLength } from '@/lib/study-type';
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
 import type { CapstoneDrillCandidate } from '@/lib/synthesis/types';
 import { toast } from 'sonner';
@@ -957,6 +958,8 @@ export function FlashcardReviewClient({
                       grade={committedGrade ?? undefined}
                       prompt={<RichText text={active.id_question ?? active.back} />}
                       answer={<RichText text={active.front} />}
+                      promptLength={studyLength(active.id_question ?? active.back)}
+                      answerLength={studyLength(active.front)}
                       answerAside={
                         active.mnemonic ? (
                           <span className="flip__aside">
