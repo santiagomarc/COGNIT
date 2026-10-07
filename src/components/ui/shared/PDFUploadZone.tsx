@@ -312,15 +312,17 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {generatedCards.map((card, i) => (
               <div key={i} className="surface p-4">
+                {/* `front` is the answer and `back` is the question in this schema
+                    (design system §7.6), so the preview reads in study order. */}
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Question
                 </p>
-                <p className="mt-1 text-sm leading-relaxed">{card.front}</p>
+                <p className="mt-1 text-sm leading-relaxed">{card.back}</p>
                 <hr className="my-3 border-border" />
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Answer
                 </p>
-                <p className="mt-1 text-sm leading-relaxed text-ink-dim">{card.back}</p>
+                <p className="mt-1 text-sm leading-relaxed text-ink-dim">{card.front}</p>
               </div>
             ))}
           </div>
