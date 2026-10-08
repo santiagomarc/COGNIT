@@ -977,7 +977,8 @@ button.flip {
 /*
  * The card prompt and answer — 1.5x scale, weightier Instrument Serif (§3.2).
  */
-.flip__body {
+.flip__body,
+.study-prompt {
   margin-block: auto;
   margin-inline: auto;
   max-width: 36ch;
@@ -993,13 +994,17 @@ button.flip {
 
 /* The step follows the text's length (`data-length`, set by FlipCard from
    `studyLength()`): a 300-character definition at the large step is 13 lines on
-   a phone and half of it sits behind an inner scroll. */
-.flip__body[data-length='md'] {
+   a phone and half of it sits behind an inner scroll. `.study-prompt` is the
+   same type for the quiz prompts, which sit on the page rather than in a card
+   face and so have no scroll container. */
+.flip__body[data-length='md'],
+.study-prompt[data-length='md'] {
   max-width: 44ch;
   font-size: var(--type-study-md);
   line-height: 1.3;
 }
-.flip__body[data-length='sm'] {
+.flip__body[data-length='sm'],
+.study-prompt[data-length='sm'] {
   max-width: 52ch;
   font-size: var(--type-study-sm);
   line-height: 1.35;

@@ -6,6 +6,7 @@ import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { Kbd } from '@/components/ui/Kbd';
 import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
+import { studyLength } from '@/lib/study-type';
 import { pageShortcutBlocked } from '@/lib/hotkeys';
 
 type MCQModeCard = {
@@ -166,7 +167,7 @@ export function MCQMode({
           {/* Question prompt in corner brackets on flat ground (§4 Task 4.1) */}
           <div className="relative flex min-h-[9rem] items-center justify-center px-6 py-8 text-center sm:px-10">
             <CornerBrackets />
-            <p className="mx-auto max-w-[34ch] text-balance font-serif text-[clamp(2.1rem,3.3vw,2.85rem)] leading-[1.25] tracking-[-0.02em] text-ink">
+            <p className="study-prompt mx-auto text-ink" data-length={studyLength(prompt)}>
               <RichText text={prompt} />
             </p>
           </div>

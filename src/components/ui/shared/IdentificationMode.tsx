@@ -10,6 +10,7 @@ import { similarity } from '@/lib/fuzzy';
 import { isAdvanceKey } from '@/lib/hotkeys';
 import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
+import { studyLength } from '@/lib/study-type';
 
 type IdentificationModeCard = {
   id: string;
@@ -106,7 +107,7 @@ export function IdentificationMode({
           {/* Question prompt in corner brackets on flat ground (§4 Task 4.1) */}
           <div className="relative flex min-h-[9rem] items-center justify-center px-6 py-8 text-center sm:px-10">
             <CornerBrackets />
-            <p className="mx-auto max-w-[34ch] text-balance font-serif text-[clamp(2.1rem,3.3vw,2.85rem)] leading-[1.25] tracking-[-0.02em] text-ink">
+            <p className="study-prompt mx-auto text-ink" data-length={studyLength(prompt)}>
               <RichText text={prompt} />
             </p>
           </div>
