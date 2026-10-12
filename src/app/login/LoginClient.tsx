@@ -195,7 +195,8 @@ export default function LoginClient() {
       }
 
       startTransition(async () => {
-        const result = await signup({ email, password });
+        const redirectTo = searchParams.get('redirectTo');
+        const result = await signup({ email, password, redirectTo });
         if (result?.error) {
           if (typeof result.error === 'string') {
             setGeneralError(result.error);

@@ -130,7 +130,7 @@ export async function loginWithOAuth(provider: 'google' | 'github', redirectTo?:
 }
 
 // ─── SIGNUP ───
-export async function signup(data: SignupInput) {
+export async function signup(data: SignupInput & { redirectTo?: string | null }) {
   const parsed = signupSchema.safeParse(data);
   if (!parsed.success) {
     return { error: parsed.error.flatten().fieldErrors };
@@ -138,13 +138,17 @@ export async function signup(data: SignupInput) {
 
   // Resolve the callback URL on the server (pinned to NEXT_PUBLIC_SITE_URL in prod)
   const baseUrl = await resolveBaseUrl();
+  // The confirmation link lands on /auth/callback, which honours a safe relative
+  // `next`. Without it, a visitor who signed up from "Save this deck" confirmed
+  // into an empty dashboard instead of the deck they came to save.
+  const next = encodeURIComponent(resolveRedirectPath(data.redirectTo));
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${baseUrl}/auth/callback`,
+      emailRedirectTo: `${baseUrl}/auth/callback?next=${next}`,
     },
   });
 
