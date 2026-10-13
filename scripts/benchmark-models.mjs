@@ -45,12 +45,7 @@ const benchmarkTasks = [
     prompt: `Analyze the study text and extract 3 flashcards. Return JSON matching: {"cards": [{"question": string, "answer": string, "explanation": string}]}. Notes: ${sampleNotes}`,
   },
   {
-    name: 'Task 2: Study Hint Generation (Text)',
-    isJson: false,
-    prompt: `A student is reviewing a flashcard with Question: "Where does the Calvin cycle take place in a plant cell?" Provide a subtle, one-sentence hint without giving the answer directly.`,
-  },
-  {
-    name: 'Task 3: Creative Mnemonic Generation',
+    name: 'Task 2: Creative Mnemonic Generation',
     isJson: false,
     prompt: `Create a memorable, concise mnemonic to help a student remember the overall chemical equation of photosynthesis: 6CO2 + 6H2O + light -> C6H12O6 + 6O2.`,
   }

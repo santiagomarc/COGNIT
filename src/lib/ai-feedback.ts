@@ -13,10 +13,6 @@ export function formatActionError(error: unknown, fallbackMessage: string): stri
         return 'Quiz enhancement is temporarily limited. Your cards are still saved and can be used in study mode.';
       }
 
-      if (error.includes('get hint')) {
-        return 'Hint generation is temporarily limited. Try answering first, then request a hint again in a bit.';
-      }
-
       if (error.includes('chat with deck')) {
         return 'Deck chat is temporarily rate-limited. Please try again shortly.';
       }

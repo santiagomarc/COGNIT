@@ -949,7 +949,6 @@ export function QuizAssessmentClient({
           ) : (
             <IdentificationMode
               key={active.id}
-              deckId={deckId}
               card={active}
               disabled={isPaused}
               enrichmentPending={isEnriching && activeNeedsIdentificationPrompt}

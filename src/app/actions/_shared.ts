@@ -11,7 +11,6 @@ export type AiActionName =
   | 'generate_cards'
   | 'enrich_cards'
   | 'sanitize_notes'
-  | 'get_hint'
   | 'generate_mnemonic'
   | 'chat_with_deck'
   | 'sync_embeddings'
@@ -23,7 +22,6 @@ const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests:
   generate_cards: { windowMinutes: 60, maxRequests: 20 },
   enrich_cards: { windowMinutes: 60, maxRequests: 120 },
   sanitize_notes: { windowMinutes: 60, maxRequests: 30 },
-  get_hint: { windowMinutes: 60, maxRequests: 90 },
   generate_mnemonic: { windowMinutes: 60, maxRequests: 60 },
   chat_with_deck: { windowMinutes: 60, maxRequests: 40 },
   // Each call now embeds at most 200 cards (see CARDS_PER_SYNC_BATCH in chat.ts),

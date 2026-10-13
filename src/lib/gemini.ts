@@ -154,7 +154,7 @@ function textConfig(request: TextRequest): GenerateContentConfig {
   };
 }
 
-/** One plain-text generation on GEMINI_MODEL (mnemonics, hints, note cleanup). */
+/** One plain-text generation on GEMINI_MODEL (mnemonics, note cleanup). */
 export async function generateText(request: TextRequest): Promise<GenerateContentResponse> {
   return ai().models.generateContent({
     model: getServerEnv().GEMINI_MODEL,

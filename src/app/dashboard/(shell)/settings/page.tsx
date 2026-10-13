@@ -111,7 +111,7 @@ export default async function SettingsPage() {
       <SettingsSection
         id="ai"
         title="AI usage & privacy"
-        description="Card generation, hints, deck chat, search and drill checks each use calls."
+        description="Card generation, deck chat, search and drill checks each use calls."
       >
         <SettingsRow label="Used in the last 24 hours" hint="Calls stop counting 24 hours after they're made.">
           <AiUsageMeter

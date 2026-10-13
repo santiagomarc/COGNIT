@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { Kbd } from '@/components/ui/Kbd';
 import { Input } from '@/components/ui/input';
-import { HintButton } from '@/components/ui/shared/HintButton';
 import { similarity } from '@/lib/fuzzy';
 import { isAdvanceKey } from '@/lib/hotkeys';
 import type { StudyGrade } from '@/lib/sm2';
@@ -20,7 +19,6 @@ type IdentificationModeCard = {
 };
 
 type IdentificationModeProps = {
-  deckId: string;
   card: IdentificationModeCard;
   disabled: boolean;
   enrichmentPending: boolean;
@@ -46,7 +44,6 @@ function getGrade(score: number): StudyGrade {
 }
 
 export function IdentificationMode({
-  deckId,
   card,
   disabled,
   enrichmentPending,
@@ -93,6 +90,18 @@ export function IdentificationMode({
     onAnswered?.(score >= 0.7);
   }
 
+  // The exit for a term that won't come. An empty answer is what the server
+  // already re-grades as a miss and the results list shows as "No answer
+  // recorded"; without this, the only way past the card was typing junk.
+  function handleDontKnow() {
+    if (disabled) {
+      return;
+    }
+
+    setResult({ answer: '', score: 0, grade: 'again' });
+    onAnswered?.(false);
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       {/* Centered stage */}
@@ -133,7 +142,7 @@ export function IdentificationMode({
                         : 'font-medium text-[var(--state-mastered)]'
                     }
                   >
-                    {result.answer}
+                    {result.answer || "Didn't know"}
                   </dd>
                 </div>
                 <div className="flex gap-3">
@@ -176,7 +185,9 @@ export function IdentificationMode({
         <div className="mx-auto flex w-full max-w-2xl items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             {!result ? (
-              <HintButton cardId={card.id} deckId={deckId} disabled={disabled} />
+              <Button type="button" variant="ghost" size="sm" onClick={handleDontKnow} disabled={disabled}>
+                Don&apos;t know
+              </Button>
             ) : (
               <p className="text-sm">
                 {result.grade === 'again' ? (
