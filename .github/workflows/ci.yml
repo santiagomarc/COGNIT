@@ -69,7 +69,10 @@ jobs:
       # version: the local one spells a NOT NULL json column
       # NonNullable<Json> and a no-argument function Record<PropertyKey,
       # never>, where the hosted one writes Json and never; both are mapped to
-      # the hosted spelling first.
+      # the hosted spelling first. CLI 2.120 (2026-10-06, pulled in by
+      # `version: latest`) also writes `ComputedFields: never;` into every
+      # table, which the hosted one omits; that empty form is dropped, so a
+      # table that gains real computed fields still fails the step.
       # On a mismatch the diff goes to the run summary and to annotations
       # (the failure email and the public API show those; job logs need a
       # signed-in viewer).
@@ -80,7 +83,7 @@ jobs:
             sed -e 's/NonNullable<Json>/Json/g' -e 's/Args: Record<PropertyKey, never>/Args: never/g' "$1" \
               | npx -y prettier@3.6.2 --no-config --stdin-filepath types.ts \
               | awk '/^[[:space:]]*__InternalSupabase: \{/ { if ($0 !~ /\}/) skip = 1; next } skip { if ($0 ~ /^[[:space:]]*\}/) skip = 0; next } { print }' \
-              | grep -v -e '^[[:space:]]*//' -e '^[[:space:]]*$' \
+              | grep -v -e '^[[:space:]]*//' -e '^[[:space:]]*$' -e '^[[:space:]]*ComputedFields: never;$' \
               | sed 's/[[:space:]]*$//'
           }
           if diff -u <(normalize src/lib/database.types.ts) <(normalize /tmp/types.ts) > /tmp/types.diff; then
