@@ -38,8 +38,6 @@ type FlipCardProps = {
   state: FlipState;
   /** Colours the 160ms commit flash. Only meaningful while `state` is `graded`. */
   grade?: StudyGrade;
-  /** Extra content rendered inside the answer face — a mnemonic, typically. */
-  answerAside?: ReactNode;
   /** Omit to render an inert card: the element becomes an `<article>`. */
   onReveal?: () => void;
   ariaLabel?: string;
@@ -51,7 +49,6 @@ type FlipFaceProps = {
   /** Hidden from assistive technology, because the face is turned away. */
   hidden: boolean;
   length?: StudyLength;
-  aside?: ReactNode;
   children: ReactNode;
 };
 
@@ -59,7 +56,7 @@ type FlipFaceProps = {
  * One face of the card. It owns its scroll container so it can tell when the
  * text runs past the fold and cue it (`.flip__more` in `globals.css`).
  */
-function FlipFace({ side, hidden, length, aside, children }: FlipFaceProps) {
+function FlipFace({ side, hidden, length, children }: FlipFaceProps) {
   const scrollRef = useRef<HTMLSpanElement>(null);
   const overflowing = useOverflowBelow(scrollRef);
 
@@ -73,7 +70,6 @@ function FlipFace({ side, hidden, length, aside, children }: FlipFaceProps) {
         <span className="flip__body" data-length={length}>
           {children}
         </span>
-        {aside}
       </span>
       {/* Must directly follow .flip__scroll: the CSS reveals it with `+`. */}
       <span className="flip__more" aria-hidden="true">
@@ -102,7 +98,6 @@ export function FlipCard({
   answerLength,
   state,
   grade,
-  answerAside,
   onReveal,
   ariaLabel,
   className,
@@ -125,7 +120,6 @@ export function FlipCard({
           side="answer"
           hidden={!showingAnswer}
           length={answerLength}
-          aside={answerAside}
         >
           {answer}
         </FlipFace>

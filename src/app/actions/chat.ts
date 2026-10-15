@@ -52,34 +52,33 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
     }
 
     const { supabase, user } = deckAccess;
-    const reservation = await reserveAiCall(supabase, user.id, 'sync_embeddings');
-    if (!reservation.ok) {
-      return { error: reservation.error };
-    }
 
     // Two cheap COUNT queries instead of fetching every embedding vector (up to
-    // ~6MB for a large deck) just to test which rows are null.
-    const { count: totalCardCount, error: totalCountError } = await supabase
-      .from('cards')
-      .select('id', { count: 'exact', head: true })
-      .eq('deck_id', parsed.data.deck_id);
+    // ~6MB for a large deck) just to test which rows are null. They run before
+    // the reservation: a sync with nothing to do must not spend an AI call
+    // against the user's limits (AI-14).
+    const [
+      { count: totalCardCount, error: totalCountError },
+      { count: totalPendingCount, error: pendingCountError },
+    ] = await Promise.all([
+      supabase.from('cards').select('id', { count: 'exact', head: true }).eq('deck_id', parsed.data.deck_id),
+      supabase.from('cards').select('id', { count: 'exact', head: true })
+        .eq('deck_id', parsed.data.deck_id).is('embedding', null),
+    ]);
 
-    if (totalCountError) {
-      return { error: sanitizeDatabaseError(totalCountError, 'Failed to load cards for embedding sync.') };
-    }
-
-    const { count: totalPendingCount, error: pendingCountError } = await supabase
-      .from('cards')
-      .select('id', { count: 'exact', head: true })
-      .eq('deck_id', parsed.data.deck_id)
-      .is('embedding', null);
-
-    if (pendingCountError) {
-      return { error: sanitizeDatabaseError(pendingCountError, 'Failed to load cards for embedding sync.') };
+    if (totalCountError || pendingCountError) {
+      return {
+        error: sanitizeDatabaseError(totalCountError ?? pendingCountError!, 'Failed to load cards for embedding sync.'),
+      };
     }
 
     if (!totalPendingCount) {
       return { success: true as const, synced: 0, pending: 0, total: totalCardCount ?? 0 };
+    }
+
+    const reservation = await reserveAiCall(supabase, user.id, 'sync_embeddings');
+    if (!reservation.ok) {
+      return { error: reservation.error };
     }
 
     // Cap and window each invocation so a large deck can't run past the server
@@ -161,7 +160,7 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
         total_cards: totalCardCount ?? 0,
         synced_cards: synced,
       },
-      reservation.reservationId,
+      reservation,
     );
 
     return { success: true as const, synced, pending: remainingPending, total: totalCardCount ?? 0 };
@@ -329,7 +328,7 @@ export async function semanticSearchCards(data: SemanticSearchInput) {
         query_chars: sanitizedQuery.length,
         result_count: results?.length ?? 0,
       },
-      reservation.reservationId,
+      reservation,
     );
 
     return { success: true as const, results: (results ?? []) as SemanticSearchResult[] };

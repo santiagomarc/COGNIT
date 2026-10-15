@@ -45,7 +45,6 @@ function toStudyCard(card: {
   mcq_distractors: unknown;
   id_question: string | null;
   topic_tags: unknown;
-  mnemonic: string | null;
 }): StudySessionCard {
   return {
     id: card.id,
@@ -62,7 +61,6 @@ function toStudyCard(card: {
     topic_tags: Array.isArray(card.topic_tags)
       ? card.topic_tags.filter((value): value is string => typeof value === 'string')
       : null,
-    mnemonic: typeof card.mnemonic === 'string' ? card.mnemonic : null,
   };
 }
 

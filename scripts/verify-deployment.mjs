@@ -28,7 +28,7 @@ const RPCS = {
   // v2 signature (202609170900): p_calls / p_daily_ceiling. The 4-argument
   // form was dropped, so a stale database fails here rather than reserving
   // without a ceiling.
-  reserve_ai_call:            { p_action: 'generate_mnemonic', p_window_minutes: 60, p_max_requests: 1, p_metadata: {}, p_calls: 1, p_daily_ceiling: 300 },
+  reserve_ai_call:            { p_action: 'sanitize_notes', p_window_minutes: 60, p_max_requests: 1, p_metadata: {}, p_calls: 1, p_daily_ceiling: 300 },
   apply_card_embeddings_batch:{ p_deck_id: '00000000-0000-4000-8000-000000000001', p_updates: [] },
   apply_quiz_sm2_batch:       { p_deck_id: '00000000-0000-4000-8000-000000000001', p_updates: [] },
   select_quiz_cards:          { p_deck_id: '00000000-0000-4000-8000-000000000001', p_limit: 5, p_focus_unproven: false },

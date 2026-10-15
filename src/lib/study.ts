@@ -49,7 +49,6 @@ export type StudySessionCard = {
   mcq_distractors: string[] | null;
   id_question: string | null;
   topic_tags: string[] | null;
-  mnemonic: string | null;
 };
 
 /**

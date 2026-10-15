@@ -129,13 +129,6 @@ export const sanitizeNotesSchema = z.object({
 
 export type SanitizeNotesInput = z.infer<typeof sanitizeNotesSchema>;
 
-export const generateMnemonicSchema = z.object({
-  card_id: z.uuid({ message: 'Invalid card id' }),
-  deck_id: z.uuid({ message: 'Invalid deck id' }),
-});
-
-export type GenerateMnemonicInput = z.infer<typeof generateMnemonicSchema>;
-
 export const syncEmbeddingsSchema = z.object({
   deck_id: z.uuid({ message: 'Invalid deck id' }),
 });

@@ -541,7 +541,7 @@ export async function generateSynthesisDrills(data: GenerateSynthesisDrillsInput
       user.id,
       'synthesis_generate',
       { deck_id: deckId, requested: count, created: rows.length, failed, clustering: clusters[0]?.clustering ?? null },
-      reservation.reservationId,
+      reservation,
     );
 
     if (rows.length === 0) {
@@ -865,7 +865,7 @@ export async function checkSynthesisAttempt(data: CheckSynthesisAttemptInput) {
         thought_tokens: usage.thoughts,
         finish_reason: finishReason,
       },
-      reservation.reservationId,
+      reservation,
     );
 
     const diagnostic: Diagnostic = {
@@ -1310,7 +1310,7 @@ export async function generatePlanQuestions(data: GeneratePlanQuestionsInput) {
     }
 
     revalidatePath(`/dashboard/${deckId}`);
-    await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: deckId, kind: 'plan', requested: count, created: rows.length, failed }, reservation.reservationId);
+    await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: deckId, kind: 'plan', requested: count, created: rows.length, failed }, reservation);
 
     if (rows.length === 0) {
       return { error: 'AI could not produce a valid plan question from these cards. Please try again.' };
@@ -1380,7 +1380,7 @@ export async function ingestQuestions(data: IngestQuestionsInput) {
     }
 
     revalidatePath(`/dashboard/${deckId}`);
-    await recordAiUsage(supabase, user.id, 'semantic_search', { deck_id: deckId, questions: questions.length, mapped: mapped.filter((entry) => entry.cardIds.length > 0).length }, reservation.reservationId);
+    await recordAiUsage(supabase, user.id, 'semantic_search', { deck_id: deckId, questions: questions.length, mapped: mapped.filter((entry) => entry.cardIds.length > 0).length }, reservation);
 
     return {
       success: true as const,
@@ -1531,13 +1531,13 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
   } catch (generationError) {
     // The reservation was spent; the failure is logged the way a batch logs a lost cluster.
     logger.warn('generateRepairDrill', 'generation failed', { message: generationError instanceof Error ? generationError.message : String(generationError) });
-    await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: 0 }, reservation.reservationId);
+    await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: 0 }, reservation);
     return 'failed';
   }
   const validation = validateDrillDraft(outcome.draft, cluster.cards);
   if (!validation.ok) {
     logger.warn('generateRepairDrill', 'draft rejected', { reason: validation.reason });
-    await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: 0 }, reservation.reservationId);
+    await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: 0 }, reservation);
     return 'failed';
   }
 
@@ -1579,6 +1579,6 @@ async function generateRepairDrill(input: { deckId: string; cardId: string; atte
     logger.info('generateRepairDrill', 'repair drill created', { deck_id: input.deckId, card_id: input.cardId, format: drill.format });
     revalidatePath(`/dashboard/${input.deckId}`);
   }
-  await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: error ? 0 : 1 }, reservation.reservationId);
+  await recordAiUsage(supabase, user.id, 'synthesis_generate', { deck_id: input.deckId, repair_of: input.attemptId, created: error ? 0 : 1 }, reservation);
   return error ? 'failed' : 'ok';
 }

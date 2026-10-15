@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_call_outcomes: {
+        Row: {
+          action: string
+          created_at: string
+          finish_reason: string | null
+          input_tokens: number | null
+          ms: number
+          output_tokens: number | null
+          reservation_id: string
+          thought_tokens: number | null
+          ttft_ms: number | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          finish_reason?: string | null
+          input_tokens?: number | null
+          ms: number
+          output_tokens?: number | null
+          reservation_id: string
+          thought_tokens?: number | null
+          ttft_ms?: number | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          finish_reason?: string | null
+          input_tokens?: number | null
+          ms?: number
+          output_tokens?: number | null
+          reservation_id?: string
+          thought_tokens?: number | null
+          ttft_ms?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_call_outcomes_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: true
+            referencedRelation: "ai_usage_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_usage_logs: {
         Row: {
           action: string

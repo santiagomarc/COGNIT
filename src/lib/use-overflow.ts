@@ -23,7 +23,7 @@ export function useOverflowBelow(ref: RefObject<HTMLElement | null>): boolean {
     measure();
     const observer = new ResizeObserver(measure);
     // The container's own box does not change when its text does, so watch the
-    // children too (the face's text, and a mnemonic when there is one).
+    // children too (the face's text).
     observer.observe(el);
     for (const child of Array.from(el.children)) observer.observe(child);
     el.addEventListener('scroll', measure, { passive: true });

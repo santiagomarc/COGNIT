@@ -8,6 +8,7 @@ import {
   type Schema,
 } from '@google/genai';
 import { getServerEnv } from '@/lib/env-server';
+import { logger } from '@/lib/logger';
 
 /*
  * The single seam between Cognit and the Gemini SDK (plan §6.1). Call sites
@@ -46,6 +47,35 @@ function ai(): GoogleGenAI {
 export function modelFamily(model: string, override?: ModelFamily): ModelFamily {
   if (override) return override;
   return /gemini-3/i.test(model) ? '3' : '2.5';
+}
+
+/**
+ * Gemini 3.x models measured to default to *minimal* thinking (Micro-synthesis
+ * Audit II §2). On 3.x, `thinking: 'none'` and every text call send no
+ * thinking config, so they run at the model's own default — fast only for the
+ * models listed here. Sending `ThinkingLevel.MINIMAL` instead is not safe:
+ * 3.x models differ in which levels they accept, and a rejected field is a
+ * 400 on every call.
+ */
+export const MINIMAL_THINKING_DEFAULT: readonly string[] = ['gemini-3.5-flash-lite'];
+
+const warnedThinkingDefault = new Set<string>();
+
+/**
+ * Logs once per model when a 3.x model's default thinking level hasn't been
+ * verified (performance plan AI-17): a higher default would silently add
+ * thinking latency to every call. `ai_call_outcomes.thought_tokens` shows it
+ * in SQL. Returns whether it warned.
+ */
+export function warnIfThinkingDefaultUnverified(model: string): boolean {
+  if (modelFamily(model, getServerEnv().GEMINI_MODEL_FAMILY) !== '3') return false;
+  if (MINIMAL_THINKING_DEFAULT.includes(model) || warnedThinkingDefault.has(model)) return false;
+  warnedThinkingDefault.add(model);
+  logger.warn('gemini', 'default thinking level unverified for this model', {
+    model,
+    verified: [...MINIMAL_THINKING_DEFAULT],
+  });
+  return true;
 }
 
 /** The model a purpose runs on: generation may be routed to a stronger model (plan D2). */
@@ -121,6 +151,7 @@ export type JsonRequest = RequestControls & {
 /** One JSON generation. The caller parses `response.text` with its zod schema. */
 export async function generateJson(request: JsonRequest): Promise<GenerateContentResponse> {
   const model = resolveModelName(request.purpose);
+  warnIfThinkingDefaultUnverified(model);
   return ai().models.generateContent({
     model,
     contents: request.contents,
@@ -154,8 +185,9 @@ function textConfig(request: TextRequest): GenerateContentConfig {
   };
 }
 
-/** One plain-text generation on GEMINI_MODEL (mnemonics, note cleanup). */
+/** One plain-text generation on GEMINI_MODEL (note clean-up). */
 export async function generateText(request: TextRequest): Promise<GenerateContentResponse> {
+  warnIfThinkingDefaultUnverified(getServerEnv().GEMINI_MODEL);
   return ai().models.generateContent({
     model: getServerEnv().GEMINI_MODEL,
     contents: request.contents,
@@ -169,6 +201,7 @@ export async function generateText(request: TextRequest): Promise<GenerateConten
  * the returned iterable yields text chunks.
  */
 export async function streamText(request: TextRequest): Promise<AsyncGenerator<string>> {
+  warnIfThinkingDefaultUnverified(getServerEnv().GEMINI_MODEL);
   const stream = await ai().models.generateContentStream({
     model: getServerEnv().GEMINI_MODEL,
     contents: request.contents,

@@ -12,7 +12,7 @@ import {
 } from '@/app/actions/_shared';
 import { buildDeckChatSystemInstruction, retrieveDeckContext } from '@/lib/rag';
 import { AiServiceError, aiFailureMessage, classifyAiError, withGeminiRetry } from '@/lib/ai-retry';
-import { generateJson, streamText } from '@/lib/gemini';
+import { streamText } from '@/lib/gemini';
 import { logger } from '@/lib/logger';
 
 /**
@@ -128,6 +128,7 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let answer = '';
+      let ttftMs: number | null = null;
       // enqueue() throws once the consumer has cancelled; the turn is over
       // either way, so the throw must not be mistaken for a model failure.
       const send = (event: string, data: unknown) => {
@@ -208,6 +209,8 @@ export async function POST(request: NextRequest) {
 
         for await (const text of stream) {
           if (abort.signal.aborted) break;
+          // Time to first token, from the reservation: what the user waits for.
+          ttftMs ??= Date.now() - reservation.startedAt;
           answer += text;
           send('delta', { text });
         }
@@ -234,13 +237,9 @@ export async function POST(request: NextRequest) {
           throw new AiServiceError('malformed_output', 'Model returned an empty stream.', 1);
         }
 
-        // ── 4. Follow-ups (best effort), then persist the whole turn ──
-        // Follow-ups go into the assistant row: a reopened session used to lose
-        // every chip because persistTurn wrote an empty array before they existed.
-        const followupSuggestions = abort.signal.aborted
-          ? []
-          : await generateFollowups(message, answer, abort.signal).catch(() => []);
-
+        // ── 4. Persist the whole turn ──
+        // No follow-up chips: they cost a second model call per turn and held
+        // `done` back after the answer was already on screen.
         const messageId = await persistTurn(supabase, {
           sessionId: activeSessionId,
           deckId: parsed.data.deck_id,
@@ -248,10 +247,10 @@ export async function POST(request: NextRequest) {
           userMessage: message,
           answer,
           referencedCardIds: context.cards.map((card) => card.id),
-          followupSuggestions,
+          followupSuggestions: [],
         });
 
-        send('done', { followupSuggestions, messageId });
+        send('done', { followupSuggestions: [], messageId });
 
         await recordAiUsage(
           supabase,
@@ -268,7 +267,8 @@ export async function POST(request: NextRequest) {
             prompt_chars: message.length,
             response_chars: answer.length,
           },
-          reservation.reservationId,
+          reservation,
+          { ttftMs },
         );
       } catch (error) {
         if (abort.signal.aborted) {
@@ -366,26 +366,4 @@ async function persistTurn(
     .eq('user_id', input.userId);
 
   return data?.id ?? null;
-}
-
-/** Cheap second call. Failure is non-fatal — the answer has already streamed. */
-async function generateFollowups(question: string, answer: string, signal: AbortSignal): Promise<string[]> {
-  const response = await withGeminiRetry(
-    () => generateJson({
-      systemInstruction: [
-        'Given a study question and its answer, propose up to 3 short follow-up questions the learner could ask next.',
-        'Under 12 words each. Return JSON: {"suggestions":[...]}',
-      ].join('\n'),
-      temperature: 0.4,
-      maxOutputTokens: 256,
-      contents: [{ role: 'user', parts: [{ text: `Q: ${question}\nA: ${answer}` }] }],
-      signal,
-    }),
-    { label: 'deck_chat_followups', maxAttempts: 1, signal },
-  );
-
-  const parsed = JSON.parse(response.text ?? '') as { suggestions?: unknown };
-  return Array.isArray(parsed.suggestions)
-    ? parsed.suggestions.filter((s): s is string => typeof s === 'string').slice(0, 3)
-    : [];
 }

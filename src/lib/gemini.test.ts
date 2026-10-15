@@ -24,7 +24,9 @@ vi.mock('@google/genai', async (importOriginal) => ({
   },
 }));
 
-const { embedContents, generateJson, generateText, jsonGenerationConfig, modelFamily, streamText } = await import('./gemini');
+const {
+  embedContents, generateJson, generateText, jsonGenerationConfig, modelFamily, streamText, warnIfThinkingDefaultUnverified,
+} = await import('./gemini');
 
 beforeEach(() => {
   mocks.generateContent.mockReset().mockResolvedValue({ text: '{}' });
@@ -144,5 +146,17 @@ describe('embedContents', () => {
       contents: [{ role: 'user', parts: [{ text: 'a' }] }, { role: 'user', parts: [{ text: 'b' }] }],
       config: { taskType: 'RETRIEVAL_QUERY', outputDimensionality: 2 },
     });
+  });
+});
+
+describe('warnIfThinkingDefaultUnverified', () => {
+  it('stays quiet for 2.5 models and for 3.x models known to default to minimal thinking', () => {
+    expect(warnIfThinkingDefaultUnverified('gemini-2.5-flash')).toBe(false);
+    expect(warnIfThinkingDefaultUnverified('gemini-3.5-flash-lite')).toBe(false);
+  });
+
+  it('warns once per unverified 3.x model', () => {
+    expect(warnIfThinkingDefaultUnverified('gemini-3-pro-test')).toBe(true);
+    expect(warnIfThinkingDefaultUnverified('gemini-3-pro-test')).toBe(false);
   });
 });

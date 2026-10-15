@@ -187,7 +187,7 @@ describe('checkSynthesisAttempt', () => {
     // No direct writes remain: the RPC owns cards, the attempt and the drill.
     expect(client.__inserted.synthesis_attempts).toBeUndefined();
     expect(chainsFor(client, 'synthesis_drills').some((chain) => chain.update.mock.calls.length > 0)).toBe(false);
-    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_check', expect.objectContaining({ verdict: 'sound' }), 'r1');
+    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_check', expect.objectContaining({ verdict: 'sound' }), expect.objectContaining({ reservationId: 'r1' }));
   });
 
   it('never trusts the model for the verdict: a partial link makes the attempt partial', async () => {
@@ -398,7 +398,7 @@ describe('checkSynthesisAttempt', () => {
     mocks.reserveAiCall.mockClear();
     await mocks.afterCallbacks[0]();
     expect(mocks.reserveAiCall).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ repair_of: 'attempt-1' }), { calls: 1 });
-    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ repair_of: 'attempt-1', created: 0 }), 'r1');
+    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ repair_of: 'attempt-1', created: 0 }), expect.objectContaining({ reservationId: 'r1' }));
 
     mocks.afterCallbacks.length = 0;
     respondWith(modelOutput());
@@ -590,7 +590,7 @@ describe('generateSynthesisDrills', () => {
     expect(rows[0].prompt_variants).toEqual(['Explain how the time quantum and context switch overhead together limit an interactive process.']);
     expect(rows[0].bloom).toBe('analyse');
     expect(rows[0].generation_meta).toMatchObject({ clustering: 'tags', model: 'gemini-test', requested_format: 'causal', prompt_version: expect.any(String) });
-    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ created: 1 }), 'r1');
+    expect(mocks.recordAiUsage).toHaveBeenCalledWith(expect.anything(), 'user-1', 'synthesis_generate', expect.objectContaining({ created: 1 }), expect.objectContaining({ reservationId: 'r1' }));
   });
 
   it('archives drills whose cards were deleted and excludes them from the active cap', async () => {

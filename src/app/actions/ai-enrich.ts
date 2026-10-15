@@ -13,6 +13,7 @@ import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
 import { withGeminiRetry } from '@/lib/ai-retry';
 import { generateJson } from '@/lib/gemini';
+import { addUsage, type AiUsageTotals } from '@/lib/ai-outcome';
 import { selectUsableDistractors } from '@/lib/distractors';
 
 type EnrichmentRow = {
@@ -158,6 +159,7 @@ export async function enrichCards(data: EnrichCardsInput) {
     const batches = chunkArray(pendingCards, ENRICH_BATCH_SIZE);
     let enrichedCount = 0;
     const failedCardIds: string[] = [];
+    let usage: AiUsageTotals | null = null;
     const enrichedCards: EnrichmentRow[] = [];
 
     // ── Parallel batch AI calls with a concurrency cap ───────────────────────
@@ -213,6 +215,7 @@ export async function enrichCards(data: EnrichCardsInput) {
           { label: 'enrich_cards', maxAttempts: 2 },
         );
 
+        usage = addUsage(usage, response);
         const enrichedRows = parseEnrichmentPayload(response.text ?? '', correctAnswerByCardId);
         const enrichedIds = new Set(enrichedRows.map((row) => row.id));
         const batchFailedIds = batch
@@ -283,7 +286,8 @@ export async function enrichCards(data: EnrichCardsInput) {
         pending_cards: pendingCards.length,
         enriched_cards: enrichedCount,
       },
-      reservation.reservationId,
+      reservation,
+      { usage },
     );
 
     return {

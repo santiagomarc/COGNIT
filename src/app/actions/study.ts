@@ -1,17 +1,14 @@
 'use server';
 
-import { after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { gradeCardSchema, GradeCardInput } from '@/lib/schemas';
 import { sm2, GRADE_MAP, DEFAULT_EASE_FACTOR, type StudyGrade } from '@/lib/sm2';
 import type { CardState } from '@/index';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import { generateMnemonicForCard } from '@/lib/mnemonic';
-import { runBackground } from '@/lib/background';
 import { logger } from '@/lib/logger';
 import { requireOwnedDeck } from './_shared';
-import { ensureSessionHeadroom, getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 
 export async function gradeCard(data: GradeCardInput) {
   const result = gradeCardSchema.safeParse(data);
@@ -29,7 +26,7 @@ export async function gradeCard(data: GradeCardInput) {
   // deck read here would only be a third round-trip saying the same thing.
   const { data: card, error: cardErr } = await supabase
     .from('cards')
-    .select('id, front, back, state, interval, ease_factor, repetition_count, mnemonic')
+    .select('id, state, interval, ease_factor, repetition_count')
     .eq('id', result.data.card_id)
     .eq('deck_id', result.data.deck_id)
     .single();
@@ -46,11 +43,6 @@ export async function gradeCard(data: GradeCardInput) {
     interval: card.interval ?? 0,
     state: (card.state as CardState) ?? 'new',
   });
-
-  const shouldGenerateMnemonic =
-    sm2Result.state === 'relearning'
-    && ((card.state as CardState) ?? 'new') !== 'relearning'
-    && !(typeof card.mnemonic === 'string' && card.mnemonic.trim().length > 0);
 
   const nowIso = new Date().toISOString();
 
@@ -78,29 +70,11 @@ export async function gradeCard(data: GradeCardInput) {
     return { error: sanitizeDatabaseError(gradePersistError, 'Failed to save your review.') };
   }
 
-  if (shouldGenerateMnemonic) {
-    await ensureSessionHeadroom();
-    // Off the response path: the grade returns now, the model call runs after
-    // the response is sent. The student who just lapsed a card should never
-    // wait on a mnemonic for it — the next card is what they need.
-    after(() => runBackground(
-      'lapse_mnemonic',
-      () => generateMnemonicForCard(supabase, user.id, result.data.deck_id, {
-        id: card.id,
-        front: card.front,
-        back: card.back,
-        mnemonic: card.mnemonic,
-      }),
-      { cardId: card.id },
-    ));
-  }
-
-  // Deck path only. Revalidating /dashboard here fired once per graded card —
-  // 40 times in a 40-card session, while the user is not even looking at it.
-  // finishStudySession() handles the dashboard once, at the end.
-  // Keeping the deck path means a mid-session back-navigation still shows
-  // current data rather than a stale card list.
-  revalidatePath(`/dashboard/${result.data.deck_id}`);
+  // No revalidatePath here. Inside a Server Action it makes Next re-render the
+  // page the action came from (the study page: six reads) into every grade's
+  // response, whatever path it names. Every dashboard page is dynamic, so all
+  // it bought was purging a 30 s client cache a session has long outlived.
+  // finishStudySession() revalidates the deck and the dashboard once, at the end.
 
   return {
     success: true,

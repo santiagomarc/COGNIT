@@ -960,14 +960,6 @@ export function FlashcardReviewClient({
                       answer={<RichText text={active.front} />}
                       promptLength={studyLength(active.id_question ?? active.back)}
                       answerLength={studyLength(active.front)}
-                      answerAside={
-                        active.mnemonic ? (
-                          <span className="flip__aside">
-                            <span className="flip__aside-label">Memory aid</span>
-                            {active.mnemonic}
-                          </span>
-                        ) : null
-                      }
                       onReveal={handleCardActivate}
                       ariaLabel={
                         showAnswer

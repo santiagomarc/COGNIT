@@ -10,8 +10,8 @@ function lastLine(spy: ReturnType<typeof vi.spyOn>) {
 describe('runBackground', () => {
   it('logs the outcome the work reports, with its task and fields', async () => {
     const info = vi.spyOn(console, 'info').mockImplementation(() => {});
-    await runBackground('lapse_mnemonic', async () => 'skipped', { cardId: 'c1' });
-    expect(lastLine(info)).toMatchObject({ scope: 'background', task: 'lapse_mnemonic', background: 'skipped', cardId: 'c1' });
+    await runBackground('update_card_embedding', async () => 'skipped', { cardId: 'c1' });
+    expect(lastLine(info)).toMatchObject({ scope: 'background', task: 'update_card_embedding', background: 'skipped', cardId: 'c1' });
   });
 
   it('turns a throw into a failed outcome instead of an unhandled rejection', async () => {

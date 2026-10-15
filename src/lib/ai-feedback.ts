@@ -21,10 +21,6 @@ export function formatActionError(error: unknown, fallbackMessage: string): stri
         return 'Deck embedding sync is temporarily limited. You can still study while it catches up later.';
       }
 
-      if (error.includes('generate mnemonic')) {
-        return 'Mnemonic generation is temporarily limited. You can continue reviewing and try again later.';
-      }
-
       if (error.includes('semantic search')) {
         return 'Search is temporarily rate-limited. Please try again shortly.';
       }

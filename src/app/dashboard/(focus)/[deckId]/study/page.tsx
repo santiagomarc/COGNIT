@@ -16,13 +16,6 @@ import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { loadCapstoneCandidates } from '@/lib/synthesis/loaders';
 
-/**
- * `gradeCard` queues the lapse mnemonic with `after()`, and that work shares
- * this route's budget. Pinned rather than left to the platform default, which
- * is 10–15 s without Fluid compute.
- */
-export const maxDuration = 60;
-
 type StudyPageProps = {
   params: Promise<{
     deckId: string;
@@ -65,7 +58,7 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
    * `is.null` clause matched nothing and a never-studied card sorted by its
    * creation time, ahead of every overdue review.
    */
-  const SELECT = 'id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question, topic_tags, mnemonic';
+  const SELECT = 'id, front, back, state, interval, ease_factor, repetition_count, next_review_at, mcq_distractors, id_question, topic_tags';
   const base = () => supabase.from('cards').select(SELECT).eq('deck_id', deckId);
   // Bounded by the maximum session so the count query is never the limiter.
   const readCap = MAX_SESSION_CARD_COUNT;
@@ -124,7 +117,6 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
     mcq_distractors: Array.isArray(c.mcq_distractors) ? c.mcq_distractors.filter((value): value is string => typeof value === 'string') : null,
     id_question: typeof c.id_question === 'string' ? c.id_question : null,
     topic_tags: Array.isArray(c.topic_tags) ? c.topic_tags.filter((value): value is string => typeof value === 'string') : null,
-    mnemonic: typeof c.mnemonic === 'string' ? c.mnemonic : null,
   }));
 
   return (

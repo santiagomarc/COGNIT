@@ -3,6 +3,7 @@ import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import type { Json } from '@/lib/database.types';
 import { logger } from '@/lib/logger';
 import { DAILY_AI_CALL_CEILING } from '@/lib/ai-usage';
+import type { AiCallOutcome } from '@/lib/ai-outcome';
 
 // Moved to src/lib/ai-usage.ts so client components can read it (sidebar plan §5.8).
 export { DAILY_AI_CALL_CEILING };
@@ -11,7 +12,6 @@ export type AiActionName =
   | 'generate_cards'
   | 'enrich_cards'
   | 'sanitize_notes'
-  | 'generate_mnemonic'
   | 'chat_with_deck'
   | 'sync_embeddings'
   | 'semantic_search'
@@ -22,7 +22,6 @@ const AI_RATE_LIMITS: Record<AiActionName, { windowMinutes: number; maxRequests:
   generate_cards: { windowMinutes: 60, maxRequests: 20 },
   enrich_cards: { windowMinutes: 60, maxRequests: 120 },
   sanitize_notes: { windowMinutes: 60, maxRequests: 30 },
-  generate_mnemonic: { windowMinutes: 60, maxRequests: 60 },
   chat_with_deck: { windowMinutes: 60, maxRequests: 40 },
   // Each call now embeds at most 200 cards (see CARDS_PER_SYNC_BATCH in chat.ts),
   // so a large deck needs several calls per sync — this limit must accommodate that.
@@ -63,8 +62,11 @@ export function sanitizeAiInputText(rawText: string, maxChars = 50_000) {
 }
 
 
+/** A granted reservation. `startedAt` is when it was granted: the model calls start here. */
+export type ReservedCall = { reservationId: string; startedAt: number };
+
 type ReservationOutcome =
-  | { ok: true; reservationId: string }
+  | ({ ok: true } & ReservedCall)
   | { ok: false; error: string };
 
 /**
@@ -97,7 +99,7 @@ export async function reserveAiCall(
   });
 
   if (!rpcError && rpcId) {
-    return { ok: true, reservationId: rpcId };
+    return { ok: true, reservationId: rpcId, startedAt: Date.now() };
   }
 
   const code = (rpcError as { code?: string } | null)?.code;
@@ -137,6 +139,10 @@ export async function reserveAiCall(
  * record and the post-hoc detail goes to the structured log, which is where
  * you would look when debugging a specific call anyway.
  *
+ * Given the whole reservation (not just its id), it also writes the call's
+ * time and tokens to `ai_call_outcomes` (AI-16): a separate insert-only table,
+ * so the audit log stays append-only and its rows still count only once.
+ *
  * Without a reservation — the legacy path, and any caller that did not reserve —
  * this still inserts, so usage is never uncounted.
  */
@@ -145,14 +151,21 @@ export async function recordAiUsage(
   userId: string,
   action: AiActionName,
   metadata: Record<string, Json> = {},
-  reservationId?: string | null,
+  reservation?: string | ReservedCall | null,
+  outcome: AiCallOutcome = {},
 ) {
+  const reservationId = typeof reservation === 'string' ? reservation : reservation?.reservationId;
   if (reservationId) {
+    const ms = typeof reservation === 'object' && reservation ? Date.now() - reservation.startedAt : null;
     logger.info('ai_usage', 'call completed', {
       action,
       reservation_id: reservationId,
+      ...(ms !== null ? { ms } : {}),
       ...metadata,
     });
+    if (ms !== null) {
+      await recordAiOutcome(supabase, userId, action, reservationId, ms, outcome);
+    }
     return;
   }
 
@@ -205,4 +218,33 @@ export async function requireOwnedDeck(deckId: string) {
   }
 
   return { supabase, user, deck };
+}
+
+/**
+ * One `ai_call_outcomes` row per completed reservation. Telemetry never fails
+ * the call it describes: an insert error (including the table not existing
+ * yet, before its migration is pushed) is logged and swallowed.
+ */
+async function recordAiOutcome(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  action: AiActionName,
+  reservationId: string,
+  ms: number,
+  outcome: AiCallOutcome,
+) {
+  const { error } = await supabase.from('ai_call_outcomes').insert({
+    reservation_id: reservationId,
+    user_id: userId,
+    action,
+    ms: Math.max(0, Math.round(ms)),
+    ttft_ms: outcome.ttftMs != null ? Math.max(0, Math.round(outcome.ttftMs)) : null,
+    input_tokens: outcome.usage?.input ?? null,
+    output_tokens: outcome.usage?.output ?? null,
+    thought_tokens: outcome.usage?.thoughts ?? null,
+    finish_reason: outcome.finishReason ?? null,
+  });
+  if (error) {
+    logger.warn('ai_call_outcomes', 'failed to record AI outcome', { action, message: error.message });
+  }
 }

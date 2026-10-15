@@ -44,11 +44,6 @@ const benchmarkTasks = [
     isJson: true,
     prompt: `Analyze the study text and extract 3 flashcards. Return JSON matching: {"cards": [{"question": string, "answer": string, "explanation": string}]}. Notes: ${sampleNotes}`,
   },
-  {
-    name: 'Task 2: Creative Mnemonic Generation',
-    isJson: false,
-    prompt: `Create a memorable, concise mnemonic to help a student remember the overall chemical equation of photosynthesis: 6CO2 + 6H2O + light -> C6H12O6 + 6O2.`,
-  }
 ];
 
 async function runBenchmark() {

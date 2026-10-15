@@ -12,11 +12,6 @@ describe('formatActionError', () => {
     expect(message).toContain('embedding sync is temporarily limited');
   });
 
-  it('maps mnemonic generation rate limit errors', () => {
-    const message = formatActionError('AI limit reached for generate mnemonic. Try again in about 60 minutes.', 'fallback');
-    expect(message).toContain('Mnemonic generation is temporarily limited');
-  });
-
   it('maps semantic search rate limit errors', () => {
     const message = formatActionError('AI limit reached for semantic search. Try again in about 60 minutes.', 'fallback');
     expect(message).toContain('Search is temporarily rate-limited');

@@ -5,6 +5,7 @@ import { sanitizeNotesSchema, SanitizeNotesInput } from '@/lib/schemas';
 import { guardAction } from '@/lib/action-guard';
 import { withGeminiRetry } from '@/lib/ai-retry';
 import { generateText } from '@/lib/gemini';
+import { addUsage, finishReasonOf } from '@/lib/ai-outcome';
 import { recordAiUsage, reserveAiCall, sanitizeAiInputText } from './_shared';
 
 function isValidTermDescriptionLine(line: string) {
@@ -71,7 +72,8 @@ export async function sanitizeNotes(data: SanitizeNotesInput) {
         valid_lines: validLines.length,
         total_lines: outputLines.length,
       },
-      reservation.reservationId,
+      reservation,
+      { usage: addUsage(null, response), finishReason: finishReasonOf(response) },
     );
 
     return { success: true, text: sanitizedText };

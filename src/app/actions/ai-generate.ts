@@ -22,6 +22,7 @@ import {
   AiServiceError, aiFailureMessage, classifyAiError, withGeminiRetry, type AiFailureKind,
 } from '@/lib/ai-retry';
 import { generateJson } from '@/lib/gemini';
+import { addUsage, type AiUsageTotals } from '@/lib/ai-outcome';
 import { assessPdfQuality, chunkDocumentText, describePdfQuality } from '@/lib/pdf-chunking';
 import {
   normalizeFrontKey, parseAndRankGeneratedCards, pickBalancedCards,
@@ -275,6 +276,7 @@ export async function generateCards(formData: FormData) {
     const usedFrontKeys = new Set<string>();
     const allCandidates: CandidateCard[] = [];
     let failedChunks = 0;
+    let usage: AiUsageTotals | null = null;
     // Why the first section failed, so an all-failed upload can say so rather
     // than one generic line that hides a quota or key problem.
     // (Asserted, not annotated: it is also assigned inside the forEach below,
@@ -329,6 +331,7 @@ export async function generateCards(formData: FormData) {
         },
       );
 
+      usage = addUsage(usage, result);
       const json = JSON.parse(result.text ?? '') as { cards?: unknown };
       if (!Array.isArray(json.cards)) {
         throw new Error('Model returned no cards array.');
@@ -433,7 +436,8 @@ export async function generateCards(formData: FormData) {
         chunk_count: chunks.length,
         failed_chunks: failedChunks,
       },
-      reservation.reservationId,
+      reservation,
+      { usage },
     );
 
     return {

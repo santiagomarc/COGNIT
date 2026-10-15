@@ -93,14 +93,13 @@ export async function updateCard(data: UpdateCardInput) {
   }
 
   // Every derived field is dropped with the text that produced it: distractors,
-  // the identification question, tags, the mnemonic and the vector.
+  // the identification question, tags and the vector.
   const updatePayload = {
     front: result.data.front,
     back: result.data.back,
     mcq_distractors: null,
     id_question: null,
     topic_tags: null,
-    mnemonic: null,
     embedding: null,
   };
 
@@ -153,7 +152,7 @@ export async function updateCard(data: UpdateCardInput) {
       if (embedError) {
         logger.warn('updateCard', 'embedding write failed', { cardId, message: embedError.message });
       }
-      await recordAiUsage(supabase, user.id, 'sync_embeddings', { card_id: cardId, synced_cards: embedError ? 0 : 1 }, reservation.reservationId);
+      await recordAiUsage(supabase, user.id, 'sync_embeddings', { card_id: cardId, synced_cards: embedError ? 0 : 1 }, reservation);
       return embedError ? 'failed' : 'ok';
     }, { cardId }));
   }
