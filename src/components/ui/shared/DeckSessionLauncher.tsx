@@ -12,7 +12,6 @@ type DeckSessionLauncherProps = {
   deckId: string;
   dueCount: number;
   totalCards: number;
-  quizReadyCards: number;
   unprovenCards: number;
   estimatedMinutes: number;
   sessionBounds: SessionBounds;
@@ -57,7 +56,6 @@ export function DeckSessionLauncher({
   deckId,
   dueCount,
   totalCards,
-  quizReadyCards,
   unprovenCards,
   estimatedMinutes,
   sessionBounds,
@@ -161,14 +159,9 @@ export function DeckSessionLauncher({
         method="get"
         className="surface flex flex-col p-4 lg:p-5"
       >
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Take quiz
-          </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
-            <span className="text-ink">{quizReadyCards}</span>/{totalCards} ready
-          </p>
-        </div>
+        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          Take quiz
+        </h2>
 
         <p className="mt-2 text-xs leading-relaxed text-ink-dim">
           Assessment mode. Results update this deck&apos;s mastery score.

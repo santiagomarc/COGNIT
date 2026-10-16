@@ -14,6 +14,9 @@ const hasKey = loadLocalEnv();
  */
 
 vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
+// The embeddings-and-tags fill runs after the response; this gate measures generation only.
+vi.mock('next/server', () => ({ after: () => undefined }));
+vi.mock('@/lib/card-derived', () => ({ fillDerivedCardData: async () => 'ok' }));
 
 vi.mock('@/lib/supabase/session', () => {
   const chain = (result: unknown) => {
@@ -30,6 +33,7 @@ vi.mock('@/lib/supabase/session', () => {
   return {
     getRequestClient: async () => supabase,
     getSessionUser: async () => ({ id: 'user-1' }),
+    ensureSessionHeadroom: async () => undefined,
   };
 });
 

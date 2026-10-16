@@ -30,6 +30,7 @@ import { getSessionCardBounds } from '@/lib/study';
 import { loadSynthesisReadings } from '@/lib/synthesis/loaders';
 import type { SynthesisReadings } from '@/lib/synthesis/types';
 import { logger } from '@/lib/logger';
+import { CardDataBackfill } from '@/components/ui/shared/CardDataBackfill';
 import type { CardSource } from '@/index';
 
 /**
@@ -78,8 +79,8 @@ type DeckDetailSnapshot = {
   questionCount: number;
   cards: DeckCardRow[];
   totalCards: number;
-  /** Deck-wide, not derived from the paginated `cards` slice above. */
-  quizReadyCards: number;
+  /** Cards still missing an embedding, tags or AI distractors: the background backfill's work (AI-13). */
+  pendingDerivedCards: number;
   topTopics: Array<[string, number]>;
   cardsErrorMessage: string | null;
   cardsErrorCode: string | null;
@@ -131,14 +132,24 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 
 const EMPTY_READINGS: SynthesisReadings = { activeDrills: 0, due: 0, linksCovered: 0, linksTotal: 0, lastAttemptAt: null, plans: { active: 0, due: 0 } };
 
-/** Deck-wide count of cards ready for MCQ — the whole deck, not the 60-card page. */
-async function loadQuizReadyCount(supabase: SupabaseServerClient, deckId: string): Promise<number> {
-  const { data, error } = await supabase.rpc('count_quiz_ready_cards', { p_deck_id: deckId });
+/**
+ * Cards still missing an embedding, topic tags or AI distractors. When there
+ * are any, the page asks the server to fill them in the background
+ * (CardDataBackfill, AI-13). "Quiz-ready" used to be counted here; a card
+ * without stored options now takes them from the deck, so every card is
+ * ready (AI-09).
+ */
+async function loadPendingDerivedCount(supabase: SupabaseServerClient, deckId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('cards')
+    .select('id', { count: 'exact', head: true })
+    .eq('deck_id', deckId)
+    .or('embedding.is.null,topic_tags.is.null,mcq_distractors.is.null');
   if (error) {
-    logger.warn('deck-page', 'count_quiz_ready_cards rpc failed', { message: error.message });
+    logger.warn('deck-page', 'pending derived-data count failed', { message: error.message });
     return 0;
   }
-  return Number(data ?? 0);
+  return count ?? 0;
 }
 
 /** Deck-wide topic-tag histogram, for the same pagination reason. */
@@ -190,7 +201,7 @@ async function loadDeckDetailSnapshot(
   // The Exam segment needs the plan readings too (plan §5.5, UX-01).
   const wantsReadings = wantsOverview || activeTab === 'exam';
 
-  const [deckRes, cardsRes, masteryRes, schedule, quizReadyCards, topTopics, synthesisReadings, mergeTargetsRes, questionCountRes] = await Promise.all([
+  const [deckRes, cardsRes, masteryRes, schedule, pendingDerivedCards, topTopics, synthesisReadings, mergeTargetsRes, questionCountRes] = await Promise.all([
     supabase
       .from('decks')
       .select('id, title, description, created_at, share_token, exam_at, listed_at')
@@ -216,7 +227,7 @@ async function loadDeckDetailSnapshot(
       .eq('user_id', userId)
       .eq('deck_id', deckId),
     loadScheduleBreakdown(supabase, deckId),
-    loadQuizReadyCount(supabase, deckId),
+    loadPendingDerivedCount(supabase, deckId),
     loadTopTopics(supabase, deckId),
     wantsReadings ? loadSynthesisReadings(supabase, { deckId, userId }) : Promise.resolve(EMPTY_READINGS),
     // `user_id` is not redundant: RLS also shows other people's shared decks.
@@ -267,7 +278,7 @@ async function loadDeckDetailSnapshot(
     })),
     cards,
     totalCards,
-    quizReadyCards,
+    pendingDerivedCards,
     topTopics,
     cardsErrorMessage: cardsError?.message ?? null,
     cardsErrorCode: cardsError?.code ?? null,
@@ -318,7 +329,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
     deckErrorMessage,
     cards,
     totalCards,
-    quizReadyCards,
+    pendingDerivedCards,
     topTopics,
     cardsErrorMessage,
     cardsErrorCode,
@@ -399,13 +410,14 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
             <Telemetry label="Cards" value={totalCards} />
             <Telemetry label="Due" value={schedule.due} tone={schedule.due > 0 ? 'due' : 'ink'} />
             <Telemetry label="Quiz-proven" value={`${masteryPercentage}%`} />
-            <Telemetry label="Quiz-ready" value={`${quizReadyCards}/${totalCards}`} />
             <Telemetry label="Last quiz" value={formatLastQuizAge(lastQuizAt)} />
           </div>
         </div>
       </header>
 
       <DeckSegments deckId={deckId} active={activeTab} cardCount={totalCards} />
+
+      {pendingDerivedCards > 0 ? <CardDataBackfill deckId={deckId} pending={pendingDerivedCards} /> : null}
 
       <AddContentPanel deckId={deckId} hasCards={hasCards} />
 
@@ -417,7 +429,6 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
               deckId={deckId}
               dueCount={schedule.due}
               totalCards={totalCards}
-              quizReadyCards={quizReadyCards}
               unprovenCards={unprovenCards}
               estimatedMinutes={estimateSessionMinutes(schedule.due)}
               sessionBounds={sessionBounds}

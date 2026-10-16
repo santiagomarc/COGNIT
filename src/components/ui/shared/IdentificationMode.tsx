@@ -10,6 +10,7 @@ import { isAdvanceKey } from '@/lib/hotkeys';
 import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
 import { studyLength } from '@/lib/study-type';
+import { quizPrompt } from '@/lib/study-prompt';
 
 type IdentificationModeCard = {
   id: string;
@@ -21,7 +22,6 @@ type IdentificationModeCard = {
 type IdentificationModeProps = {
   card: IdentificationModeCard;
   disabled: boolean;
-  enrichmentPending: boolean;
   onResolve: (grade: StudyGrade, score: number, answer: string) => void;
   /** Fires the moment the answer is checked, so audio/haptics feel immediate. */
   onAnswered?: (wasCorrect: boolean) => void;
@@ -46,15 +46,14 @@ function getGrade(score: number): StudyGrade {
 export function IdentificationMode({
   card,
   disabled,
-  enrichmentPending,
   onResolve,
   onAnswered,
 }: IdentificationModeProps) {
   const [answer, setAnswer] = useState('');
   const [result, setResult] = useState<IdentificationResult | null>(null);
 
-  const prompt = useMemo(() => card.id_question ?? card.back, [card.back, card.id_question]);
-  const promptStatusLabel = card.id_question ? 'AI-Rewritten Prompt' : 'Source Description';
+  const prompt = useMemo(() => quizPrompt(card), [card]);
+  const promptStatusLabel = card.id_question ? 'AI-Rewritten Prompt' : 'Description';
 
   // MCQ advances on Space after feedback; Identification had no equivalent, and
   // the shortcut panel admitted as much ("use keyboard focus + Enter").
@@ -121,12 +120,6 @@ export function IdentificationMode({
             </p>
           </div>
 
-          {enrichmentPending && !card.id_question ? (
-            <p className="border-l-2 border-border-strong pl-3 text-xs text-ink-dim">
-              AI is preparing a cleaner question-style clue for this card. You can still answer using
-              the saved description right now.
-            </p>
-          ) : null}
 
           {result ? (
             <div className="surface p-5 space-y-3">

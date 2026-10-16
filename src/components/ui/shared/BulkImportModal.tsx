@@ -6,7 +6,6 @@ import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Upload, X } from 'lucide-react';
 import { bulkImportCards } from '@/app/actions/card';
 import { sanitizeNotes } from '@/app/actions/ai-assist';
-import { enrichCards } from '@/app/actions/ai-enrich';
 import { useHasMounted } from '@/components/motion';
 import { BulkImportPreview } from '@/components/ui/shared/BulkImportPreview';
 import { Button } from '@/components/ui/button';
@@ -29,7 +28,6 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
   const [importedBy, setImportedBy] = useState('');
   const [isCleaning, setIsCleaning] = useState(false);
   const [isImporting, startImportTransition] = useTransition();
-  const [, startEnrichTransition] = useTransition();
   const dialogRef = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const hasMounted = useHasMounted();
@@ -116,15 +114,6 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
 
       toast.success(`${result.count} cards imported.`);
       resetModal();
-
-      // Fire enrichment in the background so quiz MCQ distractors and ID
-      // questions are ready before the user starts their first quiz.
-      const importedCardIds = result.cardIds ?? [];
-      if (importedCardIds.length > 0) {
-        startEnrichTransition(async () => {
-          await enrichCards({ deck_id: deckId, card_ids: importedCardIds });
-        });
-      }
     });
   }
 
@@ -178,8 +167,8 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                         Paste your notes
                       </h2>
                       <p className="text-sm text-ink-dim">
-                        Exact Term-Description lines, previewed live. Quiz data is enriched in the
-                        background after import.
+                        Exact Term-Description lines, previewed live. Imported cards are ready to
+                        quiz straight away.
                       </p>
                     </div>
                     <Button type="button" size="icon-sm" variant="ghost" aria-label="Close"
@@ -234,7 +223,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                           placeholder={'Mitochondria - The powerhouse of the cell\nPhotosynthesis - Process plants use to convert sunlight into energy'}
                         />
                         <p className="text-xs text-ink-dim">
-                          Import preserves your exact parsed term and description text. AI only fills quiz helper fields after save.
+                          Import preserves your exact parsed term and description text. AI adds topic tags in the background after save.
                         </p>
                       </div>
                     </div>

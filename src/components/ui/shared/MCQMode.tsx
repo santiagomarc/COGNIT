@@ -8,6 +8,7 @@ import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
 import { studyLength } from '@/lib/study-type';
 import { pageShortcutBlocked } from '@/lib/hotkeys';
+import { quizPrompt } from '@/lib/study-prompt';
 
 type MCQModeCard = {
   id: string;
@@ -20,7 +21,6 @@ type MCQModeCard = {
 type MCQModeProps = {
   card: MCQModeCard;
   disabled: boolean;
-  enrichmentPending: boolean;
   onResolve: (grade: StudyGrade, wasCorrect: boolean, answer: string) => void;
   onFallbackToIdentification: () => void;
   /** Fires the moment an option is chosen, so audio/haptics feel immediate. */
@@ -39,7 +39,6 @@ function shuffle<T>(items: T[]) {
 export function MCQMode({
   card,
   disabled,
-  enrichmentPending,
   onResolve,
   onFallbackToIdentification,
   onAnswered,
@@ -63,7 +62,7 @@ export function MCQMode({
     return shuffle([card.front, ...distractors]);
   }, [card.front, card.mcq_distractors]);
 
-  const prompt = card.id_question ?? card.back;
+  const prompt = quizPrompt(card);
   const wasCorrect = selectedOption === card.front;
 
   const handleContinue = useCallback(() => {
@@ -137,11 +136,9 @@ export function MCQMode({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Multiple choice
           </p>
-          <p className="mt-3 text-base font-semibold">Preparing quiz data</p>
+          <p className="mt-3 text-base font-semibold">Not enough options for this card</p>
           <p className="mt-2 text-sm text-ink-dim">
-            {enrichmentPending
-              ? 'AI is generating plausible distractors for this card.'
-              : 'This card does not have enough distractors yet.'}
+            Wrong options come from the deck&apos;s other terms, and this deck needs at least four distinct ones.
           </p>
           <div className="mt-5 flex justify-center gap-3">
             <Button type="button" onClick={onFallbackToIdentification}>

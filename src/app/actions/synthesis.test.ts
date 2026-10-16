@@ -12,8 +12,7 @@ const mocks = vi.hoisted(() => ({
   generateContent: vi.fn(),
   reserveAiCall: vi.fn(),
   recordAiUsage: vi.fn(),
-  enrichCards: vi.fn(async () => ({ success: true })),
-  syncEmbeddings: vi.fn(async () => ({ success: true })),
+  fillDerivedCardData: vi.fn(async () => 'ok'),
   embedTexts: vi.fn(),
   afterCallbacks: [] as Array<() => unknown>,
 }));
@@ -23,9 +22,8 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 // `after()` needs a request scope; the test collects the callbacks and runs
 // them explicitly so the response/side-effect ordering is observable.
 vi.mock('next/server', () => ({ after: (fn: () => unknown) => { mocks.afterCallbacks.push(fn); } }));
-vi.mock('./ai-enrich', () => ({ enrichCards: mocks.enrichCards }));
+vi.mock('@/lib/card-derived', () => ({ fillDerivedCardData: mocks.fillDerivedCardData }));
 vi.mock('@/lib/embeddings', () => ({ embedTexts: mocks.embedTexts, toVectorLiteral: (values: number[]) => `[${values.join(',')}]` }));
-vi.mock('./chat', () => ({ syncEmbeddings: mocks.syncEmbeddings }));
 vi.mock('@/lib/env-server', () => ({
   getServerEnv: () => ({ GEMINI_API_KEY: 'test', GEMINI_MODEL: 'gemini-test', GEMINI_EMBEDDING_MODEL: 'embed-test', GEMINI_MODEL_MAX_TOKENS: 4096 }),
 }));
@@ -654,7 +652,7 @@ describe('absorbOutsideClaim', () => {
     mocks.afterCallbacks.length = 0;
   });
 
-  it('inserts a provenance-carrying card and schedules enrichment and embedding after the response', async () => {
+  it('inserts a provenance-carrying card and schedules its embedding and tags after the response', async () => {
     const client = buildClient({
       synthesis_attempts: { data: { id: ATTEMPT_ID }, error: null },
       cards: { data: { id: NEW_CARD_ID }, error: null },
@@ -674,11 +672,10 @@ describe('absorbOutsideClaim', () => {
     });
 
     // Nothing AI-shaped ran before the response was produced.
-    expect(mocks.enrichCards).not.toHaveBeenCalled();
+    expect(mocks.fillDerivedCardData).not.toHaveBeenCalled();
     expect(mocks.afterCallbacks).toHaveLength(1);
     await mocks.afterCallbacks[0]();
-    expect(mocks.enrichCards).toHaveBeenCalledWith({ deck_id: DECK_ID, card_ids: [NEW_CARD_ID] });
-    expect(mocks.syncEmbeddings).toHaveBeenCalledWith({ deck_id: DECK_ID });
+    expect(mocks.fillDerivedCardData).toHaveBeenCalledWith(expect.anything(), 'user-1', DECK_ID, { trigger: 'absorb' });
   });
 
   it('is idempotent: a second absorb of the same claim returns the existing card without inserting', async () => {

@@ -1,6 +1,9 @@
 'use server';
 
-import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { after } from 'next/server';
+import { ensureSessionHeadroom, getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { runBackground } from '@/lib/background';
+import { fillDerivedCardData } from '@/lib/card-derived';
 import { generateCardsSchema } from '@/lib/schemas';
 import { revalidatePath } from 'next/cache';
 import { Type, type Schema } from '@/lib/gemini';
@@ -255,7 +258,7 @@ export async function generateCards(formData: FormData) {
           items: {
             type: Type.OBJECT,
             required: ['front', 'back'],
-            // A fixed emission order, as in ai-enrich.ts.
+            // A fixed emission order, as in card-enrichment.ts.
             propertyOrdering: ['front', 'back'],
             properties: {
               front: {
@@ -424,6 +427,18 @@ export async function generateCards(formData: FormData) {
 
     revalidatePath(`/dashboard/${parsed.data.deck_id}`);
     revalidatePath('/dashboard');
+
+    // Embeddings and topic tags for the new cards, after the response (AI-13,
+    // PERF-10), instead of the browser starting enrichment as a Server Action.
+    // This shares the route's budget with generation; the deck page's backfill
+    // finishes anything it doesn't.
+    const fillDeckId = parsed.data.deck_id;
+    await ensureSessionHeadroom();
+    after(() => runBackground(
+      'pdf_fill',
+      () => fillDerivedCardData(supabase, user.id, fillDeckId, { trigger: 'pdf_generate' }),
+      { deckId: fillDeckId },
+    ));
 
     await recordAiUsage(
       supabase,

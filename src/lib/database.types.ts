@@ -879,6 +879,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_card_background_enrichment_batch: {
+        Args: { p_deck_id: string; p_rows: Json }
+        Returns: number
+      }
       apply_card_embeddings_batch: {
         Args: { p_deck_id: string; p_updates: Json }
         Returns: number

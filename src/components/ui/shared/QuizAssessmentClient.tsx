@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { enrichCards } from '@/app/actions/ai-enrich';
 import { logQuizResult } from '@/app/actions/quiz';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { pageShortcutBlocked } from '@/lib/hotkeys';
 import { fireFeedback } from '@/lib/feedback-effects';
 import { useFeedbackPrefs } from '@/lib/use-feedback-prefs';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
+import { quizPrompt } from '@/lib/study-prompt';
 import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
@@ -152,7 +152,6 @@ export function QuizAssessmentClient({
   });
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [pendingQuitHref, setPendingQuitHref] = useState<string | null>(null);
-  const [isEnriching, startEnrichmentTransition] = useTransition();
   const [isSavingResult, startSavingResultTransition] = useTransition();
 
   const [feedbackPrefs, updateFeedbackPrefs] = useFeedbackPrefs();
@@ -161,7 +160,6 @@ export function QuizAssessmentClient({
     fireFeedback(wasCorrect ? 'correct' : 'incorrect', feedbackPrefs);
   }, [feedbackPrefs]);
 
-  const requestedEnrichmentIds = useRef<Set<string>>(new Set());
   const didPersistResult = useRef(false);
   const lastTickMs = useRef<number | null>(null);
   const active = sessionCards[index];
@@ -285,64 +283,6 @@ export function QuizAssessmentClient({
 
     return badges;
   }, [averagePerQuestionMs, results.length, scoreSummary.percentage]);
-
-  const applyEnrichment = useCallback((rows: Array<{ id: string; mcq_distractors: string[]; id_question: string }>) => {
-    if (rows.length === 0) {
-      return;
-    }
-
-    setSessionCards((current) =>
-      current.map((card) => {
-        const match = rows.find((row) => row.id === card.id);
-        if (!match) {
-          return card;
-        }
-
-        return {
-          ...card,
-          mcq_distractors: match.mcq_distractors,
-          id_question: match.id_question,
-        };
-      })
-    );
-  }, []);
-
-  useEffect(() => {
-    if (sessionCards.length === 0) {
-      return;
-    }
-
-    const missingIds = sessionCards
-      .filter((card) => {
-        if (requestedEnrichmentIds.current.has(card.id)) {
-          return false;
-        }
-
-        if (quizMode === 'identification') {
-          return !card.id_question;
-        }
-
-        return !Array.isArray(card.mcq_distractors) || card.mcq_distractors.length < 3 || !card.id_question;
-      })
-      .slice(0, 50)
-      .map((card) => card.id);
-
-    if (missingIds.length === 0) {
-      return;
-    }
-
-    missingIds.forEach((id) => requestedEnrichmentIds.current.add(id));
-
-    startEnrichmentTransition(async () => {
-      const result = await enrichCards({ deck_id: deckId, card_ids: missingIds });
-      if (result?.error || !result?.success) {
-        toast.error(formatActionError(result?.error ?? 'Failed to prepare quiz data', 'Failed to prepare quiz data'));
-        return;
-      }
-
-      applyEnrichment(result.cards ?? []);
-    });
-  }, [applyEnrichment, deckId, quizMode, sessionCards]);
 
   const didCelebrate = useRef(false);
   useEffect(() => {
@@ -471,7 +411,6 @@ export function QuizAssessmentClient({
     setQuitDialogOpen(false);
     setPendingQuitHref(null);
     setResumeState(null);
-    requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     didCelebrate.current = false;
     lastTickMs.current = null;
@@ -494,7 +433,6 @@ export function QuizAssessmentClient({
     setQuitDialogOpen(false);
     setPendingQuitHref(null);
     setResumeState(null);
-    requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     lastTickMs.current = null;
     toast.success('Resumed previous quiz session');
@@ -528,7 +466,6 @@ export function QuizAssessmentClient({
     setSessionDurationMs(0);
     setResumeState(null);
     clearStoredSession();
-    requestedEnrichmentIds.current.clear();
     didPersistResult.current = false;
     didCelebrate.current = false;
     lastTickMs.current = null;
@@ -589,10 +526,6 @@ export function QuizAssessmentClient({
     );
   }
 
-  const activeNeedsIdentificationPrompt = Boolean(active && !active.id_question);
-  const activeNeedsMcq = Boolean(
-    active && (!Array.isArray(active.mcq_distractors) || active.mcq_distractors.length < 3)
-  );
   const incorrectResults = results.filter((entry) => !entry.correct);
   const resultActionButtonClass = 'gap-2 min-w-[11.5rem] justify-center';
 
@@ -933,11 +866,10 @@ export function QuizAssessmentClient({
               key={active.id}
               card={active}
               disabled={isPaused}
-              enrichmentPending={isEnriching && activeNeedsMcq}
               onResolve={(_, wasCorrect, answer) =>
                 resolveQuestion({
                   cardId: active.id,
-                  prompt: active.id_question ?? active.back,
+                  prompt: quizPrompt(active),
                   correctAnswer: active.front,
                   userAnswer: answer,
                   correct: wasCorrect,
@@ -951,12 +883,11 @@ export function QuizAssessmentClient({
               key={active.id}
               card={active}
               disabled={isPaused}
-              enrichmentPending={isEnriching && activeNeedsIdentificationPrompt}
               onAnswered={handleAnswered}
               onResolve={(_, score, answer) =>
                 resolveQuestion({
                   cardId: active.id,
-                  prompt: active.id_question ?? active.back,
+                  prompt: quizPrompt(active),
                   correctAnswer: active.front,
                   userAnswer: answer,
                   correct: score >= 0.7,

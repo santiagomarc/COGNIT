@@ -12,6 +12,7 @@ import {
 import { DEFAULT_EASE_FACTOR } from '@/lib/sm2';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 import { logger } from '@/lib/logger';
+import { fillSiblingDistractors } from '@/lib/distractors';
 
 type QuizPageProps = {
   params: Promise<{
@@ -79,11 +80,13 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   // The account's cards-per-session default (sidebar plan §5.5); read beside the wave below.
   const settingsPromise = getUserSettings(user.id);
 
-  // One wave: the deck, the deck-wide count and — in focus mode — the proven
-  // count are independent reads. This page used to await them in sequence.
-  const [{ data: deck }, { count: totalInDeck }, provenResult] = await Promise.all([
+  // One wave: the deck, the deck-wide count, the deck's terms (the distractor
+  // pool, AI-09) and — in focus mode — the proven count are independent reads.
+  // This page used to await them in sequence.
+  const [{ data: deck }, { count: totalInDeck }, { data: deckTerms }, provenResult] = await Promise.all([
     supabase.from('decks').select('id, title').eq('id', deckId).eq('user_id', user.id).single(),
     supabase.from('cards').select('id', { count: 'exact', head: true }).eq('deck_id', deckId),
+    supabase.from('cards').select('id, front, topic_tags').eq('deck_id', deckId).limit(2000),
     focusUnproven
       ? supabase
         .from('card_mastery_state')
@@ -150,7 +153,12 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
   // The RPC already ordered by priority and randomised within each tier, so
   // slice FIRST (keeping the priority) and shuffle only the chosen cards for
   // presentation order. Shuffling before slicing would throw the priority away.
-  const cards: StudySessionCard[] = shuffleItems(studyCards.slice(0, takeCount));
+  // Cards without three stored options get them from the deck's other terms
+  // (AI-09): no model call, so the quiz never waits on enrichment.
+  const cards: StudySessionCard[] = fillSiblingDistractors(
+    shuffleItems(studyCards.slice(0, takeCount)),
+    deckTerms ?? [],
+  );
 
   return (
     <QuizAssessmentClient

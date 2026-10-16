@@ -25,6 +25,9 @@ vi.mock('pdf-parse', () => ({
 }));
 
 vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
+// The embeddings-and-tags fill is scheduled after the response; these tests are about generation.
+vi.mock('next/server', () => ({ after: () => undefined }));
+vi.mock('@/lib/card-derived', () => ({ fillDerivedCardData: async () => 'ok' }));
 
 vi.mock('@/lib/supabase/session', () => {
   const deckQuery: Record<string, unknown> = {};
@@ -35,7 +38,7 @@ vi.mock('@/lib/supabase/session', () => {
       ? { insert: (rows: unknown[]) => ({ select: async () => ({ data: rows.map((_, i) => ({ id: `card-${i}` })), error: null }) }) }
       : deckQuery),
   };
-  return { getRequestClient: async () => supabase, getSessionUser: async () => ({ id: 'user-1' }) };
+  return { getRequestClient: async () => supabase, getSessionUser: async () => ({ id: 'user-1' }), ensureSessionHeadroom: async () => undefined };
 });
 
 vi.mock('@/app/actions/_shared', async (importOriginal) => ({

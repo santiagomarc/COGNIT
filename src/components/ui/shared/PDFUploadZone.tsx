@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback, useTransition, type DragEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from 'react';
 import { generateCards } from '@/app/actions/ai-generate';
-import { enrichCards } from '@/app/actions/ai-enrich';
 import { Button } from '@/components/ui/button';
 import { formatActionError } from '@/lib/ai-feedback';
 import { motionTransitions } from '@/lib/motion-configs';
@@ -45,7 +44,6 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const reduced = useReducedMotion();
-  const [, startEnrichTransition] = useTransition();
 
   const resolvedMaxCardCount = maxCardChoice === 'max' ? PDF_GENERATION_MAX_COUNT : Number(maxCardChoice);
 
@@ -146,15 +144,6 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
         setGeneratedCards(result.cards);
         setSelectedFile(null);
         if (inputRef.current) inputRef.current.value = '';
-
-        // Fire enrichment in the background — generates MCQ distractors and
-        // identification questions so cards are quiz-ready immediately.
-        const generatedIds = result.cardIds ?? [];
-        if (generatedIds.length > 0) {
-          startEnrichTransition(async () => {
-            await enrichCards({ deck_id: deckId, card_ids: generatedIds });
-          });
-        }
       }
     } catch (err) {
       console.error('[PDFUploadZone] generateCards failed:', err);

@@ -9,10 +9,6 @@ export function formatActionError(error: unknown, fallbackMessage: string): stri
         return 'AI cleaning is temporarily busy. You can still import your notes directly and fix flagged rows in preview.';
       }
 
-      if (error.includes('enrich cards')) {
-        return 'Quiz enhancement is temporarily limited. Your cards are still saved and can be used in study mode.';
-      }
-
       if (error.includes('chat with deck')) {
         return 'Deck chat is temporarily rate-limited. Please try again shortly.';
       }

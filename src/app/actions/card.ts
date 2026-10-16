@@ -14,6 +14,7 @@ import { logger } from '@/lib/logger';
 import { ensureSessionHeadroom, getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 import { runBackground } from '@/lib/background';
+import { fillDerivedCardData } from '@/lib/card-derived';
 
 const BULK_DELETE_MAX_COUNT = 200;
 
@@ -194,6 +195,17 @@ export async function bulkImportCards(data: BulkImportInput) {
 
   revalidatePath(`/dashboard/${result.data.deck_id}`);
   revalidatePath('/dashboard');
+
+  // Embeddings and topic tags for the new cards, after the response (AI-13,
+  // PERF-10). The browser used to start enrichment itself, as a Server Action
+  // that held every later save in the tab behind it. Quiz options and prompts
+  // need no model any more (AI-09); whatever this run doesn't finish, the
+  // deck page's backfill picks up.
+  if ((insertedCards?.length ?? 0) > 0) {
+    const deckId = result.data.deck_id;
+    await ensureSessionHeadroom();
+    after(() => runBackground('import_fill', () => fillDerivedCardData(supabase, user.id, deckId, { trigger: 'bulk_import' }), { deckId }));
+  }
 
   return {
     success: true,

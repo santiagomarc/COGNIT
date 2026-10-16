@@ -12,9 +12,9 @@ import { sanitizeDatabaseError } from '@/lib/server-errors';
 import {
   recordAiUsage, requireOwnedDeck, reserveAiCall, sanitizeAiInputText,
 } from './_shared';
-import { logger } from '@/lib/logger';
 import { guardAction } from '@/lib/action-guard';
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
+import { embedPendingCards } from '@/lib/card-embeddings';
 
 // Bounds each syncEmbeddings invocation so a large deck can't run past the
 // server action's execution limit; the client re-invokes until pending is 0.
@@ -51,119 +51,18 @@ export async function syncEmbeddings(data: SyncEmbeddingsInput) {
       return { error: deckAccess.error };
     }
 
+    // The same job the background fills run (src/lib/card-embeddings.ts);
+    // this is the chat widget's manual "Index" button.
     const { supabase, user } = deckAccess;
-
-    // Two cheap COUNT queries instead of fetching every embedding vector (up to
-    // ~6MB for a large deck) just to test which rows are null. They run before
-    // the reservation: a sync with nothing to do must not spend an AI call
-    // against the user's limits (AI-14).
-    const [
-      { count: totalCardCount, error: totalCountError },
-      { count: totalPendingCount, error: pendingCountError },
-    ] = await Promise.all([
-      supabase.from('cards').select('id', { count: 'exact', head: true }).eq('deck_id', parsed.data.deck_id),
-      supabase.from('cards').select('id', { count: 'exact', head: true })
-        .eq('deck_id', parsed.data.deck_id).is('embedding', null),
-    ]);
-
-    if (totalCountError || pendingCountError) {
-      return {
-        error: sanitizeDatabaseError(totalCountError ?? pendingCountError!, 'Failed to load cards for embedding sync.'),
-      };
+    const result = await embedPendingCards(supabase, user.id, parsed.data.deck_id, {
+      limit: CARDS_PER_SYNC_BATCH,
+      trigger: 'chat_index',
+    });
+    if (!result.ok) {
+      return { error: result.error };
     }
 
-    if (!totalPendingCount) {
-      return { success: true as const, synced: 0, pending: 0, total: totalCardCount ?? 0 };
-    }
-
-    const reservation = await reserveAiCall(supabase, user.id, 'sync_embeddings');
-    if (!reservation.ok) {
-      return { error: reservation.error };
-    }
-
-    // Cap and window each invocation so a large deck can't run past the server
-    // action's execution limit — the caller re-invokes until `pending` is 0.
-    const { data: pendingCards, error: pendingCardsError } = await supabase
-      .from('cards')
-      .select('id, front, back')
-      .eq('deck_id', parsed.data.deck_id)
-      .is('embedding', null)
-      .order('created_at', { ascending: true })
-      .limit(CARDS_PER_SYNC_BATCH);
-
-    if (pendingCardsError) {
-      return { error: sanitizeDatabaseError(pendingCardsError, 'Failed to load cards for embedding sync.') };
-    }
-
-    let synced = 0;
-    const validCards = (pendingCards ?? [])
-      .map((card) => ({ card, payload: sanitizeAiInputText(`${card.front}\n${card.back}`, 2_000) }))
-      .filter((entry) => entry.payload.length > 0);
-
-    if (validCards.length > 0) {
-      const vectors = await embedTexts(
-        validCards.map((entry) => entry.payload),
-        // A 100-card batch spends the free tier's whole per-minute quota;
-        // waiting out the reset beats failing the sync.
-        { taskType: 'RETRIEVAL_DOCUMENT', maxServerDelayMs: 35_000 },
-      );
-
-      const updates = validCards
-        .map((entry, index) => ({ card_id: entry.card.id, vector: vectors[index] }))
-        .filter((entry): entry is { card_id: string; vector: number[] } => Boolean(entry.vector))
-        .map((entry) => ({ card_id: entry.card_id, embedding: toVectorLiteral(entry.vector) }));
-
-      // One statement instead of up to 200 UPDATEs (P-4).
-      const { data: appliedCount, error: applyError } = await supabase.rpc('apply_card_embeddings_batch', {
-        p_deck_id: parsed.data.deck_id,
-        p_updates: updates,
-      });
-
-      if (applyError) {
-        // No per-card fallback. That loop skipped failed rows and still
-        // reported success, leaving the deck silently under-retrievable.
-        logger.error('syncEmbeddings', 'apply_card_embeddings_batch failed', {
-          code: applyError.code,
-          message: applyError.message,
-        });
-        return { error: sanitizeDatabaseError(applyError, 'Failed to save card embeddings.') };
-      }
-
-      synced = Number(appliedCount ?? 0);
-    }
-
-    const remainingPending = Math.max(0, totalPendingCount - synced);
-    const metadataPayload = {
-      deck_id: parsed.data.deck_id,
-      user_id: user.id,
-      total_cards: totalCardCount ?? 0,
-      embedded_cards: (totalCardCount ?? 0) - remainingPending,
-      last_sync_at: new Date().toISOString(),
-      sync_error_message: null,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: metadataError } = await supabase
-      .from('deck_chat_embedding_metadata')
-      .upsert(metadataPayload, { onConflict: 'deck_id,user_id' });
-
-    if (metadataError) {
-      logger.warn('syncEmbeddings', 'metadata upsert failed', { message: metadataError.message });
-    }
-
-    await recordAiUsage(
-      supabase,
-      user.id,
-      'sync_embeddings',
-      {
-        deck_id: parsed.data.deck_id,
-        total_cards: totalCardCount ?? 0,
-        synced_cards: synced,
-      },
-      reservation,
-    );
-
-    return { success: true as const, synced, pending: remainingPending, total: totalCardCount ?? 0 };
+    return { success: true as const, synced: result.synced, pending: result.pending, total: result.total };
   });
 }
 

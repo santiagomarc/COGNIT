@@ -88,8 +88,7 @@ import {
   sanitizeAiInputText,
   touchDeckUpdatedAt,
 } from './_shared';
-import { enrichCards } from './ai-enrich';
-import { syncEmbeddings } from './chat';
+import { fillDerivedCardData } from '@/lib/card-derived';
 
 /**
  * Micro-synthesis Server Actions (COGNIT_MICRO_SYNTHESIS_SPEC.md Rev. B.1 §9.3).
@@ -1085,16 +1084,17 @@ export async function absorbOutsideClaim(data: AbsorbOutsideClaimInput) {
     await touchDeckUpdatedAt(supabase, deckId, user.id);
     revalidatePath(`/dashboard/${deckId}`);
 
-    // The back half of the loop, off the response path. Both actions reserve
-    // their own spend; a refused reservation leaves the card plain, which the
-    // deck's enrich and sync controls pick up later.
+    // The back half of the loop, off the response path: the new card's
+    // embedding and tags. Each reserves its own spend; a refused reservation
+    // leaves the card for the deck page's backfill. Quiz options and prompts
+    // come from the deck and need nothing here (AI-09).
     const cardId = card.id;
     await ensureSessionHeadroom();
-    after(() => runBackground('absorb_enrich', async () => {
-      const enriched = await enrichCards({ deck_id: deckId, card_ids: [cardId] });
-      const synced = await syncEmbeddings({ deck_id: deckId });
-      return 'error' in enriched || 'error' in synced ? 'failed' : 'ok';
-    }, { deckId, cardId }));
+    after(() => runBackground(
+      'absorb_fill',
+      () => fillDerivedCardData(supabase, user.id, deckId, { trigger: 'absorb' }),
+      { deckId, cardId },
+    ));
 
     return { success: true as const, cardId, duplicate: false };
   });

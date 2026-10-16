@@ -1,6 +1,6 @@
 # Cognit — Performance Plan (light AI, snappy app)
 
-**Revision:** 1.1 · 2026-10-15. Rev 1.1: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
+**Revision:** 1.2 · 2026-10-16. Rev 1.2: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
 **Baseline:** `main` @ `73eabb5` (clean tree; re-checked at the end of the audit). Line references in §2 and the appendices are to this baseline; P0 has since moved some of them.
 **Scope:** where Cognit's AI calls go and which of them a user waits on; what else makes the signed-in app slower than it needs to be; and the phased plan that makes AI light and the app snappy. No application code was changed by this audit.
 **Companions:** `COGNIT_UIUX_PLAN.md` (Rev 1.0, called **UIUX** below; PERF-06…09 and FLOW-06 live there and are scheduled here, not restated) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; the AUTH-02 runbook in §6.3, the LC series, house style) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` (§2: live thinking measurements on `gemini-3.5-flash-lite`).
@@ -71,7 +71,7 @@ Close behind:
 | Phase | Goal | Size | Exit gate |
 |---|---|---|---|
 | **P0** | Measure, and take the free wins: remove mnemonics and chat follow-ups, ES256 signing keys (owner, ≈ 15 min), a durable record of every AI call, no page re-render inside each grade, count-before-reserve, a thinking guard. **Code done 2026-10-15** (§4.7) | 1–1.5 days | G0 (§4.6) |
-| **P1** | AI off the user's path: quiz data from the deck, embeddings when cards are made, no browser-invoked enrichment | 2.5–3.5 days | G1 (§5.5) |
+| **P1** | AI off the user's path: quiz data from the deck, embeddings when cards are made, no browser-invoked enrichment. **Code done 2026-10-16** (§5.6) | 2.5–3.5 days | G1 (§5.5) |
 | **P2** | Study and quiz feel instant: the quiz clock and its persistence; UIUX PERF-06/07 if U2 hasn't run | 0.5 day (+2.5 UIUX) | G2 (§6.3) |
 | **P3** | Chat and search: no pre-send sync, small decks in full context, instant lexical search, semantic search by a cancellable route | 1.75–2.25 days | G3 (§7.4) |
 | **P4** | Lighter pages: load unopened UI on open, lower budgets, keep the proxy off static pages | 1–1.5 days | G4 (§8.3) |
@@ -83,7 +83,7 @@ About **8.75–11.25 days** (P0's code is already done), plus the 2.5 UIUX days 
 
 | Measure | Now | Target |
 |---|---|---|
-| Generative model calls per 30 days, same usage | ≈ 53 | ≤ 25 (estimate after P0: ≈ 33; after P1: ≈ 21) |
+| Generative model calls per 30 days, same usage | ≈ 53 | ≤ 33 (estimate after P0: ≈ 33; after P1: ≈ 30 with AI distractors kept, §5.6; ≈ 21 if OD-7 turns them off) |
 | AI calls between a user action and the next screen: quiz start · first chat question · a save after an import | 1 · up to 20 sync rounds · queued behind enrichment | 0 · 0 · 0 |
 | Model calls before a chat turn is "done" | 2, plus a query embedding | 1 since P0, plus an embedding only on decks over 80 cards after P3 |
 | Supabase Auth user lookups per day | ≈ 1,625 | ≤ 100 (token refreshes) |
@@ -140,10 +140,10 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 
 | ID | Sev | Area | Location | Finding | Evidence | Fix |
 |---|---|---|---|---|---|---|
-| **PERF-10** | S1 | Server Actions | `BulkImportModal.tsx:120–127`, `PDFUploadZone.tsx:150–158`, `QuizAssessmentClient.tsx:289–345`, `DeckChatWidget.tsx:101–118`; `next/dist/client/components/app-router-instance.js:100–158`, `next/dist/client/app-call-server.js:17–18` | Long AI work runs as browser-invoked Server Actions. Every client call to a Server Action is dispatched as `ACTION_SERVER_ACTION` through the router's single action queue. With one pending, the next is appended and waits (`:151–157`); only a navigation jumps the queue (`:139–150`). A background `enrichCards` (3 parallel batches, up to 2 attempts each) therefore holds every later save in the tab: adding, editing or deleting a card, the share toggle, palette search, the quiz's final `logQuizResult`. | measured (source) + code | §5.3 |
+| **PERF-10** | S1 | Server Actions | `BulkImportModal.tsx:120–127`, `PDFUploadZone.tsx:150–158`, `QuizAssessmentClient.tsx:289–345`, `DeckChatWidget.tsx:101–118`; `next/dist/client/components/app-router-instance.js:100–158`, `next/dist/client/app-call-server.js:17–18` | Long AI work runs as browser-invoked Server Actions. Every client call to a Server Action is dispatched as `ACTION_SERVER_ACTION` through the router's single action queue. With one pending, the next is appended and waits (`:151–157`); only a navigation jumps the queue (`:139–150`). A background `enrichCards` (3 parallel batches, up to 2 attempts each) therefore holds every later save in the tab: adding, editing or deleting a card, the share toggle, palette search, the quiz's final `logQuizResult`. | measured (source) + code | §5.3 ✓ P1 |
 | **AI-10** | S1 | Chat | `DeckChatWidget.tsx:235–238`, `:101–118`; `chat.ts:109` | A deck's first question awaits `runSync()` before it is sent: a loop of up to 20 `syncEmbeddings` actions, each embedding up to 200 cards, with `maxServerDelayMs: 35_000` against the free tier's 100-texts-a-minute cap. 337 of 387 cards are unembedded, so nearly every deck takes this path. | code + prod coverage | §7.1 |
-| **AI-13** | S1 | Search | `card.ts:32` (`createCard`), `:164` (`bulkImportCards`), `ai-generate.ts` (`generateCards`) | No path embeds a card when it is created; embeddings come only from the chat widget, `updateCard` (`card.ts:139`) and synthesis absorb (`synthesis.ts:1093–1095`). With 13% coverage, `search_user_cards_by_embedding` can return at most 13% of cards. | measured (prod) | §5.2 |
-| **AI-09** | S2 | Quiz | `QuizAssessmentClient.tsx:155`, `:289–345`; `count_quiz_ready_cards` (`202609070900_phase25_corrections.sql`); `[deckId]/page.tsx:135`, `:219`, `:402`; `DeckSessionLauncher.tsx:169` | Quiz data comes only from a model: MCQ needs 3 stored distractors and Identification a stored question. A quiz starts by enriching up to 50 cards that lack them, and MCQ falls back to Identification meanwhile. 45 cards lack them today. Every non-empty deck has ≥ 7 cards. The other cards' terms are the standard distractor pool (Quizlet's Learn mode works this way), and masking the term in the description gives an identification prompt with no model. | measured (prod) + code | §5.1 |
+| **AI-13** | S1 | Search | `card.ts:32` (`createCard`), `:164` (`bulkImportCards`), `ai-generate.ts` (`generateCards`) | No path embeds a card when it is created; embeddings come only from the chat widget, `updateCard` (`card.ts:139`) and synthesis absorb (`synthesis.ts:1093–1095`). With 13% coverage, `search_user_cards_by_embedding` can return at most 13% of cards. | measured (prod) | §5.2 ✓ P1 |
+| **AI-09** | S2 | Quiz | `QuizAssessmentClient.tsx:155`, `:289–345`; `count_quiz_ready_cards` (`202609070900_phase25_corrections.sql`); `[deckId]/page.tsx:135`, `:219`, `:402`; `DeckSessionLauncher.tsx:169` | Quiz data comes only from a model: MCQ needs 3 stored distractors and Identification a stored question. A quiz starts by enriching up to 50 cards that lack them, and MCQ falls back to Identification meanwhile. 45 cards lack them today. Every non-empty deck has ≥ 7 cards. The other cards' terms are the standard distractor pool (Quizlet's Learn mode works this way), and masking the term in the description gives an identification prompt with no model. | measured (prod) + code | §5.1 ✓ P1 |
 | **AI-11** | S2 | Chat | `api/chat/route.ts:237–254`, `:372–389` | `done`, which ends the turn in the UI, is sent only after a second model call for follow-up chips returns. The answer is already on screen; the input stays busy for one more call (≈ 1.6–2 s at best). The call is capped at 256 output tokens, parsed as JSON, and its failures are swallowed to `[]`. | code | §4.0 ✓ P0 |
 | **AI-12** | S2 | Search | `CommandPalette.tsx:130–150`, `chat.ts:286–340` | Card search is semantic only: an Auth check, a reservation, the query embedding, then the vector search, in sequence, as a Server Action, so it can't be cancelled and queues behind PERF-10. There is no lexical search, so finding a term you know still costs a model call and sees only embedded cards. | code | §7.3 |
 | **AI-15** | S2 | Study | `study.ts:50–53`, `:81–96`; `mnemonic.ts:53–75` | A mnemonic is written for every first lapse: 38% of recent model calls, though 37 of 42 lapsed cards never lapsed again. It runs in the background, but on the same per-minute quota as chat and generation. | measured (prod) + code | §4.0 ✓ P0 (removed) |
@@ -292,6 +292,8 @@ Follow Next Horizon §6.3, steps 1–4. No code changes: `getClaims()` (`claims.
 
 ## 5. Phase P1 — AI off the user's path (2.5–3.5 days)
 
+**Status 2026-10-16:** code done, uncommitted, on top of `404dd24`; what was built differs from §5.1–§5.3 where §5.6 says so. Owed by the owner: pushing two migrations, and the B.6 review (§5.6).
+
 ### 5.1 AI-09 — Quiz data from the deck (1–1.5 days)
 
 **Distractors.** `pickSiblingDistractors` in `src/lib/distractors.ts` takes the other cards' terms in the same deck as candidates and ranks them. It then passes the top candidates through the existing `selectUsableDistractors`, which already drops the answer, exact duplicates, and anything ≥ 0.85 similar to the answer or to an option already chosen.
@@ -365,13 +367,37 @@ Mnemonics were removed in P0 (§4.0, OD-3) instead of being limited to second la
 
 ### 5.5 Gate G1
 
-- A quiz on a freshly imported deck shows MCQ at once and creates no `enrich_cards` reservation (B.1 before and after).
-- Right after a PDF or bulk import, adding or editing a card returns in normal time while background work runs (Network panel; V1 once a test account exists).
-- Every deck visited since P1 has 100% embedding coverage (B.3).
-- The distractor gate (B.6) passed.
-- 30-day generative calls are tracking toward ≤ 25 (B.1).
+| Check | State 2026-10-16 |
+|---|---|
+| A quiz on a freshly imported deck shows MCQ at once and creates no `enrich_cards` reservation from the quiz | ✓ by construction: the quiz has no enrichment call left; options come from the deck when none are stored (test: `distractors.test.ts`) |
+| Right after an import, adding or editing a card returns in normal time while background work runs | ✓ by construction: no browser-invoked AI action remains; confirm in the Network panel after deploy |
+| Every deck visited since P1 reaches 100% embedding coverage (B.3) | Owed: after the migrations are pushed and decks are visited |
+| The distractor gate (B.6) | **Failed on the agent's reading** (§5.6); owner's review owed |
+| 30-day generative calls tracking toward the revised target | Owed: a month of data |
+| `npm test`, `tsc --noEmit`, `npm run lint`, `next build` + budgets | ✓ 620 tests in 67 files; build ✓; every route within budget |
 
----
+### 5.6 Execution notes (2026-10-16)
+
+**The B.6 review.** A blind A/B sheet of 30 random cards that already had AI distractors, with the deck-sourced set computed by the shipped `pickSiblingDistractors`, is at `/private/tmp/claude-501/-Users-marcsantiago-Dev-cognit/23ac7c57-ab06-4750-9955-0a0cee809810/scratchpad/b6/distractor-review.md`, with the answer key in `distractor-review-key.txt` beside it. It was generated from a read-only export by a scratchpad script, not a repo test (a one-off review). On the agent's reading the AI sets win about 15–17 of 30 and the deck's 3–4, the rest even, so the gate (deck loses on ≤ 10) fails:
+- **Where the deck loses:** decks mix kinds of term. "Paciano" draws symbols, "University of Santo Tomas" draws Rizal's essays. Decks also hold near-synonym cards ("Data Transfer Cost" offered for "Data Transfer Pricing").
+- **Where the AI loses, more rarely:** the answer itself among the options (#7), and near-synonyms ("Service Disruption" for "Interruption").
+- **Two ranking fixes went in after the first pass:** shared content words now score (the other "… generation computers" for "Fifth generation computers"), and a term containing the answer is never offered. Deck terms use a 0.93 near-duplicate cut instead of 0.85, which rejected real parallel terms.
+
+**What was built instead of §5.1/§5.3's deck-only design (a hybrid):**
+- **The quiz never waits.** `fillSiblingDistractors` gives every card without three stored options a deck-sourced set on the quiz page; prompts are `quizPrompt()` (the stored AI question if any, else the masked description), in the browser and in `logQuizResult`'s stored text.
+- **AI distractors are still written, in the background.** `src/lib/card-enrichment.ts` (`enrichPendingCards`) asks for three distractors (the old prompt's rules, plus "match the term in kind") and 2–4 tags per card, 25 cards a call, up to 4 calls a run, one attempt each, reserved as `enrich_cards`. Identification questions are no longer written: the masked description replaces them, which roughly halves the output. `AI_DISTRACTORS` in that file turns the distractor half off (OD-7).
+- **The write** is a new RPC, `apply_card_background_enrichment_batch` (migration `202610160900`), which sets only non-empty tags and complete sets of three, leaving the stored question alone. The tags-only `apply_card_tags_batch` in §5.3 was never pushed and is not in the tree.
+- **Removed:** the `enrichCards` Server Action and `enrichCardsSchema`, all three browser calls (bulk import, PDF upload, quiz start), the quiz's enrichment state and "pending" notices, the deck page's "Quiz-ready" readouts and `loadQuizReadyCount` (`count_quiz_ready_cards` stays in the database, unused), and the `enrich cards` error copy.
+
+**Embeddings and the backfill (§5.2), as built:**
+- `src/lib/card-embeddings.ts` (`embedPendingCards`) is the old `syncEmbeddings` body; the action is now a wrapper used by the chat widget's Index button.
+- `src/lib/card-derived.ts` (`fillDerivedCardData`) runs one embedding batch, then enrichment, each even if the other fails. `bulkImportCards`, `generateCards` and synthesis absorb schedule it with `after()`.
+- **Backfill route:** `POST /api/decks/backfill` (not `/api/embeddings/backfill`: it fills tags and distractors too). It is throttled to one run a minute per user (`derivedDataRanRecently`, the free tier's quota window), not ten minutes, so a 300-card import fills in minutes.
+- **Manual cards:** `createCard` schedules nothing. The deck page counts cards missing an embedding, tags or distractors in its existing parallel wave, and `CardDataBackfill` asks the route again whenever that count changes. Cards added by hand are filled in batches, not one reservation per card against the hourly and 24 h limits.
+
+**Tests added or changed:** `distractors.test.ts`, `study-prompt.test.ts`, `card-embeddings.test.ts`, `card-enrichment.test.ts`, `card-derived.test.ts`, `api/decks/backfill/route.test.ts`, `card.test.ts`; `synthesis.test.ts` mocks the fill job; `ai-generate.test.ts` and the live `pdf-generation.live.ts` mock `after`, the fill job and `ensureSessionHeadroom`.
+
+**Order to ship:** push both migrations (`202610150900`, `202610160900`), then deploy. Before the push, deploying is safe: the outcome inserts and the background enrichment write fail quietly, and quizzes use deck-sourced options.
 
 ## 6. Phase P2 — Study and quiz feel instant (0.5 day, +2.5 if UIUX U2 hasn't run)
 
@@ -500,6 +526,7 @@ $$;
 | **OD-4** | A test account | Add `LOAD_TEST_EMAIL` and `LOAD_TEST_PASSWORD` to `.env.local` | **Yes.** Every signed-in gate (V1) needs it; it's the same ask as UIUX. |
 | **OD-5** | Region | Stay in Mumbai · move Supabase and Vercel to Singapore | **Stay.** A region move means a new Supabase project and a data migration; revisit with real-user data (PERF-09). |
 | **OD-6** | The 342 cards that already have AI distractors | Keep them · recompute every card from the deck | **Keep.** They're already paid for, and the gate (B.6) compares against them. |
+| **OD-7** | AI distractors in the background job | Keep (`AI_DISTRACTORS = true`) · deck options only | **Keep**, unless the owner's own B.6 review finds the deck sets lose on ≤ 10 of 30 (§5.6). Turning it off saves roughly 10–15 calls a month at current use. |
 
 ## 11. Out of scope
 

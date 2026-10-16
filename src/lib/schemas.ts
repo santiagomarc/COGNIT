@@ -116,13 +116,6 @@ export const bulkImportSchema = z.object({
 
 export type BulkImportInput = z.infer<typeof bulkImportSchema>;
 
-export const enrichCardsSchema = z.object({
-  deck_id: z.uuid({ message: "Invalid deck id" }),
-  card_ids: z.array(z.uuid({ message: "Invalid card id" })).min(1).max(200),
-});
-
-export type EnrichCardsInput = z.infer<typeof enrichCardsSchema>;
-
 export const sanitizeNotesSchema = z.object({
   raw_text: z.string().trim().min(1, { message: "Notes are required" }).max(50_000, { message: "Notes are too long" }),
 });

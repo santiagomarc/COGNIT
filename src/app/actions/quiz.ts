@@ -9,6 +9,7 @@ import { isMissingDatabaseFunctionError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { normalizeForMatch, requireOwnedDeck } from './_shared';
 import { logger } from '@/lib/logger';
+import { quizPrompt } from '@/lib/study-prompt';
 
 export async function logQuizResult(data: LogQuizResultInput) {
   const result = logQuizResultSchema.safeParse(data);
@@ -54,7 +55,7 @@ export async function logQuizResult(data: LogQuizResultInput) {
     return {
       card_id: entry.card_id,
       correct,
-      prompt_text: card.id_question ?? card.back,
+      prompt_text: quizPrompt(card),
       correct_answer_text: card.front,
       user_answer_text: userAnswer,
     };
