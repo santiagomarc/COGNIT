@@ -21,6 +21,8 @@ import { fireFeedback } from '@/lib/feedback-effects';
 import { useFeedbackPrefs } from '@/lib/use-feedback-prefs';
 import { IdentificationMode } from '@/components/ui/shared/IdentificationMode';
 import { quizPrompt } from '@/lib/study-prompt';
+import { foldSegment, formatDuration } from '@/lib/session-clock';
+import { ElapsedTelemetry } from '@/components/ui/shared/ElapsedTelemetry';
 import { MCQMode } from '@/components/ui/shared/MCQMode';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
@@ -66,14 +68,6 @@ type PersistedQuizSessionState = {
 };
 
 const QUIZ_SESSION_STATE_VERSION = 1;
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
-}
 
 function getModeLabel(mode: QuizMode) {
   return mode === 'mcq' ? 'Multiple Choice' : 'Identification';
@@ -161,29 +155,34 @@ export function QuizAssessmentClient({
   }, [feedbackPrefs]);
 
   const didPersistResult = useRef(false);
-  const lastTickMs = useRef<number | null>(null);
   const active = sessionCards[index];
   const completed = index >= sessionCards.length;
   const sessionDuration = sessionDurationMs;
   const shouldProtectProgress = !completed && sessionCards.length > 0;
 
+  /*
+   * The session clock (PERF-12). A 250 ms interval used to add to
+   * `sessionDurationMs`, re-rendering this whole client four times a second
+   * and re-saving the session on every tick. Now the running segment's start
+   * sits in a ref and is folded into `durationRef` when the clock stops
+   * (pause, the last answer, a resume prompt, unmount); ElapsedTelemetry is
+   * the only thing that ticks. React runs this cleanup before the effects
+   * below in the same commit, so the saved result and the stored session see
+   * the folded total.
+   */
+  const clockRunning = !completed && !isPaused && !resumeState && sessionCards.length > 0;
+  const durationRef = useRef(0);
+  const segmentStartRef = useRef<number | null>(null);
+
   useEffect(() => {
-    if (completed || isPaused || resumeState) {
-      lastTickMs.current = null;
-      return;
-    }
-
-    lastTickMs.current = Date.now();
-    const intervalId = window.setInterval(() => {
-      const now = Date.now();
-      const previous = lastTickMs.current ?? now;
-      const delta = now - previous;
-      lastTickMs.current = now;
-      setSessionDurationMs((current) => current + Math.max(delta, 0));
-    }, 250);
-
-    return () => window.clearInterval(intervalId);
-  }, [completed, isPaused, resumeState]);
+    if (!clockRunning) return;
+    segmentStartRef.current = Date.now();
+    return () => {
+      durationRef.current = foldSegment(durationRef.current, segmentStartRef.current, Date.now());
+      segmentStartRef.current = null;
+      setSessionDurationMs(durationRef.current);
+    };
+  }, [clockRunning]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || resumeState) {
@@ -195,23 +194,38 @@ export function QuizAssessmentClient({
       return;
     }
 
-    const payload: PersistedQuizSessionState = {
-      version: QUIZ_SESSION_STATE_VERSION,
-      sessionCards,
-      quizMode,
-      index,
-      results,
-      hasSavedResult,
-      isRematchSession,
-      isPaused,
-      sessionDurationMs,
+    // Saved when the session changes and when the tab hides, never on the
+    // clock (PERF-12): the duration is read live from the clock refs.
+    const save = () => {
+      const payload: PersistedQuizSessionState = {
+        version: QUIZ_SESSION_STATE_VERSION,
+        sessionCards,
+        quizMode,
+        index,
+        results,
+        hasSavedResult,
+        isRematchSession,
+        isPaused,
+        sessionDurationMs: foldSegment(durationRef.current, segmentStartRef.current, Date.now()),
+      };
+
+      try {
+        window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+      } catch {
+        // Ignore storage failures.
+      }
     };
 
-    try {
-      window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch {
-      // Ignore storage failures.
-    }
+    save();
+    const saveWhenHidden = () => {
+      if (document.visibilityState === 'hidden') save();
+    };
+    document.addEventListener('visibilitychange', saveWhenHidden);
+    window.addEventListener('pagehide', save);
+    return () => {
+      document.removeEventListener('visibilitychange', saveWhenHidden);
+      window.removeEventListener('pagehide', save);
+    };
   }, [
     completed,
     hasSavedResult,
@@ -222,7 +236,6 @@ export function QuizAssessmentClient({
     resumeState,
     results,
     sessionCards,
-    sessionDurationMs,
     storageKey,
   ]);
 
@@ -301,7 +314,8 @@ export function QuizAssessmentClient({
       const saveResult = await logQuizResult({
         deck_id: deckId,
         mode: quizMode,
-        duration_ms: sessionDuration,
+        // The folded total: the clock's cleanup ran earlier in this commit.
+        duration_ms: durationRef.current,
         include_in_history: !isRematchSession,
         results: results.map((entry) => ({
           card_id: entry.cardId,
@@ -317,7 +331,7 @@ export function QuizAssessmentClient({
 
       setHasSavedResult(true);
     });
-  }, [completed, deckId, isRematchSession, quizMode, results, sessionDuration]);
+  }, [completed, deckId, isRematchSession, quizMode, results]);
 
   useEffect(() => {
     if (!shouldProtectProgress) {
@@ -408,12 +422,12 @@ export function QuizAssessmentClient({
     setIsRematchSession(false);
     setIsPaused(false);
     setSessionDurationMs(0);
+    durationRef.current = 0;
     setQuitDialogOpen(false);
     setPendingQuitHref(null);
     setResumeState(null);
     didPersistResult.current = false;
     didCelebrate.current = false;
-    lastTickMs.current = null;
   }, [cards, clearStoredSession, mode]);
 
   const resumePreviousSession = useCallback(() => {
@@ -430,11 +444,11 @@ export function QuizAssessmentClient({
     setIsRematchSession(Boolean(resumeState.isRematchSession));
     setIsPaused(Boolean(resumeState.isPaused));
     setSessionDurationMs(Math.max(0, resumeState.sessionDurationMs));
+    durationRef.current = Math.max(0, resumeState.sessionDurationMs);
     setQuitDialogOpen(false);
     setPendingQuitHref(null);
     setResumeState(null);
     didPersistResult.current = false;
-    lastTickMs.current = null;
     toast.success('Resumed previous quiz session');
   }, [resumeState]);
 
@@ -464,11 +478,11 @@ export function QuizAssessmentClient({
     setIsRematchSession(true);
     setIsPaused(false);
     setSessionDurationMs(0);
+    durationRef.current = 0;
     setResumeState(null);
     clearStoredSession();
     didPersistResult.current = false;
     didCelebrate.current = false;
-    lastTickMs.current = null;
   };
 
   if (sessionCards.length === 0) {
@@ -573,7 +587,7 @@ export function QuizAssessmentClient({
               label="Question"
               value={`${Math.min(index + 1, sessionCards.length)}/${sessionCards.length}`}
             />
-            <Telemetry label="Elapsed" value={formatDuration(sessionDuration)} />
+            <ElapsedTelemetry key={`${clockRunning ? 'run' : 'stop'}:${sessionDurationMs}`} baseMs={sessionDurationMs} running={clockRunning} />
 
             {!completed ? (
               <Button

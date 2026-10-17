@@ -157,7 +157,7 @@
   --dur-hover: 120ms;
   --dur-key: 70ms;
   --dur-panel: 160ms;
-  --dur-flip: 520ms;
+  --dur-flip: 320ms; /* 520 → 320 (UIUX PERF-06): the answer face shows at 160 ms */
 }
 
 /*

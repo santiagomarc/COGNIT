@@ -13,7 +13,7 @@ import { GradeKey } from '@/components/ui/shared/GradeKey';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { StudyCapstoneOffer, type CapstoneOffer } from '@/components/ui/shared/synthesis/StudyCapstoneOffer';
 import { gradeCard, finishStudySession } from '@/app/actions/study';
-import { cardLeaveSpring, motionTransitions } from '@/lib/motion-configs';
+import { cardLeaveSpring, EASE_OUT, motionTransitions } from '@/lib/motion-configs';
 import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
 import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { studyLength } from '@/lib/study-type';
@@ -21,6 +21,8 @@ import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
 import type { CapstoneDrillCandidate } from '@/lib/synthesis/types';
 import { toast } from 'sonner';
 import { RichText } from '@/components/ui/shared/RichText';
+import { ElapsedTelemetry } from '@/components/ui/shared/ElapsedTelemetry';
+import { formatDuration } from '@/lib/session-clock';
 
 type FlashcardReviewClientProps = {
   deckId: string;
@@ -77,17 +79,10 @@ const GRADE_ORDER: StudyGrade[] = ['again', 'hard', 'good', 'easy'];
 /**
  * How long the card wears its grade before it leaves the stack (§7.6). Short
  * enough to stay out of the way of a fast grader, long enough that the commit
- * is acknowledged rather than silently swallowed.
+ * is acknowledged rather than silently swallowed. 160 → 120 ms with the faster
+ * advance (UIUX PERF-06, §5.7).
  */
-const COMMIT_FLASH_MS = 160;
-
-function formatDuration(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return secs > 0 ? `${minutes}m ${secs}s` : `${minutes}m`;
-}
+const COMMIT_FLASH_MS = 120;
 
 function isStudyGrade(value: unknown): value is StudyGrade {
   return value === 'again' || value === 'hard' || value === 'good' || value === 'easy';
@@ -217,17 +212,13 @@ export function FlashcardReviewClient({
   const active = sessionCards[index];
   const completed = index >= sessionCards.length;
 
-  useEffect(() => {
-    if (resumeState || completed || isPaused) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [completed, isPaused, resumeState]);
+  /*
+   * No ticking interval here any more (UIUX PERF-07). `nowMs` moves on events
+   * (a grade, pause, resume, restart), and ElapsedTelemetry is the only thing
+   * that re-renders each second. The 1 s interval used to re-render this whole
+   * client and re-save the session to sessionStorage on every tick.
+   */
+  const clockRunning = !resumeState && !completed && !isPaused;
 
   /*
    * `P` pauses and resumes the session (design system §7.3). The elapsed
@@ -271,7 +262,7 @@ export function FlashcardReviewClient({
   );
 
   // The session clock freezes at completion without an effect: applyGrade sets
-  // `nowMs` on the final grade, and the ticking interval above stops as soon as
+  // `nowMs` on the final grade, and ElapsedTelemetry stops counting as soon as
   // `completed` is true.
 
   const progress = useMemo(() => {
@@ -571,22 +562,37 @@ export function FlashcardReviewClient({
       return;
     }
 
-    const payload: PersistedStudySessionState = {
-      version: STUDY_SESSION_STATE_VERSION,
-      sourceCardIds: sessionCardIds,
-      queueCardIds: sessionCards.map((card) => card.id),
-      index,
-      showAnswer,
-      gradeLog,
-      sessionDurationMs: Math.max(0, nowMs - sessionStartMs),
+    // Saved on events (a grade, a reveal, pause) and when the tab hides,
+    // not every second (UIUX PERF-07). A running clock is read live.
+    const save = () => {
+      const payload: PersistedStudySessionState = {
+        version: STUDY_SESSION_STATE_VERSION,
+        sourceCardIds: sessionCardIds,
+        queueCardIds: sessionCards.map((card) => card.id),
+        index,
+        showAnswer,
+        gradeLog,
+        sessionDurationMs: Math.max(0, (isPaused ? nowMs : Date.now()) - sessionStartMs),
+      };
+
+      try {
+        window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
+      } catch {
+        // Ignore storage failures.
+      }
     };
 
-    try {
-      window.sessionStorage.setItem(storageKey, JSON.stringify(payload));
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [completed, gradeLog, index, nowMs, resumeState, sessionCardIds, sessionCards, sessionStartMs, showAnswer, storageKey]);
+    save();
+    const saveWhenHidden = () => {
+      if (document.visibilityState === 'hidden') save();
+    };
+    document.addEventListener('visibilitychange', saveWhenHidden);
+    window.addEventListener('pagehide', save);
+    return () => {
+      document.removeEventListener('visibilitychange', saveWhenHidden);
+      window.removeEventListener('pagehide', save);
+    };
+  }, [completed, gradeLog, index, isPaused, nowMs, resumeState, sessionCardIds, sessionCards, sessionStartMs, showAnswer, storageKey]);
 
   useEffect(() => {
     if (completed || resumeState) return;
@@ -805,7 +811,7 @@ export function FlashcardReviewClient({
                 value={`${Math.min(index + 1, sessionCards.length)}/${sessionCards.length}`}
               />
               <Telemetry label="Ease" value={active ? active.ease_factor.toFixed(2) : '—'} />
-              <Telemetry label="Elapsed" value={formatDuration(sessionDuration)} />
+              <ElapsedTelemetry key={`${clockRunning ? 'run' : 'stop'}:${sessionDuration}`} baseMs={sessionDuration} running={clockRunning} />
 
               {/* The keycap is bound to the control it triggers, never listed
                   in a footer strip (§7.3), and never hidden responsively. */}
@@ -845,8 +851,16 @@ export function FlashcardReviewClient({
 
         {/* Part 2: Centered stage (§5 Task 3.2) */}
         {/* The focus layout is the main landmark; a nested <main> duplicated it (A11Y-01). */}
-        <div className="flex flex-1 items-center justify-center p-4 md:p-8">
-          <AnimatePresence mode="wait">
+        {/* `relative`: popLayout positions the leaving card against this box. */}
+        <div className="relative flex flex-1 items-center justify-center p-4 md:p-8">
+          {/*
+            popLayout, not wait (UIUX PERF-06, §5.7): the next card no longer
+            waits ~556 ms for the old one's exit spring to settle. The old card
+            fades in 90 ms while the new one enters; the spring stays on `y`
+            only, and opacity reaches 1 on a 120 ms tween, so the next prompt
+            is readable ~240 ms after the grade key instead of ~900.
+          */}
+          <AnimatePresence mode="popLayout" initial={false}>
             {completed ? (
               <m.div
                 key="summary"
@@ -926,8 +940,8 @@ export function FlashcardReviewClient({
                 key={active.id}
                 initial={{ opacity: 0, y: 22 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -18 }}
-                transition={prefersReducedMotion ? { duration: 0 } : cardLeaveSpring}
+                exit={{ opacity: 0, transition: prefersReducedMotion ? { duration: 0 } : { duration: 0.09, ease: 'linear' } }}
+                transition={prefersReducedMotion ? { duration: 0 } : { y: cardLeaveSpring, opacity: { duration: 0.12, ease: EASE_OUT } }}
                 className="mx-auto w-full max-w-2xl space-y-3"
               >
                 {/* Eyebrow above the card (§5 Task 3.3) */}

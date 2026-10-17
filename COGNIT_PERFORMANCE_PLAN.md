@@ -1,6 +1,6 @@
 # Cognit — Performance Plan (light AI, snappy app)
 
-**Revision:** 1.2 · 2026-10-16. Rev 1.2: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
+**Revision:** 1.3 · 2026-10-17. Rev 1.3: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
 **Baseline:** `main` @ `73eabb5` (clean tree; re-checked at the end of the audit). Line references in §2 and the appendices are to this baseline; P0 has since moved some of them.
 **Scope:** where Cognit's AI calls go and which of them a user waits on; what else makes the signed-in app slower than it needs to be; and the phased plan that makes AI light and the app snappy. No application code was changed by this audit.
 **Companions:** `COGNIT_UIUX_PLAN.md` (Rev 1.0, called **UIUX** below; PERF-06…09 and FLOW-06 live there and are scheduled here, not restated) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; the AUTH-02 runbook in §6.3, the LC series, house style) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` (§2: live thinking measurements on `gemini-3.5-flash-lite`).
@@ -72,7 +72,7 @@ Close behind:
 |---|---|---|---|
 | **P0** | Measure, and take the free wins: remove mnemonics and chat follow-ups, ES256 signing keys (owner, ≈ 15 min), a durable record of every AI call, no page re-render inside each grade, count-before-reserve, a thinking guard. **Code done 2026-10-15** (§4.7) | 1–1.5 days | G0 (§4.6) |
 | **P1** | AI off the user's path: quiz data from the deck, embeddings when cards are made, no browser-invoked enrichment. **Code done 2026-10-16** (§5.6) | 2.5–3.5 days | G1 (§5.5) |
-| **P2** | Study and quiz feel instant: the quiz clock and its persistence; UIUX PERF-06/07 if U2 hasn't run | 0.5 day (+2.5 UIUX) | G2 (§6.3) |
+| **P2** | Study and quiz feel instant: the quiz clock and its persistence; UIUX PERF-06/07 if U2 hasn't run. **Code done 2026-10-17** (§6.4) | 0.5 day (+2.5 UIUX) | G2 (§6.3) |
 | **P3** | Chat and search: no pre-send sync, small decks in full context, instant lexical search, semantic search by a cancellable route | 1.75–2.25 days | G3 (§7.4) |
 | **P4** | Lighter pages: load unopened UI on open, lower budgets, keep the proxy off static pages | 1–1.5 days | G4 (§8.3) |
 | **P5** | PDF generation by section, streamed, with tags in the same call (UIUX OD-8) | 2 days | G5 (§9.2) |
@@ -150,7 +150,7 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 | **AI-16** | S2 | Observability | `_shared.ts:143–168` | No durable per-call record of latency, outcome, tokens or finish reason: with a reservation, completion is a console line. `ai_usage_logs` is deliberately immutable (`202609050900_immutable_table_deny_policies.sql:81–91`), so it can't be updated in place either. | code | §4.2 ✓ P0 |
 | **AI-18** | S2 | Generation | `ai-generate.ts:54–67`, `:339–360`; `PDFUploadZone.tsx:116–165` | PDF generation is all-or-nothing from the user's view: no card shows until every wave finishes or the 48 s budget runs out, and the generated cards need a second model call (enrichment) for tags and quiz data. | code | §9 |
 | **PERF-11** | S2 | Server | `study.ts:103`; `next/dist/server/web/spec-extension/revalidate.js:199–203`; `next/dist/server/app-render/action-handler.js:806–826` | Any `revalidatePath` inside a Server Action makes Next render the *current* page into the action's response, whatever path it names. Next's own comment: `// TODO: only revalidate if the path matches`. `gradeCard` revalidates the deck path on every grade, so every grade re-renders the study page (deck, count, capstone candidates, two card reads, settings): ≈ 6 Supabase reads on top of the grade's own 2. The UI doesn't wait, because grades are queued (`FlashcardReviewClient.tsx:199–208`), but the queue drains slower and the session end waits for it. Every dashboard page is dynamic, so the call only purges a 30 s client cache (`next.config.ts` `staleTimes`) that a study session has long outlived. | measured (source) + code | §4.3 ✓ P0 |
-| **PERF-12** | S2 | Quiz runtime | `QuizAssessmentClient.tsx:172–186`, `:190–229` | A 250 ms interval sets `sessionDurationMs`, re-rendering the whole ≈ 1,000-line client four times a second. The persistence effect depends on it, so every session card and result is `JSON.stringify`'d and written synchronously to `sessionStorage` 4 times a second: ≈ 2,400 writes in a 10-minute quiz. Study does the same once a second (UIUX PERF-07). | code | §6.1 |
+| **PERF-12** | S2 | Quiz runtime | `QuizAssessmentClient.tsx:172–186`, `:190–229` | A 250 ms interval sets `sessionDurationMs`, re-rendering the whole ≈ 1,000-line client four times a second. The persistence effect depends on it, so every session card and result is `JSON.stringify`'d and written synchronously to `sessionStorage` 4 times a second: ≈ 2,400 writes in a 10-minute quiz. Study does the same once a second (UIUX PERF-07). | code | §6.1 ✓ P2 |
 | **AI-14** | S3 | Embeddings | `chat.ts:55` vs `:59–80` | `syncEmbeddings` reserves an AI call before counting pending cards, so a sync with nothing to do still spends a reservation (against the hourly and 24 h limits) and four round-trips. | code | §4.4 ✓ P0 |
 | **AI-17** | S3 | Model config | `gemini.ts:84`, `:148–155` | On Gemini 3, `thinking: 'none'` sends no thinking config, and text calls never send one. That is fast only because `gemini-3.5-flash-lite` defaults to minimal. Pointing `GEMINI_MODEL` at a 3.x model with a higher default would silently add up to 4× latency to every call. | code + Audit II §2 | §4.5 ✓ P0 |
 | **PERF-13** | S3 | Bundle | `AddContentPanel.tsx:18–58`; `(shell)/layout.tsx:95–101`; `synthesis/GenerateSynthesisDrillsButton.tsx` | The deck page loads 30.2 kB gz of add-content UI (card form, bulk-import preview, PDF upload) that sits in a `<details>` closed on every deck with cards. It also loads 12.9 kB of drill and plan generation UI before any drill is asked for. Every shell page loads 13.8 kB of shell dialogs (create deck, shortcuts, palette) before ⌘K, ⌘N or ? is pressed. | measured (build) | §8.1 |
@@ -162,8 +162,8 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 | ID | Where | State on 2026-10-14 | Scheduled |
 |---|---|---|---|
 | **AUTH-02** (S2) | Next Horizon §6.3 | JWKS `{"keys":[]}`. New evidence: Supabase Auth ran its per-lookup queries 1,624–1,631 times in 23 h 44 min, against 1,795 PostgREST requests (A.4): about one Auth lookup per data request. | P0 (§4.1) |
-| **PERF-06** (S2) | UIUX §5.7 | ≈ 0.9 s of animation from a grade to the next readable card; `AnimatePresence mode="wait"` is still at `FlashcardReviewClient.tsx:849`. | P2 (§6.2) |
-| **PERF-07** (S3) | UIUX §5.1 | The study clock (`:220–230`) still drives a full re-render and the `sessionStorage` write (`:564–589`) every second. | P2 (§6.2) |
+| **PERF-06** (S2) | UIUX §5.7 | ≈ 0.9 s of animation from a grade to the next readable card; `AnimatePresence mode="wait"` is still at `FlashcardReviewClient.tsx:849`. | **Done in P2** (§6.4); UX-08 not included |
+| **PERF-07** (S3) | UIUX §5.1 | The study clock (`:220–230`) still drives a full re-render and the `sessionStorage` write (`:564–589`) every second. | **Done in P2** (§6.4); the REF-01 split stays in UIUX |
 | **PERF-08** (S3) | UIUX §6.6 | No `loading.tsx` under `src/app/s/[token]/` or `src/app/explore/`. | UIUX U3 |
 | **PERF-09** (S2) | UIUX §8 | No real-user metrics. Needed to confirm P2 and P4 in the field. | After P3 (§3.2) |
 | **FLOW-06** | UIUX §6.4 | Item 1 (move PDF enrichment into `after()`) is superseded by §5.3; items 2–4 (an honest counter, `beforeunload`, no infinite animation) stand and move to P5. | P5 |
@@ -401,6 +401,8 @@ Mnemonics were removed in P0 (§4.0, OD-3) instead of being limited to second la
 
 ## 6. Phase P2 — Study and quiz feel instant (0.5 day, +2.5 if UIUX U2 hasn't run)
 
+**Status 2026-10-17:** code done, uncommitted, on top of `cbc5bce`; measured in §6.4.
+
 ### 6.1 PERF-12 — The quiz clock and its persistence (0.5 day)
 
 - **The clock.** Keep `startedAtMs` and `pausedTotalMs` in state and derive elapsed time when needed. An `<ElapsedReadout>` child owns the one-second interval for the telemetry readout (`QuizAssessmentClient.tsx:643`), so the quiz body stops re-rendering.
@@ -414,11 +416,47 @@ If UIUX U2 hasn't run by now, do UIUX §5.7 (transitions: ≈ 0.9 s → ≤ 0.3 
 
 ### 6.3 Gate G2
 
-- The React Profiler shows no quiz-body commits from the clock.
-- `sessionStorage` writes in a 10-question quiz: at most one per answer, plus one per hide.
-- If PERF-09 has landed: INP p75 on `/quiz` and `/study` ≤ 200 ms.
+| Check | State 2026-10-17 |
+|---|---|
+| No quiz-body re-renders from the clock | ✓ by construction: no interval in the quiz or study client; `ElapsedTelemetry` alone ticks |
+| `sessionStorage` writes: per answer and per hide, never on the clock | ✓ measured: 0 writes in 5 s idle on both pages (before: 20 quiz, 5 study); study 2 per card (before: 3.8) |
+| Grade → next card readable ≤ 300 ms; Space → answer readable ≤ 200 ms (UIUX budgets) | ✓ measured: 229 ms and 175–195 ms (before: 963 ms; flip settled at 540 ms, the face showing at half of the 520 ms flip by the CSS, not measured) |
+| INP p75 on `/quiz` and `/study` ≤ 200 ms | Owed: needs PERF-09 (UIUX U5) |
+| `npm test`, `tsc --noEmit`, `npm run lint`, `next build` + budgets | ✓ 625 tests in 68 files; build ✓; study 196.2 kB gz (≤ 199), quiz 197.4 (≤ 202) |
 
----
+### 6.4 Execution notes (2026-10-17)
+
+**What was built.**
+- **Shared clock.** `src/lib/session-clock.ts` (`foldSegment`, the shared `formatDuration`, with tests) and `src/components/ui/shared/ElapsedTelemetry.tsx`: the only component that re-renders each second, keyed by running state and base time so each running segment counts from its own start.
+- **Quiz (PERF-12).**
+  - The 250 ms interval is gone. A running segment's start sits in a ref and folds into `durationRef` when the clock stops.
+  - React runs that cleanup before the save-result effect in the same commit, so `logQuizResult` gets the folded total.
+  - The session is saved when it changes and on `visibilitychange` → hidden and `pagehide`, with the duration read live from the refs.
+- **Study (PERF-07).**
+  - The 1 s interval is gone; `nowMs` moves on events only.
+  - Saving follows the quiz pattern, adding `isPaused` to the dependencies so a paused clock is read as frozen.
+  - This is UIUX §5.1's persistence and clock half; its file split (REF-01) is behaviour-preserving refactoring that stays in UIUX.
+- **Transitions (PERF-06), as UIUX §5.7 specifies:**
+  - `AnimatePresence mode="popLayout" initial={false}` on a `relative` container.
+  - The card exits on a 90 ms opacity tween; it enters with the spring on `y` and opacity on a 120 ms tween.
+  - The commit flash goes 160 → 120 ms, and `--dur-flip` 520 → 320 ms. `motionTransitions.flip` (used by `Flashcard.tsx`) moves to 0.32 s too, so there is one flip speed.
+  - UX-08 (Space grades Good) is a keyboard-behaviour change waiting on UIUX OD-3 and was not done.
+
+**How it was measured.** Two scratch clones, `cbc5bce` and P2, each with a throwaway `/p2-preview` route rendering the real study and quiz clients with eight cards and a stubbed grade action. Both ran as production builds (`next start`), driven by `playwright-core` with system Chrome; timings are `requestAnimationFrame` polls from the key event, median of five cards.
+
+| Measure | Before | After |
+|---|---|---|
+| Grade key → next card readable (opacity ≥ 0.99) | 963 ms | **229 ms** |
+| … next card at rest (spring settled on `y`) | 963 ms | 362 ms |
+| Space → answer face visible | — | 175–195 ms |
+| Space → flip settled | 540 ms | 327 ms |
+| Study saves while idle, 5 s | 5 | **0** |
+| Study saves per card | 3.8 | 2 |
+| Quiz saves while idle, 5 s | 20 | **0** |
+| Quiz elapsed frozen while paused (2.5 s) | yes | yes |
+| Quiz result duration, 8 answers, 6.8 s wall | "6s" | "6s" |
+
+**Found along the way (not P2, not fixed):** after pausing and resuming a quiz with `P`, the next keyboard answer shows "Incorrect" with no option marked as chosen, and Space does not continue. It reproduces identically on `cbc5bce` and on P2, so it predates this work; without a pause the same key sequence completes all eight questions. Suspect `MCQMode`'s option shuffle (`Math.random` inside a `useMemo`) being re-run across the pause, so the chosen string no longer matches the displayed options. It needs its own fix and test.
 
 ## 7. Phase P3 — Chat and search (1.75–2.25 days)
 
