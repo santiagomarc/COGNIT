@@ -5,7 +5,7 @@ import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ArrowRight, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-import { semanticSearchCards, type SemanticSearchResult } from '@/app/actions/chat';
+import type { CardSearchResult } from '@/lib/card-search';
 import { logout } from '@/app/auth/actions';
 import { useTheme } from '@/components/ThemeProvider';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,20 @@ type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
 
 /** The minimum a semantic search will accept — below it the row is inert. */
 const MIN_SEARCH_LENGTH = 3;
+/** Text search runs as you type from this length, after a short pause. */
+const MIN_TEXT_SEARCH_LENGTH = 2;
+const TEXT_SEARCH_DEBOUNCE_MS = 120;
+
+/** GET a search route; resolves null when the request was superseded. */
+async function fetchCardSearch(url: string, signal: AbortSignal): Promise<{ results?: CardSearchResult[]; error?: string } | null> {
+  try {
+    const response = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    return (await response.json()) as { results?: CardSearchResult[]; error?: string };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return null;
+    return { error: 'Search is unavailable right now. Please try again.' };
+  }
+}
 
 type CommandPaletteProps = {
   decks: PaletteDeck[];
@@ -74,22 +88,41 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  /*
+   * Two searches (AI-12). Text matches arrive as you type, from a Postgres
+   * lookup with no model; "Search by meaning" is an explicit row that spends an
+   * AI call. Both are cancellable GETs, not Server Actions, so a stale request
+   * never lands over a newer one and never queues behind other actions.
+   */
+  const [textResults, setTextResults] = useState<CardSearchResult[]>([]);
   const [status, setStatus] = useState<SearchStatus>('idle');
-  const [results, setResults] = useState<SemanticSearchResult[]>([]);
+  const [results, setResults] = useState<CardSearchResult[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const textAbortRef = useRef<AbortController | null>(null);
+  const meaningAbortRef = useRef<AbortController | null>(null);
+  const textTimerRef = useRef<number | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   /** Whatever had focus when the palette opened: the sidebar's Search, or the page. */
   const openerRef = useRef<HTMLElement | null>(null);
   const reduced = useReducedMotion();
 
+  const cancelSearches = useCallback(() => {
+    if (textTimerRef.current !== null) window.clearTimeout(textTimerRef.current);
+    textTimerRef.current = null;
+    textAbortRef.current?.abort();
+    meaningAbortRef.current?.abort();
+  }, []);
+
   const close = useCallback(() => {
+    cancelSearches();
     setOpen(false);
     setQuery('');
+    setTextResults([]);
     setResults([]);
     setStatus('idle');
     setErrorMessage(null);
     setActiveIndex(0);
-  }, []);
+  }, [cancelSearches]);
 
   const dialogRef = useModalDialog({
     open,
@@ -131,27 +164,58 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
     const trimmed = raw.trim();
     if (trimmed.length < MIN_SEARCH_LENGTH) return;
 
+    meaningAbortRef.current?.abort();
+    const controller = new AbortController();
+    meaningAbortRef.current = controller;
     setStatus('loading');
     setErrorMessage(null);
 
-    try {
-      const result = await semanticSearchCards({ query: trimmed });
-
-      if (result?.error || !result?.success) {
-        setStatus('error');
-        setResults([]);
-        setErrorMessage(formatActionError(result?.error, 'Search failed. Please try again.'));
-        return;
-      }
-
-      setResults(result.results ?? []);
-      setStatus('done');
-    } catch {
+    const body = await fetchCardSearch(`/api/search/semantic?q=${encodeURIComponent(trimmed)}`, controller.signal);
+    if (body === null) return;
+    if (body.error || !body.results) {
       setStatus('error');
       setResults([]);
-      setErrorMessage('Search is unavailable right now. Please try again.');
+      setErrorMessage(formatActionError(body.error, 'Search failed. Please try again.'));
+      return;
     }
+    setResults(body.results);
+    setStatus('done');
   }, []);
+
+  const runTextSearch = useCallback(async (trimmed: string) => {
+    textAbortRef.current?.abort();
+    const controller = new AbortController();
+    textAbortRef.current = controller;
+
+    const body = await fetchCardSearch(`/api/search?q=${encodeURIComponent(trimmed)}`, controller.signal);
+    if (body === null) return;
+    // A failed text search shows nothing rather than an error: the commands
+    // and "search by meaning" still work, and the next keystroke retries.
+    setTextResults(body.results ?? []);
+  }, []);
+
+  /** Each keystroke: results for the old query go, and a text search is scheduled for the new one. */
+  const handleQueryChange = useCallback((value: string) => {
+    setQuery(value);
+    setActiveIndex(0);
+    cancelSearches();
+    setResults([]);
+    setStatus('idle');
+    setErrorMessage(null);
+
+    const trimmed = value.trim();
+    if (trimmed.length < MIN_TEXT_SEARCH_LENGTH) {
+      setTextResults([]);
+      return;
+    }
+    textTimerRef.current = window.setTimeout(() => {
+      textTimerRef.current = null;
+      void runTextSearch(trimmed);
+    }, TEXT_SEARCH_DEBOUNCE_MS);
+  }, [cancelSearches, runTextSearch]);
+
+  // A search must not land after the palette has unmounted.
+  useEffect(() => cancelSearches, [cancelSearches]);
 
   const runEffect = useCallback(
     (effect: NonNullable<PaletteCommand['effect']>) => {
@@ -206,6 +270,11 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
   );
 
   const canSearch = query.trim().length >= MIN_SEARCH_LENGTH;
+  // A card already listed as a text match isn't listed again under "By meaning".
+  const meaningResults = useMemo(() => {
+    const listed = new Set(textResults.map((card) => card.id));
+    return results.filter((card) => !listed.has(card.id));
+  }, [results, textResults]);
 
   /*
    * Every selectable row in render order. The active index addresses this
@@ -234,32 +303,37 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
       }
     }
 
-    if (canSearch) {
-      flat.push({
-        key: 'run-search',
-        label: `Search card text for “${query.trim()}”`,
-        hint: status === 'loading' ? 'Searching…' : 'Enter',
-        run: () => void runSearch(query),
-      });
-    }
-
-    for (const card of results) {
+    const cardRow = (card: CardSearchResult, prefix: string): PaletteRow => {
       const href = `/dashboard/${card.deck_id}`;
-      flat.push({
-        key: `result:${card.id}`,
+      const deck = removeDeckTagFromTitle(card.deck_title);
+      return {
+        key: `${prefix}:${card.id}`,
         label: card.front,
         detail: card.back,
-        hint: `${removeDeckTagFromTitle(card.deck_title)} · ${Math.round(card.similarity * 100)}%`,
+        hint: card.similarity === null ? deck : `${deck} · ${Math.round(card.similarity * 100)}%`,
         href,
         run: () => {
           close();
           router.push(href);
         },
+      };
+    };
+
+    for (const card of textResults) flat.push(cardRow(card, 'text'));
+
+    if (canSearch) {
+      flat.push({
+        key: 'run-search',
+        label: `Search by meaning for “${query.trim()}”`,
+        hint: status === 'loading' ? 'Searching…' : 'Enter',
+        run: () => void runSearch(query),
       });
     }
 
+    for (const card of meaningResults) flat.push(cardRow(card, 'meaning'));
+
     return flat;
-  }, [sections, canSearch, query, status, results, close, router, runEffect, runSearch]);
+  }, [sections, textResults, canSearch, query, status, meaningResults, close, router, runEffect, runSearch]);
 
   // Keep the cursor inside the list as rows appear and disappear under it.
   useEffect(() => {
@@ -370,10 +444,7 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
               <div className="border-b border-border px-5 py-4">
                 <Input
                   value={query}
-                  onChange={(event) => {
-                    setQuery(event.target.value);
-                    setActiveIndex(0);
-                  }}
+                  onChange={(event) => handleQueryChange(event.target.value)}
                   placeholder="Search decks, commands, or card text…"
                   role="combobox"
                   aria-expanded="true"
@@ -409,28 +480,40 @@ export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteP
                     </div>
                   ))}
 
+                  {textResults.length > 0 ? (
+                    <div className="mb-1 border-t border-border pt-1 first:border-t-0 first:pt-0">
+                      <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                        Cards
+                      </p>
+                      {textResults.map((card) => (
+                        <PaletteRowView key={`text:${card.id}`} row={rows[cursor]} index={cursor++} activeIndex={activeIndex} onHover={setActiveIndex} />
+                      ))}
+                    </div>
+                  ) : null}
+
                   {canSearch ? (
-                    <div className="mb-1 border-t border-border pt-1">
+                    <div className="mb-1 border-t border-border pt-1 first:border-t-0 first:pt-0">
                       <PaletteRowView row={rows[cursor]} index={cursor++} activeIndex={activeIndex} onHover={setActiveIndex} />
                     </div>
                   ) : null}
 
-                  {results.length > 0 ? (
-                    <div className="border-t border-border pt-1">
+                  {meaningResults.length > 0 ? (
+                    <div className="border-t border-border pt-1 first:border-t-0 first:pt-0">
                       <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                        Cards
+                        By meaning
                       </p>
-                      {results.map((card) => (
-                        <PaletteRowView key={card.id} row={rows[cursor]} index={cursor++} activeIndex={activeIndex} onHover={setActiveIndex} />
+                      {meaningResults.map((card) => (
+                        <PaletteRowView key={`meaning:${card.id}`} row={rows[cursor]} index={cursor++} activeIndex={activeIndex} onHover={setActiveIndex} />
                       ))}
                     </div>
                   ) : null}
                 </div>
 
-                {status === 'done' && results.length === 0 && canSearch ? (
+                {status === 'done' && meaningResults.length === 0 && canSearch ? (
                   <p className="px-3 py-3 text-xs text-ink-dim">
-                    No matching cards. Search only covers cards indexed for deck chat — open a
-                    deck&apos;s chat panel once to index it.
+                    {results.length > 0
+                      ? 'Nothing more by meaning beyond the cards above.'
+                      : 'Nothing found by meaning. Cards added in the last few minutes may not be searchable this way yet.'}
                   </p>
                 ) : null}
               </div>

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { formatActionError } from '@/lib/ai-feedback';
 import { useDeckChatStream, type ChatReference } from '@/lib/use-deck-chat-stream';
+import { FULL_CONTEXT_MAX_CARDS } from '@/lib/chat-context';
 import { toast } from 'sonner';
 
 type DeckChatWidgetProps = {
@@ -51,7 +52,6 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [indexStatus, setIndexStatus] = useState<IndexStatus>(null);
   const [lastQuestion, setLastQuestion] = useState('');
-  const hasAutoSyncedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const { state, send, cancel, reset } = useDeckChatStream();
@@ -232,13 +232,12 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
       created_at: new Date().toISOString(),
     }]);
 
-    if (indexStatus && indexStatus.pending > 0 && !hasAutoSyncedRef.current) {
-      hasAutoSyncedRef.current = true;
-      await runSync();
-    }
-
+    // No indexing before the question goes out (AI-10). It used to await a
+    // loop of up to 20 sync actions here, tens of seconds on the free tier's
+    // embedding cap. Small decks are answered from the whole deck and need no
+    // index; larger ones are indexed in the background on every deck visit.
     await send({ deckId, message: trimmed, sessionId: activeSessionId });
-  }, [activeSessionId, deckId, indexStatus, isStreaming, runSync, send]);
+  }, [activeSessionId, deckId, isStreaming, send]);
 
   const retry = useCallback(() => {
     if (lastQuestion) void send({ deckId, message: lastQuestion, sessionId: activeSessionId });
@@ -263,11 +262,12 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
         </Button>
       </div>
 
-      {indexStatus && indexStatus.pending > 0 ? (
+      {/* Only decks too big to send whole depend on the index (AI-10). */}
+      {indexStatus && indexStatus.pending > 0 && indexStatus.total > FULL_CONTEXT_MAX_CARDS ? (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-l-2 border-[var(--state-learning)] py-1 pl-3 text-xs">
           <span className="text-ink-dim">
-            {indexStatus.pending} of {indexStatus.total} cards aren&apos;t indexed yet.
-            Chat can only answer from indexed cards.
+            {indexStatus.pending} of {indexStatus.total} cards are still being indexed in the background.
+            Answers can miss them until then.
           </span>
           <Button type="button" size="sm" onClick={runSync} disabled={isSyncing}>
             {isSyncing ? (

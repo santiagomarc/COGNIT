@@ -10,7 +10,8 @@ import {
   reserveAiCall,
   sanitizeAiInputText,
 } from '@/app/actions/_shared';
-import { buildDeckChatSystemInstruction, retrieveDeckContext } from '@/lib/rag';
+import { buildDeckChatSystemInstruction, retrieveDeckContext, wholeDeckContext } from '@/lib/rag';
+import { FULL_CONTEXT_MAX_CARDS, fitsWholeDeck } from '@/lib/chat-context';
 import { AiServiceError, aiFailureMessage, classifyAiError, withGeminiRetry } from '@/lib/ai-retry';
 import { streamText } from '@/lib/gemini';
 import { logger } from '@/lib/logger';
@@ -141,12 +142,25 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        // ── 1. Retrieve (threshold-aware) ──
-        const context = await retrieveDeckContext(supabase, {
-          deckId: parsed.data.deck_id,
-          query: message,
-          topK: parsed.data.top_k ?? 5,
-        });
+        // ── 1. Context: the whole deck when it fits, else retrieval ──
+        // A small deck goes to the model whole (AI-10): one read instead of a
+        // query embedding plus a vector search, and no index needed, so a
+        // freshly imported deck can be asked about at once. One card past the
+        // limit is read so "too big" needs no second query.
+        const { data: deckCards } = await supabase
+          .from('cards')
+          .select('id, front, back')
+          .eq('deck_id', parsed.data.deck_id)
+          .order('created_at', { ascending: true })
+          .limit(FULL_CONTEXT_MAX_CARDS + 1);
+        const wholeDeck = fitsWholeDeck(deckCards ?? []);
+        const context = wholeDeck
+          ? wholeDeckContext(deckCards ?? [], message)
+          : await retrieveDeckContext(supabase, {
+            deckId: parsed.data.deck_id,
+            query: message,
+            topK: parsed.data.top_k ?? 5,
+          });
 
         if (context.degraded) {
           send('error', {
@@ -181,7 +195,7 @@ export async function POST(request: NextRequest) {
           .limit(6);
 
         const history = (historyRows ?? []).reverse();
-        const contextText = context.cards
+        const contextText = (wholeDeck ? deckCards ?? [] : context.cards)
           .map((card, index) => `${index + 1}. ${card.front}: ${card.back}`)
           .join('\n');
 
@@ -192,6 +206,7 @@ export async function POST(request: NextRequest) {
               deckTitle,
               contextText,
               grounded: context.grounded,
+              wholeDeck,
               nonce: randomUUID().slice(0, 8),
             }),
             contents: [
@@ -259,7 +274,8 @@ export async function POST(request: NextRequest) {
           {
             deck_id: parsed.data.deck_id,
             session_id: activeSessionId,
-            context_count: context.cards.length,
+            context_mode: wholeDeck ? 'whole_deck' : 'retrieved',
+            context_count: wholeDeck ? (deckCards ?? []).length : context.cards.length,
             grounded: context.grounded,
             // Production evidence for the grounding floor (plan §3.5): the best
             // similarity seen, above or below it.

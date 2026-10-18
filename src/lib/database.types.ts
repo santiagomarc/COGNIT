@@ -1121,6 +1121,16 @@ export type Database = {
           similarity: number
         }[]
       }
+      search_user_cards_lexical: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          back: string
+          deck_id: string
+          deck_title: string
+          front: string
+          id: string
+        }[]
+      }
       select_quiz_cards: {
         Args: {
           p_deck_id: string

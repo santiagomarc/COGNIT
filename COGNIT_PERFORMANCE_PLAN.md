@@ -1,6 +1,6 @@
 # Cognit — Performance Plan (light AI, snappy app)
 
-**Revision:** 1.3 · 2026-10-17. Rev 1.3: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
+**Revision:** 1.4 · 2026-10-18. Rev 1.4: P3's code landed uncommitted on top of `4427194` (P2's commit), §7.5. Rev 1.3 · 2026-10-17: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
 **Baseline:** `main` @ `73eabb5` (clean tree; re-checked at the end of the audit). Line references in §2 and the appendices are to this baseline; P0 has since moved some of them.
 **Scope:** where Cognit's AI calls go and which of them a user waits on; what else makes the signed-in app slower than it needs to be; and the phased plan that makes AI light and the app snappy. No application code was changed by this audit.
 **Companions:** `COGNIT_UIUX_PLAN.md` (Rev 1.0, called **UIUX** below; PERF-06…09 and FLOW-06 live there and are scheduled here, not restated) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; the AUTH-02 runbook in §6.3, the LC series, house style) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` (§2: live thinking measurements on `gemini-3.5-flash-lite`).
@@ -73,7 +73,7 @@ Close behind:
 | **P0** | Measure, and take the free wins: remove mnemonics and chat follow-ups, ES256 signing keys (owner, ≈ 15 min), a durable record of every AI call, no page re-render inside each grade, count-before-reserve, a thinking guard. **Code done 2026-10-15** (§4.7) | 1–1.5 days | G0 (§4.6) |
 | **P1** | AI off the user's path: quiz data from the deck, embeddings when cards are made, no browser-invoked enrichment. **Code done 2026-10-16** (§5.6) | 2.5–3.5 days | G1 (§5.5) |
 | **P2** | Study and quiz feel instant: the quiz clock and its persistence; UIUX PERF-06/07 if U2 hasn't run. **Code done 2026-10-17** (§6.4) | 0.5 day (+2.5 UIUX) | G2 (§6.3) |
-| **P3** | Chat and search: no pre-send sync, small decks in full context, instant lexical search, semantic search by a cancellable route | 1.75–2.25 days | G3 (§7.4) |
+| **P3** | Chat and search: no pre-send sync, small decks in full context, instant lexical search, semantic search by a cancellable route **Code done 2026-10-18** (§7.5) | 1.75–2.25 days | G3 (§7.4) |
 | **P4** | Lighter pages: load unopened UI on open, lower budgets, keep the proxy off static pages | 1–1.5 days | G4 (§8.3) |
 | **P5** | PDF generation by section, streamed, with tags in the same call (UIUX OD-8) | 2 days | G5 (§9.2) |
 
@@ -141,11 +141,11 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 | ID | Sev | Area | Location | Finding | Evidence | Fix |
 |---|---|---|---|---|---|---|
 | **PERF-10** | S1 | Server Actions | `BulkImportModal.tsx:120–127`, `PDFUploadZone.tsx:150–158`, `QuizAssessmentClient.tsx:289–345`, `DeckChatWidget.tsx:101–118`; `next/dist/client/components/app-router-instance.js:100–158`, `next/dist/client/app-call-server.js:17–18` | Long AI work runs as browser-invoked Server Actions. Every client call to a Server Action is dispatched as `ACTION_SERVER_ACTION` through the router's single action queue. With one pending, the next is appended and waits (`:151–157`); only a navigation jumps the queue (`:139–150`). A background `enrichCards` (3 parallel batches, up to 2 attempts each) therefore holds every later save in the tab: adding, editing or deleting a card, the share toggle, palette search, the quiz's final `logQuizResult`. | measured (source) + code | §5.3 ✓ P1 |
-| **AI-10** | S1 | Chat | `DeckChatWidget.tsx:235–238`, `:101–118`; `chat.ts:109` | A deck's first question awaits `runSync()` before it is sent: a loop of up to 20 `syncEmbeddings` actions, each embedding up to 200 cards, with `maxServerDelayMs: 35_000` against the free tier's 100-texts-a-minute cap. 337 of 387 cards are unembedded, so nearly every deck takes this path. | code + prod coverage | §7.1 |
+| **AI-10** | S1 | Chat | `DeckChatWidget.tsx:235–238`, `:101–118`; `chat.ts:109` | A deck's first question awaits `runSync()` before it is sent: a loop of up to 20 `syncEmbeddings` actions, each embedding up to 200 cards, with `maxServerDelayMs: 35_000` against the free tier's 100-texts-a-minute cap. 337 of 387 cards are unembedded, so nearly every deck takes this path. | code + prod coverage | §7.1 ✓ P3 |
 | **AI-13** | S1 | Search | `card.ts:32` (`createCard`), `:164` (`bulkImportCards`), `ai-generate.ts` (`generateCards`) | No path embeds a card when it is created; embeddings come only from the chat widget, `updateCard` (`card.ts:139`) and synthesis absorb (`synthesis.ts:1093–1095`). With 13% coverage, `search_user_cards_by_embedding` can return at most 13% of cards. | measured (prod) | §5.2 ✓ P1 |
 | **AI-09** | S2 | Quiz | `QuizAssessmentClient.tsx:155`, `:289–345`; `count_quiz_ready_cards` (`202609070900_phase25_corrections.sql`); `[deckId]/page.tsx:135`, `:219`, `:402`; `DeckSessionLauncher.tsx:169` | Quiz data comes only from a model: MCQ needs 3 stored distractors and Identification a stored question. A quiz starts by enriching up to 50 cards that lack them, and MCQ falls back to Identification meanwhile. 45 cards lack them today. Every non-empty deck has ≥ 7 cards. The other cards' terms are the standard distractor pool (Quizlet's Learn mode works this way), and masking the term in the description gives an identification prompt with no model. | measured (prod) + code | §5.1 ✓ P1 |
 | **AI-11** | S2 | Chat | `api/chat/route.ts:237–254`, `:372–389` | `done`, which ends the turn in the UI, is sent only after a second model call for follow-up chips returns. The answer is already on screen; the input stays busy for one more call (≈ 1.6–2 s at best). The call is capped at 256 output tokens, parsed as JSON, and its failures are swallowed to `[]`. | code | §4.0 ✓ P0 |
-| **AI-12** | S2 | Search | `CommandPalette.tsx:130–150`, `chat.ts:286–340` | Card search is semantic only: an Auth check, a reservation, the query embedding, then the vector search, in sequence, as a Server Action, so it can't be cancelled and queues behind PERF-10. There is no lexical search, so finding a term you know still costs a model call and sees only embedded cards. | code | §7.3 |
+| **AI-12** | S2 | Search | `CommandPalette.tsx:130–150`, `chat.ts:286–340` | Card search is semantic only: an Auth check, a reservation, the query embedding, then the vector search, in sequence, as a Server Action, so it can't be cancelled and queues behind PERF-10. There is no lexical search, so finding a term you know still costs a model call and sees only embedded cards. | code | §7.3 ✓ P3 |
 | **AI-15** | S2 | Study | `study.ts:50–53`, `:81–96`; `mnemonic.ts:53–75` | A mnemonic is written for every first lapse: 38% of recent model calls, though 37 of 42 lapsed cards never lapsed again. It runs in the background, but on the same per-minute quota as chat and generation. | measured (prod) + code | §4.0 ✓ P0 (removed) |
 | **AI-16** | S2 | Observability | `_shared.ts:143–168` | No durable per-call record of latency, outcome, tokens or finish reason: with a reservation, completion is a console line. `ai_usage_logs` is deliberately immutable (`202609050900_immutable_table_deny_policies.sql:81–91`), so it can't be updated in place either. | code | §4.2 ✓ P0 |
 | **AI-18** | S2 | Generation | `ai-generate.ts:54–67`, `:339–360`; `PDFUploadZone.tsx:116–165` | PDF generation is all-or-nothing from the user's view: no card shows until every wave finishes or the 48 s budget runs out, and the generated cards need a second model call (enrichment) for tags and quiz data. | code | §9 |
@@ -460,6 +460,8 @@ If UIUX U2 hasn't run by now, do UIUX §5.7 (transitions: ≈ 0.9 s → ≤ 0.3 
 
 ## 7. Phase P3 — Chat and search (1.75–2.25 days)
 
+**Status 2026-10-18:** code done, uncommitted, on top of `4427194`; §7.5 says where it differs from §7.1 and §7.3.
+
 ### 7.1 AI-10 — Chat never waits for indexing, and small decks need no index (0.75 day)
 
 - **No pre-send sync.** Delete `DeckChatWidget.tsx:235–238`. The "Index" button stays as a manual nudge while a deck backfills.
@@ -506,11 +508,43 @@ $$;
 
 ### 7.4 Gate G3
 
-- The first answer on a 40-card deck creates no `sync_embeddings` reservation and makes no query embedding.
-- Chat `ttft_ms` p50 (B.2) is below its P0 baseline.
-- A palette search for a known term returns lexical results with no `semantic_search` reservation, in ≤ 150 ms server time (B.4).
+| Check | State 2026-10-18 |
+|---|---|
+| The first answer on a 40-card deck creates no `sync_embeddings` reservation and makes no query embedding | ✓ by construction: the widget no longer syncs before sending, and a deck within the limits is answered whole (`rag.test.ts`, `chat-context.test.ts`) |
+| Chat `ttft_ms` p50 (B.2) below its P0 baseline | Owed: needs the migrations pushed and some chat use |
+| `done` precedes follow-ups | Done in P0 (follow-ups removed) |
+| A palette search for a known term returns text matches with no `semantic_search` reservation | ✓ unit tests (`card-search.test.ts`, `api/search/route.test.ts`) and a browser run (§7.5); server time ≤ 150 ms owed on production |
+| `npm test`, `tsc --noEmit`, `npm run lint`, `next build` + budgets | ✓ 645 tests in 74 files; build ✓; every route within budget (shell pages +0.3 kB gz for the palette's second search) |
 
----
+### 7.5 Execution notes (2026-10-18)
+
+**Chat (AI-10).**
+- **No pre-send sync.** `DeckChatWidget` sends the question straight away; the auto-sync and its ref are gone.
+- **The index banner** shows only for decks too large to send whole, and now says the cards are being indexed in the background (P1's deck-visit backfill), with "Index now" kept as a manual nudge.
+- **Whole-deck mode.** `src/lib/chat-context.ts`: `fitsWholeDeck` (≤ 80 cards and ≤ 24,000 characters of card text) and `rankReferences`, which picks the source chips by words shared with the question, a term match counting double.
+  - `api/chat/route.ts` reads up to 81 of the deck's cards and, when they fit, sends them all, skipping the query embedding and the vector search.
+  - `buildDeckChatSystemInstruction({ wholeDeck })` tells the model it has the whole deck and must say when the deck does not cover the question rather than answer from general knowledge.
+  - Usage metadata records `context_mode` (`whole_deck` / `retrieved`).
+- **Not done: the lexical fallback for large decks still being indexed.** A question is natural language, so a substring match on it finds little; it would need full-text search, a second migration. Only one deck is over the limit, and the deck-visit backfill (60 s pacing) indexes it within minutes of opening it. If chat on large decks gets used before then, add a `websearch_to_tsquery` fallback.
+
+**Search (AI-12).**
+- **The lexical function.** Migration `202610180900_search_user_cards_lexical.sql`: `pg_trgm` in the `extensions` schema, trigram GIN indexes on `cards.front` and `cards.back`, and `search_user_cards_lexical(p_query, p_limit)`.
+  - `ILIKE` with LIKE wildcards escaped, term matches first, then shorter terms.
+  - Filtered to the caller's own decks: RLS also exposes publicly shared decks' cards. Trashed decks are excluded.
+  - Its query was run read-only against production with the owner's id in place of `auth.uid()`: "generation" returned the five computer generations in order; "%" matched only the two cards containing a literal percent sign.
+- **The search module.** `src/lib/card-search.ts`: `searchCardsByText` and `searchCardsByMeaning`, the latter with `src/lib/query-embedding-cache.ts` (200 entries, 10 minutes, per instance, keyed case- and space-insensitively). A cached query spends no reservation and makes no model call.
+- **Routes:** `GET /api/search?q=` (≥ 2 characters, no AI) and `GET /api/search/semantic?q=` (≥ 3), both `Cache-Control: private, no-store`. The `semanticSearchCards` Server Action is deleted.
+- **The palette.**
+  - Text matches load as you type (120 ms after the last key), with the previous request cancelled.
+  - "Search by meaning for …" is its own row; its results list only cards not already shown as text matches, and clear on the next keystroke.
+  - The old "open a deck's chat panel once to index it" copy is gone.
+- **Browser run.** A production build of a scratch clone, with the two routes stubbed to return sample cards, driven in Chrome. Typing "mit" at 30 ms per key sent one `/api/search?q=mit`; "Mitosis" and "Mitochondria" listed under Cards; "Search by meaning" added only "Meiosis"; the next keystroke cleared it and searched "mito"; no page errors. A double border above the first result group was fixed (`first:border-t-0`).
+
+**Tests added:** `chat-context.test.ts`, `rag.test.ts`, `query-embedding-cache.test.ts`, `card-search.test.ts`, `api/search/route.test.ts`, `api/search/semantic/route.test.ts`.
+
+**Not verified here:** a real chat answer in whole-deck mode (needs a signed-in session and the live model). Ask a few questions on a small deck after deploying, including one the deck doesn't cover, which should be declined.
+
+**Order to ship:** three migrations are now unpushed (`202610150900`, `202610160900`, `202610180900`); push them, then deploy. Before the push, palette text search returns an error (the function doesn't exist) and shows nothing; semantic search and chat work.
 
 ## 8. Phase P4 — Lighter pages (1–1.5 days)
 

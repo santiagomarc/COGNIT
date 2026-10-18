@@ -1,19 +1,14 @@
 'use server';
 
-import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import {
   syncEmbeddingsSchema, SyncEmbeddingsInput,
   createDeckChatSessionSchema, CreateDeckChatSessionInput,
   getDeckChatMessagesSchema, GetDeckChatMessagesInput,
-  semanticSearchSchema, SemanticSearchInput,
 } from '@/lib/schemas';
 import { isMissingTableError } from '@/lib/supabase-errors';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
-import {
-  recordAiUsage, requireOwnedDeck, reserveAiCall, sanitizeAiInputText,
-} from './_shared';
+import { requireOwnedDeck } from './_shared';
 import { guardAction } from '@/lib/action-guard';
-import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 import { embedPendingCards } from '@/lib/card-embeddings';
 
 // Bounds each syncEmbeddings invocation so a large deck can't run past the
@@ -172,64 +167,3 @@ export async function getDeckChatMessages(data: GetDeckChatMessagesInput) {
   return { success: true, messages: messages ?? [] };
 }
 
-export type SemanticSearchResult = {
-  id: string;
-  deck_id: string;
-  deck_title: string;
-  front: string;
-  back: string;
-  similarity: number;
-};
-
-export async function semanticSearchCards(data: SemanticSearchInput) {
-  return guardAction('Search', async () => {
-    const parsed = semanticSearchSchema.safeParse(data);
-    if (!parsed.success) {
-      return { error: parsed.error.flatten().fieldErrors as never };
-    }
-
-    const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
-    if (!user) {
-      return { error: 'You must be logged in.' };
-    }
-
-    const reservation = await reserveAiCall(supabase, user.id, 'semantic_search');
-    if (!reservation.ok) {
-      return { error: reservation.error };
-    }
-
-    const sanitizedQuery = sanitizeAiInputText(parsed.data.query, 300);
-    if (!sanitizedQuery) {
-      return { error: 'Search query is empty after sanitization.' };
-    }
-
-    const [queryVector] = await embedTexts([sanitizedQuery], { taskType: 'RETRIEVAL_QUERY' });
-    if (!queryVector) {
-      return { error: 'Failed to generate query embedding.' };
-    }
-    const queryVectorLiteral = toVectorLiteral(queryVector);
-
-    const { data: results, error } = await supabase.rpc('search_user_cards_by_embedding', {
-      p_user_id: user.id,
-      p_query_embedding: queryVectorLiteral,
-      p_limit: parsed.data.limit ?? 8,
-    });
-
-    if (error) {
-      return { error: sanitizeDatabaseError(error, 'Search failed. Please try again.') };
-    }
-
-    await recordAiUsage(
-      supabase,
-      user.id,
-      'semantic_search',
-      {
-        query_chars: sanitizedQuery.length,
-        result_count: results?.length ?? 0,
-      },
-      reservation,
-    );
-
-    return { success: true as const, results: (results ?? []) as SemanticSearchResult[] };
-  });
-}
