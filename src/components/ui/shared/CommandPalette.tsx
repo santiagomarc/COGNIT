@@ -50,6 +50,8 @@ type CommandPaletteProps = {
   /** Where "start session" goes. Null when the account has no decks at all. */
   sessionHref: string | null;
   totalDue: number;
+  /** Mounted by a trigger: LazyCommandPalette loads this on first use (PERF-13). */
+  defaultOpen?: boolean;
 };
 
 /** One selectable row, whatever produced it. */
@@ -82,10 +84,10 @@ type PaletteRow = {
  * active row is tracked with `aria-activedescendant`. Arrow keys would fight a
  * roving tabindex otherwise, and the Tab trap stays two elements wide.
  */
-export function CommandPalette({ decks, sessionHref, totalDue }: CommandPaletteProps) {
+export function CommandPalette({ decks, sessionHref, totalDue, defaultOpen = false }: CommandPaletteProps) {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   /*

@@ -7,9 +7,8 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ShortcutsTable } from '@/components/ui/shared/ShortcutsTable';
 import { OPEN_SHORTCUTS_EVENT } from '@/lib/dashboard-events';
-import { isTypingTarget, pageShortcutBlocked } from '@/lib/hotkeys';
 import { motionTransitions } from '@/lib/motion-configs';
-import { isShortcutsHotkey } from '@/lib/shortcuts';
+import { opensShortcuts } from '@/lib/shell-hotkeys';
 import { useModalDialog } from '@/lib/use-modal-dialog';
 
 /**
@@ -23,16 +22,16 @@ import { useModalDialog } from '@/lib/use-modal-dialog';
  * (`pageShortcutBlocked`, KBD-01), and the command palette's "Keyboard
  * shortcuts" row opens it through OPEN_SHORTCUTS_EVENT.
  */
-export function KeyboardShortcutsDialog() {
-  const [open, setOpen] = useState(false);
+/** `defaultOpen`: mounted by a trigger (LazyShellDialogs loads this on first use, PERF-13). */
+export function KeyboardShortcutsDialog({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
+  const [open, setOpen] = useState(defaultOpen);
   const reduced = useReducedMotion();
   const close = useCallback(() => setOpen(false), []);
   const dialogRef = useModalDialog({ open, onClose: close });
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (pageShortcutBlocked(event) || isTypingTarget(event.target)) return;
-      if (!isShortcutsHotkey(event)) return;
+      if (!opensShortcuts(event)) return;
       event.preventDefault();
       setOpen(true);
     };

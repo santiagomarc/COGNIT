@@ -1,6 +1,4 @@
-import { AddCardForm } from '@/components/ui/shared/AddCardForm';
-import { BulkImportModal } from '@/components/ui/shared/BulkImportModal';
-import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
+import { AddContentBody } from '@/components/ui/shared/AddContentBody';
 
 /**
  * All three ingestion surfaces, behind one disclosure (Run 6, Task 3.2).
@@ -13,7 +11,9 @@ import { PDFUploadZone } from '@/components/ui/shared/PDFUploadZone';
  * a disclosure, not in the permanent composition.
  *
  * A native `<details>`, so it costs no JavaScript, is keyboard-operable and
- * screen-reader-announced for free, and survives with JS disabled.
+ * screen-reader-announced for free, and survives with JS disabled. Its body
+ * (AddContentBody) loads the three surfaces only when the panel first opens
+ * (performance plan PERF-13).
  */
 export function AddContentPanel({ deckId, hasCards }: { deckId: string; hasCards: boolean }) {
   return (
@@ -41,19 +41,7 @@ export function AddContentPanel({ deckId, hasCards }: { deckId: string; hasCards
         </span>
       </summary>
 
-      <div className="flex flex-col gap-4 border-t border-border p-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <p className="max-w-[62ch] text-sm text-ink-dim">
-            {hasCards
-              ? 'Add individual cards, bulk-import structured notes, or generate cards from a PDF.'
-              : 'Add cards, bulk-import notes, or generate from a PDF to unlock study and quiz modes.'}
-          </p>
-          <BulkImportModal deckId={deckId} />
-        </div>
-
-        <AddCardForm deckId={deckId} />
-        <PDFUploadZone deckId={deckId} />
-      </div>
+      <AddContentBody deckId={deckId} hasCards={hasCards} />
     </details>
   );
 }

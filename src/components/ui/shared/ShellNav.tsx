@@ -1,5 +1,5 @@
 import { Breadcrumb } from '@/components/ui/shared/Breadcrumb';
-import { CommandPalette } from '@/components/ui/shared/CommandPalette';
+import { LazyCommandPalette } from '@/components/ui/shared/LazyCommandPalette';
 import { loadShellNav } from '@/lib/shell-nav';
 
 /**
@@ -26,5 +26,5 @@ export function ShellBreadcrumbFallback() {
 
 export async function ShellCommandPalette({ userId }: { userId: string }) {
   const { decks, sessionHref, totalDue } = await loadShellNav(userId);
-  return <CommandPalette decks={decks} sessionHref={sessionHref} totalDue={totalDue} />;
+  return <LazyCommandPalette decks={decks} sessionHref={sessionHref} totalDue={totalDue} />;
 }

@@ -5,8 +5,7 @@ import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/supabase/session';
 import { SIDEBAR_COOKIE, parseSidebarPreference } from '@/lib/sidebar-nav';
 import { AmbientField } from '@/components/ui/shared/AmbientField';
-import { CreateDeckModal } from '@/components/ui/shared/CreateDeckModal';
-import { KeyboardShortcutsDialog } from '@/components/ui/shared/KeyboardShortcutsDialog';
+import { LazyShellDialogs } from '@/components/ui/shared/LazyShellDialogs';
 import { ShellBreadcrumb, ShellBreadcrumbFallback, ShellCommandPalette } from '@/components/ui/shared/ShellNav';
 import { AccountRow } from '@/components/ui/shared/sidebar/AccountRow';
 import { Sidebar, SidebarToggle } from '@/components/ui/shared/sidebar/Sidebar';
@@ -91,10 +90,12 @@ export default async function ShellLayout({ children }: { children: React.ReactN
         </div>
       </div>
 
-      {/* Opened by the sidebar's New deck, ⌘N, the due-now band, the onboarding panel and the palette. */}
-      <CreateDeckModal />
-      {/* `?`, the account menu and the palette's "Keyboard shortcuts" row (sidebar plan §5.7). */}
-      <KeyboardShortcutsDialog />
+      {/*
+        Create deck (the sidebar's New deck, ⌘N, the due-now band, the
+        onboarding panel, the palette) and keyboard shortcuts (`?`, the account
+        menu, the palette's row; sidebar plan §5.7), loaded on first use (PERF-13).
+      */}
+      <LazyShellDialogs />
       {/* Headless: the sidebar's Search and ⌘K open it (sidebar plan §6.8). */}
       <Suspense fallback={null}>
         <ShellCommandPalette userId={user.id} />

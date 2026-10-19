@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motionTransitions } from '@/lib/motion-configs';
 import { OPEN_CREATE_DECK_EVENT } from '@/lib/dashboard-events';
-import { isTypingTarget, pageShortcutBlocked } from '@/lib/hotkeys';
+import { opensCreateDeck } from '@/lib/shell-hotkeys';
 import { useModalDialog } from '@/lib/use-modal-dialog';
 import { toast } from 'sonner';
 
@@ -28,9 +28,10 @@ import { toast } from 'sonner';
  * The `OPEN_CREATE_DECK_EVENT` listener is kept: the onboarding panel lives in
  * a different part of the tree and still asks for this by name.
  */
-export function CreateDeckModal() {
+/** `defaultOpen`: mounted by a trigger (LazyShellDialogs loads this on first use, PERF-13). */
+export function CreateDeckModal({ defaultOpen = false }: { defaultOpen?: boolean } = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [isLoading, setIsLoading] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
@@ -68,9 +69,7 @@ export function CreateDeckModal() {
    */
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (pageShortcutBlocked(event) || isTypingTarget(event.target)) return;
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
-      if (event.key.toLowerCase() !== 'n') return;
+      if (!opensCreateDeck(event)) return;
 
       event.preventDefault();
       setOpen(true);

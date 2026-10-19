@@ -116,10 +116,19 @@ export async function proxy(request: NextRequest) {
   return supabaseResponse;
 }
 
-// Configure which routes the middleware should run on
+/*
+ * Only the routes that need the proxy (performance plan PERF-14). It does
+ * three things: the nonce CSP on /dashboard and /s/ (csp.ts NONCE_ROUTES),
+ * the redirects for /dashboard and /login/update-password, and refreshing the
+ * session cookie for server code that reads it. Every other page is static or
+ * reads no session on the server: running the proxy there added ~70 ms to `/`
+ * and `/login` from UTC+8 for nothing (129–137 ms vs 58 ms for a static asset,
+ * measured 2026-10-14). /auth/callback writes its own cookies, and /api routes
+ * check their own sessions, as before.
+ *
+ * A new route that reads the session on the server, or needs a nonce, must be
+ * added here.
+ */
 export const config = {
-  matcher: [
-    // Run on all routes except static files and api routes
-    '/((?!api/|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/dashboard/:path*', '/s/:path*', '/login/update-password'],
 };

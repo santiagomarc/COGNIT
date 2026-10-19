@@ -1,6 +1,6 @@
 # Cognit — Performance Plan (light AI, snappy app)
 
-**Revision:** 1.4 · 2026-10-18. Rev 1.4: P3's code landed uncommitted on top of `4427194` (P2's commit), §7.5. Rev 1.3 · 2026-10-17: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
+**Revision:** 1.5 · 2026-10-19. Rev 1.5: P4's code landed uncommitted on top of `0b17d22` (P3's commit); its bundle saving is smaller than estimated and partly offset by bundler duplication (§8.4). Rev 1.4 · 2026-10-18: P3's code landed uncommitted on top of `4427194` (P2's commit), §7.5. Rev 1.3 · 2026-10-17: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
 **Baseline:** `main` @ `73eabb5` (clean tree; re-checked at the end of the audit). Line references in §2 and the appendices are to this baseline; P0 has since moved some of them.
 **Scope:** where Cognit's AI calls go and which of them a user waits on; what else makes the signed-in app slower than it needs to be; and the phased plan that makes AI light and the app snappy. No application code was changed by this audit.
 **Companions:** `COGNIT_UIUX_PLAN.md` (Rev 1.0, called **UIUX** below; PERF-06…09 and FLOW-06 live there and are scheduled here, not restated) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; the AUTH-02 runbook in §6.3, the LC series, house style) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` (§2: live thinking measurements on `gemini-3.5-flash-lite`).
@@ -74,7 +74,7 @@ Close behind:
 | **P1** | AI off the user's path: quiz data from the deck, embeddings when cards are made, no browser-invoked enrichment. **Code done 2026-10-16** (§5.6) | 2.5–3.5 days | G1 (§5.5) |
 | **P2** | Study and quiz feel instant: the quiz clock and its persistence; UIUX PERF-06/07 if U2 hasn't run. **Code done 2026-10-17** (§6.4) | 0.5 day (+2.5 UIUX) | G2 (§6.3) |
 | **P3** | Chat and search: no pre-send sync, small decks in full context, instant lexical search, semantic search by a cancellable route **Code done 2026-10-18** (§7.5) | 1.75–2.25 days | G3 (§7.4) |
-| **P4** | Lighter pages: load unopened UI on open, lower budgets, keep the proxy off static pages | 1–1.5 days | G4 (§8.3) |
+| **P4** | Lighter pages: load unopened UI on open, lower budgets, keep the proxy off static pages **Code done 2026-10-19** (§8.4) | 1–1.5 days | G4 (§8.3) |
 | **P5** | PDF generation by section, streamed, with tags in the same call (UIUX OD-8) | 2 days | G5 (§9.2) |
 
 About **8.75–11.25 days** (P0's code is already done), plus the 2.5 UIUX days P2 may absorb. Order: **P0 → P1 → P2 → P3 → P4 → P5**. P2 and P4 don't depend on P1 and can run in parallel with it.
@@ -89,7 +89,7 @@ About **8.75–11.25 days** (P0's code is already done), plus the 2.5 UIUX days 
 | Supabase Auth user lookups per day | ≈ 1,625 | ≤ 100 (token refreshes) |
 | Supabase requests per study grade | ≈ 8 (+ 2 Auth) | 2 (+ 0 Auth) |
 | Quiz `sessionStorage` writes | 4 a second | one per answer, plus one when the tab hides |
-| Deck page first-load JS | 245.5 kB gz | ≤ 195 kB gz |
+| Deck page first-load JS | 245.5 kB gz | ≤ 195 kB gz (estimate was wrong: 238.1 after P4, §8.4) |
 | Warm TTFB of a prerendered public page, from UTC+8 | 129–137 ms | ≈ 60 ms (a static asset today: 58 ms) |
 | Cards with an embedding | 13% | 100% |
 
@@ -153,8 +153,8 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 | **PERF-12** | S2 | Quiz runtime | `QuizAssessmentClient.tsx:172–186`, `:190–229` | A 250 ms interval sets `sessionDurationMs`, re-rendering the whole ≈ 1,000-line client four times a second. The persistence effect depends on it, so every session card and result is `JSON.stringify`'d and written synchronously to `sessionStorage` 4 times a second: ≈ 2,400 writes in a 10-minute quiz. Study does the same once a second (UIUX PERF-07). | code | §6.1 ✓ P2 |
 | **AI-14** | S3 | Embeddings | `chat.ts:55` vs `:59–80` | `syncEmbeddings` reserves an AI call before counting pending cards, so a sync with nothing to do still spends a reservation (against the hourly and 24 h limits) and four round-trips. | code | §4.4 ✓ P0 |
 | **AI-17** | S3 | Model config | `gemini.ts:84`, `:148–155` | On Gemini 3, `thinking: 'none'` sends no thinking config, and text calls never send one. That is fast only because `gemini-3.5-flash-lite` defaults to minimal. Pointing `GEMINI_MODEL` at a 3.x model with a higher default would silently add up to 4× latency to every call. | code + Audit II §2 | §4.5 ✓ P0 |
-| **PERF-13** | S3 | Bundle | `AddContentPanel.tsx:18–58`; `(shell)/layout.tsx:95–101`; `synthesis/GenerateSynthesisDrillsButton.tsx` | The deck page loads 30.2 kB gz of add-content UI (card form, bulk-import preview, PDF upload) that sits in a `<details>` closed on every deck with cards. It also loads 12.9 kB of drill and plan generation UI before any drill is asked for. Every shell page loads 13.8 kB of shell dialogs (create deck, shortcuts, palette) before ⌘K, ⌘N or ? is pressed. | measured (build) | §8.1 |
-| **PERF-14** | S3 | Edge | `proxy.ts:120–125`; `csp.ts:33` | The proxy runs on every non-API page, including prerendered pages that are neither nonce routes nor session readers. Warm TTFB from UTC+8: `/login` 129 ms and `/` 137 ms, against 58 ms for a `_next/static` asset, which skips the proxy. | measured | §8.2 |
+| **PERF-13** | S3 | Bundle | `AddContentPanel.tsx:18–58`; `(shell)/layout.tsx:95–101`; `synthesis/GenerateSynthesisDrillsButton.tsx` | The deck page loads 30.2 kB gz of add-content UI (card form, bulk-import preview, PDF upload) that sits in a `<details>` closed on every deck with cards. It also loads 12.9 kB of drill and plan generation UI before any drill is asked for. Every shell page loads 13.8 kB of shell dialogs (create deck, shortcuts, palette) before ⌘K, ⌘N or ? is pressed. | measured (build) | §8.1 ✓ P4 (partly) |
+| **PERF-14** | S3 | Edge | `proxy.ts:120–125`; `csp.ts:33` | The proxy runs on every non-API page, including prerendered pages that are neither nonce routes nor session readers. Warm TTFB from UTC+8: `/login` 129 ms and `/` 137 ms, against 58 ms for a `_next/static` asset, which skips the proxy. | measured | §8.2 ✓ P4 |
 | **LC-05** | S3 | Background | `mnemonic.ts:53–75`; `ai-retry.ts` defaults | Background model calls use the interactive retry policy (3 attempts) and ignore the server's retry delay. Under rate limiting they spend more of the minute's quota, and more function time, on work nobody is waiting for. | code | §4.0 ✓ P0 (removed) |
 
 **Referenced, still open, not restated here**
@@ -548,6 +548,8 @@ $$;
 
 ## 8. Phase P4 — Lighter pages (1–1.5 days)
 
+**Status 2026-10-19:** code done, uncommitted, on top of `0b17d22`; §8.4 has the measured result.
+
 ### 8.1 PERF-13 — Load unopened UI when it's opened (0.5–1 day)
 
 - **Add content.** A small client `<AddContentBody>` mounts `AddCardForm`, `BulkImportModal` and `PDFUploadZone` through `next/dynamic` only once the `<details>` opens (`onToggle`). When `hasCards` is false the panel starts open and loads at once.
@@ -565,11 +567,43 @@ $$;
 
 ### 8.3 Gate G4
 
-- The bundle report passes the lowered budgets.
-- The B.4 probe shows `/` and `/login` within 20 ms of the static asset.
-- Signing in, signing out and the password-reset link still work (manual).
+| Check | State 2026-10-19 |
+|---|---|
+| The bundle report passes the lowered budgets | ✓ every route within budget; seven shell budgets lowered (§8.4) |
+| `/` and `/login` within 20 ms of a static asset on the B.4 probe | Owed: after deploy (the proxy change only shows on Vercel) |
+| Signing in, signing out and the password-reset link still work | Partly: signed-out redirects for `/dashboard`, `/dashboard/stats` and `/login/update-password` and the `/s/` nonce verified on `next start`; sign-in and reset owed after deploy |
+| `npm test`, `tsc --noEmit`, `npm run lint`, `next build` | ✓ 650 tests in 75 files; build ✓ |
 
----
+### 8.4 Execution notes (2026-10-19)
+
+**What was built.**
+- **Shell dialogs.**
+  - `src/lib/use-lazy-dialog.ts`: until a dialog's code loads, a few-line listener handles its hotkey and open event and mounts it already open; the code is also prefetched when the browser is idle (`src/lib/when-idle.ts`), after which the dialog mounts closed and its own listeners take over.
+  - `LazyShellDialogs` (create deck, shortcuts) replaces the two eager dialogs in `(shell)/layout.tsx`; `LazyCommandPalette` replaces the palette in `ShellCommandPalette`. Each dialog gained `defaultOpen`.
+  - The opening keys moved to `src/lib/shell-hotkeys.ts`, shared by the dialogs and the lazy listeners, with tests.
+- **Add content.** The panel's body is now `AddContentBody`: the card form, bulk import and PDF upload mount when the `<details>` first opens (its `toggle` event), stay mounted, and are prefetched when idle. An empty deck's panel starts open and renders on the server as before.
+- **Proxy (PERF-14).** The matcher is now `['/dashboard/:path*', '/s/:path*', '/login/update-password']`. The only other session readers outside `/dashboard` are `/auth/callback`, which writes its own cookies, and `/api`, already excluded.
+- **Not done: the synthesis launcher's drill and plan buttons.** They are visible controls on the deck's Overview, not unopened UI; deferring them would only delay their interactivity or make them pop in.
+
+**Measured (clean production builds of `0b17d22` and P4, gzip first-load JS).**
+
+| Route | Before | After |
+|---|---|---|
+| `/dashboard/[deckId]` | 245.8 | 238.1 (−7.7) |
+| `/dashboard` (Today) | 220.5 | 219.6 (−0.9) |
+| settings · trash | 213.9 · 205.6 | 212.8 · 203.8 |
+| shared · drills · stats | 205.1 · 202.5 · 202.5 | 195.4 · 190.7 · 190.7 (−9.7 to −11.8) |
+| study · quiz · synthesis | 195.4 · 197.4 · 208.1 | 198.6 · 200.5 · 211.2 (+3.1 to +3.2) |
+| `/` · `/login` · `/s/[token]` | 184.1 · 187.4 · 186.4 | 185.6 · 188.7 · 188.0 (+1.3 to +1.6) |
+
+- **The estimate was wrong.** The 30.2 kB chunk §2 attributed to the add-content panel was mostly shared UI (inputs, labels, textareas) that the deck's card list still needs; the panel's own code was about 8 kB, which is what the deck page saved.
+- **The regression on unrelated pages is bundler duplication.** With the dialogs gone from the shell layout, Turbopack regrouped shared modules and now copies `Button` (cva variants, Radix `Slot`) and Next's link formatting into each of the two error-boundary chunks every route loads (4.5 → 6.3 kB each). It costs ~3 kB on study and quiz, a few milliseconds of parse.
+  - **Options if it matters:** make the error boundaries lean (a plain link styled with `buttonVariants`, no `Slot`), or recheck after the next Next.js upgrade.
+- **Budgets lowered** (they only move down): Today 226 → 223, deck 250 → 242, settings 219 → 216, trash 211 → 207, shared 210 → 199, drills and stats 208 → 195. Study stays at 199 (now 198.6), quiz 202 (200.5).
+- **Browser run.** A production build of a scratch clone with a preview page holding the lazy dialogs and the add-content panel, driven in Chrome twice: once with `requestIdleCallback` disabled (the first trigger must load and open the dialog) and once letting idle prefetch mount it.
+  - Both times: no dialog at load; ⌘N opened create-deck (and again after closing); `?` opened shortcuts; ⌘K opened the palette.
+  - The closed panel had no form fields until opened, then three.
+  - No page errors. An empty deck's panel content was in the server HTML; a closed panel's was not.
 
 ## 9. Phase P5 — PDF generation by section, streamed (2 days)
 
