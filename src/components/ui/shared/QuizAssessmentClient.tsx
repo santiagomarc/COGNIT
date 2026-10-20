@@ -38,6 +38,8 @@ type QuizAssessmentClientProps = {
   cards: StudySessionCard[];
   totalInDeck: number;
   mode: QuizMode;
+  /** Random per request, from the quiz page: seeds the options' shuffle so server and browser agree. */
+  shuffleSeed: string;
 };
 
 type QuizQuestionResult = {
@@ -87,6 +89,7 @@ export function QuizAssessmentClient({
   cards,
   totalInDeck,
   mode,
+  shuffleSeed,
 }: QuizAssessmentClientProps) {
   const router = useRouter();
   const reduced = useReducedMotion();
@@ -880,6 +883,7 @@ export function QuizAssessmentClient({
               key={active.id}
               card={active}
               disabled={isPaused}
+              shuffleSeed={shuffleSeed}
               onResolve={(_, wasCorrect, answer) =>
                 resolveQuestion({
                   cardId: active.id,

@@ -7,8 +7,9 @@ import { Kbd } from '@/components/ui/Kbd';
 import type { StudyGrade } from '@/lib/sm2';
 import { RichText } from '@/components/ui/shared/RichText';
 import { studyLength } from '@/lib/study-type';
-import { pageShortcutBlocked } from '@/lib/hotkeys';
+import { optionIndexFromKey, pageShortcutBlocked } from '@/lib/hotkeys';
 import { quizPrompt } from '@/lib/study-prompt';
+import { seededShuffle } from '@/lib/seeded-shuffle';
 
 type MCQModeCard = {
   id: string;
@@ -21,24 +22,18 @@ type MCQModeCard = {
 type MCQModeProps = {
   card: MCQModeCard;
   disabled: boolean;
+  /** Per quiz session, from the server: the options' order is the same on the server and in the browser. */
+  shuffleSeed: string;
   onResolve: (grade: StudyGrade, wasCorrect: boolean, answer: string) => void;
   onFallbackToIdentification: () => void;
   /** Fires the moment an option is chosen, so audio/haptics feel immediate. */
   onAnswered?: (wasCorrect: boolean) => void;
 };
 
-function shuffle<T>(items: T[]) {
-  const next = [...items];
-  for (let index = next.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [next[index], next[randomIndex]] = [next[randomIndex], next[index]];
-  }
-  return next;
-}
-
 export function MCQMode({
   card,
   disabled,
+  shuffleSeed,
   onResolve,
   onFallbackToIdentification,
   onAnswered,
@@ -59,8 +54,8 @@ export function MCQMode({
         return true;
       });
 
-    return shuffle([card.front, ...distractors]);
-  }, [card.front, card.mcq_distractors]);
+    return seededShuffle([card.front, ...distractors], `${shuffleSeed}:${card.id}`);
+  }, [card.front, card.id, card.mcq_distractors, shuffleSeed]);
 
   const prompt = quizPrompt(card);
   const wasCorrect = selectedOption === card.front;
@@ -87,8 +82,8 @@ export function MCQMode({
         return;
       }
 
-      const optionIndex = Number(event.key) - 1;
-      if (optionIndex < 0 || optionIndex >= options.length) {
+      const optionIndex = optionIndexFromKey(event, options.length);
+      if (optionIndex === null) {
         return;
       }
 

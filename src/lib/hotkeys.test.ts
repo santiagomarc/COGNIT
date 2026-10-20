@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isAdvanceKey, isBlockingDialogOpen, pageShortcutBlocked } from '@/lib/hotkeys';
+import { isAdvanceKey, isBlockingDialogOpen, optionIndexFromKey, pageShortcutBlocked } from '@/lib/hotkeys';
 
 /** A stand-in for `document` that answers only the selector the guard uses. */
 function rootWith(dialogs: { allow?: boolean }[]): ParentNode {
@@ -69,5 +69,28 @@ describe('isAdvanceKey — the quiz identification result', () => {
     expect(isAdvanceKey(key({ target: new FakeInput() as unknown as EventTarget }), rootWith([]))).toBe(false);
     expect(isAdvanceKey(key({ repeat: true }), rootWith([]))).toBe(false);
     expect(isAdvanceKey(key({ key: 'n' }), rootWith([]))).toBe(false);
+  });
+});
+
+describe('optionIndexFromKey — the multiple-choice digit keys', () => {
+  const key = (k: string, mods: Partial<Pick<KeyboardEvent, 'metaKey' | 'ctrlKey' | 'altKey'>> = {}) => ({
+    key: k, metaKey: false, ctrlKey: false, altKey: false, ...mods,
+  });
+
+  it('maps 1–4 to the four options', () => {
+    expect(['1', '2', '3', '4'].map((k) => optionIndexFromKey(key(k), 4))).toEqual([0, 1, 2, 3]);
+  });
+
+  it('ignores the pause key, Enter, Tab, arrows and letters (they used to answer as NaN)', () => {
+    for (const k of ['p', 'P', 'Enter', 'Tab', 'ArrowDown', ' ', 'Shift', 'a']) {
+      expect(optionIndexFromKey(key(k), 4)).toBeNull();
+    }
+  });
+
+  it('ignores 0, digits past the option count, and digits with a modifier', () => {
+    expect(optionIndexFromKey(key('0'), 4)).toBeNull();
+    expect(optionIndexFromKey(key('5'), 4)).toBeNull();
+    expect(optionIndexFromKey(key('1', { metaKey: true }), 4)).toBeNull();
+    expect(optionIndexFromKey(key('2', { ctrlKey: true }), 4)).toBeNull();
   });
 });

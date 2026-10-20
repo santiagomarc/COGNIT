@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { notFound, redirect } from 'next/navigation';
 import { getRequestClient, getSessionUser, getUserSettings } from '@/lib/supabase/session';
 import { QuizAssessmentClient } from '@/components/ui/shared/QuizAssessmentClient';
@@ -167,6 +168,7 @@ export default async function DeckQuizPage({ params, searchParams }: QuizPagePro
       cards={cards}
       totalInDeck={totalInDeck ?? 0}
       mode={mode as QuizMode}
+      shuffleSeed={randomUUID()}
     />
   );
 }

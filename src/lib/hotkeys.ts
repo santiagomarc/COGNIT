@@ -51,3 +51,23 @@ export function isAdvanceKey(
   if (pageShortcutBlocked(event, root) || isTypingTarget(event.target)) return false;
   return (event.key === 'Enter' || event.key === ' ') && !event.repeat;
 }
+
+/**
+ * The option a digit key picks in a multiple-choice question: '1' → 0, up to
+ * `optionCount`. Null for any other key, and for a digit held with ⌘, Ctrl or
+ * Alt (⌘1 switches browser tabs).
+ *
+ * `Number(event.key) - 1` used to be the parse. It is NaN for every key that
+ * isn't a digit, and NaN passes both `< 0` and `>= length`, so P (pause),
+ * Enter, Tab or an arrow "answered" the question with no option: it showed
+ * Incorrect with nothing marked, and Space could not continue.
+ */
+export function optionIndexFromKey(
+  event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey'>,
+  optionCount: number,
+): number | null {
+  if (event.metaKey || event.ctrlKey || event.altKey) return null;
+  if (!/^[1-9]$/.test(event.key)) return null;
+  const index = Number(event.key) - 1;
+  return index < optionCount ? index : null;
+}

@@ -456,7 +456,11 @@ If UIUX U2 hasn't run by now, do UIUX §5.7 (transitions: ≈ 0.9 s → ≤ 0.3 
 | Quiz elapsed frozen while paused (2.5 s) | yes | yes |
 | Quiz result duration, 8 answers, 6.8 s wall | "6s" | "6s" |
 
-**Found along the way (not P2, not fixed):** after pausing and resuming a quiz with `P`, the next keyboard answer shows "Incorrect" with no option marked as chosen, and Space does not continue. It reproduces identically on `cbc5bce` and on P2, so it predates this work; without a pause the same key sequence completes all eight questions. Suspect `MCQMode`'s option shuffle (`Math.random` inside a `useMemo`) being re-run across the pause, so the chosen string no longer matches the displayed options. It needs its own fix and test.
+**Found along the way, fixed 2026-10-20:** after pausing a quiz with `P`, the next answer showed "Incorrect" with nothing marked and Space would not continue.
+- **Cause:** `MCQMode` parsed keys with `Number(event.key) - 1`. That is NaN for every key that isn't a digit, and NaN passes both range checks, so P (the pause key, which reaches the handler before the pause lands), Enter, Tab, an arrow or any letter "answered" with no option.
+- **Fix:** `optionIndexFromKey` in `src/lib/hotkeys.ts` accepts only `1`–`9` within the option count and ignores digits held with ⌘, Ctrl or Alt; `hotkeys.test.ts` covers it. In a browser run, pause and resume followed by Enter, Tab, ArrowDown and a letter left the question unanswered, then the digit keys answered all eight.
+- **Second bug, same check:** a hydration mismatch on every quiz load. The options were shuffled with `Math.random()` during render, so the server's order never matched the browser's, and React re-rendered the whole quiz client-side. The quiz page now passes a per-request `shuffleSeed`, and `seededShuffle` (`src/lib/seeded-shuffle.ts`, tested) orders each card's options by seed plus card id; three loads in dev mode logged no hydration error.
+- **Still open, smaller:** the quiz and study clients read `sessionStorage` in a `useState` initializer to show the resume prompt, so a page load *with* a saved session also mismatches (the server renders the quiz, the browser the prompt). React recovers by re-rendering; reading the stored session in an effect or with `useSyncExternalStore` would remove it.
 
 ## 7. Phase P3 — Chat and search (1.75–2.25 days)
 
