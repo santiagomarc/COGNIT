@@ -15,6 +15,7 @@ import { FULL_CONTEXT_MAX_CARDS, fitsWholeDeck } from '@/lib/chat-context';
 import { AiServiceError, aiFailureMessage, classifyAiError, withGeminiRetry } from '@/lib/ai-retry';
 import { streamText } from '@/lib/gemini';
 import { logger } from '@/lib/logger';
+import { formatSseFrame } from '@/lib/sse-parsing';
 
 /**
  * Streaming deck chat over Server-Sent Events.
@@ -46,7 +47,7 @@ export const maxDuration = 60;
 const encoder = new TextEncoder();
 
 function sse(event: string, data: unknown) {
-  return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  return encoder.encode(formatSseFrame(event, data));
 }
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
@@ -81,14 +82,13 @@ export async function POST(request: NextRequest) {
   }
 
   // Reserve BEFORE the model call so a failed stream still counts against the
-  // budget — the whole point of finding S-2. A turn is two model calls: the
-  // answer and its follow-ups.
+  // budget — the whole point of finding S-2. A turn is one model call since
+  // follow-up chips were dropped (performance plan OD-1).
   const reservation = await reserveAiCall(
     supabase,
     user.id,
     'chat_with_deck',
     { deck_id: parsed.data.deck_id },
-    { calls: 2 },
   );
   if (!reservation.ok) {
     const status = reservation.error === 'You must be logged in.' ? 401 : 429;

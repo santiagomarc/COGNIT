@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { readSseStream } from '@/lib/sse-parsing';
 
 export type ChatReference = { id: string; front: string; similarity: number | null };
 
@@ -39,10 +40,8 @@ type SendInput = {
 };
 
 /**
- * Parses an SSE body incrementally.
- *
- * Hand-rolled rather than using EventSource because EventSource cannot issue
- * POST requests, and the request carries a JSON body.
+ * Deck chat over SSE (`/api/chat`); the frame parsing is shared with PDF
+ * generation in sse-parsing.ts.
  */
 export function useDeckChatStream() {
   const [state, setState] = useState<StreamState>(INITIAL);
@@ -91,17 +90,7 @@ export function useDeckChatStream() {
         return;
       }
 
-      const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-      let buffer = '';
-
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        const { frames, rest } = takeCompleteFrames(buffer + value);
-        buffer = rest;
-        for (const frame of frames) applyFrame(frame, setState);
-      }
+      await readSseStream(response.body, (event, payload) => applyEvent(event, payload, setState));
 
       setState((s) => (s.status === 'error' ? s : { ...s, status: 'done' }));
     } catch (error) {
@@ -123,55 +112,11 @@ export function useDeckChatStream() {
   return { state, send, cancel, reset };
 }
 
-/**
- * Splits an SSE buffer into complete frames, returning whatever trailing
- * partial frame is left over.
- *
- * A network chunk can end anywhere — including mid-frame, or between the two
- * newlines of a frame separator — so the leftover MUST be carried into the next
- * read. Exported for tests; this is the piece most likely to break subtly.
- */
-export function takeCompleteFrames(buffer: string): { frames: string[]; rest: string } {
-  const frames: string[] = [];
-  let rest = buffer;
-
-  let boundary = rest.indexOf('\n\n');
-  while (boundary !== -1) {
-    frames.push(rest.slice(0, boundary));
-    rest = rest.slice(boundary + 2);
-    boundary = rest.indexOf('\n\n');
-  }
-
-  return { frames, rest };
-}
-
-/** Exported for tests. Parses one SSE frame into {event, data}. */
-export function parseFrame(frame: string): { event: string; data: string } {
-  let event = 'message';
-  let data = '';
-
-  for (const line of frame.split('\n')) {
-    if (line.startsWith('event: ')) event = line.slice(7).trim();
-    else if (line.startsWith('data: ')) data += line.slice(6);
-  }
-
-  return { event, data };
-}
-
-function applyFrame(
-  frame: string,
+function applyEvent(
+  event: string,
+  payload: Record<string, unknown>,
   setState: React.Dispatch<React.SetStateAction<StreamState>>,
 ) {
-  const { event, data } = parseFrame(frame);
-  if (!data) return;
-
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(data) as Record<string, unknown>;
-  } catch {
-    return;
-  }
-
   switch (event) {
     case 'meta':
       setState((s) => ({

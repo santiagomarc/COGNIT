@@ -2,12 +2,12 @@
  * Pure card-generation helpers: term validation, candidate scoring, and
  * difficulty balancing.
  *
- * Extracted from actions/ai-generate.ts so they can be exported and unit
- * tested — a 'use server' module may only export async functions. The logic is
- * unchanged apart from the pickBalancedCards fix noted below.
+ * Pure, so they can be unit tested; PDF generation (`/api/generate`) calls
+ * them per card as the model's output streams in.
  */
 import { normalizeForMatch, normalizeWhitespace } from '@/lib/text-normalize';
 import { hasBalancedMath } from '@/lib/rich-text';
+import { selectUsableDistractors } from '@/lib/distractors';
 
 export type CardDifficultyBand = 'foundational' | 'intermediate' | 'advanced';
 
@@ -16,6 +16,10 @@ export type CandidateCard = {
   back: string;
   score: number;
   difficulty: CardDifficultyBand;
+  /** From the generation call itself (AI-18); empty when the model gave none usable. */
+  topicTags: string[];
+  /** Exactly three, or empty: selectUsableDistractors' rule. */
+  distractors: string[];
 };
 
 export const TERM_MAX_WORDS = 4;
@@ -205,55 +209,130 @@ export function pickBalancedCards(candidates: CandidateCard[], maxCount: number)
   return selected.slice(0, maxCount);
 }
 
-export function parseAndRankGeneratedCards(
-  rawCards: unknown[],
-  sourceTextLower: string,
-  usedFrontKeys: Set<string>,
-) {
-  const uniqueCandidates = new Map<string, CandidateCard>();
-
-  for (const item of rawCards) {
-    if (!item || typeof item !== 'object') {
-      continue;
-    }
-
-    const maybeCard = item as Record<string, unknown>;
-    if (typeof maybeCard.front !== 'string' || typeof maybeCard.back !== 'string') {
-      continue;
-    }
-
-    const normalized = normalizeGeneratedCard({ front: maybeCard.front, back: maybeCard.back });
-    if (!isValidTermFront(normalized.front)) {
-      continue;
-    }
-
-    if (normalized.back.length < MIN_BACK_CHARS || isEnumerationLike(normalized.back)) {
-      continue;
-    }
-
-    // A stray `$` would render as a raw dollar sign on the card face; the
-    // prompt asks for `$…$` LaTeX, so an unbalanced one is a malformed card.
-    if (!hasBalancedMath(normalized.front) || !hasBalancedMath(normalized.back)) {
-      continue;
-    }
-
-    const frontKey = normalizeFrontKey(normalized.front);
-    if (!frontKey || usedFrontKeys.has(frontKey)) {
-      continue;
-    }
-
-    const candidate: CandidateCard = {
-      ...normalized,
-      score: scoreCandidateCard(normalized, sourceTextLower),
-      difficulty: classifyCardDifficulty(normalized),
-    };
-
-    const existing = uniqueCandidates.get(frontKey);
-    if (!existing || candidate.score > existing.score) {
-      uniqueCandidates.set(frontKey, candidate);
-    }
-  }
-
-  return [...uniqueCandidates.values()].sort((a, b) => b.score - a.score);
+/**
+ * Tags as the app stores them: trimmed, lowercase, 2–40 characters,
+ * deduplicated, at most four. Shared by generation and background enrichment.
+ */
+export function normalizeTopicTags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(
+    raw
+      .filter((value): value is string => typeof value === 'string')
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length >= 2 && value.length <= 40),
+  )].slice(0, 4);
 }
 
+/**
+ * One card from the model, checked and scored, or null when it fails a rule:
+ * a term-shaped front, a real description, no list, balanced math. Its tags
+ * and distractors are cleaned; a card with unusable ones is still a card (the
+ * background job fills them later).
+ */
+export function parseGeneratedCard(item: unknown, sourceTextLower: string): CandidateCard | null {
+  if (!item || typeof item !== 'object') return null;
+
+  const raw = item as Record<string, unknown>;
+  if (typeof raw.front !== 'string' || typeof raw.back !== 'string') return null;
+
+  const normalized = normalizeGeneratedCard({ front: raw.front, back: raw.back });
+  if (!isValidTermFront(normalized.front)) return null;
+  if (normalized.back.length < MIN_BACK_CHARS || isEnumerationLike(normalized.back)) return null;
+
+  // A stray `$` would render as a raw dollar sign on the card face; the
+  // prompt asks for `$…$` LaTeX, so an unbalanced one is a malformed card.
+  if (!hasBalancedMath(normalized.front) || !hasBalancedMath(normalized.back)) return null;
+
+  const distractors = Array.isArray(raw.mcq_distractors)
+    ? selectUsableDistractors(raw.mcq_distractors.filter((value): value is string => typeof value === 'string'), normalized.front)
+    : [];
+
+  return {
+    ...normalized,
+    score: scoreCandidateCard(normalized, sourceTextLower),
+    difficulty: classifyCardDifficulty(normalized),
+    topicTags: normalizeTopicTags(raw.topic_tags),
+    distractors,
+  };
+}
+
+/**
+ * Below this score a streamed card is held back instead of shown at once. A
+ * one- or two-word term found verbatim in the source with a 40–260 character
+ * description scores 15–17, a three- or four-word one 12–14; a five- or
+ * six-word term scores at most 7. A held card is not lost: it fills any room
+ * left once every section has answered.
+ */
+export const STREAM_ACCEPT_MIN_SCORE = 8;
+
+/** A section's share of the cards still wanted, so a long document is covered past its opening. */
+export function sectionCap(count: number, accepted: number, sectionsLeft: number): number {
+  return Math.max(1, Math.ceil(Math.max(0, count - accepted) / Math.max(1, sectionsLeft)));
+}
+
+/**
+ * How many cards to ask one section for: a little over its share, so a weak
+ * card can be passed over; never fewer than three, never more than `max`.
+ */
+export function sectionRequestSize(cap: number, max: number): number {
+  return Math.max(3, Math.min(max, Math.ceil(cap * 1.4)));
+}
+
+/**
+ * Chooses cards while they stream in (performance plan AI-18). The old
+ * pipeline waited for every section, then ranked the whole pool; this decides
+ * per card, so a good card is shown and saved the moment the model finishes
+ * writing it:
+ *
+ * - A new card is taken at once when the request still has room, its section
+ *   is under its cap, and it scores at least STREAM_ACCEPT_MIN_SCORE.
+ * - Anything else that isn't a duplicate is held. When the sections are done,
+ *   `fill` takes the best held cards for the room left, balanced by difficulty
+ *   as the whole-document pick was.
+ *
+ * Duplicates are checked against `usedFrontKeys`, which the caller seeds with
+ * the deck's existing terms so a second upload adds only new ones.
+ */
+export function createCardPicker(options: { count: number; usedFrontKeys: Set<string>; minScore?: number }) {
+  const minScore = options.minScore ?? STREAM_ACCEPT_MIN_SCORE;
+  const caps = new Map<number, number>();
+  const taken = new Map<number, number>();
+  const held: CandidateCard[] = [];
+  let accepted = 0;
+
+  const sectionFull = (section: number) => (taken.get(section) ?? 0) >= (caps.get(section) ?? 0);
+
+  return {
+    accepted: () => accepted,
+    full: () => accepted >= options.count,
+    sectionFull,
+    /** Opens a section with room for `cap` cards. */
+    open(section: number, cap: number) {
+      caps.set(section, cap);
+      taken.set(section, 0);
+    },
+    /** `take`: show and save it now. `hold`: kept for `fill`. `duplicate`: the deck or this run has the term. */
+    offer(section: number, candidate: CandidateCard): 'take' | 'hold' | 'duplicate' {
+      const key = normalizeFrontKey(candidate.front);
+      if (!key || options.usedFrontKeys.has(key)) return 'duplicate';
+      options.usedFrontKeys.add(key);
+
+      if (accepted < options.count && !sectionFull(section) && candidate.score >= minScore) {
+        accepted += 1;
+        taken.set(section, (taken.get(section) ?? 0) + 1);
+        return 'take';
+      }
+      held.push(candidate);
+      return 'hold';
+    },
+    /** Once every section has answered: the best held cards for the room left. */
+    fill(): CandidateCard[] {
+      const room = options.count - accepted;
+      if (room <= 0 || held.length === 0) return [];
+      const picked = pickBalancedCards([...held].sort((a, b) => b.score - a.score), room);
+      held.length = 0;
+      accepted += picked.length;
+      return picked;
+    },
+  };
+}

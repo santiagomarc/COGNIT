@@ -1,5 +1,6 @@
 import {z} from "zod";
 import { DECK_TAG_VALUES } from '@/lib/deck-tags';
+import { MAX_CHUNKS } from '@/lib/pdf-chunking';
 import { countWords, maxWordsFor, responseText } from '@/lib/synthesis/text';
 
 export const cardSourceSchema = z.enum(['manual', 'ai_pdf', 'bulk_import', 'ai_cleaned', 'synthesis_claim']);
@@ -97,8 +98,14 @@ export type UpdateCardInput = z.infer<typeof updateCardSchema>;
 
 export const generateCardsSchema = z.object({
     deck_id: z.uuid({ message: "Invalid deck id" }),
-  /** Maximum flashcards to generate. AI may return fewer when coverage is complete. */
-    count: z.number().int().min(5).max(30).default(10),
+  /**
+   * Maximum flashcards to generate. AI may return fewer when coverage is
+   * complete. The upload offers 5–30; less only when a long PDF continues
+   * with what is left of the request (performance plan AI-18).
+   */
+    count: z.number().int().min(1).max(30).default(10),
+  /** The first section to read: 0, or where the previous request stopped. */
+    offset: z.number().int().min(0).max(MAX_CHUNKS).default(0),
 });
 
 export type GenerateCardsInput = z.infer<typeof generateCardsSchema>;

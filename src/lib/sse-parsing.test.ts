@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseFrame, takeCompleteFrames } from './use-deck-chat-stream';
+import { formatSseFrame, parseFrame, readSseStream, takeCompleteFrames } from './sse-parsing';
 
 describe('takeCompleteFrames', () => {
   it('returns whole frames and no leftover when the buffer ends cleanly', () => {
@@ -68,5 +68,28 @@ describe('parseFrame', () => {
     const payload = { text: 'note: this matters' };
     const { data } = parseFrame(`event: delta\ndata: ${JSON.stringify(payload)}`);
     expect(JSON.parse(data)).toEqual(payload);
+  });
+});
+
+describe('formatSseFrame and readSseStream', () => {
+  it('round-trips frames split at arbitrary byte boundaries', async () => {
+    const wire = formatSseFrame('card', { front: 'Thrashing', back: 'Paging that "starves" the CPU.\n' })
+      + 'event: noise\ndata: not json\n\n'
+      + formatSseFrame('done', { saved: 1 });
+    const bytes = new TextEncoder().encode(wire);
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (let i = 0; i < bytes.length; i += 7) controller.enqueue(bytes.slice(i, i + 7));
+        controller.close();
+      },
+    });
+
+    const seen: [string, Record<string, unknown>][] = [];
+    await readSseStream(body, (event, payload) => seen.push([event, payload]));
+
+    expect(seen).toEqual([
+      ['card', { front: 'Thrashing', back: 'Paging that "starves" the CPU.\n' }],
+      ['done', { saved: 1 }],
+    ]);
   });
 });

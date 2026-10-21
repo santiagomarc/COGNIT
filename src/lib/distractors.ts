@@ -1,5 +1,18 @@
 import { similarity } from '@/lib/fuzzy';
 
+/**
+ * What the model is told a distractor must be, wherever it writes them: the
+ * background enrichment job and PDF generation (performance plan AI-18).
+ */
+export const DISTRACTOR_PROMPT_RULES: readonly string[] = [
+  'DISTRACTOR RULES — all of these must hold:',
+  '1. PLAUSIBLE: a learner who half-knows the material could pick it. Draw from the same subject area.',
+  '2. UNAMBIGUOUSLY WRONG: never a synonym, abbreviation, plural, alternate spelling, or translation of the correct term.',
+  '3. MUTUALLY DISTINCT: the three distractors must not be paraphrases of each other.',
+  '4. PARALLEL FORM: match the correct term in kind, length, register, and grammatical form (a person gets people, a two-word noun phrase gets two-word noun phrases).',
+  '5. Never use "all of the above", "none of the above", or joke options.',
+];
+
 /** Above this, a "distractor" is really the same string as another option. */
 const DISTRACTOR_MAX_SIMILARITY = 0.85;
 

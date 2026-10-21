@@ -169,6 +169,34 @@ export async function generateJson(request: JsonRequest): Promise<GenerateConten
   });
 }
 
+/**
+ * One JSON generation, streamed (PDF generation, AI-18). Yields each chunk as
+ * it arrives: `text` is the next slice of the JSON document, and the last
+ * chunk carries `usageMetadata`. The model's thinking default is the same as
+ * `generateJson`'s. Pass `signal` to stop it; `timeoutMs` is not applied to a
+ * stream (the caller owns the deadline).
+ */
+export async function streamJson(request: JsonRequest): Promise<AsyncGenerator<GenerateContentResponse>> {
+  const model = resolveModelName(request.purpose);
+  warnIfThinkingDefaultUnverified(model);
+  const stream = await ai().models.generateContentStream({
+    model,
+    contents: request.contents,
+    config: {
+      systemInstruction: request.systemInstruction,
+      ...jsonGenerationConfig({
+        model,
+        responseSchema: request.responseSchema,
+        temperature: request.temperature,
+        maxOutputTokens: request.maxOutputTokens,
+        thinking: request.thinking,
+      }),
+      ...controls({ signal: request.signal }),
+    },
+  });
+  return stream;
+}
+
 export type TextRequest = RequestControls & {
   systemInstruction: string;
   contents: Content[];

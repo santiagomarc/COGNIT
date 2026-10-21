@@ -3,7 +3,8 @@ import { Type, generateJson, type Schema } from '@/lib/gemini';
 import { withGeminiRetry } from '@/lib/ai-retry';
 import { addUsage, type AiUsageTotals } from '@/lib/ai-outcome';
 import { removeDeckTagFromTitle } from '@/lib/deck-tags';
-import { selectUsableDistractors } from '@/lib/distractors';
+import { DISTRACTOR_PROMPT_RULES, selectUsableDistractors } from '@/lib/distractors';
+import { normalizeTopicTags } from '@/lib/card-generation';
 import { logger } from '@/lib/logger';
 import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { recordAiUsage, reserveAiCall, sanitizeAiInputText } from '@/app/actions/_shared';
@@ -72,14 +73,7 @@ export function parseEnrichmentRows(raw: string, frontById: Map<string, string>)
     const front = frontById.get(id);
     if (front === undefined) return [];
 
-    const tags = Array.isArray(row.topic_tags)
-      ? [...new Set(
-        row.topic_tags
-          .filter((value): value is string => typeof value === 'string')
-          .map((value) => value.trim().toLowerCase())
-          .filter((value) => value.length >= 2 && value.length <= 40),
-      )].slice(0, 4)
-      : [];
+    const tags = normalizeTopicTags(row.topic_tags);
     const distractors = Array.isArray(row.mcq_distractors)
       ? selectUsableDistractors(row.mcq_distractors.filter((value): value is string => typeof value === 'string'), front)
       : [];
@@ -152,12 +146,7 @@ export async function enrichPendingCards(
       ? [
         '',
         'For each flashcard produce exactly three incorrect answer options ("distractors") for the TERM.',
-        'DISTRACTOR RULES — all of these must hold:',
-        '1. PLAUSIBLE: a learner who half-knows the material could pick it. Draw from the same subject area.',
-        '2. UNAMBIGUOUSLY WRONG: never a synonym, abbreviation, plural, alternate spelling, or translation of the correct term.',
-        '3. MUTUALLY DISTINCT: the three distractors must not be paraphrases of each other.',
-        '4. PARALLEL FORM: match the correct term in kind, length, register, and grammatical form (a person gets people, a two-word noun phrase gets two-word noun phrases).',
-        '5. Never use "all of the above", "none of the above", or joke options.',
+        ...DISTRACTOR_PROMPT_RULES,
         '',
       ]
       : []),
