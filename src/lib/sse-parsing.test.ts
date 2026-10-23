@@ -77,7 +77,7 @@ describe('formatSseFrame and readSseStream', () => {
       + 'event: noise\ndata: not json\n\n'
       + formatSseFrame('done', { saved: 1 });
     const bytes = new TextEncoder().encode(wire);
-    const body = new ReadableStream<Uint8Array>({
+    const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         for (let i = 0; i < bytes.length; i += 7) controller.enqueue(bytes.slice(i, i + 7));
         controller.close();

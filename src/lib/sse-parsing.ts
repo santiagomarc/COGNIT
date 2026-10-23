@@ -51,7 +51,7 @@ export function parseFrame(frame: string): { event: string; data: string } {
  * are skipped.
  */
 export async function readSseStream(
-  body: ReadableStream<Uint8Array>,
+  body: ReadableStream<Uint8Array<ArrayBuffer>>,
   onFrame: (event: string, payload: Record<string, unknown>) => void,
 ): Promise<void> {
   const reader = body.pipeThrough(new TextDecoderStream()).getReader();

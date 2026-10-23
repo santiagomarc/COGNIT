@@ -2,33 +2,38 @@ import { describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadLocalEnv } from './env';
+import { readSseStream } from '@/lib/sse-parsing';
 
 const hasKey = loadLocalEnv();
 
 /**
- * The PDF upload gate: the real `generateCards` action — PDF parsing through
- * pdf-parse's serverless worker, chunking, the live model, ranking — under
- * production's environment (NODE_ENV=production, no CRON_SECRET, default
- * model and token cap), with only the database stubbed. It must return cards
- * inside the deck page's function budget. One model call per PDF section.
+ * The PDF upload gate (performance plan G5): the real `/api/generate` route —
+ * PDF parsing through pdf-parse's serverless worker, chunking, the live
+ * model's stream, the card checks and the picker — under production's
+ * environment (NODE_ENV=production, no CRON_SECRET, default model), with only
+ * the database stubbed. The first card must arrive within one section's
+ * latency, and the request must end inside the function budget.
  */
 
-vi.mock('next/cache', () => ({ revalidatePath: () => undefined }));
-// The embeddings-and-tags fill runs after the response; this gate measures generation only.
-vi.mock('next/server', () => ({ after: () => undefined }));
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  // The embeddings fill runs after the response; this gate measures generation only.
+  after: () => undefined,
+}));
 vi.mock('@/lib/card-derived', () => ({ fillDerivedCardData: async () => 'ok' }));
 
 vi.mock('@/lib/supabase/session', () => {
-  const chain = (result: unknown) => {
-    const node: Record<string, unknown> = {};
-    for (const method of ['select', 'eq', 'order', 'limit']) node[method] = () => node;
-    node.single = async () => result;
-    return node;
-  };
+  const query: Record<string, unknown> = {};
+  for (const method of ['select', 'eq', 'order', 'limit']) query[method] = () => query;
+  query.maybeSingle = async () => ({ data: { id: 'deck-1' }, error: null });
+  query.then = (resolve: (value: unknown) => void) => resolve({ data: [], error: null });
+  let inserted = 0;
   const supabase = {
-    from: (table: string) => (table === 'cards'
-      ? { insert: (rows: unknown[]) => ({ select: async () => ({ data: rows.map((_, i) => ({ id: `card-${i}` })), error: null }) }) }
-      : chain({ data: { id: 'deck-1' }, error: null })),
+    from: () => ({
+      ...query,
+      insert: () => ({ select: () => ({ single: async () => ({ data: { id: `card-${(inserted += 1)}` }, error: null }) }) }),
+    }),
+    rpc: async () => ({ data: [], error: null }),
   };
   return {
     getRequestClient: async () => supabase,
@@ -39,7 +44,7 @@ vi.mock('@/lib/supabase/session', () => {
 
 vi.mock('@/app/actions/_shared', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/app/actions/_shared')>()),
-  reserveAiCall: async () => ({ ok: true, reservationId: 'reservation-1' }),
+  reserveAiCall: async () => ({ ok: true, reservationId: 'reservation-1', startedAt: Date.now() }),
   recordAiUsage: async () => undefined,
   touchDeckUpdatedAt: async () => undefined,
 }));
@@ -101,7 +106,7 @@ function sourceText(chars: number): string {
 
 const FUNCTION_BUDGET_MS = Number(process.env.PDF_GATE_BUDGET_MS ?? 60_000);
 
-describe.skipIf(!hasKey)('live PDF generation — the upload action returns cards inside the function budget', () => {
+describe.skipIf(!hasKey)('live PDF generation — cards stream from the route inside the function budget', () => {
   it.each([
     ['a short handout (one section)', 18_000],
     ['a long lecture PDF (several sections)', 95_000],
@@ -111,7 +116,7 @@ describe.skipIf(!hasKey)('live PDF generation — the upload action returns card
     vi.stubEnv('GEMINI_MODEL', '');
     vi.resetModules();
     delete process.env.GEMINI_MODEL;
-    const { generateCards } = await import('@/app/actions/ai-generate');
+    const { POST } = await import('@/app/api/generate/route');
 
     const pdf = buildPdf(sourceText(chars));
     const form = new FormData();
@@ -120,13 +125,27 @@ describe.skipIf(!hasKey)('live PDF generation — the upload action returns card
     form.append('count', 'max');
 
     const started = Date.now();
-    const result = await generateCards(form) as Record<string, unknown>;
+    const response = await POST(new Request('http://localhost/api/generate', { method: 'POST', body: form }) as never);
+    const parsedAt = Date.now() - started;
+    expect(response.status).toBe(200);
+
+    const cardTimes: number[] = [];
+    let last: { event: string; payload: Record<string, unknown> } | null = null;
+    let sections = 0;
+    await readSseStream(response.body as ReadableStream<Uint8Array<ArrayBuffer>>, (event, payload) => {
+      if (event === 'card') cardTimes.push(Date.now() - started);
+      if (event === 'start') sections = Number(payload.sections);
+      if (['done', 'more', 'error'].includes(event)) last = { event, payload };
+    });
     const elapsed = Date.now() - started;
-    console.log(`  ${chars} chars · ${elapsed} ms · ${'error' in result && result.error ? `error: ${JSON.stringify(result.error)}` : `${result.count} cards from ${result.chunkCount} sections · partial ${Boolean(result.partial)} · failed sections ${result.failedChunks ?? 0}`}`);
+    const end = last as { event: string; payload: Record<string, unknown> } | null;
+    console.log(`  ${chars} chars · ${sections} sections · parsed ${parsedAt} ms · first card ${cardTimes[0] ?? '—'} ms · ${cardTimes.length} cards · end ${elapsed} ms · ${end?.event} ${JSON.stringify(end?.payload)}`);
     vi.unstubAllEnvs();
 
-    expect(result.error ?? null).toBeNull();
-    expect(Number(result.count)).toBeGreaterThan(0);
+    expect(end?.event).not.toBe('error');
+    expect(cardTimes.length).toBeGreaterThan(0);
+    // The first card well before the section would have finished whole.
+    expect(cardTimes[0]).toBeLessThan(elapsed);
     expect(elapsed).toBeLessThan(FUNCTION_BUDGET_MS);
   });
 });

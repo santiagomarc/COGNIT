@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useRef, useCallback, type DragEvent, type ChangeEvent } from 'react';
-import { generateCards } from '@/app/actions/ai-generate';
+import { useState, useRef, useCallback, useEffect, type DragEvent, type ChangeEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { formatActionError } from '@/lib/ai-feedback';
+import { ElapsedTelemetry } from '@/components/ui/shared/ElapsedTelemetry';
 import { motionTransitions } from '@/lib/motion-configs';
+import { usePdfGeneration, type GenerationOutcome } from '@/lib/use-pdf-generation';
 import { toast } from 'sonner';
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Upload, X } from 'lucide-react';
@@ -13,14 +14,10 @@ type PDFUploadZoneProps = {
   deckId: string;
 };
 
-type GeneratedCard = { front: string; back: string };
-
 const PDF_GENERATION_MAX_COUNT = 30;
 
-// Must stay in sync with MAX_PDF_BYTES in app/actions/ai-generate.ts. Rejecting
-// oversized files here matters: a body larger than the Next.js transport limits
-// is truncated before the server action runs, so the action's own size check
-// never gets a chance to return its message.
+// Must stay in sync with MAX_PDF_BYTES in lib/pdf-generation.ts. Rejecting
+// oversized files here saves uploading a body the server will refuse.
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 
 function getFileRejectionReason(file: File) {
@@ -40,12 +37,26 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [maxCardChoice, setMaxCardChoice] = useState<string>('10');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedCards, setGeneratedCards] = useState<GeneratedCard[]>([]);
+  const [startedAt, setStartedAt] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const reduced = useReducedMotion();
+  const router = useRouter();
+  const generation = usePdfGeneration();
+  const { running: isGenerating, cards: generatedCards, clear: clearGenerated } = generation;
 
   const resolvedMaxCardCount = maxCardChoice === 'max' ? PDF_GENERATION_MAX_COUNT : Number(maxCardChoice);
+
+  // Closing the tab stops the run (the cards shown so far stay saved);
+  // leaving for another page in the app does not (FLOW-06).
+  useEffect(() => {
+    if (!isGenerating) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isGenerating]);
 
   // ── Drag handlers ──
   const handleDragEnter = useCallback((e: DragEvent) => {
@@ -86,8 +97,8 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
     }
 
     setSelectedFile(file);
-    setGeneratedCards([]);
-  }, []);
+    clearGenerated();
+  }, [clearGenerated]);
 
   const handleFileChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,55 +112,29 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
     }
 
     setSelectedFile(file);
-    setGeneratedCards([]);
-  }, []);
+    clearGenerated();
+  }, [clearGenerated]);
 
   const clearFile = useCallback(() => {
     setSelectedFile(null);
-    setGeneratedCards([]);
+    clearGenerated();
     if (inputRef.current) inputRef.current.value = '';
-  }, []);
+  }, [clearGenerated]);
 
   // ── Generate ──
   async function handleGenerate() {
     if (!selectedFile) return;
 
-    setIsGenerating(true);
-    setGeneratedCards([]);
+    setStartedAt(Date.now());
+    const outcome = await generation.generate({ file: selectedFile, deckId, count: maxCardChoice });
+    reportOutcome(outcome, resolvedMaxCardCount);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('deck_id', deckId);
-      formData.append('count', maxCardChoice);
-
-      const result = await generateCards(formData);
-
-      if (result.error) {
-        toast.error(formatActionError(result.error, 'Failed to generate cards.'));
-      } else if (result.success && result.cards) {
-        if (result.partial) {
-          // A long PDF is split into sections; one failing section no longer
-          // loses the document, but the user should know it happened.
-          const failed = result.failedChunks ?? 0;
-          toast.warning(
-            `${result.count} cards generated. ${failed} section${failed === 1 ? '' : 's'} of the PDF couldn't be processed — you can re-upload just those pages.`,
-            { duration: 8000 },
-          );
-        } else if (result.count < resolvedMaxCardCount) {
-          toast.success(`${result.count} cards generated (AI stopped early after covering the material).`);
-        } else {
-          toast.success(`${result.count} cards generated and saved!`);
-        }
-        setGeneratedCards(result.cards);
-        setSelectedFile(null);
-        if (inputRef.current) inputRef.current.value = '';
-      }
-    } catch (err) {
-      console.error('[PDFUploadZone] generateCards failed:', err);
-      toast.error('Something went wrong. Please try again.');
-    } finally {
-      setIsGenerating(false);
+    if (outcome.saved > 0) {
+      setSelectedFile(null);
+      if (inputRef.current) inputRef.current.value = '';
+      // The deck's card list and counts; also clears the router's cached
+      // pages, which a route handler (unlike a Server Action) can't purge.
+      router.refresh();
     }
   }
 
@@ -257,9 +242,9 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
 
         {/*
           The working state is a scrim over the zone it belongs to — the one
-          place a blur is permitted (§7.8). What it replaces was a pulsing brain
-          glyph, which said nothing about progress and everything about being an
-          AI demo (§6).
+          place a blur is permitted (§7.8). Nothing in it animates: the cards
+          arriving below, the count and the elapsed time are the progress
+          (FLOW-06). Only the phase is announced; the counter is aria-hidden.
         */}
         <AnimatePresence>
           {isGenerating && (
@@ -268,25 +253,33 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
-              className="absolute inset-0 z-[var(--z-sticky)] flex flex-col items-center justify-center rounded-[var(--radius-container)] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
-              role="status"
-              aria-live="polite"
+              className="absolute inset-0 z-[var(--z-sticky)] flex flex-col items-center justify-center gap-1 rounded-[var(--radius-container)] bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] px-6 text-center backdrop-blur-[4px]"
             >
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                Working
+              <p role="status" aria-live="polite" className="text-sm font-medium">
+                {generation.stopping
+                  ? 'Stopping'
+                  : generatedCards.length === 0 ? 'Reading your PDF' : 'Writing cards'}
               </p>
-              <p className="mt-2 text-sm font-medium">Reading your PDF and writing cards</p>
-              <p className="mt-1 text-xs text-ink-dim">
-                This usually takes under a minute for a chapter.
-              </p>
-
-              <div className="mt-4 h-[3px] w-48 overflow-hidden bg-border">
-                <m.div
-                  className="h-full w-1/2 bg-ink-dim"
-                  animate={reduced ? { x: '-100%' } : { x: ['-100%', '200%'] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-                />
+              <div aria-hidden="true" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+                <ElapsedTelemetry key={startedAt} baseMs={0} running />
+                <span className="font-mono text-[13px] tnum text-ink-dim">
+                  {generatedCards.length} {generatedCards.length === 1 ? 'card' : 'cards'} saved
+                  {generation.progress.sections > 1 && (
+                    <> · section {Math.min(generation.progress.sectionsRead + 1, generation.progress.sections)} of {generation.progress.sections}</>
+                  )}
+                </span>
               </div>
+              <p className="mt-1 max-w-sm text-xs text-ink-dim">
+                Each card is saved as it&apos;s written. You can leave this page; the rest will still be added to this deck.
+              </p>
+              <Button
+                size="sm"
+                className="mt-3"
+                onClick={generation.cancel}
+                disabled={generation.stopping}
+              >
+                {generation.stopping ? 'Stopping…' : 'Stop'}
+              </Button>
             </m.div>
           )}
         </AnimatePresence>
@@ -296,11 +289,11 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       {generatedCards.length > 0 && (
         <div className="space-y-3">
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            <span className="tnum">{generatedCards.length}</span> cards generated and saved
+            <span className="tnum">{generatedCards.length}</span> {isGenerating ? 'saved so far' : 'cards generated and saved'}
           </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {generatedCards.map((card, i) => (
-              <div key={i} className="surface p-4">
+            {generatedCards.map((card) => (
+              <div key={card.id} className="surface p-4">
                 {/* `front` is the answer and `back` is the question in this schema
                     (design system §7.6), so the preview reads in study order. */}
                 <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
@@ -319,4 +312,36 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       )}
     </div>
   );
+}
+
+/** One toast for how the run ended. Sonner is global, so it shows even after the user has left the page. */
+function reportOutcome(outcome: GenerationOutcome, requested: number) {
+  const cards = (n: number) => `${n} card${n === 1 ? '' : 's'}`;
+
+  if (outcome.kind === 'cancelled') {
+    toast(outcome.saved > 0 ? `Stopped. ${cards(outcome.saved)} saved.` : 'Stopped. No cards were saved.');
+    return;
+  }
+
+  if (outcome.kind === 'error') {
+    if (outcome.saved > 0) toast.warning(`${cards(outcome.saved)} saved. ${outcome.message}`, { duration: 8000 });
+    else toast.error(outcome.message);
+    return;
+  }
+
+  if (outcome.limited) {
+    toast.warning(`${cards(outcome.saved)} generated. ${outcome.limited}`, { duration: 8000 });
+  } else if (outcome.failedSections > 0) {
+    // A long PDF is split into sections; one failing section no longer
+    // loses the document, but the user should know it happened.
+    const failed = outcome.failedSections;
+    toast.warning(
+      `${cards(outcome.saved)} generated. ${failed} section${failed === 1 ? '' : 's'} of the PDF couldn't be processed — you can re-upload just those pages.`,
+      { duration: 8000 },
+    );
+  } else if (outcome.saved < requested) {
+    toast.success(`${cards(outcome.saved)} generated (AI stopped early after covering the material).`);
+  } else {
+    toast.success(`${cards(outcome.saved)} generated and saved!`);
+  }
 }

@@ -41,7 +41,7 @@ import { logger } from '@/lib/logger';
  * Wire protocol:
  *   event: start    {"sections","offset"}
  *   event: card     {"id","front","back"}           saved before it is sent
- *   event: section  {"index","status"}              "done" | "failed" | "unfinished"
+ *   event: section  {"index","status"}              "done" | "failed"
  *   event: more     {"nextOffset","remaining"}      time ran out; send the file again from nextOffset
  *   event: done     {"saved","failedSections","limited"?}
  *   event: error    {"message","retryable"}
@@ -59,9 +59,11 @@ export const maxDuration = 60;
 const GENERATE_CONCURRENCY = 3;
 
 /**
- * The function is killed at 60 s. Streams still open at 50 s are cut off and
- * the request ends with `more`, so the client continues from the first
- * unfinished section in a fresh request; the cut leaves the last saves and the
+ * The function is killed at 60 s. Streams still open at 50 s are cut off (a
+ * cut section keeps the cards it gave; with none it counts as failed) and the
+ * request ends with `more`, so the client continues from the next unread
+ * section in a fresh request. Every request reads at least one wave, so a
+ * continuation always moves forward. The cut leaves the last saves and the
  * final frame inside the limit.
  */
 const GENERATION_BUDGET_MS = 50_000;
@@ -75,7 +77,7 @@ const EXISTING_TERMS_LIMIT = 5_000;
 const encoder = new TextEncoder();
 
 type StopReason = 'full' | 'stop' | 'deadline';
-type SectionStatus = 'done' | 'failed' | 'unfinished' | 'stopped';
+type SectionStatus = 'done' | 'failed' | 'stopped';
 type SectionResult = { status: SectionStatus; kind?: AiFailureKind; usage: AiUsageTotals | null };
 
 export async function POST(request: NextRequest) {
@@ -227,7 +229,9 @@ export async function POST(request: NextRequest) {
         const usage = () => (lastUsage ? addUsage(null, lastUsage) : null);
         const settle = (reason: StopReason): SectionResult => {
           if (reason === 'full') return { status: 'done', usage: usage() };
-          if (reason === 'deadline') return { status: 'unfinished', usage: usage() };
+          if (reason === 'deadline') {
+            return taken > 0 ? { status: 'done', usage: usage() } : { status: 'failed', kind: 'timeout', usage: usage() };
+          }
           return { status: 'stopped', usage: usage() };
         };
         try {
@@ -339,20 +343,12 @@ export async function POST(request: NextRequest) {
             return result;
           }));
 
-          let waveUsage: AiUsageTotals | null = null;
-          for (const [index, result] of results.entries()) {
-            if (result.usage) {
-              waveUsage = {
-                input: (waveUsage?.input ?? 0) + result.usage.input,
-                output: (waveUsage?.output ?? 0) + result.usage.output,
-                thoughts: (waveUsage?.thoughts ?? 0) + result.usage.thoughts,
-              };
-            }
+          const waveUsage = sumUsage(results.map((result) => result.usage));
+          for (const result of results) {
             if (result.status === 'failed') {
               failedSections += 1;
               firstFailureKind ??= result.kind ?? 'unknown';
             }
-            if (result.status === 'unfinished') nextOffset ??= sections[index].index;
           }
 
           await recordAiUsage(
@@ -371,8 +367,6 @@ export async function POST(request: NextRequest) {
             // Time to the wave's first card: what the user waits for (G5).
             { usage: waveUsage, ttftMs: wave.firstCardAt !== null ? wave.firstCardAt - reservation.startedAt : null },
           );
-
-          if (nextOffset !== null) break;
         }
 
         // Every section has answered (or the limit stopped them): the best
@@ -430,6 +424,17 @@ export async function POST(request: NextRequest) {
       'X-Accel-Buffering': 'no',
     },
   });
+}
+
+/** The wave's token totals: the sum over its sections, or null when none reported usage. */
+function sumUsage(usages: (AiUsageTotals | null)[]): AiUsageTotals | null {
+  const reported = usages.filter((usage): usage is AiUsageTotals => usage !== null);
+  if (reported.length === 0) return null;
+  return reported.reduce((total, usage) => ({
+    input: total.input + usage.input,
+    output: total.output + usage.output,
+    thoughts: total.thoughts + usage.thoughts,
+  }));
 }
 
 /** Why nothing was saved, in words the user can act on. */

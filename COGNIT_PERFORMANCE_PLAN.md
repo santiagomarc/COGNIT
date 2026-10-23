@@ -1,6 +1,6 @@
 # Cognit — Performance Plan (light AI, snappy app)
 
-**Revision:** 1.5 · 2026-10-19. Rev 1.5: P4's code landed uncommitted on top of `0b17d22` (P3's commit); its bundle saving is smaller than estimated and partly offset by bundler duplication (§8.4). Rev 1.4 · 2026-10-18: P3's code landed uncommitted on top of `4427194` (P2's commit), §7.5. Rev 1.3 · 2026-10-17: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
+**Revision:** 1.6 · 2026-10-23. Rev 1.6: P5's code landed on top of `66f5082`, a commit that holds P5 half-built (CI and the Vercel build are red on it until the rest is committed). Cards now stream from inside each model call, not only per section, and the generation call writes distractors as well as tags (§9.3). Rev 1.5 · 2026-10-19: P4's code landed uncommitted on top of `0b17d22` (P3's commit); its bundle saving is smaller than estimated and partly offset by bundler duplication (§8.4). Rev 1.4 · 2026-10-18: P3's code landed uncommitted on top of `4427194` (P2's commit), §7.5. Rev 1.3 · 2026-10-17: P2's code landed uncommitted on top of `cbc5bce` (P1's commit), measured before/after in production builds (§6.4). Rev 1.2 · 2026-10-16: P1's code landed uncommitted on top of `404dd24` (P0's commit); the B.6 distractor review failed its gate on the agent's reading, so P1 keeps AI distractors as a background job and uses deck-sourced options only as the instant fallback (§5.6). Rev 1.1 · 2026-10-15: the owner decided OD-1 (chat follow-ups dropped) and OD-3 (mnemonics removed entirely, not throttled); both moved into P0, and P0's code landed uncommitted on top of `73eabb5` (§4.7 has the execution notes). Rev 1.0 · 2026-10-14.
 **Baseline:** `main` @ `73eabb5` (clean tree; re-checked at the end of the audit). Line references in §2 and the appendices are to this baseline; P0 has since moved some of them.
 **Scope:** where Cognit's AI calls go and which of them a user waits on; what else makes the signed-in app slower than it needs to be; and the phased plan that makes AI light and the app snappy. No application code was changed by this audit.
 **Companions:** `COGNIT_UIUX_PLAN.md` (Rev 1.0, called **UIUX** below; PERF-06…09 and FLOW-06 live there and are scheduled here, not restated) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; the AUTH-02 runbook in §6.3, the LC series, house style) · `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` (§2: live thinking measurements on `gemini-3.5-flash-lite`).
@@ -75,7 +75,7 @@ Close behind:
 | **P2** | Study and quiz feel instant: the quiz clock and its persistence; UIUX PERF-06/07 if U2 hasn't run. **Code done 2026-10-17** (§6.4) | 0.5 day (+2.5 UIUX) | G2 (§6.3) |
 | **P3** | Chat and search: no pre-send sync, small decks in full context, instant lexical search, semantic search by a cancellable route **Code done 2026-10-18** (§7.5) | 1.75–2.25 days | G3 (§7.4) |
 | **P4** | Lighter pages: load unopened UI on open, lower budgets, keep the proxy off static pages **Code done 2026-10-19** (§8.4) | 1–1.5 days | G4 (§8.3) |
-| **P5** | PDF generation by section, streamed, with tags in the same call (UIUX OD-8) | 2 days | G5 (§9.2) |
+| **P5** | PDF generation by section, streamed, with tags in the same call (UIUX OD-8) **Code done 2026-10-23** (§9.3) | 2 days | G5 (§9.2) |
 
 About **8.75–11.25 days** (P0's code is already done), plus the 2.5 UIUX days P2 may absorb. Order: **P0 → P1 → P2 → P3 → P4 → P5**. P2 and P4 don't depend on P1 and can run in parallel with it.
 
@@ -148,7 +148,7 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 | **AI-12** | S2 | Search | `CommandPalette.tsx:130–150`, `chat.ts:286–340` | Card search is semantic only: an Auth check, a reservation, the query embedding, then the vector search, in sequence, as a Server Action, so it can't be cancelled and queues behind PERF-10. There is no lexical search, so finding a term you know still costs a model call and sees only embedded cards. | code | §7.3 ✓ P3 |
 | **AI-15** | S2 | Study | `study.ts:50–53`, `:81–96`; `mnemonic.ts:53–75` | A mnemonic is written for every first lapse: 38% of recent model calls, though 37 of 42 lapsed cards never lapsed again. It runs in the background, but on the same per-minute quota as chat and generation. | measured (prod) + code | §4.0 ✓ P0 (removed) |
 | **AI-16** | S2 | Observability | `_shared.ts:143–168` | No durable per-call record of latency, outcome, tokens or finish reason: with a reservation, completion is a console line. `ai_usage_logs` is deliberately immutable (`202609050900_immutable_table_deny_policies.sql:81–91`), so it can't be updated in place either. | code | §4.2 ✓ P0 |
-| **AI-18** | S2 | Generation | `ai-generate.ts:54–67`, `:339–360`; `PDFUploadZone.tsx:116–165` | PDF generation is all-or-nothing from the user's view: no card shows until every wave finishes or the 48 s budget runs out, and the generated cards need a second model call (enrichment) for tags and quiz data. | code | §9 |
+| **AI-18** | S2 | Generation | `ai-generate.ts:54–67`, `:339–360`; `PDFUploadZone.tsx:116–165` | PDF generation is all-or-nothing from the user's view: no card shows until every wave finishes or the 48 s budget runs out, and the generated cards need a second model call (enrichment) for tags and quiz data. | code | §9 ✓ P5 |
 | **PERF-11** | S2 | Server | `study.ts:103`; `next/dist/server/web/spec-extension/revalidate.js:199–203`; `next/dist/server/app-render/action-handler.js:806–826` | Any `revalidatePath` inside a Server Action makes Next render the *current* page into the action's response, whatever path it names. Next's own comment: `// TODO: only revalidate if the path matches`. `gradeCard` revalidates the deck path on every grade, so every grade re-renders the study page (deck, count, capstone candidates, two card reads, settings): ≈ 6 Supabase reads on top of the grade's own 2. The UI doesn't wait, because grades are queued (`FlashcardReviewClient.tsx:199–208`), but the queue drains slower and the session end waits for it. Every dashboard page is dynamic, so the call only purges a 30 s client cache (`next.config.ts` `staleTimes`) that a study session has long outlived. | measured (source) + code | §4.3 ✓ P0 |
 | **PERF-12** | S2 | Quiz runtime | `QuizAssessmentClient.tsx:172–186`, `:190–229` | A 250 ms interval sets `sessionDurationMs`, re-rendering the whole ≈ 1,000-line client four times a second. The persistence effect depends on it, so every session card and result is `JSON.stringify`'d and written synchronously to `sessionStorage` 4 times a second: ≈ 2,400 writes in a 10-minute quiz. Study does the same once a second (UIUX PERF-07). | code | §6.1 ✓ P2 |
 | **AI-14** | S3 | Embeddings | `chat.ts:55` vs `:59–80` | `syncEmbeddings` reserves an AI call before counting pending cards, so a sync with nothing to do still spends a reservation (against the hourly and 24 h limits) and four round-trips. | code | §4.4 ✓ P0 |
@@ -166,7 +166,7 @@ Non-empty decks hold 7, 10, 10, 12, 15, 15, 33, 35, 38, 40, 48 and 124 cards; fo
 | **PERF-07** (S3) | UIUX §5.1 | The study clock (`:220–230`) still drives a full re-render and the `sessionStorage` write (`:564–589`) every second. | **Done in P2** (§6.4); the REF-01 split stays in UIUX |
 | **PERF-08** (S3) | UIUX §6.6 | No `loading.tsx` under `src/app/s/[token]/` or `src/app/explore/`. | UIUX U3 |
 | **PERF-09** (S2) | UIUX §8 | No real-user metrics. Needed to confirm P2 and P4 in the field. | After P3 (§3.2) |
-| **FLOW-06** | UIUX §6.4 | Item 1 (move PDF enrichment into `after()`) is superseded by §5.3; items 2–4 (an honest counter, `beforeunload`, no infinite animation) stand and move to P5. | P5 |
+| **FLOW-06** | UIUX §6.4 | Item 1 (move PDF enrichment into `after()`) is superseded by §5.3; items 2–4 (an honest counter, `beforeunload`, no infinite animation) stand and move to P5. | P5 ✓ |
 
 ### 2.2 Verified good: don't break these
 
@@ -624,6 +624,49 @@ $$;
 - Cancel stops further reservations.
 - PDF cards have tags without an `enrich_cards` reservation.
 
+### 9.3 Execution notes (2026-10-23)
+
+**What changed from §9.1, and why.**
+- **Cards stream from inside each call, not only per section.** All 14 production PDF runs in the last 30 days were one section, so streaming per section alone would have shown nothing sooner. The model's JSON is streamed (`streamJson` in `gemini.ts`, measured: objects arrive progressively, the first card ~1.8 s after the call starts) and each card object is parsed the moment it closes (`src/lib/json-array-stream.ts`).
+- **Distractors come in the same call as tags.** OD-7 kept AI distractors, so with tags alone the background job would still reserve `enrich_cards` for every PDF card and G5 could not hold. The generation schema now asks for `topic_tags` (2–4) and `mcq_distractors` (3), with the same distractor rules as the background job (`DISTRACTOR_PROMPT_RULES` in `distractors.ts`). Cost: ~150 output tokens a card instead of ~65, so a section takes longer to finish, but its first card does not, and no second call follows. `maxOutputTokens` is 8,192 for this call (30 cards no longer fit the default 4,096).
+- **Each card is saved, then sent.** One insert per card, in order, before its `card` frame, so every card on screen is in the deck. A closed tab or a cancel keeps everything shown, not just finished sections.
+- **One reservation per wave of three sections**, not one per upload or per section. The per-action window counts rows, so a 12-section PDF is 4 rows; cancelling stops at the current wave.
+- **Choosing per card replaces ranking the whole pool** (`createCardPicker` in `card-generation.ts`). A card is taken at once when the request has room, its section is under its share (`sectionCap`, so a long PDF is covered past its opening), and it scores at least 8; anything else is held, and held cards fill whatever room is left when every section has answered (difficulty-balanced, as before). Once the request has its cards, the open streams are cut, so the 1.4× over-ask costs nothing when the model's cards are good.
+  - **Risk:** within a section, arrival order now beats score among cards above the floor. Watch the first real uploads; raising `STREAM_ACCEPT_MIN_SCORE` holds more back.
+- **New cards skip terms the deck already has.** The deck's terms seed the duplicate check, which also keeps a continuation from repeating the first request. A second upload of the same PDF now adds only new terms.
+- **Continuation re-sends the file.** A request that runs out of its 50 s budget ends with `more` (`nextOffset`, `remaining`), and the browser posts the same file again from that section. A section cut off by the deadline keeps the cards it gave (or counts as failed with none) and is not re-read, so every request moves forward and a hanging section can't loop.
+
+**What was built.**
+- `POST /api/generate` (`src/app/api/generate/route.ts`), SSE: `start`, `card`, `section`, `more`, `done`, `error`. Outside the proxy's matcher, so the upload body is no longer buffered by the proxy. It calls `ensureSessionHeadroom()` before streaming (a token refresh can't reach the cookies once the response has started), records each wave with `ttft_ms` = time to its first card, and schedules the embeddings fill with `after()`.
+- PDF reading and the prompt moved to `src/lib/pdf-generation.ts`. `src/app/actions/ai-generate.ts` and its test are deleted. Its deadline tests moved to `route.test.ts` (13 tests).
+- `src/lib/sse-parsing.ts` now holds the frame helpers chat and generation share (`formatSseFrame`, `takeCompleteFrames`, `parseFrame`, `readSseStream`).
+- **The upload (FLOW-06 items 2–4).**
+  - `usePdfGeneration` drives the stream and continuations.
+  - `PDFUploadZone` shows cards as they arrive, an elapsed counter (`ElapsedTelemetry`, aria-hidden), the count saved and the section, and a **Stop** button.
+  - The live region speaks only the phase ("Reading your PDF", "Writing cards", "Stopping").
+  - `beforeunload` is on while it runs. In-app navigation does not abort the run; its toast still shows.
+  - The looping bar is gone. It calls `router.refresh()` at the end, since a route handler can't purge the router cache as a Server Action's `revalidatePath` did.
+- **Alongside.**
+  - Chat reserved 2 calls a turn for follow-ups that P0 removed; now 1.
+  - `serverActions.bodySizeLimit` drops from 12 MB to 4 MB (the largest Server Action body is now a 200-card bulk import), and `proxyClientMaxBodySize` is gone.
+
+**Gate G5.**
+
+| Check | Result |
+|---|---|
+| First cards within one section's latency | ✓ Live gate (`npm run ai:pdf`, real model, database stubbed): one-section handout, first card at 3.1 s, section done at 5.0 s (8 cards); three-section lecture, first card at 4.0 s, done at 21.2 s (12 cards). In production, compare `ai_call_outcomes.ttft_ms` with `ms` for `generate_cards` (B.2). |
+| Cancel stops further reservations | ✓ `route.test.ts`: a cancel after the first card leaves one reservation and no calls for sections 4–6. In Chrome against a stand-in route: Stop after two cards kept both, toasted "Stopped. 2 cards saved.", and sent nothing more. |
+| PDF cards have tags without an `enrich_cards` reservation | ✓ in tests: every inserted card carries its tags and three distractors, so the background job finds nothing to enrich. In production, after deploy: `select count(*) filter (where topic_tags is null or mcq_distractors is null), count(*) from cards where source = 'ai_pdf' and created_at > '<deploy time>';` and no `enrich_cards` row with `metadata->>'trigger' = 'pdf_generate'` after it. |
+
+- **Live-gate caveat.** Both runs saw `fetch failed` on some calls (connect failures, ~10 s each attempt), on this machine's connection to the API; a standalone probe also connected slowly at the time. Those sections were reported as failed and the rest kept, which is the intended behaviour; production runs from `bom1`.
+- **Browser run** (production build of a scratch clone, a stand-in `/api/generate` streaming on the same wire protocol): the phase read "Reading your PDF" then "Writing cards"; the counter ticked; `beforeunload` was guarded during the run and released after; no infinite animations; the second request continued from section 1 with the remaining count (7 of 10); six cards and the "stopped early" toast at the end; no page errors. `after()` registered mid-stream was confirmed to run under `next start`.
+- **Bundle:** all routes within budget (deck 238.3 kB of 242).
+- **Suite:** 682 tests in 77 files; `tsc` and lint clean.
+
+**Open.**
+- **Vercel's request body limit (4.5 MB) is below the app's 10 MB.** If it applies, a larger PDF is refused before the route runs. That was equally true of the Server Action, but one production log row shows a 5.4 MB upload on 2026-09-01, origin unknown. The browser now explains a 413. Verify with a 6 MB PDF on production; the fix, if needed, is uploading to Storage first.
+- **Signed-in end-to-end on production** needs the test account (OD-4).
+
 ---
 
 ## 10. Owner decisions
@@ -636,7 +679,7 @@ $$;
 | **OD-4** | A test account | Add `LOAD_TEST_EMAIL` and `LOAD_TEST_PASSWORD` to `.env.local` | **Yes.** Every signed-in gate (V1) needs it; it's the same ask as UIUX. |
 | **OD-5** | Region | Stay in Mumbai · move Supabase and Vercel to Singapore | **Stay.** A region move means a new Supabase project and a data migration; revisit with real-user data (PERF-09). |
 | **OD-6** | The 342 cards that already have AI distractors | Keep them · recompute every card from the deck | **Keep.** They're already paid for, and the gate (B.6) compares against them. |
-| **OD-7** | AI distractors in the background job | Keep (`AI_DISTRACTORS = true`) · deck options only | **Keep**, unless the owner's own B.6 review finds the deck sets lose on ≤ 10 of 30 (§5.6). Turning it off saves roughly 10–15 calls a month at current use. |
+| **OD-7** | AI distractors in the background job | Keep (`AI_DISTRACTORS = true`) · deck options only | **Keep**, unless the owner's own B.6 review finds the deck sets lose on ≤ 10 of 30 (§5.6). Turning it off saves roughly 10–15 calls a month at current use. Since P5, PDF cards get theirs from the generation call itself (§9.3); the flag governs only the background job. |
 
 ## 11. Out of scope
 
