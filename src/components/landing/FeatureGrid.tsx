@@ -19,7 +19,7 @@ const features = [
     stat: 'PDF',
     title: 'Import anything',
     description:
-      'Upload a document and Cognit extracts the study material. PDFs, markdown and plain text.',
+      'Upload a PDF and Cognit writes cards from its text. Paste plain-text notes to import them as cards.',
   },
   {
     stat: 'AI',

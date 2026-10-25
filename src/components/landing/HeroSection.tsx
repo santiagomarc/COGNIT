@@ -111,7 +111,7 @@ export function HeroSection() {
 
           <FadeInUp delay={0.12}>
             <p className="mx-auto mt-8 max-w-xl font-mono text-[15px] leading-relaxed text-slate-100">
-              Turn dense documents into high-yield flashcards in 30 seconds. Let the SM-2 algorithm engineer your retention.
+              Turn a PDF into flashcards, then let SM-2 schedule every review.
             </p>
           </FadeInUp>
 
@@ -141,7 +141,7 @@ export function HeroSection() {
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
             <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
               <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                cognit.app/dashboard
+                Today
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
                 Search <Kbd>⌘K</Kbd>

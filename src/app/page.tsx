@@ -1,6 +1,5 @@
 import { HeroSection } from '@/components/landing/HeroSection';
 import { HowItWorks } from '@/components/landing/HowItWorks';
-import { SocialProof } from '@/components/landing/SocialProof';
 import { FeatureGrid } from '@/components/landing/FeatureGrid';
 import { Footer } from '@/components/landing/Footer';
 import { LandingBackground } from '@/components/landing/LandingBackground';
@@ -16,9 +15,6 @@ export default async function HomePage() {
       {/* Below-the-fold sections: skip paint/layout until near viewport (CWV improvement) */}
       <section className="cv-auto">
         <HowItWorks />
-      </section>
-      <section className="cv-auto">
-        <SocialProof />
       </section>
       <section id="features" className="cv-auto">
         <FeatureGrid />

@@ -7,7 +7,7 @@ const steps = [
     number: '01',
     title: 'Upload or type your material',
     description:
-      'Drop a PDF, paste your notes, or type questions manually. Cognit handles any format so you can start studying in seconds.',
+      'Upload a PDF, paste notes as Term – Definition, or write cards yourself.',
   },
   {
     number: '02',
