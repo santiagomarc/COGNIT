@@ -45,6 +45,7 @@ export async function generateMetadata({ params }: SharedDeckPageProps): Promise
       title: `${title} — a Cognit deck`,
       description: deck.description ?? 'Free flashcards with spaced repetition and AI quizzes.',
       type: 'article',
+      images: [{ url: '/opengraph-image', width: 1200, height: 630 }],
     },
     // Shared decks are user content. Keep them out of search indexes.
     robots: { index: false, follow: false },

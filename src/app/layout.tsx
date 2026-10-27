@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { MotionProvider } from "@/components/MotionProvider";
 import { Toaster } from "sonner";
 import { THEME_BOOTSTRAP } from "@/lib/theme-script";
+import { SITE_URL } from "@/lib/site-url";
 import "./globals.css";
 
 /*
@@ -33,6 +34,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Cognit - The Universal Active Recall Engine",
   description: "AI-powered study platform that transforms any source material into interactive flashcards with smart grading.",
   keywords: ["flashcards", "spaced repetition", "AI flashcards", "study", "active recall", "PDF to flashcards"],
@@ -41,23 +43,15 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://cognit.app",
+    url: "/",
     title: "Cognit - The Universal Active Recall Engine",
     description: "AI-powered study platform that transforms any source material into interactive flashcards with smart grading.",
     siteName: "Cognit",
-    images: [{
-      url: "https://cognit.app/og-image.png",
-      width: 1200,
-      height: 630,
-      alt: "Cognit Dashboard Preview",
-    }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Cognit - The Universal Active Recall Engine",
     description: "AI-powered study platform that transforms any source material into interactive flashcards with smart grading.",
-    images: ["https://cognit.app/og-image.png"],
-    creator: "@cognit",
   },
   icons: {
     icon: "/icon.svg",

@@ -1,15 +1,16 @@
 import { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/site-url';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      url: 'https://cognit.app',
+      url: SITE_URL,
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 1,
     },
     {
-      url: 'https://cognit.app/login',
+      url: `${SITE_URL}/login`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.8,
