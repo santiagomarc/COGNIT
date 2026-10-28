@@ -3,6 +3,9 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/lib/database.types';
 import { publicEnv } from '@/lib/env-public';
+import { getSessionUser } from '@/lib/supabase/session';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { Wordmark } from '@/components/ui/shared/Wordmark';
 
 const PAGE_SIZE = 24;
 const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
@@ -33,15 +36,31 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
   const { q, page } = await searchParams;
   const query = q?.trim().slice(0, 80) ?? '';
   const pageIndex = Math.max(0, Number.parseInt(page ?? '0', 10) || 0);
-  const { data, error } = await directoryClient().rpc('list_public_decks', {
-    ...(query ? { p_query: query } : {}),
-    p_limit: PAGE_SIZE,
-    p_offset: pageIndex * PAGE_SIZE,
-  });
+  const [user, { data, error }] = await Promise.all([
+    getSessionUser(),
+    directoryClient().rpc('list_public_decks', {
+      ...(query ? { p_query: query } : {}),
+      p_limit: PAGE_SIZE,
+      p_offset: pageIndex * PAGE_SIZE,
+    }),
+  ]);
   const decks = error ? [] : data ?? [];
 
   return (
     <main id="main-content" className="container mx-auto flex max-w-3xl flex-col gap-4 p-4 md:py-10">
+      <div className="flex items-center justify-between gap-4">
+        <Wordmark href="/" size="sm" />
+        <div className="flex items-center gap-4">
+          <Link
+            href={user ? '/dashboard' : '/login?mode=login'}
+            className="rounded-[var(--radius-control)] text-sm text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          >
+            {user ? 'Your decks' : 'Sign in'}
+          </Link>
+          <ThemeToggle />
+        </div>
+      </div>
+      <div className="h-px w-full bg-border" />
       <header>
         <p className={LABEL}>Directory</p>
         <h1 className="mt-1 font-serif type-display leading-[1.08] tracking-[-0.02em] text-ink">Explore decks</h1>
@@ -57,7 +76,11 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         />
       </form>
       {decks.length === 0 ? (
-        <p className="surface p-5 text-sm text-ink-dim">{error ? 'The directory is unavailable right now.' : 'No listed decks match.'}</p>
+        <p className="surface p-5 text-sm text-ink-dim">{error
+            ? 'The directory is unavailable right now.'
+            : query
+              ? `No listed deck matches “${query}”.`
+              : 'No decks are listed yet.'}</p>
       ) : (
         <ul className="well overflow-hidden px-3.5">
           {decks.map((deck) => (
