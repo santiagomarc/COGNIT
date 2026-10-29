@@ -782,22 +782,27 @@ export function FlashcardReviewClient({
       <div className="flex flex-1 flex-col" inert={isPaused && !completed}>
         {/* Part 1: Session telemetry header (§7.9) */}
         <header className="flex-none p-4 md:px-8 md:pt-6 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          {/* Below `sm` the header is one row: 44px icon buttons either side of
+              the card count and clock. Deck and ease are reference, not
+              controls, so they wait for the room (and the deck is named in the
+              pause overlay). */}
+          <div className="flex items-center justify-between gap-x-4 gap-y-3 sm:flex-wrap">
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={saveAndExit}
-              className="gap-2 px-2"
+              aria-label={pendingGrades > 0 ? 'Saving' : 'Save and exit'}
+              className="h-11 min-w-11 gap-2 px-2 sm:h-8 sm:min-w-0"
             >
               <ArrowLeft className="h-4 w-4" />
-              {pendingGrades > 0 ? 'Saving…' : 'Save & exit'}
+              <span className="hidden sm:inline">{pendingGrades > 0 ? 'Saving…' : 'Save & exit'}</span>
             </Button>
 
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className="flex items-center gap-x-4 sm:flex-wrap sm:gap-x-6 sm:gap-y-2">
               {/* The deck name is prose, so it stays in the sans face — mono is
                   for the numbers a user reads as data (§3.2). */}
-              <div className="flex items-baseline gap-2">
+              <div className="hidden items-baseline gap-2 sm:flex">
                 <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
                   Deck
                 </span>
@@ -810,7 +815,7 @@ export function FlashcardReviewClient({
                 label="Card"
                 value={`${Math.min(index + 1, sessionCards.length)}/${sessionCards.length}`}
               />
-              <Telemetry label="Ease" value={active ? active.ease_factor.toFixed(2) : '—'} />
+              <Telemetry label="Ease" value={active ? active.ease_factor.toFixed(2) : '—'} className="hidden sm:flex" />
               <ElapsedTelemetry key={`${clockRunning ? 'run' : 'stop'}:${sessionDuration}`} baseMs={sessionDuration} running={clockRunning} />
 
               {/* The keycap is bound to the control it triggers, never listed
@@ -822,10 +827,11 @@ export function FlashcardReviewClient({
                   size="sm"
                   onClick={togglePause}
                   aria-pressed={isPaused}
-                  className="gap-2 px-2"
+                  aria-label={isPaused ? 'Resume' : 'Pause'}
+                  className="h-11 min-w-11 gap-2 px-2 sm:h-8 sm:min-w-0"
                 >
                   {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-                  {isPaused ? 'Resume' : 'Pause'}
+                  <span className="hidden sm:inline">{isPaused ? 'Resume' : 'Pause'}</span>
                   <Kbd>P</Kbd>
                 </Button>
               ) : null}
@@ -1064,6 +1070,7 @@ export function FlashcardReviewClient({
                 Session paused
               </p>
               <h2 className="mt-3 text-xl font-semibold tracking-[-.025em]">Timer is on hold</h2>
+              <p className="mt-1 truncate text-[13px] text-ink-dim">{deckTitle}</p>
               <p className="mt-2 text-sm text-ink-dim">
                 Your place in the deck is kept. Paused time is not counted toward the session.
               </p>
