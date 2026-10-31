@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatInterval, projectedInterval } from './grade-interval';
+import { formatInterval, projectedInterval, spokenInterval } from './grade-interval';
 import { defaultSM2, type SM2Input } from './sm2';
 
 function buildCard(overrides: Partial<SM2Input> = {}): SM2Input {
@@ -70,5 +70,21 @@ describe('projectedInterval', () => {
     const shown = (['again', 'hard', 'good', 'easy'] as const).map((g) => projectedInterval(g, card));
 
     expect(new Set(shown).size).toBe(4);
+  });
+});
+
+describe('spokenInterval', () => {
+  it('spells out every unit and pluralises', () => {
+    expect(spokenInterval('1m')).toBe('1 minute');
+    expect(spokenInterval('10m')).toBe('10 minutes');
+    expect(spokenInterval('3h')).toBe('3 hours');
+    expect(spokenInterval('1d')).toBe('1 day');
+    expect(spokenInterval('4d')).toBe('4 days');
+    expect(spokenInterval('2mo')).toBe('2 months');
+    expect(spokenInterval('1y')).toBe('1 year');
+  });
+
+  it('passes through anything it does not recognise', () => {
+    expect(spokenInterval('soon')).toBe('soon');
   });
 });

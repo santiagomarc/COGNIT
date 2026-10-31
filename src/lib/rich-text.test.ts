@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasBalancedMath, hasRichText, parseRichText } from './rich-text';
+import { hasBalancedMath, hasRichText, parseRichText, plainText } from './rich-text';
 
 describe('parseRichText', () => {
   it('leaves prices alone', () => {
@@ -63,5 +63,16 @@ describe('hasBalancedMath', () => {
 
   it('rejects a stray delimiter the renderer would print raw', () => {
     expect(hasBalancedMath('$E=mc^2 is famous')).toBe(false);
+  });
+});
+
+describe('plainText', () => {
+  it('reads math and code as their contents', () => {
+    expect(plainText('The area is $\\pi r^2$ for `r` in metres')).toBe('The area is \\pi r^2 for r in metres');
+  });
+
+  it('leaves prices and plain text alone', () => {
+    expect(plainText('It costs $5 and $10')).toBe('It costs $5 and $10');
+    expect(plainText('Mitochondria')).toBe('Mitochondria');
   });
 });

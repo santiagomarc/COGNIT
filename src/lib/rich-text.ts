@@ -69,3 +69,13 @@ export function hasBalancedMath(text: string): boolean {
     .replace(/\$(?=\d)/g, '');
   return !stripped.includes('$');
 }
+
+/** The card text as a screen reader should hear it: delimiters dropped, math and code read as their contents. */
+export function plainText(text: string): string {
+  if (!hasRichText(text)) return text;
+  return parseRichText(text)
+    .map((segment) => segment.value)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

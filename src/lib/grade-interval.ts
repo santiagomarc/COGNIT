@@ -37,3 +37,20 @@ export function projectedInterval(
   const result = sm2(GRADE_MAP[grade], card);
   return formatInterval(result.interval, result.nextReviewAt, now);
 }
+
+const SPOKEN_UNITS: Record<string, [string, string]> = {
+  m: ['minute', 'minutes'],
+  h: ['hour', 'hours'],
+  d: ['day', 'days'],
+  mo: ['month', 'months'],
+  y: ['year', 'years'],
+};
+
+/** `4d` → "4 days", `1m` → "1 minute": the `formatInterval` string, spelled out for a live region. */
+export function spokenInterval(short: string): string {
+  const match = /^(\d+)(m|h|d|mo|y)$/.exec(short);
+  if (!match) return short;
+  const count = Number(match[1]);
+  const [one, many] = SPOKEN_UNITS[match[2]];
+  return `${count} ${count === 1 ? one : many}`;
+}

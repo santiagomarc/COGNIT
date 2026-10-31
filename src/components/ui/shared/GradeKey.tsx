@@ -21,7 +21,7 @@ const GRADE_STATE: Record<StudyGrade, string> = {
   easy: 'var(--state-neutral)',
 };
 
-const GRADE_LABEL: Record<StudyGrade, string> = {
+export const GRADE_LABEL: Record<StudyGrade, string> = {
   again: 'Again',
   hard: 'Hard',
   good: 'Good',

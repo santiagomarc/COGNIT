@@ -9,12 +9,14 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/Kbd';
 import { FlipCard, type FlipState } from '@/components/ui/shared/FlipCard';
-import { GradeKey } from '@/components/ui/shared/GradeKey';
+import { GRADE_LABEL, GradeKey } from '@/components/ui/shared/GradeKey';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { StudyCapstoneOffer, type CapstoneOffer } from '@/components/ui/shared/synthesis/StudyCapstoneOffer';
 import { gradeCard, finishStudySession } from '@/app/actions/study';
 import { cardLeaveSpring, EASE_OUT, motionTransitions } from '@/lib/motion-configs';
 import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
+import { projectedInterval, spokenInterval } from '@/lib/grade-interval';
+import { plainText } from '@/lib/rich-text';
 import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { studyLength } from '@/lib/study-type';
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
@@ -204,6 +206,11 @@ export function FlashcardReviewClient({
   // gradeCard already returns nextReviewAt/interval; the client used to discard
   // them, so the summary never said when the work actually pays off.
   const [scheduledReviews, setScheduledReviews] = useState<string[]>([]);
+
+  // What the last grade did, spoken once with the next card (A11Y-13). Keyed
+  // by the card it precedes, so it can never replay on another card.
+  const [gradeNote, setGradeNote] = useState<{ forIndex: number; text: string } | null>(null);
+  const cardRef = useRef<HTMLButtonElement>(null);
 
   const cardStart = useRef(sessionStartMs);
   const commitTimerRef = useRef<number | null>(null);
@@ -396,6 +403,18 @@ export function FlashcardReviewClient({
       const reviewedCardsCount = Math.max(previousIndex + 1, 1);
       const averageMsPerCard = Math.max(MIN_ASSUMED_MS_PER_CARD, elapsedSessionMs / reviewedCardsCount);
       const nextCards = insertRequeueCard(previousCards, previousIndex, active, grade, averageMsPerCard);
+
+      setGradeNote({
+        forIndex: previousIndex + 1,
+        text: `Graded ${GRADE_LABEL[grade]}. Next review in ${spokenInterval(
+          projectedInterval(grade, {
+            repetitionCount: active.repetition_count ?? 0,
+            easeFactor: active.ease_factor ?? DEFAULT_EASE_FACTOR,
+            interval: active.interval ?? 0,
+            state: active.state ?? 'new',
+          })
+        )}.`,
+      });
 
       // Optimistically advance to the next card; the write happens in the outbox.
       setSessionCards(nextCards);
@@ -693,6 +712,33 @@ export function FlashcardReviewClient({
       ? 'flipping'
       : 'default';
 
+  /**
+   * The live region says what a sighted user sees: the position and the
+   * question, then the answer on reveal, and what a grade just did (A11Y-13).
+   * `aria-atomic` makes each change one announcement.
+   */
+  const announcement = (() => {
+    if (completed) return `Flashcard review complete. ${effectiveAttemptCount} reviews completed.`;
+    if (!active) return '';
+    const question = plainText(active.id_question ?? active.back);
+    if (showAnswer && !peeking) return `Answer: ${plainText(active.front)}`;
+    if (peeking) return `Question: ${question}`;
+    const note = gradeNote?.forIndex === index ? `${gradeNote.text} ` : '';
+    return `${note}Card ${index + 1} of ${sessionCards.length}. Question: ${question}`;
+  })();
+
+  // After a grade the old card is gone and the grade key that had focus is
+  // inert, so focus would fall to <body>. Put it on the new card, where the
+  // live region has just read the question. Only when focus was lost: a user
+  // who tabbed somewhere else keeps it.
+  useEffect(() => {
+    if (index === 0 || completed) return;
+    const focused = document.activeElement;
+    if (!focused || focused === document.body || focused.closest('.grade-band')) {
+      cardRef.current?.focus({ preventScroll: true });
+    }
+  }, [index, completed]);
+
   function handleCardActivate() {
     if (isPaused) return;
 
@@ -850,9 +896,7 @@ export function FlashcardReviewClient({
         </header>
 
         <div className="sr-only" aria-live="polite" aria-atomic="true">
-          {completed
-            ? `Flashcard review complete. ${effectiveAttemptCount} reviews completed.`
-            : `Card ${index + 1} of ${sessionCards.length}.`}
+          {announcement}
         </div>
 
         {/* Part 2: Centered stage (§5 Task 3.2) */}
@@ -981,12 +1025,13 @@ export function FlashcardReviewClient({
                       promptLength={studyLength(active.id_question ?? active.back)}
                       answerLength={studyLength(active.front)}
                       onReveal={handleCardActivate}
-                      ariaLabel={
+                      cardRef={cardRef}
+                      hint={
                         showAnswer
                           ? peeking
-                            ? 'Showing the question again. Press to return to the answer.'
-                            : 'Showing the answer. Grade it with keys 1 to 4.'
-                          : 'Showing the question. Press to reveal the answer.'
+                            ? 'Press to return to the answer.'
+                            : 'Grade with keys 1 to 4.'
+                          : 'Press Space to show the answer.'
                       }
                     />
                   </m.div>

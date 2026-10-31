@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode, type Ref } from 'react';
 
 import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import type { StudyGrade } from '@/lib/sm2';
@@ -40,7 +40,14 @@ type FlipCardProps = {
   grade?: StudyGrade;
   /** Omit to render an inert card: the element becomes an `<article>`. */
   onReveal?: () => void;
-  ariaLabel?: string;
+  /**
+   * What the button does, as a description. The card's own text is its
+   * accessible name, so this must not replace it (A11Y-13): an `aria-label`
+   * here hid the question and the answer from screen readers entirely.
+   */
+  hint?: string;
+  /** The interactive card, so focus can follow the user to the next one. */
+  cardRef?: Ref<HTMLButtonElement>;
   className?: string;
 };
 
@@ -99,9 +106,11 @@ export function FlipCard({
   state,
   grade,
   onReveal,
-  ariaLabel,
+  hint,
+  cardRef,
   className,
 }: FlipCardProps) {
+  const hintId = useId();
   const showingAnswer = state !== 'default';
 
   const faces = (
@@ -131,16 +140,24 @@ export function FlipCard({
 
   if (onReveal) {
     return (
-      <button
-        type="button"
-        onClick={onReveal}
-        data-state={state}
-        data-grade={grade}
-        aria-label={ariaLabel}
-        className={cn('flip', className)}
-      >
-        {faces}
-      </button>
+      <>
+        <button
+          ref={cardRef}
+          type="button"
+          onClick={onReveal}
+          data-state={state}
+          data-grade={grade}
+          aria-describedby={hint ? hintId : undefined}
+          className={cn('flip', className)}
+        >
+          {faces}
+        </button>
+        {hint ? (
+          <span id={hintId} className="sr-only">
+            {hint}
+          </span>
+        ) : null}
+      </>
     );
   }
 
@@ -148,7 +165,6 @@ export function FlipCard({
     <article
       data-state={state}
       data-grade={grade}
-      aria-label={ariaLabel}
       className={cn('flip', className)}
     >
       {faces}
