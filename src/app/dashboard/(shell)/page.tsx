@@ -392,8 +392,11 @@ export default async function Dashboard() {
   // With nothing due, prefer the deck holding the most unseen cards over the
   // most recently touched one: that is where studying ahead does the most.
   const mostNewDeck = [...dueByDeckRows].sort((a, b) => b.new_count - a.new_count)[0];
+  // Say what the button starts (UIUX plan §5.5): one deck, one chunk of it.
+  // `chunk` is the account's cards-per-session; the band names the deck.
+  const chunk = (await settingsPromise).sessionCardCount;
   const sessionHref = deckBreakdown[0]
-    ? `/dashboard/${deckBreakdown[0].deckId}/study`
+    ? `/dashboard/${deckBreakdown[0].deckId}/study?scope=due&count=${chunk}`
     : mostNewDeck && mostNewDeck.new_count > 0 && knownDeckIds.has(mostNewDeck.deck_id)
       ? `/dashboard/${mostNewDeck.deck_id}/study?scope=include_reviewed`
       : mostRecentDeck
@@ -449,6 +452,7 @@ export default async function Dashboard() {
                 oldestOverdueDays={overdueDays}
                 estimatedMinutes={estimatedMinutes}
                 sessionHref={sessionHref}
+                chunkSize={chunk}
                 forecastDays={forecastDays}
                 dueDrills={dueDrillsReading}
               />

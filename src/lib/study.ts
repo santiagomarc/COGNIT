@@ -177,3 +177,50 @@ export function summariseNextReviews(timestamps: string[], now = Date.now()): st
     .map(([days, count]) => `${count} card${count === 1 ? '' : 's'} ${label(days)}`)
     .join(' · ');
 }
+
+export type StudyContinuation = {
+  hereDue: number;
+  next: { deckId: string; title: string; dueCount: number } | null;
+};
+
+export type SummaryAction = { label: string; href: string };
+
+/**
+ * The session summary's next step (UIUX plan §5.5): exactly one primary, and
+ * never a dead end while cards are due.
+ *
+ * `round` only makes the URL new. `staleTimes.dynamic` is 30 s, so pushing the
+ * same URL again would replay the cached payload — the cards just graded.
+ */
+export function summaryActions(
+  deckId: string,
+  continuation: StudyContinuation,
+  chunk: number,
+  round: string,
+): { primary: SummaryAction; secondary: SummaryAction } {
+  const dueSession = (id: string) => `/dashboard/${id}/study?scope=due&count=${chunk}&round=${round}`;
+
+  if (continuation.hereDue > 0) {
+    const nextCount = Math.min(chunk, continuation.hereDue);
+    const left = continuation.hereDue - nextCount;
+    return {
+      primary: {
+        label: left > 0 ? `Keep going · next ${nextCount} (${left} left here)` : `Keep going · last ${nextCount}`,
+        href: dueSession(deckId),
+      },
+      secondary: { label: 'Back to deck', href: `/dashboard/${deckId}` },
+    };
+  }
+
+  if (continuation.next) {
+    return {
+      primary: { label: `Next: ${continuation.next.title} · ${continuation.next.dueCount} due`, href: dueSession(continuation.next.deckId) },
+      secondary: { label: 'Back to Today', href: '/dashboard' },
+    };
+  }
+
+  return {
+    primary: { label: 'Back to Today', href: '/dashboard' },
+    secondary: { label: 'Study ahead', href: `/dashboard/${deckId}/study?scope=include_reviewed` },
+  };
+}

@@ -22,6 +22,8 @@ type DueNowBandProps = {
   estimatedMinutes: number;
   /** Where "start session" goes. Null when the account has no decks at all. */
   sessionHref: string | null;
+  /** Cards per session: the chunk "Start session" opens, and what its sub-copy names. */
+  chunkSize: number;
   /** The seven days after today. See `buildSevenDayForecast`. */
   forecastDays: ForecastDay[];
   /**
@@ -56,6 +58,7 @@ export function DueNowBand({
   oldestOverdueDays,
   estimatedMinutes,
   sessionHref,
+  chunkSize,
   forecastDays,
   dueDrills,
 }: DueNowBandProps) {
@@ -175,12 +178,21 @@ export function DueNowBand({
 
         {/* The dashboard's one filled button (§7.2). */}
         {sessionHref ? (
-          <Button asChild variant="primary" size="lg" className="shrink-0 gap-2 max-sm:w-full">
-            <Link href={sessionHref}>
-              {hasWork ? 'Start session' : 'Study ahead'}
-              <Kbd>S</Kbd>
-            </Link>
-          </Button>
+          <div className="flex shrink-0 flex-col gap-1.5 max-sm:w-full sm:items-end">
+            <Button asChild variant="primary" size="lg" className="gap-2 max-sm:w-full">
+              <Link href={sessionHref}>
+                {hasWork ? 'Start session' : 'Study ahead'}
+                <Kbd>S</Kbd>
+              </Link>
+            </Button>
+            {hasWork && dueDecks[0] ? (
+              <p className="max-w-[16rem] truncate text-[13px] text-ink-dim sm:text-right">
+                Starts with <span className="text-ink">{dueDecks[0].deckTitle}</span> ·{' '}
+                <span className="font-mono tnum text-ink">{Math.min(chunkSize, dueDecks[0].dueCount)}</span> of{' '}
+                <span className="font-mono tnum text-ink">{dueDecks[0].dueCount}</span>
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </div>
 
@@ -246,7 +258,7 @@ export function DueNowBand({
                   {named.map((deck) => (
                     <li key={deck.deckId}>
                       <Link
-                        href={`/dashboard/${deck.deckId}/study`}
+                        href={`/dashboard/${deck.deckId}/study?scope=due&count=${chunkSize}`}
                         className="group flex items-baseline gap-3 rounded-[var(--radius-sm)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                       >
                         <span className="min-w-0 flex-1 truncate text-[13px] text-ink-dim group-hover:text-ink">

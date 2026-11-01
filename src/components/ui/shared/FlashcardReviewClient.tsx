@@ -12,12 +12,12 @@ import { FlipCard, type FlipState } from '@/components/ui/shared/FlipCard';
 import { GRADE_LABEL, GradeKey } from '@/components/ui/shared/GradeKey';
 import { Telemetry } from '@/components/ui/shared/Telemetry';
 import { StudyCapstoneOffer, type CapstoneOffer } from '@/components/ui/shared/synthesis/StudyCapstoneOffer';
-import { gradeCard, finishStudySession } from '@/app/actions/study';
+import { gradeCard, finishStudySession, getStudyContinuation } from '@/app/actions/study';
 import { cardLeaveSpring, EASE_OUT, motionTransitions } from '@/lib/motion-configs';
 import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
 import { projectedInterval, spokenInterval } from '@/lib/grade-interval';
 import { plainText } from '@/lib/rich-text';
-import { summariseNextReviews, type StudyScope, type StudySessionCard } from '@/lib/study';
+import { summariseNextReviews, summaryActions, type StudyContinuation, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { studyLength } from '@/lib/study-type';
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
 import type { CapstoneDrillCandidate } from '@/lib/synthesis/types';
@@ -32,6 +32,8 @@ type FlashcardReviewClientProps = {
   cards: StudySessionCard[];
   totalInDeck: number;
   studyScope: StudyScope;
+  /** The account's cards per session, which "Keep going" uses for the next chunk. */
+  chunkSize: number;
   /**
    * The deck's active synthesis drills, lean. The completed state offers one
    * of them as a capstone when the session warmed its anchors (spec §8.3).
@@ -104,6 +106,7 @@ export function FlashcardReviewClient({
   cards,
   totalInDeck,
   studyScope,
+  chunkSize,
   capstoneDrills = NO_DRILLS,
 }: FlashcardReviewClientProps) {
   const router = useRouter();
@@ -571,6 +574,49 @@ export function FlashcardReviewClient({
     }
   }, [completed, deckId]);
 
+  // What comes after this session (UIUX plan §5.5). Asked once the outbox has
+  // drained, so the counts include this session's own grades. `undefined`
+  // while asking; `null` when it could not be answered.
+  const [continuation, setContinuation] = useState<StudyContinuation | null | undefined>(undefined);
+  const [round] = useState(() => Date.now().toString(36));
+  const wantsContinuation = completed && pendingGrades === 0 && studyScope === 'due';
+  useEffect(() => {
+    if (!wantsContinuation) return;
+    let cancelled = false;
+    getStudyContinuation(deckId)
+      .then((result) => {
+        if (cancelled) return;
+        setContinuation('success' in result && result.success ? { hereDue: result.hereDue, next: result.next } : null);
+      })
+      .catch(() => {
+        if (!cancelled) setContinuation(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantsContinuation, deckId]);
+
+  const summaryNext = useMemo(
+    () => (continuation ? summaryActions(deckId, continuation, chunkSize, round) : null),
+    [continuation, deckId, chunkSize, round]
+  );
+
+  // The summary is not a dialog and the grade keys are unmounted, so Enter is
+  // free to take the primary action — unless focus is already on a control,
+  // which handles Enter itself.
+  useEffect(() => {
+    if (!summaryNext) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('a, button, input, textarea, select, [contenteditable]')) return;
+      event.preventDefault();
+      router.push(summaryNext.primary.href);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [summaryNext, router]);
+
   useEffect(() => {
     if (typeof window === 'undefined' || resumeState) {
       return;
@@ -955,9 +1001,9 @@ export function FlashcardReviewClient({
                     </span>
                   </div>
                   <div className="flex items-center justify-between px-5 py-3">
-                    <span className="text-sm text-ink-dim">Retention rate</span>
+                    <span className="text-sm text-ink-dim">Recalled</span>
                     <span className="font-mono text-sm font-medium tnum">
-                      {effectiveAttemptCount > 0 ? `${Math.round(((goodCount + easyCount) / effectiveAttemptCount) * 100)}%` : '—'}
+                      {effectiveAttemptCount > 0 ? `${goodCount + easyCount} of ${effectiveAttemptCount}` : '—'}
                     </span>
                   </div>
 
@@ -972,18 +1018,52 @@ export function FlashcardReviewClient({
                 {/* One drill on the concepts just retrieved, or nothing (§8.3). */}
                 <StudyCapstoneOffer deckId={deckId} drill={capstoneOffer} />
 
-                <div className="flex justify-center gap-3">
-                  <Button onClick={restart} className="gap-2">
-                    <RotateCcw className="h-4 w-4" />
-                    Review Again
-                  </Button>
-                  <Button asChild variant="primary" className="gap-2">
-                    <Link href={`/dashboard/${deckId}`}>
-                      Back to deck
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </div>
+                {studyScope === 'due' ? (
+                  // After a due session, repeating the same cards has no
+                  // scheduling value, so there is no "Review Again" here.
+                  summaryNext ? (
+                    <div className="flex flex-wrap justify-center gap-3">
+                      <Button asChild>
+                        <Link href={summaryNext.secondary.href}>{summaryNext.secondary.label}</Link>
+                      </Button>
+                      <Button asChild variant="primary" className="gap-2">
+                        <Link href={summaryNext.primary.href}>
+                          {summaryNext.primary.label}
+                          <ChevronRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {continuation === null ? (
+                        // Could not ask: never strand the user.
+                        <Button asChild variant="primary" className="gap-2">
+                          <Link href="/dashboard">
+                            Back to Today
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      ) : (
+                        <Button variant="primary" disabled>
+                          Checking what is due…
+                        </Button>
+                      )}
+                    </div>
+                  )
+                ) : (
+                  <div className="flex justify-center gap-3">
+                    <Button onClick={restart} className="gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Review Again
+                    </Button>
+                    <Button asChild variant="primary" className="gap-2">
+                      <Link href={`/dashboard/${deckId}`}>
+                        Back to deck
+                        <ChevronRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </m.div>
             ) : (
               <m.div

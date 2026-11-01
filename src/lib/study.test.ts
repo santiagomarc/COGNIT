@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  summaryActions,
   DEFAULT_SESSION_CARD_COUNT,
   MAX_SESSION_CARD_COUNT,
   MIN_SESSION_CARD_COUNT,
@@ -73,5 +74,34 @@ describe('newCardAllowance', () => {
     expect(newCardAllowance(10, 20, 0)).toBe(0);
     expect(newCardAllowance(10, 4, 0)).toBe(6);
     expect(newCardAllowance(10, 20, 12)).toBe(12);
+  });
+});
+
+describe('summaryActions (UIUX plan §5.5)', () => {
+  const next = { deckId: 'deck-b', title: 'Pharmacology', dueCount: 12 };
+
+  it('keeps going in this deck while cards are due, in a fresh URL', () => {
+    const { primary, secondary } = summaryActions('deck-a', { hereDue: 21, next }, 10, 'r1');
+    expect(primary.label).toBe('Keep going · next 10 (11 left here)');
+    expect(primary.href).toBe('/dashboard/deck-a/study?scope=due&count=10&round=r1');
+    expect(secondary).toEqual({ label: 'Back to deck', href: '/dashboard/deck-a' });
+  });
+
+  it('says "last" when the next chunk finishes the deck', () => {
+    const { primary } = summaryActions('deck-a', { hereDue: 4, next: null }, 10, 'r1');
+    expect(primary.label).toBe('Keep going · last 4');
+  });
+
+  it('moves to the deck with the most due when this one is done', () => {
+    const { primary, secondary } = summaryActions('deck-a', { hereDue: 0, next }, 10, 'r1');
+    expect(primary.label).toBe('Next: Pharmacology · 12 due');
+    expect(primary.href).toBe('/dashboard/deck-b/study?scope=due&count=10&round=r1');
+    expect(secondary.href).toBe('/dashboard');
+  });
+
+  it('goes back to Today, offering to study ahead, when nothing is due anywhere', () => {
+    const { primary, secondary } = summaryActions('deck-a', { hereDue: 0, next: null }, 10, 'r1');
+    expect(primary).toEqual({ label: 'Back to Today', href: '/dashboard' });
+    expect(secondary.href).toBe('/dashboard/deck-a/study?scope=include_reviewed');
   });
 });

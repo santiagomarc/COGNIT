@@ -41,3 +41,62 @@ describe('finishStudySession', () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith(`/dashboard/${DECK_ID}`);
   });
 });
+
+describe('getStudyContinuation', () => {
+  const OTHER_DECK = '00000000-0000-4000-8000-000000000003';
+  const THIRD_DECK = '00000000-0000-4000-8000-000000000004';
+
+  beforeEach(() => vi.clearAllMocks());
+
+  function mockClient(rows: Array<{ deck_id: string; due_count: number; new_count: number }>, deck: unknown = { id: OTHER_DECK, title: 'Pharmacology' }) {
+    mocks.client = createSupabaseMock({
+      tables: { decks: { data: deck, error: null } },
+      rpcs: { get_due_cards_by_deck: { data: rows, error: null } },
+    });
+  }
+
+  it('reports what is left in this deck', async () => {
+    mockClient([
+      { deck_id: DECK_ID, due_count: 21, new_count: 0 },
+      { deck_id: OTHER_DECK, due_count: 12, new_count: 0 },
+    ]);
+    const { getStudyContinuation } = await import('./study');
+    expect(await getStudyContinuation(DECK_ID)).toMatchObject({
+      success: true,
+      hereDue: 21,
+      next: { deckId: OTHER_DECK, title: 'Pharmacology', dueCount: 12 },
+    });
+  });
+
+  it('points at the deck with the most due when this one is done', async () => {
+    mockClient([
+      { deck_id: DECK_ID, due_count: 0, new_count: 3 },
+      { deck_id: THIRD_DECK, due_count: 2, new_count: 0 },
+      { deck_id: OTHER_DECK, due_count: 12, new_count: 0 },
+    ]);
+    const { getStudyContinuation } = await import('./study');
+    const result = await getStudyContinuation(DECK_ID);
+    expect(result).toMatchObject({ hereDue: 0, next: { deckId: OTHER_DECK, dueCount: 12 } });
+  });
+
+  it('has nothing next when nothing is due anywhere', async () => {
+    mockClient([{ deck_id: DECK_ID, due_count: 0, new_count: 0 }]);
+    const { getStudyContinuation } = await import('./study');
+    expect(await getStudyContinuation(DECK_ID)).toMatchObject({ success: true, hereDue: 0, next: null });
+  });
+
+  it('does not name a deck the caller cannot read', async () => {
+    mockClient([{ deck_id: OTHER_DECK, due_count: 4, new_count: 0 }], null);
+    const { getStudyContinuation } = await import('./study');
+    expect(await getStudyContinuation(DECK_ID)).toMatchObject({ next: null });
+  });
+
+  it('rejects a malformed id and a signed-out caller', async () => {
+    mockClient([]);
+    const { getStudyContinuation } = await import('./study');
+    expect(await getStudyContinuation('nope')).toEqual({ error: 'Invalid deck id.' });
+
+    mocks.client = createSupabaseMock({ user: null });
+    expect(await getStudyContinuation(DECK_ID)).toEqual({ error: 'You must be logged in.' });
+  });
+});

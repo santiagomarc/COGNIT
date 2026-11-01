@@ -121,11 +121,15 @@ export default async function DeckStudyPage({ params, searchParams }: StudyPageP
 
   return (
     <FlashcardReviewClient
+      // A new set of cards is a new session. Without a key, "Keep going"
+      // pushes the same route and React keeps the finished session's state.
+      key={cards.map((card) => card.id).join('|')}
       deckId={deckId}
       deckTitle={removeDeckTagFromTitle(deck.title)}
       cards={cards}
       totalInDeck={totalInDeck ?? 0}
       studyScope={studyScope}
+      chunkSize={settings.sessionCardCount}
       capstoneDrills={capstoneDrills}
     />
   );

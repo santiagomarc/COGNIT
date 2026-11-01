@@ -9,6 +9,8 @@ import { sanitizeDatabaseError } from '@/lib/server-errors';
 import { logger } from '@/lib/logger';
 import { requireOwnedDeck } from './_shared';
 import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
+import { loadDueByDeckRows } from '@/lib/dashboard-due';
+import { removeDeckTagFromTitle } from '@/lib/deck-tags';
 
 export async function gradeCard(data: GradeCardInput) {
   const result = gradeCardSchema.safeParse(data);
@@ -105,4 +107,48 @@ export async function finishStudySession(deckId: string) {
   revalidatePath('/dashboard');
   revalidatePath(`/dashboard/${parsed.data}`);
   return { success: true };
+}
+
+/**
+ * What comes after a session (UIUX plan §5.5): how many cards are still due in
+ * this deck, else the deck with the most due. The summary asks once the outbox
+ * has flushed, so the counts include the session's own grades. Everything is
+ * scoped to the caller: ids come from their own due breakdown, never the client.
+ */
+export async function getStudyContinuation(deckId: string) {
+  const parsed = deckIdSchema.safeParse(deckId);
+  if (!parsed.success) {
+    return { error: 'Invalid deck id.' };
+  }
+
+  const [supabase, user] = await Promise.all([getRequestClient(), getSessionUser()]);
+  if (!user) {
+    return { error: 'You must be logged in.' };
+  }
+
+  const rows = await loadDueByDeckRows(supabase, user.id, new Date().toISOString());
+  const hereDue = rows.find((row) => row.deck_id === parsed.data)?.due_count ?? 0;
+  const candidate = rows
+    .filter((row) => row.deck_id !== parsed.data && row.due_count > 0)
+    .sort((a, b) => b.due_count - a.due_count)[0];
+
+  if (!candidate) {
+    return { success: true as const, hereDue, next: null };
+  }
+
+  // Titles come from one small read, scoped to the user. A deck that is gone
+  // (trashed) has no row, and the continuation falls back to "nothing next".
+  const { data: deck } = await supabase
+    .from('decks')
+    .select('id, title')
+    .eq('id', candidate.deck_id)
+    .eq('user_id', user.id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  return {
+    success: true as const,
+    hereDue,
+    next: deck ? { deckId: deck.id, title: removeDeckTagFromTitle(deck.title), dueCount: candidate.due_count } : null,
+  };
 }
