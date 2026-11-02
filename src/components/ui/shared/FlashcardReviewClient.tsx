@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { pageShortcutBlocked } from '@/lib/hotkeys';
+import { isTypingTarget, pageShortcutBlocked } from '@/lib/hotkeys';
 import { m, AnimatePresence, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
 import { ArrowLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
@@ -17,6 +17,7 @@ import { cardLeaveSpring, EASE_OUT, motionTransitions } from '@/lib/motion-confi
 import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
 import { projectedInterval, spokenInterval } from '@/lib/grade-interval';
 import { plainText } from '@/lib/rich-text';
+import { createHeldGrade } from '@/lib/held-grade';
 import { summariseNextReviews, summaryActions, type StudyContinuation, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { studyLength } from '@/lib/study-type';
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
@@ -96,8 +97,14 @@ type GradeJob = {
   cardId: string;
   grade: StudyGrade;
   durationMs: number;
-  /** Restores the session to the moment before this grade was applied. */
+  /** Restores the session to the moment before this grade was applied, after the server refused it. */
   rollback: () => void;
+  /**
+   * Takes the grade back by choice, before it was sent. Unlike `rollback` it
+   * leaves `scheduledReviews` alone: this grade never produced one, and an
+   * earlier grade's reply may have landed since.
+   */
+  undo: () => void;
 };
 
 export function FlashcardReviewClient({
@@ -206,6 +213,15 @@ export function FlashcardReviewClient({
   const outboxRef = useRef<GradeJob[]>([]);
   const flushPromiseRef = useRef<Promise<void> | null>(null);
   const [pendingGrades, setPendingGrades] = useState(0);
+  // The newest grade waits here for UNDO_WINDOW_MS before it is sent (plan §5.6).
+  // It counts as pending: the exit button and the unload guard must wait for it.
+  const [undoable, setUndoable] = useState<StudyGrade | null>(null);
+  const heldCountRef = useRef(0);
+  const syncPending = useCallback(() => {
+    setPendingGrades(outboxRef.current.length + heldCountRef.current);
+  }, []);
+  const heldRef = useRef<ReturnType<typeof createHeldGrade<GradeJob>> | null>(null);
+  const [undoNote, setUndoNote] = useState<{ forIndex: number; text: string } | null>(null);
   // gradeCard already returns nextReviewAt/interval; the client used to discard
   // them, so the summary never said when the work actually pays off.
   const [scheduledReviews, setScheduledReviews] = useState<string[]>([]);
@@ -377,13 +393,16 @@ export function FlashcardReviewClient({
 
         if (failed) {
           job.rollback();
+          // Later grades were applied on top of state the server never saw,
+          // and the held one is one of them.
           outboxRef.current = [];
-          setPendingGrades(0);
+          heldRef.current?.discard();
+          syncPending();
           return;
         }
 
         outboxRef.current.shift();
-        setPendingGrades(outboxRef.current.length);
+        syncPending();
       }
     })().finally(() => {
       flushPromiseRef.current = null;
@@ -391,7 +410,46 @@ export function FlashcardReviewClient({
 
     flushPromiseRef.current = run;
     return run;
-  }, [deckId]);
+  }, [deckId, syncPending]);
+
+  useEffect(() => {
+    const held = createHeldGrade<GradeJob>({
+      onRelease: (job) => {
+        outboxRef.current.push(job);
+        syncPending();
+        void flushOutbox();
+      },
+      onChange: (job) => {
+        heldCountRef.current = job ? 1 : 0;
+        setUndoable(job ? job.grade : null);
+        syncPending();
+      },
+    });
+    heldRef.current = held;
+    return () => {
+      // Leaving the page must not drop the newest grade.
+      held.flush();
+      heldRef.current = null;
+    };
+  }, [flushOutbox, syncPending]);
+
+  // A hidden tab may never come back, so the held grade is sent now.
+  useEffect(() => {
+    const flushHeld = () => heldRef.current?.flush();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushHeld();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flushHeld);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flushHeld);
+    };
+  }, []);
+
+  const undoLastGrade = useCallback(() => {
+    heldRef.current?.undo()?.undo();
+  }, []);
 
   const applyGrade = useCallback(
     (grade: StudyGrade) => {
@@ -428,10 +486,21 @@ export function FlashcardReviewClient({
       cardStart.current = Date.now();
       setNowMs(Date.now());
 
-      outboxRef.current.push({
+      heldRef.current?.hold({
         cardId: active.id,
         grade,
         durationMs,
+        undo: () => {
+          setSessionCards(previousCards);
+          setIndex(previousIndex);
+          // The card comes back answer-side and armed, ready to re-grade.
+          setShowAnswer(true);
+          setPeeking(false);
+          setGradeLog((prev) => prev.slice(0, previousGradeLogLength));
+          cardStart.current = Date.now();
+          setNowMs(Date.now());
+          setUndoNote({ forIndex: previousIndex, text: `Undid ${GRADE_LABEL[grade]}.` });
+        },
         rollback: () => {
           setSessionCards(previousCards);
           setIndex(previousIndex);
@@ -442,12 +511,9 @@ export function FlashcardReviewClient({
           setNowMs(Date.now());
         },
       });
-      setPendingGrades(outboxRef.current.length);
-      void flushOutbox();
     },
     [
       active,
-      flushOutbox,
       gradeLog.length,
       index,
       insertRequeueCard,
@@ -550,7 +616,8 @@ export function FlashcardReviewClient({
   }, [startNewSession]);
 
   const saveAndExit = useCallback(async () => {
-    // Every queued grade lands before the page goes away.
+    // Every queued grade lands before the page goes away, the held one included.
+    heldRef.current?.flush();
     await flushOutbox();
     clearStoredProgress();
 
@@ -568,11 +635,13 @@ export function FlashcardReviewClient({
     router.push(`/dashboard/${deckId}`);
   }, [clearStoredProgress, deckId, effectiveAttemptCount, flushOutbox, router]);
 
+  // Once the held grade has been sent too, so the revalidation sees it.
+  const sessionSettled = completed && pendingGrades === 0;
   useEffect(() => {
-    if (completed) {
+    if (sessionSettled) {
       finishStudySession(deckId).catch(() => {});
     }
-  }, [completed, deckId]);
+  }, [sessionSettled, deckId]);
 
   // What comes after this session (UIUX plan §5.5). Asked once the outbox has
   // drained, so the counts include this session's own grades. `undefined`
@@ -718,6 +787,20 @@ export function FlashcardReviewClient({
     };
   }, [commitGrade, completed, isPaused, resumeState, showAnswer, togglePause]);
 
+  // Undo works on the last card too, when the summary is already showing, so
+  // it is not part of the grading handler (which stands down once completed).
+  useEffect(() => {
+    if (!undoable || isPaused || resumeState) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'z' || event.repeat || event.altKey || event.shiftKey) return;
+      if (pageShortcutBlocked(event) || isTypingTarget(event.target)) return;
+      event.preventDefault();
+      undoLastGrade();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [undoable, isPaused, resumeState, undoLastGrade]);
+
   useEffect(() => {
     if ((completed && pendingGrades === 0) || resumeState || sessionCards.length === 0) {
       return;
@@ -767,7 +850,10 @@ export function FlashcardReviewClient({
     if (completed) return `Flashcard review complete. ${effectiveAttemptCount} reviews completed.`;
     if (!active) return '';
     const question = plainText(active.id_question ?? active.back);
-    if (showAnswer && !peeking) return `Answer: ${plainText(active.front)}`;
+    if (showAnswer && !peeking) {
+      const undone = undoNote?.forIndex === index ? `${undoNote.text} ` : '';
+      return `${undone}Answer: ${plainText(active.front)}`;
+    }
     if (peeking) return `Question: ${question}`;
     const note = gradeNote?.forIndex === index ? `${gradeNote.text} ` : '';
     return `${note}Card ${index + 1} of ${sessionCards.length}. Question: ${question}`;
@@ -970,6 +1056,14 @@ export function FlashcardReviewClient({
                     Session
                   </p>
                   <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Review complete</h2>
+                  {undoable ? (
+                    <button type="button" onClick={undoLastGrade} className="reveal-hint mx-auto mt-2">
+                      <span>
+                        Undo <strong className="font-medium text-ink">{GRADE_LABEL[undoable]}</strong>
+                      </span>
+                      <Kbd>Z</Kbd>
+                    </button>
+                  ) : null}
                   <p className="mt-1 text-ink-dim">
                     You reviewed {effectiveAttemptCount} attempt{effectiveAttemptCount !== 1 ? 's' : ''} across {uniqueReviewedCardCount} card{uniqueReviewedCardCount !== 1 ? 's' : ''} in {formatDuration(sessionDuration)}.
                   </p>
@@ -1149,6 +1243,17 @@ export function FlashcardReviewClient({
         {!completed ? (
           <footer className="grade-band">
             <div className="mx-auto w-full max-w-2xl">
+              {/* Present only while the grade can still be taken back (plan §5.6). */}
+              <div className="flex min-h-[28px] items-center justify-center pb-1">
+                {undoable ? (
+                  <button type="button" onClick={undoLastGrade} className="reveal-hint" disabled={isPaused}>
+                    <span>
+                      Undo <strong className="font-medium text-ink">{GRADE_LABEL[undoable]}</strong>
+                    </span>
+                    <Kbd>Z</Kbd>
+                  </button>
+                ) : null}
+              </div>
               <div
                 className="grade-deck"
                 data-armed={showAnswer ? 'true' : 'false'}
