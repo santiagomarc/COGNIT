@@ -1,9 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
-import Link from 'next/link';
 
-import { Button } from '@/components/ui/button';
+import { BUTTON_CLASS } from '@/components/ui/button-class';
 import { logger } from '@/lib/logger';
 
 /**
@@ -19,6 +18,15 @@ import { logger } from '@/lib/logger';
  *
  * `console.error` is now the project logger, so an error on this path is
  * scoped and structured like every other one.
+ *
+ * The two controls are a plain `<button>` and `<a>` wearing `Button`'s classes
+ * (performance plan §8.4). Every route loads both boundary chunks, and
+ * Turbopack copied `Button`, Radix `Slot` and Next's link runtime into each
+ * one: 9.4 kB gz on every dashboard route. The `<a>` is also the better
+ * control here, not only the smaller one: a full load rebuilds whatever client
+ * state the render error came from, and on `/dashboard` itself a client-side
+ * link to the same path would leave this boundary on screen. That is why
+ * `no-html-link-for-pages` is switched off for that one line.
  */
 export default function DashboardError({
   error,
@@ -60,12 +68,13 @@ export default function DashboardError({
         ) : null}
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Button onClick={reset} variant="primary">
+          <button type="button" onClick={reset} className={BUTTON_CLASS.primary}>
             Try again
-          </Button>
-          <Button asChild>
-            <Link href="/dashboard">Back to your decks</Link>
-          </Button>
+          </button>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- a full load is the recovery; see above */}
+          <a href="/dashboard" className={BUTTON_CLASS.default}>
+            Back to your decks
+          </a>
         </div>
       </div>
     </div>

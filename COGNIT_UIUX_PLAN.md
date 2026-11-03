@@ -1,14 +1,15 @@
 # Cognit — UI/UX Plan
 
-**Revision:** 1.0 · 2026-10-01.
+**Revision:** 1.1 · 2026-11-03. Rev 1.1: an execution status (just below the reading guide): U0 is done, U2 is mostly done, U1 and U3–U5 are open; a new S1, COPY-07, found and fixed; CI back within its bundle budgets, and every budget lowered. Rev 1.0 · 2026-10-01.
 **Baseline:** `main` @ `bc66b1d` (re-checked at the end of the audit: no new commits; untracked `COGNIT_SIDEBAR_SETTINGS_PLAN.md` and `COGNIT_UIUX_PLAN_PROMPT.md` only).
 **Scope:** an audit of Cognit's UI and UX, seen running where the session could see it and read from code where it could not, and the phased plan that follows. No code was changed.
-**Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. D; this plan proposes **Rev. F**, §9, on top of the sidebar plan's Rev. E) · `COGNIT_SIDEBAR_SETTINGS_PLAN.md` (Rev 1.0, approved 2026-09-30, not yet executed; called **SSP** below) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; house style, finding IDs, §7 standing rules).
+**Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. E since SSP; this plan proposes **Rev. F**, §9, not yet applied) · `COGNIT_SIDEBAR_SETTINGS_PLAN.md` (Rev 1.0, executed 2026-10-01 – 10-03; owner UAT owed; called **SSP** below) · `COGNIT_PERFORMANCE_PLAN.md` (Rev 1.6, complete; its P2, P3 and P5 delivered PERF-06/07, half of IA-04 and FLOW-06) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; house style, finding IDs, §7 standing rules).
 
 ---
 
 ## How to read this document
 
+- **Execution status** (just below) says what has landed since Rev 1.0, with commits. Read it first: it supersedes the per-item plans where they disagree.
 - **§0** is the one-page answer. **§1** holds the findings, the seed verdicts, what is verified good, the competitor comparison and what could not be checked. **§2** is the roadmap and how it interleaves with SSP. **§3–§8** are the phases, each ending in a gate. **§9** is the design-system revision. **§10** lists the owner's decisions, **§11** what is out of scope. Appendices hold the evidence and the scripts.
 - Finding IDs continue the Next Horizon series (**UX-06…, A11Y-12…, MOB-05…, DS-08…, PERF-06…**) and add **FLOW** (a journey that fails its purpose), **COPY** (words that mislead), **VIS** (design-system visuals) and **TEST** (the harness). None collides with Next Horizon or SSP IDs (DATA, DST, SET, NAV, DSR).
 - Severity: **S0** blocks use or loses data · **S1** user-visible defect, or a flow that fails its purpose · **S2** quality, accessibility or consistency debt · **S3** polish.
@@ -26,6 +27,73 @@
 | How long does a grade take? | The card's enter/exit spring run through **framer-motion 12.34.3's own `spring` generator** (the version in `package-lock.json`), plus the CSS durations in `globals.css` (Appendix C.2). |
 | Production | `curl` timings and headers against https://cognit-nine.vercel.app (Appendix C.4). |
 | **What could not be verified** | **Every signed-in screen, live.** The owner was asked at the start for a test account in `.env.local` (`LOAD_TEST_EMAIL` / `LOAD_TEST_PASSWORD`); the keys never appeared, and this session does not create accounts in production. Signed-in findings are therefore **read from code** and marked *code* in the evidence column, each with the check that confirms it. Also not available: a real iPhone or Android device, VoiceOver or NVDA, and usage data (there is none: no analytics exist, and production holds a handful of decks). The scripts in Appendix D run the missing checks as soon as the keys exist. |
+
+## Execution status (2026-11-03)
+
+Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 and the bundle fix below were made on top of `dda8bc4` and were uncommitted when this was written. Every `file:line` in this section is to that code, not to `bc66b1d`. The sketches in §3–§8 are still the intent, but the code they point at has moved a long way (`FlashcardReviewClient.tsx` is 1,327 lines, up from 1,081), so re-find every location before building from one.
+
+**Where each item stands.**
+
+| Phase | Item | Status | Commit (date) |
+|---|---|---|---|
+| **U0** | COPY-03 PDF preview order | ✓ | `4a7ea91` (10-07) |
+| | FLOW-05 signup from a share link keeps the deck | ✓ | `f80506d` (10-12) |
+| | COPY-01 · COPY-04 honest landing, footer | ✓ social proof deleted (OD-5) | `3abf478`, `01d741c` (10-25) |
+| | FLOW-07 unfurls: `SITE_URL`, OG image | ✓ | `a26c15c` (10-27) |
+| | IA-01 Explore frame | ✓ | `92c0fda` (10-28) |
+| | Gate GU0 | not run as a gate; each item checked as it landed | |
+| **U1** | TEST-01 harness | ✗ not started. No `e2e/`, no `playwright.config.ts`; the test account (§1.5 V1; performance plan OD-4) still doesn't exist | |
+| **U2** | UX-07 · MOB-06 card fits, "More below" cue | ✓ with `study-type.ts`, `use-overflow.ts`, the `--type-study-*` tokens | `c438c17` (10-05), `c596dc6` (10-08) |
+| | A11Y-13 a card a screen reader can read | ✓ with `spokenInterval` (`grade-interval.ts`) and `plainText` (`rich-text.ts`) | `7c609fd`, `77ccee8` (10-29 – 10-31) |
+| | FLOW-01 · VIS-04 (study) honest chunk, "Keep going", "Starts with…" on Today | ✓ `getStudyContinuation` in `actions/study.ts`, `summaryActions` in `lib/study.ts`; "Recalled" on the summary | `0e7eff7` (11-01) |
+| | FLOW-03 undo the last grade (`Z`) | ✓ `held-grade.ts`; the `study-undo` row in `SHORTCUTS` | `dda8bc4` (11-02) |
+| | PERF-06 · PERF-07 transitions, no 1 s re-render | ✓ by performance plan P2 (below) | `4427194` (10-17) |
+| | REF-01 split `FlashcardReviewClient` | ✗ | |
+| | UX-08 Space/Enter as Good | ✗ waits on OD-3 | |
+| | FLOW-02 edit a card in the session | ✗ its message fix is done (COPY-07) | |
+| | MOB-05 swipe shows its grade | ✗ | |
+| | Gate GU2 | not run (needs U1) | |
+| **U3** | FLOW-06 honest PDF wait | ✓ superseded by performance plan P5 (below) | `66f5082`, `26edf07` (10-21 – 10-23) |
+| | IA-04 find a card by its words | ◐ ⌘K half done by performance plan P3; the Cards-tab filter is not (`DeckCardsManager.tsx` has no search) | `0b17d22` (10-18) |
+| | COPY-02 · COPY-06 · IA-02 one meaning per word | ◐ only "Recalled" on the study summary. Today's "Retention", DeckRow's "Mastery" and "+2d", and "Merge" on Overview are unchanged | |
+| | UX-06 local day | ✗ needs the §6.1 migration | |
+| | FLOW-04 · FB-01 · COPY-05 · PERF-08 | ✗ | |
+| **U4** | DS-08/09/10, VIS-01/02/03, VIS-04 (quiz), A11Y-12/14/15 | ✗ not started. "Flawless Victory" and "Speed Demon" are still at `QuizAssessmentClient.tsx:278, 286` and the letter grade at `:681`. Nested `<main>` is still in `MCQMode.tsx:151`, `IdentificationMode.tsx:107`, `FlashcardReviewClient`, `QuizAssessmentClient`, `SynthesisDrillClient`, `synthesis/loading.tsx` and `explore/page.tsx` | |
+| | DS Rev. F (§9) | ✗ `COGNIT_DESIGN_SYSTEM.md` is still Rev. E, though two Rev. F tokens already ship in `globals.css`: `--dur-flip: 320ms` and `--type-study-*` | |
+| **U5** | PERF-09 `rum_samples`, funnel | ✗ | |
+
+**What changed from the sketches, and why.**
+- **FLOW-06 is the performance plan's AI-18, not §6.4.** P5 replaced the Server Action with a streamed route handler (`POST /api/generate`, SSE). Cards appear as each one is saved, with a Stop button, an elapsed counter and a `beforeunload` guard. Tags and distractors come in the generation call itself, so §6.4 item 1 (scheduling `enrichCards`) no longer applies. Details: performance plan §9.3.
+- **IA-04's ⌘K half is the performance plan's AI-12.** `GET /api/search`, RPC `search_user_cards_lexical` (pg_trgm), migration `202610180900`. Production needs that migration pushed. The Cards-tab filter should reuse this RPC, or `ilike` with PostgREST's reserved characters stripped, rather than add a third search path.
+- **PERF-06 · PERF-07 came from the performance plan's P2.** Flip 320 ms, flash 120 ms, `popLayout`; `ElapsedTelemetry` and `session-clock.ts` tick the clock without re-rendering the client; progress saves on events, not on a timer.
+- **The REF-01 file table (§5.1) predates undo, continuation and the screen-reader text.** Map the current code instead: the held grade and undo go into `useGradeOutbox` (`hold`, `undo`), reusing `held-grade.ts`; continuation goes into `StudySummary`; the A11Y-13 live text into `StudyCard` and `StudyHeader`.
+- **The order differed from OD-1.** SSP landed first (Phases 0–3, `c032f10` and `db8843f`, 10-01 – 10-03), then U0 and most of U2 in parallel. U1 hasn't started, so U2's items were checked by unit tests and by hand, not by `study.spec.ts`.
+
+**New finding: COPY-07 (S1). A hand-written card studied upside down.** `AddCardForm` labelled `front` "Question" (placeholder "e.g. What is closure in JavaScript?") and `back` "Answer", and saved them as typed. Study shows `id_question ?? back` as the prompt and `front` as the answer, as do PDF generation, bulk import, the PDF preview (COPY-03), the share page and the quiz. So every card typed into the form was shown answer-first. The validation messages agreed with the wrong labels (`schemas.ts:79–80, 91–92`, `form-checks.ts:85, 87`).
+- **Fixed.** The form asks for the **Question** first, bound to `back`, then the **Answer**, bound to `front`, with the naming-trap comment. Its look is unchanged. The messages now name the field the user sees (`back` → "Question is required"), which also closes the message half of §5.8. `AddCardForm.test.tsx` fails on the old mapping.
+- **Checked and correct already:** the card edit dialog (`FlashcardWithActions`, "Term (answer)" / "Description (question)"), the share page, the PDF and bulk-import previews, `AddAsCardForm`, the quiz modes, ⌘K and chat citations.
+- **Existing data: not yet counted.** Cards with `source = 'manual'` are the ones the form wrote, plus any row from before 2026-03-06, when the column arrived with that default. The read-only count failed on 2026-11-03 because the production project was paused (status `INACTIVE`). Whether to swap those cards with a migration is the owner's call, once the count is in.
+
+**Bundle (2026-11-03): CI back within budget.** The `verify` job had been red at "Bundle budgets" on every commit since `7c609fd`: study 201.4 kB gz against 199.
+- **Cause, measured.** Clean CI-env builds of `a26c15c` (the last green) and `dda8bc4`, joined by route: study grew 2.6 kB and nothing else moved more than 0.2. Its own chunk split in two, both study-only. The new modules (`held-grade`, `grade-interval`, `rich-text`, the `study.ts` additions) import nothing heavy, so the growth is the A11Y-13, FLOW-01 and FLOW-03 code itself.
+- **Fix: the error boundaries' option from performance plan §8.4, taken further.** `app/error.tsx` and `dashboard/error.tsx` now render a plain `<button>` and `<a>` wearing `Button`'s exact classes (`components/ui/button-class.ts`; `button-class.test.ts` fails if they drift from `cn(buttonVariants(...))`). Dropping `Button` alone saved 2.8 kB; dropping `next/link` as well saved 9.4 kB, because Turbopack copied the link runtime into both boundary chunks that every route loads. A full load is also the better recovery from a render error: on `/dashboard`, a client-side link to the same path would leave the boundary on screen. It costs the first `eslint-disable` in `src`, for `no-html-link-for-pages`, on that one line.
+- **Look unchanged.** Before and after screenshots of both boundaries in both themes are pixel-identical, as are the controls' computed styles, hover background and focus outline.
+
+| Route | `a26c15c` | `dda8bc4` | After | Budget |
+|---|---|---|---|---|
+| study | 198.8 | 201.4 | 192.0 | 199 → 195 |
+| quiz | 201.0 | 201.1 | 191.7 | 202 → 195 |
+| deck | 238.3 | 238.3 | 229.0 | 242 → 232 |
+| other `/dashboard` routes | | | −9.4 each | lowered |
+| `/`, `/login`, `/login/update-password`, `/s/[token]` | | | −4.6 to −4.7 | lowered |
+| `/explore` (no budget) | 165.9 | 176.6 | 164.0 | none |
+
+- **Every budget lowered** to the measured size plus 3 kB, rounded up (the convention P4 used); none raised. GU2's bundle row now means 195 kB for study.
+
+**Owner decisions (§10), as they stand.**
+- **Made by what shipped:** OD-4 (the chunk, named on screen, with "Keep going"), OD-5 (social proof deleted), OD-9 (320 ms flip, 120 ms flash).
+- **Superseded:** OD-8. PDF generation by section, with cancel, is the performance plan's P5.
+- **Still open:** OD-2 (display steps, U4), OD-3 (Space as Good; UX-08 waits on it), OD-6 (suspend and bury), OD-7 (the quiz's letter grade), OD-10 (privacy page), OD-11 (real-user metrics).
 
 ---
 
@@ -90,6 +158,7 @@ Each seed was re-checked against `bc66b1d` (no commits landed during the audit).
 | **COPY-01** | S1 | Landing · trust | `SocialProof.tsx:56–58`, `HeroSection.tsx:114`, `HowItWorks.tsx:10`, `FeatureGrid.tsx:22` | "10,000+ Active students", "2,000,000+ Cards studied", "4.9 Average rating": constants, not reads (the file's own comment says they "need substantiating or removing before launch"). Production holds a handful of decks. The hero claims flashcards "in 30 seconds" (measured: 2–61 s per call); step 1 claims "Cognit handles any format"; features say "PDFs, markdown and plain text" (upload accepts `application/pdf` only, `PDFUploadZone.tsx:28`). | measured: `landing__1280__dark__scrolled.png` | 3.1 |
 | **FLOW-05** | S1 | Sharing · funnel | `auth/actions.ts:147`, `s/[token]/page.tsx:135` | "Save this deck — free" sends a visitor to `/login?redirectTo=/s/<token>`. Sign-in honours it; **sign-up doesn't**: `emailRedirectTo` is `${baseUrl}/auth/callback` with no `next`, so after confirming their email the visitor lands on an empty dashboard, not the deck they came to save. | code; §3.2 check | 3.2 |
 | **UX-06** | S1 | Time | `202609011200…rpcs.sql:26` (`at time zone 'UTC'`), `(shell)/page.tsx:314–366`, `DueNowBand.tsx:12`, `ActivityHeatmap.tsx:17`, `dashboard-forecast.ts:59–63` | Every "day" is a UTC day: the streak, "Reviewed today", the heatmap, the 7-day forecast's weekday columns. For a user in UTC+8 (the owner), today starts at 08:00. Reviews at 07:30 count towards yesterday, "Reviewed today" reads 0 after a morning session, and a streak can break or extend by the clock rather than by study. | code | 6.1 |
+| **COPY-07** | S1 | Cards · trust | `AddCardForm.tsx:74–96` (at `dda8bc4`), `schemas.ts:79–80, 91–92`, `form-checks.ts:85, 87` | *Found 2026-11-03.* The add-card form labels `front` "Question" and `back` "Answer". Study shows `back` as the prompt and `front` as the answer, so every hand-written card is studied upside down. | code, then `AddCardForm.test.tsx` | Execution status |
 | **PERF-06** | S2 | Study · latency | `FlashcardReviewClient.tsx:81, 848, 924–930`, `globals.css:783` (`--dur-flip` 520 ms), `motion-configs.ts:47–51` | From a grade key to the next prompt **readable: ≈ 909 ms**: a 160 ms commit flash, then `AnimatePresence mode="wait"` holds the new card until the old one's exit spring settles (opacity reaches framer's 0.005 rest threshold at **556 ms**), then the enter spring reaches 95 % opacity at 193 ms. Fully at rest: 1,272 ms. Reveal: the answer face appears at 260 ms and squares at 520 ms. About **1.2–1.8 s of every card is animation**, which is **1–1.5 minutes of a 50-card session**. Anki's reveal and advance are instant. | measured: framer-motion 12.34.3 `spring` generator, Appendix C.2; live confirmation §5.7 | 5.7 |
 | **COPY-02** | S2 | Vocabulary | `GreetingHeader.tsx:92–95`, `DeckRow.tsx:171–190, 65–71`, `FlashcardReviewClient.tsx:893–896`, `stats/page.tsx` (Retention · 30d), `DeckSessionLauncher.tsx` ("mastery score") | UX-02 fixed the deck header only. **"Retention"** still means three things: quiz-proven share (Today's header), good+easy share of this session (study summary), and review pass rate (Stats). **"Mastery"** on each deck row is the quiz-proven share, painted `--state-mastered` from 70 % and driving the row's tick, which UX-02 reserved for SM-2 "mastered" (interval ≥ 21 d). | code | 6.2 |
 | **COPY-03** | S2 | PDF | `PDFUploadZone.tsx:312–323` | The just-generated preview labels `card.front` **"Question"** and `card.back` **"Answer"**. In this schema `front` is the term (the answer) and `back` is the definition (the prompt), so the first cards a new user sees are labelled the other way round from how they'll be studied: the F-07 naming trap, back again. | code | 3.3 |
@@ -690,7 +759,7 @@ Predicted after (from the same spring generator and the new durations): about 12
 
 Suspend and bury, as Anki has them, need a card state the schema doesn't have. That's OD-6, not this phase.
 
-Also fix the swapped validation messages at `schemas.ts:90–91`: "Question is required" guards `front`, which is the answer. The message should name the field the user sees, so `front` → "Answer is required" and `back` → "Question is required". Mirror it in `form-checks.ts`.
+*Done in Rev 1.1 with COPY-07.* Also fix the swapped validation messages at `schemas.ts:90–91`: "Question is required" guards `front`, which is the answer. The message should name the field the user sees, so `front` → "Answer is required" and `back` → "Question is required". Mirror it in `form-checks.ts`.
 
 **Tests:** `study.spec.ts`: `E` → edit the answer → save → reveal shows the new text; the fixture client reads it back. `Escape` closes and focus returns to the card. Pressing `1` behind the open sheet does nothing.
 
@@ -705,7 +774,7 @@ While the card is dragged after the reveal, show the grade the release will comm
 | Check | How | Pass |
 |---|---|---|
 | Unit and build | `npx tsc --noEmit && npm run lint && npm test && npm run build` | green; new: reducer, outbox, `studyLength`, `getStudyContinuation` |
-| Bundle | `node scripts/bundle-report.mjs .next --budgets scripts/bundle-budgets.json` | `/dashboard/(focus)/[deckId]/study/page` within 199 kB (the split must not grow it) |
+| Bundle | `node scripts/bundle-report.mjs .next --budgets scripts/bundle-budgets.json` | `/dashboard/(focus)/[deckId]/study/page` within its budget, 195 kB since Rev 1.1 (the split must not grow it) |
 | Harness | `npx playwright test` | green, with the U2 assertions in `study.spec.ts`; the axe baseline for `/study` has no new rule |
 | Latency | `study.spec.ts` | median reveal ≤ 200 ms, advance ≤ 300 ms (desktop project) |
 | Card fit | `study.spec.ts` at 375 × 812 | the 300-character fixture fits; the 600-character one is cued |

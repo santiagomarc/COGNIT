@@ -82,9 +82,9 @@ export function checkUpdatePassword(input: { password: string; confirmPassword: 
 export function checkCreateCard(input: { deck_id: string; front: string; back: string }): Checked<{ deck_id: string; front: string; back: string; source: 'manual' }> {
   const errors = new Collector();
   errors.add('deck_id', !UUID.test(input.deck_id), 'Invalid deck id');
-  errors.add('front', input.front.length < 1, 'Question is required');
+  errors.add('front', input.front.length < 1, 'Answer is required');
   errors.add('front', input.front.length > 1000, 'Too big: expected string to have <=1000 characters');
-  errors.add('back', input.back.length < 1, 'Answer is required');
+  errors.add('back', input.back.length < 1, 'Question is required');
   errors.add('back', input.back.length > 2000, 'Too big: expected string to have <=2000 characters');
   return errors.result({ ...input, source: 'manual' as const });
 }

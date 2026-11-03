@@ -69,31 +69,19 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
         </p>
       </div>
 
+      {/*
+        * In this schema `back` is the question and `front` the answer (the
+        * term), which is how study, the PDF generator and bulk import all read
+        * a card. The fields bind that way round, so a hand-written card is not
+        * studied upside down (UIUX plan COPY-07).
+        */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="front">Question</Label>
+          <Label htmlFor="back">Question</Label>
           <Input
-            id="front"
-            name="front"
-            placeholder="e.g. What is closure in JavaScript?"
-            required
-            aria-invalid={!!errors.front}
-            aria-describedby={errors.front ? 'front-error' : undefined}
-            onChange={() => clearError('front')}
-          />
-          {errors.front && (
-            <p id="front-error" className="text-xs text-destructive" role="alert">
-              {errors.front}
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="back">Answer</Label>
-          <Textarea
             id="back"
             name="back"
-            placeholder="A function bundled with its lexical scope..."
+            placeholder="e.g. What is closure in JavaScript?"
             required
             aria-invalid={!!errors.back}
             aria-describedby={errors.back ? 'back-error' : undefined}
@@ -102,6 +90,24 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
           {errors.back && (
             <p id="back-error" className="text-xs text-destructive" role="alert">
               {errors.back}
+            </p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="front">Answer</Label>
+          <Textarea
+            id="front"
+            name="front"
+            placeholder="A function bundled with its lexical scope..."
+            required
+            aria-invalid={!!errors.front}
+            aria-describedby={errors.front ? 'front-error' : undefined}
+            onChange={() => clearError('front')}
+          />
+          {errors.front && (
+            <p id="front-error" className="text-xs text-destructive" role="alert">
+              {errors.front}
             </p>
           )}
         </div>
