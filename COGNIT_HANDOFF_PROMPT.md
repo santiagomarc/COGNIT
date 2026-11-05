@@ -8,6 +8,8 @@ date from 2026-09-08 and are now historical.
 
 --- PROMPT START ---
 
+> **Superseded 2026-11-05.** T0–T3 are done (`c982ca5`, `c3a2d59`), and the owner has since cut the task queue (§7): UX-08 and VIS-01 are dropped, and REF-01, most of U4, and U5 are deferred. The current order is the **"Where to continue"** list in `COGNIT_UIUX_PLAN.md`'s execution status. §1–§3 and §9 (context, standing rules, machine facts, architecture) still apply.
+
 ## 1. Context
 
 You are continuing work on **Cognit** at `/Users/marcsantiago/Dev/cognit`, a spaced-repetition

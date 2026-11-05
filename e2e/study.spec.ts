@@ -35,6 +35,43 @@ test('a keyboard session reads the card, the answer and the grade (A11Y-13)', as
   await expect(live).toHaveText(/^Flashcard review complete\. \d+ reviews completed\./);
 });
 
+test('E opens the edit sheet, shortcuts stand down behind it, and the edit shows in the session (FLOW-02)', async ({ page }) => {
+  const { deckId } = requireSeed();
+  await page.goto(`/dashboard/${deckId}/study?count=5&scope=include_reviewed`);
+  const live = page.locator('div.sr-only[aria-live="polite"]');
+  await expect(live).toHaveText(/^Card 1 of 5\. Question: \S/);
+
+  await page.keyboard.press('Space');
+  await expect(live).toHaveText(/^Answer: \S/);
+  const original = (await live.innerText()).replace(/^Answer: /, '');
+
+  await page.keyboard.press('e');
+  const sheet = page.getByRole('dialog', { name: 'Edit card' });
+  await expect(sheet).toBeVisible();
+  const answer = sheet.getByLabel('Answer');
+  await expect(answer).toHaveValue(original);
+
+  // Behind the sheet the grade keys do nothing: the card is still the first.
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await expect(page.locator('.flip')).toBeFocused();
+  await page.keyboard.press('e');
+  await expect(sheet).toBeVisible();
+  await answer.fill('Edited in the session');
+  await answer.press('1');
+  await expect(live).toHaveText(/^Answer: /);
+
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet).toBeHidden();
+  await expect(live).toHaveText('Answer: Edited in the session');
+
+  // Put the fixture back so a rerun finds the same card.
+  await page.keyboard.press('e');
+  await sheet.getByLabel('Answer').fill(original);
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet).toBeHidden();
+});
+
 /*
  * A measurement, not a gate: timings on a laptop vary too much to fail a run
  * on. `E2E_LATENCY=1 npm run e2e -- study` prints the medians; compare them

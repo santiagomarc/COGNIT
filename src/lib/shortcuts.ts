@@ -30,6 +30,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   { id: 'flip', keys: ['Space'], label: 'Flip card', scope: 'Study', owner: 'FlashcardReviewClient' },
   { id: 'grade', keys: ['1', '2', '3', '4'], label: 'Grade: again, hard, good, easy', scope: 'Study', owner: 'FlashcardReviewClient' },
   { id: 'study-pause', keys: ['P'], label: 'Pause', scope: 'Study', owner: 'FlashcardReviewClient' },
+  { id: 'study-edit', keys: ['E'], label: 'Edit card', scope: 'Study', owner: 'FlashcardReviewClient' },
   { id: 'study-undo', keys: ['Z'], label: 'Undo last grade', scope: 'Study', owner: 'FlashcardReviewClient' },
   { id: 'quiz-answer', keys: ['1', '2', '3', '4'], label: 'Pick an answer', scope: 'Quiz', owner: 'MCQMode' },
   { id: 'quiz-pause', keys: ['P'], label: 'Pause', scope: 'Quiz', owner: 'QuizAssessmentClient' },

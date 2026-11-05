@@ -1,6 +1,6 @@
 # Cognit — UI/UX Plan
 
-**Revision:** 1.1 · 2026-11-03. Rev 1.1: an execution status (just below the reading guide): U0 is done, U2 is mostly done, U1 and U3–U5 are open; a new S1, COPY-07, found and fixed; CI back within its bundle budgets, and every budget lowered. Rev 1.0 · 2026-10-01.
+**Revision:** 1.2 · 2026-11-05. Rev 1.2: the owner said no to OD-3 and OD-7, so UX-08 and VIS-01 are dropped; U1 was trimmed and committed; the rest of the plan is cut to an ordered queue ("Where to continue", in the execution status). Rev 1.1 · 2026-11-03. Rev 1.1: an execution status (just below the reading guide): U0 is done, U2 is mostly done, U1 and U3–U5 are open; a new S1, COPY-07, found and fixed; CI back within its bundle budgets, and every budget lowered. Rev 1.0 · 2026-10-01.
 **Baseline:** `main` @ `bc66b1d` (re-checked at the end of the audit: no new commits; untracked `COGNIT_SIDEBAR_SETTINGS_PLAN.md` and `COGNIT_UIUX_PLAN_PROMPT.md` only).
 **Scope:** an audit of Cognit's UI and UX, seen running where the session could see it and read from code where it could not, and the phased plan that follows. No code was changed.
 **Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. E since SSP; this plan proposes **Rev. F**, §9, not yet applied) · `COGNIT_SIDEBAR_SETTINGS_PLAN.md` (Rev 1.0, executed 2026-10-01 – 10-03; owner UAT owed; called **SSP** below) · `COGNIT_PERFORMANCE_PLAN.md` (Rev 1.6, complete; its P2, P3 and P5 delivered PERF-06/07, half of IA-04 and FLOW-06) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; house style, finding IDs, §7 standing rules).
@@ -32,6 +32,32 @@
 
 Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 and the bundle fix below were made on top of `dda8bc4` and were uncommitted when this was written. Every `file:line` in this section is to that code, not to `bc66b1d`. The sketches in §3–§8 are still the intent, but the code they point at has moved a long way (`FlashcardReviewClient.tsx` is 1,327 lines, up from 1,081), so re-find every location before building from one.
 
+**Where to continue (2026-11-05).** The owner cut the plan to what users will notice; everything not listed under "Next" is deferred or dropped below.
+
+*Owner first. Production is down until step 1 is done.*
+1. Restore the Supabase project (it was paused for inactivity: status `INACTIVE` on 2026-11-03).
+2. Set `CRON_SECRET` in Vercel → Production and redeploy; re-enable the cron-job.org job with `Authorization: Bearer <secret>`. Check: an unauthenticated `curl https://cognit-nine.vercel.app/api/keep-alive` returns 401, not 500.
+3. `supabase db push` (probably pending: `202610150900`, `202610160900`, `202610180900`; maybe `202610020900`).
+4. Add `LOAD_TEST_EMAIL` and `LOAD_TEST_PASSWORD` to `.env.local`.
+
+*Next, in order.*
+1. **Finish U1.** `npm run build && npm run e2e` with the test account; fix what the signed-in specs find (focus return after study pause is the likely failure).
+2. **FLOW-02: edit a card in the session** (§5.8). `E` and a header button open `EditCardSheet`. Load the sheet with `next/dynamic` so study stays inside its 195 kB budget. Register `E` in `SHORTCUTS`. Add its case to `study.spec.ts`.
+3. **UX-06: a day is the user's day** (§6.1). It needs a migration, which the owner pushes.
+4. **MOB-05: swipe shows its grade** (§5.9).
+5. **IA-04: the Cards-tab filter** (§6.7). Reuse `search_user_cards_lexical`; don't add a third search path.
+6. **COPY-02 · COPY-06 · IA-02: one meaning per word** (§6.2).
+7. **A small migration revoking `anon` EXECUTE on the Phase 1 RPCs** (§11). It isn't a UIUX item, but it's cheap and closes a gap.
+
+*Deferred* (do them when there's a reason, not as a phase):
+- **REF-01:** only if FLOW-02 makes `FlashcardReviewClient` painful to work in, and then just the summary and the pause overlay, not §5.1's whole split.
+- **A11Y-12 (landmarks, skip link) · A11Y-14 · A11Y-15:** `a11y.spec.ts` carries A11Y-12's rules in its allow-list; delete them when the fix lands.
+- **The rest of U4:** DS-08/09/10, VIS-02/03, VIS-04 (quiz) and design system Rev. F.
+- **FLOW-04 · FB-01 · COPY-05 · PERF-08.**
+- **U5** (OD-11): not with today's handful of users. Vercel Speed Insights is the no-code option if numbers are wanted.
+
+*Dropped by the owner:* UX-08 (OD-3: Space doesn't grade) and VIS-01 (OD-7: the quiz keeps its letter grade and badges).
+
 **Where each item stands.**
 
 | Phase | Item | Status | Commit (date) |
@@ -42,14 +68,14 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 | | FLOW-07 unfurls: `SITE_URL`, OG image | ✓ | `a26c15c` (10-27) |
 | | IA-01 Explore frame | ✓ | `92c0fda` (10-28) |
 | | Gate GU0 | not run as a gate; each item checked as it landed | |
-| **U1** | TEST-01 harness | ◐ built 2026-11-04 and trimmed 2026-11-05 at the owner's call (notes below); uncommitted. Public pages pass here; signed-in specs wait for the test account | |
+| **U1** | TEST-01 harness | ◐ trimmed (notes below); waits on one run with the test account | `c3a2d59` (11-05) |
 | **U2** | UX-07 · MOB-06 card fits, "More below" cue | ✓ with `study-type.ts`, `use-overflow.ts`, the `--type-study-*` tokens | `c438c17` (10-05), `c596dc6` (10-08) |
 | | A11Y-13 a card a screen reader can read | ✓ with `spokenInterval` (`grade-interval.ts`) and `plainText` (`rich-text.ts`) | `7c609fd`, `77ccee8` (10-29 – 10-31) |
 | | FLOW-01 · VIS-04 (study) honest chunk, "Keep going", "Starts with…" on Today | ✓ `getStudyContinuation` in `actions/study.ts`, `summaryActions` in `lib/study.ts`; "Recalled" on the summary | `0e7eff7` (11-01) |
 | | FLOW-03 undo the last grade (`Z`) | ✓ `held-grade.ts`; the `study-undo` row in `SHORTCUTS` | `dda8bc4` (11-02) |
 | | PERF-06 · PERF-07 transitions, no 1 s re-render | ✓ by performance plan P2 (below) | `4427194` (10-17) |
-| | REF-01 split `FlashcardReviewClient` | ✗ | |
-| | UX-08 Space/Enter as Good | ✗ waits on OD-3 | |
+| | REF-01 split `FlashcardReviewClient` | deferred (see Where to continue) | |
+| | UX-08 Space/Enter as Good | — dropped: OD-3 no | |
 | | FLOW-02 edit a card in the session | ✗ its message fix is done (COPY-07) | |
 | | MOB-05 swipe shows its grade | ✗ | |
 | | Gate GU2 | not run (needs U1) | |
@@ -90,7 +116,7 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 
 - **Every budget lowered** to the measured size plus 3 kB, rounded up (the convention P4 used); none raised. GU2's bundle row now means 195 kB for study.
 
-**U1 (2026-11-05): trimmed to what protects U2.** The owner judged §4's full harness too much for a one-person app with few users, and chose a smaller one.
+**U1 (2026-11-05, `c3a2d59`): trimmed to what protects U2.** The owner judged §4's full harness too much for a one-person app with few users, and chose a smaller one.
 - **Kept:**
   - `study.spec.ts`: a keyboard session, checking the live region's question, answer and grade text, then the summary.
   - `focus.spec.ts`: focus returns after ⌘K, New deck, the trash confirm (cancelled), study pause and quiz quit, each opened from the keyboard.
@@ -111,7 +137,9 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 **Owner decisions (§10), as they stand.**
 - **Made by what shipped:** OD-4 (the chunk, named on screen, with "Keep going"), OD-5 (social proof deleted), OD-9 (320 ms flip, 120 ms flash).
 - **Superseded:** OD-8. PDF generation by section, with cancel, is the performance plan's P5.
-- **Still open:** OD-2 (display steps, U4), OD-3 (Space as Good; UX-08 waits on it), OD-6 (suspend and bury), OD-7 (the quiz's letter grade), OD-10 (privacy page), OD-11 (real-user metrics).
+- **Decided 2026-11-05:** OD-3 **no**, so Space doesn't grade and UX-08 is dropped. OD-7 **no**, so the quiz keeps its letter grade and badges, and VIS-01 is dropped.
+- **Not now:** OD-6 (suspend and bury), OD-11 (real-user metrics; U5 deferred).
+- **Still open:** OD-2 (display steps, deferred with U4), OD-10 (privacy page).
 
 ---
 

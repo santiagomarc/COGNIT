@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isTypingTarget, pageShortcutBlocked } from '@/lib/hotkeys';
 import { m, AnimatePresence, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
-import { ArrowLeft, ChevronRight, Pause, Play, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Pause, Pencil, Play, RotateCcw } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import { DEFAULT_EASE_FACTOR, type SM2Input, type StudyGrade } from '@/lib/sm2';
 import { projectedInterval, spokenInterval } from '@/lib/grade-interval';
 import { plainText } from '@/lib/rich-text';
 import { createHeldGrade } from '@/lib/held-grade';
+import { whenIdle } from '@/lib/when-idle';
 import { summariseNextReviews, summaryActions, type StudyContinuation, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { studyLength } from '@/lib/study-type';
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
@@ -43,6 +45,10 @@ type FlashcardReviewClientProps = {
 };
 
 const NO_DRILLS: CapstoneDrillCandidate[] = [];
+
+// Loaded on first use (UIUX plan §5.8): the study route is held to a bundle budget.
+const loadEditSheet = () => import('@/components/ui/shared/EditCardSheet');
+const EditCardSheet = dynamic(() => loadEditSheet().then((mod) => mod.EditCardSheet), { ssr: false });
 
 type GradeLogEntry = {
   cardId: string;
@@ -231,6 +237,12 @@ export function FlashcardReviewClient({
   const [gradeNote, setGradeNote] = useState<{ forIndex: number; text: string } | null>(null);
   const cardRef = useRef<HTMLButtonElement>(null);
 
+  // Fix a card without leaving the session (UIUX plan §5.8). The clock pauses
+  // while the sheet is open; the pause overlay stays out of its way.
+  const [editing, setEditing] = useState(false);
+  const pausedByEditRef = useRef(false);
+  useEffect(() => whenIdle(() => void loadEditSheet()), []);
+
   const cardStart = useRef(sessionStartMs);
   const commitTimerRef = useRef<number | null>(null);
   const pausedAtRef = useRef<number | null>(null);
@@ -276,6 +288,54 @@ export function FlashcardReviewClient({
     setNowMs(now);
     setIsPaused(true);
   }, [isPaused]);
+
+  const openEdit = useCallback(() => {
+    if (editing || !sessionCards[index]) return;
+    // A held grade is sent first: undoing it later would restore the card as
+    // it was before this edit (or bring back a card deleted from the sheet).
+    heldRef.current?.flush();
+    if (!isPaused) {
+      pausedByEditRef.current = true;
+      togglePause();
+    }
+    setEditing(true);
+  }, [editing, index, isPaused, sessionCards, togglePause]);
+
+  const closeEdit = useCallback(() => {
+    setEditing(false);
+    if (pausedByEditRef.current) {
+      pausedByEditRef.current = false;
+      togglePause();
+    }
+    requestAnimationFrame(() => cardRef.current?.focus({ preventScroll: true }));
+  }, [togglePause]);
+
+  const handleCardEdited = useCallback(
+    (next: { question: string; answer: string }) => {
+      const id = sessionCards[index]?.id;
+      // The action clears the derived fields with the text that produced them.
+      setSessionCards((cardsNow) =>
+        cardsNow.map((card) =>
+          card.id === id ? { ...card, back: next.question, front: next.answer, id_question: null, mcq_distractors: null } : card
+        )
+      );
+      closeEdit();
+    },
+    [closeEdit, index, sessionCards]
+  );
+
+  const handleCardDeleted = useCallback(() => {
+    const id = sessionCards[index]?.id;
+    // Every copy goes (a failed card can be queued again). The next card slides
+    // into this position, so `index` only moves for copies before it.
+    const removedBefore = sessionCards.slice(0, index).filter((card) => card.id === id).length;
+    setSessionCards((cardsNow) => cardsNow.filter((card) => card.id !== id));
+    setIndex((value) => value - removedBefore);
+    setShowAnswer(false);
+    setPeeking(false);
+    cardStart.current = Date.now();
+    closeEdit();
+  }, [closeEdit, index, sessionCards]);
 
   /* A pending commit flash must not fire into an unmounted tree. */
   useEffect(
@@ -749,6 +809,12 @@ export function FlashcardReviewClient({
         return;
       }
 
+      if (event.key.toLowerCase() === 'e' && !event.metaKey && !event.ctrlKey && !event.altKey && !isPaused) {
+        event.preventDefault();
+        openEdit();
+        return;
+      }
+
       // Everything else is suspended while the session is on hold — the point
       // of the pause is that the user is not at the desk.
       if (isPaused) return;
@@ -785,7 +851,7 @@ export function FlashcardReviewClient({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [commitGrade, completed, isPaused, resumeState, showAnswer, togglePause]);
+  }, [commitGrade, completed, isPaused, openEdit, resumeState, showAnswer, togglePause]);
 
   // Undo works on the last card too, when the summary is already showing, so
   // it is not part of the grading handler (which stands down once completed).
@@ -998,6 +1064,21 @@ export function FlashcardReviewClient({
 
               {/* The keycap is bound to the control it triggers, never listed
                   in a footer strip (§7.3), and never hidden responsively. */}
+              {!completed ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={openEdit}
+                  disabled={isPaused}
+                  aria-label="Edit card"
+                  className="h-11 min-w-11 gap-2 px-2 sm:h-8 sm:min-w-0"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Edit</span>
+                  <Kbd className="max-sm:hidden">E</Kbd>
+                </Button>
+              ) : null}
               {!completed ? (
                 <Button
                   type="button"
@@ -1285,8 +1366,22 @@ export function FlashcardReviewClient({
         Scrim per §7.8 — `--z-overlay`, and the 4px blur that modal scrims are
         the only permitted use of in the product.
       */}
+      {editing && active ? (
+        <EditCardSheet
+          // A new card is a new form, whichever way the sheet got there.
+          key={active.id}
+          deckId={deckId}
+          cardId={active.id}
+          question={active.back}
+          answer={active.front}
+          onClose={closeEdit}
+          onSaved={handleCardEdited}
+          onDeleted={handleCardDeleted}
+        />
+      ) : null}
+
       <AnimatePresence>
-        {isPaused && !completed ? (
+        {isPaused && !completed && !editing ? (
           <m.div
             key="study-paused-overlay"
             initial={{ opacity: 0 }}
