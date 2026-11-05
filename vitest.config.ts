@@ -1,9 +1,11 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 import path from 'node:path';
 
 export default defineConfig({
   test: {
     environment: 'node',
+    // e2e/ is Playwright's (UIUX plan §4.3); Vitest's default include matches its *.spec.ts.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     // @vitest/coverage-v8 is pinned to the exact vitest version: it declares an
     // exact peer, and installing it by range re-resolves vitest itself.
     coverage: {

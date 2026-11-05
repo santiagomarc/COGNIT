@@ -42,7 +42,7 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 | | FLOW-07 unfurls: `SITE_URL`, OG image | ✓ | `a26c15c` (10-27) |
 | | IA-01 Explore frame | ✓ | `92c0fda` (10-28) |
 | | Gate GU0 | not run as a gate; each item checked as it landed | |
-| **U1** | TEST-01 harness | ✗ not started. No `e2e/`, no `playwright.config.ts`; the test account (§1.5 V1; performance plan OD-4) still doesn't exist | |
+| **U1** | TEST-01 harness | ◐ built 2026-11-04 and trimmed 2026-11-05 at the owner's call (notes below); uncommitted. Public pages pass here; signed-in specs wait for the test account | |
 | **U2** | UX-07 · MOB-06 card fits, "More below" cue | ✓ with `study-type.ts`, `use-overflow.ts`, the `--type-study-*` tokens | `c438c17` (10-05), `c596dc6` (10-08) |
 | | A11Y-13 a card a screen reader can read | ✓ with `spokenInterval` (`grade-interval.ts`) and `plainText` (`rich-text.ts`) | `7c609fd`, `77ccee8` (10-29 – 10-31) |
 | | FLOW-01 · VIS-04 (study) honest chunk, "Keep going", "Starts with…" on Today | ✓ `getStudyContinuation` in `actions/study.ts`, `summaryActions` in `lib/study.ts`; "Recalled" on the summary | `0e7eff7` (11-01) |
@@ -89,6 +89,24 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 | `/explore` (no budget) | 165.9 | 176.6 | 164.0 | none |
 
 - **Every budget lowered** to the measured size plus 3 kB, rounded up (the convention P4 used); none raised. GU2's bundle row now means 195 kB for study.
+
+**U1 (2026-11-05): trimmed to what protects U2.** The owner judged §4's full harness too much for a one-person app with few users, and chose a smaller one.
+- **Kept:**
+  - `study.spec.ts`: a keyboard session, checking the live region's question, answer and grade text, then the summary.
+  - `focus.spec.ts`: focus returns after ⌘K, New deck, the trash confirm (cancelled), study pause and quiz quit, each opened from the keyboard.
+  - `a11y.spec.ts`: axe on landing, login, Today, the deck, study and quiz, in both themes. It fails on any rule not in a short allow-list of known findings, each tagged with its ID (A11Y-12 today); delete a finding's rules when its fix lands.
+  - The seed and global setup.
+- **Dropped from §4:**
+  - the CI job, and with it the throwaway Supabase stack;
+  - the WebKit and phone projects;
+  - the target-size spec;
+  - the screenshot matrix;
+  - the count baselines and their tooling;
+  - the latency gate. The latency test is now a measurement, run with `E2E_LATENCY=1`, that prints medians to compare with U2's 200 / 300 ms.
+- **How it runs:** `npm run build`, then `npm run e2e`. That runs desktop Chrome (the installed one) against production Supabase with the LOAD_TEST_* account from `.env.local`. It touches only `[e2e] …` decks and never creates an account. Without the account, only landing and login run.
+- **One fixture deck,** seeded with embeddings, tags and distractors. Otherwise the deck page's `CardDataBackfill` would make a model call on production's free tier. Study is opened with `scope=include_reviewed`, so a grade in one spec never empties another's session.
+- **Checked here** (production build, CI's placeholder Supabase URL, no account): the 4 public axe tests pass, and the 15 signed-in tests skip with the reason. On 2026-11-04, the larger version showed an unlabelled `<input>` on `/login` failing axe on `label`; the trimmed spec fails on any rule outside its allow-list. The unit suite is still 722 tests, with no `e2e/` file collected.
+- **Gate GU1, as trimmed:** `npm run e2e` green once with the test account. The focus and study specs were written from code and have never run.
 
 **Owner decisions (§10), as they stand.**
 - **Made by what shipped:** OD-4 (the chunk, named on screen, with "Keep going"), OD-5 (social proof deleted), OD-9 (320 ms flip, 120 ms flash).
