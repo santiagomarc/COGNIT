@@ -20,7 +20,7 @@ import { projectedInterval, spokenInterval } from '@/lib/grade-interval';
 import { plainText } from '@/lib/rich-text';
 import { createHeldGrade } from '@/lib/held-grade';
 import { whenIdle } from '@/lib/when-idle';
-import { summariseNextReviews, summaryActions, type StudyContinuation, type StudyScope, type StudySessionCard } from '@/lib/study';
+import { summariseNextReviews, summaryActions, swipeIntent, type StudyContinuation, type StudyScope, type StudySessionCard } from '@/lib/study';
 import { studyLength } from '@/lib/study-type';
 import { pickCapstoneDrill } from '@/lib/synthesis/schedule';
 import type { CapstoneDrillCandidate } from '@/lib/synthesis/types';
@@ -390,6 +390,16 @@ export function FlashcardReviewClient({
     };
   }, [capstoneDrills, completed, gradeLog, nowMs]);
 
+  // The grade a release would commit, shown while the card is dragged
+  // (UIUX plan §5.9). Set only when it changes, so a drag doesn't re-render per pixel.
+  const [swipe, setSwipe] = useState<{ grade: 'again' | 'good' | null; commits: boolean }>({ grade: null, commits: false });
+  const [swipeHintSeen, setSwipeHintSeen] = useState(() => {
+    try {
+      return typeof window === 'undefined' || window.localStorage.getItem('cognit-hint-swipe') === '1';
+    } catch {
+      return true;
+    }
+  });
   const dragX = useMotionValue(0);
   const rotate = useTransform(dragX, [-220, 220], [-14, 14]);
 
@@ -511,9 +521,21 @@ export function FlashcardReviewClient({
     heldRef.current?.undo()?.undo();
   }, []);
 
+  // The swipe hint is shown on the first revealed card only; any grade, by key
+  // or by swipe, means the user has found their way.
+  const markSwipeHintSeen = useCallback(() => {
+    setSwipeHintSeen(true);
+    try {
+      window.localStorage.setItem('cognit-hint-swipe', '1');
+    } catch {
+      // Private mode: the hint simply shows again next session.
+    }
+  }, []);
+
   const applyGrade = useCallback(
     (grade: StudyGrade) => {
       if (!active) return;
+      markSwipeHintSeen();
       const durationMs = Date.now() - cardStart.current;
       const previousCards = sessionCards;
       const previousIndex = index;
@@ -574,6 +596,7 @@ export function FlashcardReviewClient({
     },
     [
       active,
+      markSwipeHintSeen,
       gradeLog.length,
       index,
       insertRequeueCard,
@@ -1250,25 +1273,48 @@ export function FlashcardReviewClient({
                 className="mx-auto w-full max-w-2xl space-y-3"
               >
                 {/* Eyebrow above the card (§5 Task 3.3) */}
-                <p className="text-center font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-                  {flipState === 'default' ? 'Question' : 'Answer'}
-                </p>
+                {swipe.grade ? (
+                  // What releasing now would grade: the word and a 2px tick in its
+                  // state colour, filling in once the drag is far enough to commit.
+                  <p
+                    aria-hidden="true"
+                    className="flex flex-col items-center gap-1 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]"
+                    style={{
+                      color: swipe.commits
+                        ? swipe.grade === 'good' ? 'var(--state-mastered)' : 'var(--state-lapsed)'
+                        : 'var(--ink-dimmer)',
+                    }}
+                  >
+                    {GRADE_LABEL[swipe.grade]}
+                    <span
+                      className="h-[2px] w-8"
+                      style={{
+                        background: swipe.commits
+                          ? swipe.grade === 'good' ? 'var(--state-mastered)' : 'var(--state-lapsed)'
+                          : 'var(--border-control)',
+                      }}
+                    />
+                  </p>
+                ) : (
+                  <p className="text-center font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                    {flipState === 'default' ? 'Question' : 'Answer'}
+                  </p>
+                )}
 
                 <div className="relative">
                   <m.div
                     drag={showAnswer && !isPaused ? 'x' : false}
                     dragConstraints={{ left: 0, right: 0 }}
                     style={{ x: dragX, rotate }}
+                    onDrag={(_, info) => {
+                      const next = swipeIntent(info.offset.x, info.velocity.x);
+                      setSwipe((current) => (current.grade === next.grade && current.commits === next.commits ? current : next));
+                    }}
                     onDragEnd={(_, info) => {
+                      setSwipe({ grade: null, commits: false });
                       if (!showAnswer) return;
-                      // Distance OR velocity: a short fast flick is a grade too,
-                      // and a slow drag released back near centre is not.
-                      const flick = Math.abs(info.velocity.x) > 500 && Math.abs(info.offset.x) > 40;
-                      const swipe = Math.abs(info.offset.x) > 120;
-                      if (!flick && !swipe) return;
-                      const direction = Math.sign(flick ? info.velocity.x : info.offset.x);
-                      if (direction > 0) commitGrade('good');
-                      else if (direction < 0) commitGrade('again');
+                      const { grade, commits } = swipeIntent(info.offset.x, info.velocity.x);
+                      if (grade && commits) commitGrade(grade);
                     }}
                     className="relative cursor-grab active:cursor-grabbing"
                   >
@@ -1291,6 +1337,10 @@ export function FlashcardReviewClient({
                     />
                   </m.div>
                 </div>
+
+                {showAnswer && !peeking && !swipeHintSeen && window.matchMedia('(pointer: coarse)').matches ? (
+                  <p className="text-center text-[13px] text-ink-dim">Swipe right for Good, left for Again</p>
+                ) : null}
 
                 {/* Minimal, centered reveal affordance (§5 Task 3.3) */}
                 <div className="flex min-h-[38px] items-center justify-center pt-2">
@@ -1348,7 +1398,7 @@ export function FlashcardReviewClient({
                     card={activeSm2}
                     onCommit={commitGrade}
                     disabled={!showAnswer || isPaused || committedGrade !== null}
-                    isDown={heldGrade === grade || committedGrade === grade}
+                    isDown={heldGrade === grade || committedGrade === grade || (swipe.commits && swipe.grade === grade)}
                   />
                 ))}
               </div>

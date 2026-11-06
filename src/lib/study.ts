@@ -224,3 +224,23 @@ export function summaryActions(
     secondary: { label: 'Study ahead', href: `/dashboard/${deckId}/study?scope=include_reviewed` },
   };
 }
+
+/** A drag shows its grade past this many px, and commits past `SWIPE_COMMIT_PX` (or on a fast flick). */
+export const SWIPE_SHOW_PX = 40;
+export const SWIPE_COMMIT_PX = 120;
+const SWIPE_FLICK_VELOCITY = 500;
+
+/**
+ * What releasing a card drag right now would do (UIUX plan §5.9). One rule for
+ * the live label and for the release, so the preview can never disagree with
+ * the commit. Right is Good, left is Again; Hard and Easy stay on the keys.
+ * A short fast flick commits like a long drag, and a slow drag released near
+ * the centre is not a grade.
+ */
+export function swipeIntent(offsetX: number, velocityX: number): { grade: 'again' | 'good' | null; commits: boolean } {
+  if (Math.abs(offsetX) <= SWIPE_SHOW_PX) return { grade: null, commits: false };
+  const flick = Math.abs(velocityX) > SWIPE_FLICK_VELOCITY;
+  const direction = Math.sign(flick ? velocityX : offsetX);
+  const commits = flick || Math.abs(offsetX) > SWIPE_COMMIT_PX;
+  return { grade: direction > 0 ? 'good' : direction < 0 ? 'again' : null, commits };
+}

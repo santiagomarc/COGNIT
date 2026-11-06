@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  swipeIntent,
   summaryActions,
   DEFAULT_SESSION_CARD_COUNT,
   MAX_SESSION_CARD_COUNT,
@@ -103,5 +104,32 @@ describe('summaryActions (UIUX plan §5.5)', () => {
     const { primary, secondary } = summaryActions('deck-a', { hereDue: 0, next: null }, 10, 'r1');
     expect(primary).toEqual({ label: 'Back to Today', href: '/dashboard' });
     expect(secondary.href).toBe('/dashboard/deck-a/study?scope=include_reviewed');
+  });
+});
+
+describe('swipeIntent (UIUX plan §5.9)', () => {
+  it('shows nothing near the centre', () => {
+    expect(swipeIntent(30, 0)).toEqual({ grade: null, commits: false });
+    expect(swipeIntent(-40, 0)).toEqual({ grade: null, commits: false });
+  });
+
+  it('previews Good to the right and Again to the left before it commits', () => {
+    expect(swipeIntent(80, 0)).toEqual({ grade: 'good', commits: false });
+    expect(swipeIntent(-80, 0)).toEqual({ grade: 'again', commits: false });
+  });
+
+  it('commits past 120 px', () => {
+    expect(swipeIntent(121, 0)).toEqual({ grade: 'good', commits: true });
+    expect(swipeIntent(-121, 0)).toEqual({ grade: 'again', commits: true });
+    expect(swipeIntent(120, 0).commits).toBe(false);
+  });
+
+  it('commits a short fast flick in the direction it moves', () => {
+    expect(swipeIntent(60, 900)).toEqual({ grade: 'good', commits: true });
+    expect(swipeIntent(-60, -900)).toEqual({ grade: 'again', commits: true });
+  });
+
+  it('does not treat a fast flick under 40 px as a grade', () => {
+    expect(swipeIntent(30, 900)).toEqual({ grade: null, commits: false });
   });
 });
