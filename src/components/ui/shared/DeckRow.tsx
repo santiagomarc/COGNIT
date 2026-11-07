@@ -127,6 +127,13 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
             {deck.tag}
           </span>
         ) : null}
+        {/* The due column counts cards only (COPY-06): "+2d" read as two days. */}
+        {deck.dueDrillCount > 0 ? (
+          <span className="shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+            <span className="tnum">{deck.dueDrillCount}</span> {deck.dueDrillCount === 1 ? 'drill' : 'drills'}
+            <span className="sr-only"> due</span>
+          </span>
+        ) : null}
       </Link>
 
       {/* Mono and tabular throughout, so the numbers form real columns down the
@@ -144,16 +151,6 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
             title={deck.newCount > 0 ? `${deck.newCount} new ${deck.newCount === 1 ? 'card' : 'cards'} to learn` : undefined}
           >
             {deck.dueCount}
-            {/* Drills due ride beside the card count: a drill is a task too. */}
-            {deck.dueDrillCount > 0 ? (
-              <span
-                className="ml-1 text-[10px] uppercase tracking-[0.12em]"
-                style={{ color: 'var(--state-due)' }}
-                aria-label={`${deck.dueDrillCount} ${deck.dueDrillCount === 1 ? 'drill' : 'drills'} due`}
-              >
-                +{deck.dueDrillCount}d
-              </span>
-            ) : null}
           </dd>
         </div>
 

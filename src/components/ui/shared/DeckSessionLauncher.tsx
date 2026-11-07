@@ -164,7 +164,7 @@ export function DeckSessionLauncher({
         </h2>
 
         <p className="mt-2 text-xs leading-relaxed text-ink-dim">
-          Assessment mode. Results update this deck&apos;s mastery score.
+          Assessment mode. Results update which cards are quiz-proven.
         </p>
 
         <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink">
