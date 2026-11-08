@@ -232,7 +232,7 @@ export default function LoginClient() {
       <AmbientField />
 
       {/* ═══════════ Left panel (the product, at rest) ═══════════ */}
-      <div className="relative z-[1] hidden w-[58%] flex-col justify-center px-12 lg:flex xl:px-[88px]">
+      <aside className="relative z-[1] hidden w-[58%] flex-col justify-center px-12 lg:flex xl:px-[88px]">
         <div className="w-full max-w-[470px]">
           <Wordmark href="/" size="lg" />
 
@@ -305,14 +305,14 @@ export default function LoginClient() {
             Next review, scheduled by SM-2
           </p>
         </div>
-      </div>
+      </aside>
 
       {/* A hard `border-r` is what made this page read as two rectangles pasted
           together. The divider fades out at both ends instead. */}
       <div className="rule--v relative z-[1] hidden lg:block" aria-hidden="true" />
 
       {/* ═══════════ Right panel (auth form) ═══════════ */}
-      <div className="relative z-[1] flex flex-1 flex-col items-center justify-center px-6 py-12">
+      <main id="main-content" className="relative z-[1] flex flex-1 flex-col items-center justify-center px-6 py-12">
         {/* Theme toggle */}
         <div className="absolute right-4 top-4">
           <ThemeToggle />
@@ -564,7 +564,7 @@ export default function LoginClient() {
             )}
           </m.div>
         </AnimatePresence>
-      </div>
+      </main>
     </div>
   );
 }

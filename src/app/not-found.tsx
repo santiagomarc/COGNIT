@@ -27,7 +27,7 @@ export const metadata = {
  */
 export default function NotFound() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
+    <main id="main-content" className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-6 py-12">
       <Wordmark href="/" size="sm" />
 
       <div className="mt-10 border-t border-border pt-8">
@@ -55,6 +55,6 @@ export default function NotFound() {
           </Button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

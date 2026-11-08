@@ -91,7 +91,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
   const remaining = Math.max(0, cardCount - (previewCards?.length ?? 0));
 
   return (
-    <div id="main-content" className="container mx-auto max-w-5xl space-y-8 p-6 md:p-10">
+    <main id="main-content" className="container mx-auto max-w-5xl space-y-8 p-6 md:p-10">
       {/*
         The header is the telemetry strip the rest of the product uses (§7.9),
         not a centred hero on a translucent card. Someone arriving from a link
@@ -172,6 +172,6 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
           </>
         ) : null}
       </section>
-    </div>
+    </main>
   );
 }

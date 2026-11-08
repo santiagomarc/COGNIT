@@ -148,7 +148,7 @@ export function MCQMode({
   return (
     <div className="flex flex-1 flex-col">
       {/* Centered stage */}
-      <main className="flex flex-1 items-center justify-center p-4 md:p-8">
+      <div className="flex flex-1 items-center justify-center p-4 md:p-8">
         <div className="mx-auto w-full max-w-2xl space-y-6">
           {/* Eyebrow */}
           <div className="flex items-center justify-between font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
@@ -210,7 +210,7 @@ export function MCQMode({
             })}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Action band pinned to bottom (§4 Task 4.3) */}
       <footer className="grade-band">

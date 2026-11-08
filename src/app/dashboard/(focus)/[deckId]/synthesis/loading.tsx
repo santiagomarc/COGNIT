@@ -21,7 +21,7 @@ export default function SynthesisLoading() {
         <div className="h-px w-full bg-border" />
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 pb-8 md:px-8">
+      <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-5 px-4 pb-8 md:px-8">
         <div className="space-y-2">
           <div className="glass-skeleton h-7 w-full rounded-sm" />
           <div className="glass-skeleton h-7 w-4/5 rounded-sm" />
@@ -32,7 +32,7 @@ export default function SynthesisLoading() {
           <div className="glass-skeleton h-[40px] w-20 rounded-[var(--radius-sm)]" />
           <div className="glass-skeleton h-[40px] w-28 rounded-[var(--radius-sm)]" />
         </div>
-      </main>
+      </div>
     </div>
   );
 }

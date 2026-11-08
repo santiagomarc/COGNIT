@@ -65,7 +65,7 @@ export default function UpdatePasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-12">
+    <main id="main-content" className="flex min-h-screen items-center justify-center px-6 py-12">
       {/* Theme toggle */}
       <div className="fixed right-4 top-4 z-[var(--z-sticky)]">
         <ThemeToggle />
@@ -217,6 +217,6 @@ export default function UpdatePasswordPage() {
           </>
         )}
       </m.div>
-    </div>
+    </main>
   );
 }

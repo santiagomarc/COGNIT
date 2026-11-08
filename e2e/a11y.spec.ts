@@ -11,17 +11,9 @@ import { SURFACES } from './surfaces';
  */
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 
-const KNOWN: Record<string, string> = {
-  // A11Y-12 (U4): no single top-level <main>, and no skip link target.
-  // Measured on the public pages (Appendix B.1).
-  'landmark-one-main': 'A11Y-12',
-  region: 'A11Y-12',
-  'skip-link': 'A11Y-12',
-  // A11Y-12 (U4): study, quiz and the drill render their own <main> inside
-  // the shell's. Read from code, not yet seen by axe.
-  'landmark-main-is-top-level': 'A11Y-12',
-  'landmark-no-duplicate-main': 'A11Y-12',
-};
+// Rules with a scheduled fix, tagged with their finding ID. Empty: A11Y-12
+// (landmarks, skip link) landed and the public pages are axe-clean.
+const KNOWN: Record<string, string> = {};
 
 const THEMES: Theme[] = ['light', 'dark'];
 
