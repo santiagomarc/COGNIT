@@ -91,7 +91,7 @@ import {
 import { fillDerivedCardData } from '@/lib/card-derived';
 
 /**
- * Micro-synthesis Server Actions (COGNIT_MICRO_SYNTHESIS_SPEC.md Rev. B.1 §9.3).
+ * Micro-synthesis Server Actions (docs/specs/micro-synthesis-spec.md Rev. B.1 §9.3).
  *
  * Two model calls in the whole feature: one per generated drill (parallel,
  * temperature 0.6) and one per check (temperature 0.1, ≈ 3 s). The model

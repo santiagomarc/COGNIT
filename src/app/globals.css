@@ -6,7 +6,7 @@
 /*
  * ─────────────────────────────────────────────────────────────────────────
  *  Obsidian Telemetry — token layer
- *  Spec: COGNIT_DESIGN_SYSTEM.md §2 (colour), §3 (type), §4 (space/radius/z)
+ *  Spec: docs/design-system.md §2 (colour), §3 (type), §4 (space/radius/z)
  *
  *  Two layers live here:
  *
@@ -1399,7 +1399,7 @@ button.flip {
 @utility type-display-sm { font-size: var(--type-display-sm); }
 
 /*
- * ─── Micro-synthesis drills (COGNIT_MICRO_SYNTHESIS_SPEC.md §10.7) ───
+ * ─── Micro-synthesis drills (docs/specs/micro-synthesis-spec.md §10.7) ───
  *
  * No new hue, radius or elevation. The answer form's container is the plane
  * (`.raised` while answering, `.well` once diagnosed); the controls inside it

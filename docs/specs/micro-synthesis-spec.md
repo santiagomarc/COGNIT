@@ -3,7 +3,7 @@
 **Technical specification · Rev. B.1 — supersedes `COGNIT_ESSAY_ENGINE_SPEC.md` (Rev. A)**
 **Status:** Phases 0–4 implemented (B.1 adjustments of 2026-09-12; Phase 2 capstone and dashboard reading; Phase 3 from `COGNIT_MICRO_SYNTHESIS_AUDIT.md` on 2026-09-15; Phase 4 — plans, formats, grading integrity, the live gates — from `COGNIT_MICRO_SYNTHESIS_AUDIT_II.md` via `COGNIT_MICRO_SYNTHESIS_EXECUTION_PLAN.md` on 2026-09-21, §12.2d) · **Written:** 2026-09-12 · **Against:** `main` @ `81a12e0`; Phase 4 on `dbe01eb`
 **Applies to:** Next.js 16 (App Router) · React 19 · TypeScript strict · Supabase Postgres + pgvector · Gemini 2.5 Flash via `@google/generative-ai` 0.24 · Tailwind v4 · Vitest 4
-**Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. C), `COGNIT_HANDOFF.md`
+**Companions:** `docs/design-system.md` (Rev. C), `COGNIT_HANDOFF.md`
 
 ---
 
@@ -999,7 +999,7 @@ supabase/migrations/202609120900_micro_synthesis.sql
 
 ## 10. UI/UX — Obsidian Telemetry
 
-Governed by `COGNIT_DESIGN_SYSTEM.md` Rev. C. Restated because they bind here: one `.raised`
+Governed by `docs/design-system.md` Rev. C. Restated because they bind here: one `.raised`
 per screen (§1b there), hue only as a state channel paired with a word or count (§2.2, §2.2b
 there), serif at 24 px and never below (§3.3 there), no ambient field on a canvas (§7.10 rule 3
 there — the drill canvas is a study canvas).

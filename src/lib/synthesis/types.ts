@@ -1,5 +1,5 @@
 /**
- * Micro-synthesis domain types (COGNIT_MICRO_SYNTHESIS_SPEC.md Rev. B.1 §9.2).
+ * Micro-synthesis domain types (docs/specs/micro-synthesis-spec.md Rev. B.1 §9.2).
  *
  * Client-safe: no server imports. Cards cross every boundary as
  * `{ id, term, definition }` — never `front` / `back` (design system §7.6).

@@ -223,7 +223,7 @@ against a 300-call daily ceiling. At 100 active users that is real money.
 | `PHASE_2_AUDIT.md` | Review of Gemini's Phases 1–2; 6 defects, 2 gaps |
 | `PHASE_3_COMPLETION_REPORT.md` | Phase 2.5 + 3 |
 | `PHASE_4_COMPLETION_REPORT.md` | Phase 4 |
-| `COGNIT_PROGRAM_REPORT.md` | This document |
+| `docs/history/2026-09-program-report.md` | This document |
 | `supabase/verify/production-assertions.sql` | Post-migration SQL assertions |
 | `scripts/verify-deployment.mjs` | `npm run verify:deployment` |
 | `scripts/calibrate-threshold.mjs` | Retrieval threshold calibration |

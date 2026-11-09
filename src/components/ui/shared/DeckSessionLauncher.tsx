@@ -15,7 +15,7 @@ type DeckSessionLauncherProps = {
   unprovenCards: number;
   estimatedMinutes: number;
   sessionBounds: SessionBounds;
-  /** The synthesis block's readings (COGNIT_MICRO_SYNTHESIS_SPEC.md §10.2). */
+  /** The synthesis block's readings (docs/specs/micro-synthesis-spec.md §10.2). */
   synthesisReadings: SynthesisReadings;
   /** The deck's most common topic tags, for topic-directed generation (audit F3). */
   synthesisTopics?: string[];

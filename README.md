@@ -12,7 +12,8 @@ repetition, quiz yourself, and chat with your own deck.
 ## Setup
 
 1. `npm ci`
-2. `cp .env.example .env.local` and fill in every value.
+2. `cp .env.example .env.local` and fill in every value. Teammates: get the values from the
+   project owner over a private channel. Never commit `.env.local`.
 3. Apply the database migrations:
    ```bash
    supabase link --project-ref <your-ref> && supabase db push
@@ -36,12 +37,14 @@ without the migrations every RPC quietly falls into a slower fallback path.
 | `npm test` | Vitest, single run |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run test:coverage` | Coverage report |
+| `npm run e2e` | Playwright + axe end-to-end tests (needs a build and a test account in `.env.local`) |
 | `npm run verify:deployment` | Checks every RPC exists in the target database |
 
 ## Architecture
 
-Full topology, component inventory and design rationale:
-[`COGNIT_PRODUCTION_EXECUTION_PLAN.md`](COGNIT_PRODUCTION_EXECUTION_PLAN.md) §1.
+Full topology, folder map, data model and invariants:
+[`docs/architecture.md`](docs/architecture.md). Why things are built this way:
+[`docs/decisions.md`](docs/decisions.md).
 
 Briefly:
 
@@ -54,6 +57,30 @@ Briefly:
 - **Every AI call** goes through `withGeminiRetry` (`src/lib/ai-retry.ts`) and every AI
   Server Action through `guardAction` (`src/lib/action-guard.ts`), so a provider failure
   becomes a typed error result rather than an unhandled rejection.
+
+## Docs
+
+Everything lives in [`docs/`](docs/README.md):
+
+- [architecture](docs/architecture.md)
+- [decisions](docs/decisions.md)
+- [progress log and open items](docs/progress-log.md)
+- [design system](docs/design-system.md)
+- [UI/UX plan in progress](docs/plans/uiux-plan.md)
+- [runbooks](docs/runbooks/)
+
+[`CLAUDE.md`](CLAUDE.md) holds the team rules. Claude Code reads it automatically.
+
+## Working as a team
+
+Everyone commits directly to `main`:
+
+1. Run `git pull --rebase` before starting and before pushing.
+2. Run `npx tsc --noEmit && npm run lint && npm test` before every push.
+3. Never leave CI red. Fix or revert right away.
+4. Tell the group before committing a migration. Only the owner runs `supabase db push`
+   (see [docs/runbooks/migrations.md](docs/runbooks/migrations.md)).
+5. After each feature, add an entry to [docs/progress-log.md](docs/progress-log.md).
 
 ## Database
 

@@ -197,7 +197,7 @@ export const logQuizResultSchema = z.object({
 
 export type LogQuizResultInput = z.infer<typeof logQuizResultSchema>;
 
-/* ═══════════ Micro-synthesis (COGNIT_MICRO_SYNTHESIS_SPEC.md §9.1) ═══════════ */
+/* ═══════════ Micro-synthesis (docs/specs/micro-synthesis-spec.md §9.1) ═══════════ */
 
 export const synthesisFormatSchema = z.enum(['causal', 'counterfactual', 'comparative', 'evaluate', 'apply', 'distinguish', 'elaborate']);
 

@@ -3,7 +3,7 @@
 **Revision:** 1.2 · 2026-11-05. Rev 1.2: the owner said no to OD-3 and OD-7, so UX-08 and VIS-01 are dropped; U1 was trimmed and committed; the rest of the plan is cut to an ordered queue ("Where to continue", in the execution status). Rev 1.1 · 2026-11-03. Rev 1.1: an execution status (just below the reading guide): U0 is done, U2 is mostly done, U1 and U3–U5 are open; a new S1, COPY-07, found and fixed; CI back within its bundle budgets, and every budget lowered. Rev 1.0 · 2026-10-01.
 **Baseline:** `main` @ `bc66b1d` (re-checked at the end of the audit: no new commits; untracked `COGNIT_SIDEBAR_SETTINGS_PLAN.md` and `COGNIT_UIUX_PLAN_PROMPT.md` only).
 **Scope:** an audit of Cognit's UI and UX, seen running where the session could see it and read from code where it could not, and the phased plan that follows. No code was changed.
-**Companions:** `COGNIT_DESIGN_SYSTEM.md` (Rev. E since SSP; this plan proposes **Rev. F**, §9, not yet applied) · `COGNIT_SIDEBAR_SETTINGS_PLAN.md` (Rev 1.0, executed 2026-10-01 – 10-03; owner UAT owed; called **SSP** below) · `COGNIT_PERFORMANCE_PLAN.md` (Rev 1.6, complete; its P2, P3 and P5 delivered PERF-06/07, half of IA-04 and FLOW-06) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; house style, finding IDs, §7 standing rules).
+**Companions:** `docs/design-system.md` (Rev. E since SSP; this plan proposes **Rev. F**, §9, not yet applied) · `COGNIT_SIDEBAR_SETTINGS_PLAN.md` (Rev 1.0, executed 2026-10-01 – 10-03; owner UAT owed; called **SSP** below) · `COGNIT_PERFORMANCE_PLAN.md` (Rev 1.6, complete; its P2, P3 and P5 delivered PERF-06/07, half of IA-04 and FLOW-06) · `COGNIT_NEXT_HORIZON_PLAN.md` (Rev 1.4; house style, finding IDs, §7 standing rules).
 
 ---
 
@@ -85,7 +85,7 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 | | UX-06 local day | ✗ needs the §6.1 migration | |
 | | FLOW-04 · FB-01 · COPY-05 · PERF-08 | ✗ | |
 | **U4** | DS-08/09/10, VIS-01/02/03, VIS-04 (quiz), A11Y-12/14/15 | ✗ not started. "Flawless Victory" and "Speed Demon" are still at `QuizAssessmentClient.tsx:278, 286` and the letter grade at `:681`. Nested `<main>` is still in `MCQMode.tsx:151`, `IdentificationMode.tsx:107`, `FlashcardReviewClient`, `QuizAssessmentClient`, `SynthesisDrillClient`, `synthesis/loading.tsx` and `explore/page.tsx` | |
-| | DS Rev. F (§9) | ✗ `COGNIT_DESIGN_SYSTEM.md` is still Rev. E, though two Rev. F tokens already ship in `globals.css`: `--dur-flip: 320ms` and `--type-study-*` | |
+| | DS Rev. F (§9) | ✗ `docs/design-system.md` is still Rev. E, though two Rev. F tokens already ship in `globals.css`: `--dur-flip: 320ms` and `--type-study-*` | |
 | **U5** | PERF-09 `rum_samples`, funnel | ✗ | |
 
 **What changed from the sketches, and why.**
@@ -227,7 +227,7 @@ Each seed was re-checked against `bc66b1d` (no commits landed during the audit).
 | **UX-08** | S2 | Study · rhythm | `FlashcardReviewClient.tsx:615–622` | After the reveal, Space and Enter do nothing. Anki's reviewer grades **Good** on Space/Enter after reveal, so a whole session runs on one key plus the occasional 1 or 2. Decision OD-3. | code | 5.7 |
 | **VIS-03** | S3 | Design system · state | `QuizAssessmentClient.tsx:822`, `SynthesisDrillClient.tsx:771` | "Correct answer: …" is set in `--state-lapsed`. The correct answer isn't a lapse, and the diagnostics list below puts the same text in ink. The drill's "Checking" tick uses `--state-streak`, a state hue on a network wait. | code | 7.3 |
 | **DS-09** | S3 | Design system · type | see S2 | Seed S2, corrected (§1.1). | code | 7.2 |
-| **DS-10** | S3 | Design system · doc drift | `COGNIT_DESIGN_SYSTEM.md` §3.3, §4.2, §7.2, §7.6 vs `globals.css:113–116`, `button.tsx:70–75` | The document contradicts itself and the code. §3.3 has no `--type-display-sm` (the code does, at 24 px) and calls `display-lg` the page title, while app `h1`s use `type-display`. §7.6 sets the card at 25–34 px, §3.3 at 38–52 px. §7.2 says buttons are 34 px, §4.2 says 40 px; the code ships 32 / 40 / 44. | code | 9 |
+| **DS-10** | S3 | Design system · doc drift | `docs/design-system.md` §3.3, §4.2, §7.2, §7.6 vs `globals.css:113–116`, `button.tsx:70–75` | The document contradicts itself and the code. §3.3 has no `--type-display-sm` (the code does, at 24 px) and calls `display-lg` the page title, while app `h1`s use `type-display`. §7.6 sets the card at 25–34 px, §3.3 at 38–52 px. §7.2 says buttons are 34 px, §4.2 says 40 px; the code ships 32 / 40 / 44. | code | 9 |
 | **COPY-04** | S3 | Landing | `Footer.tsx:9–21, 43` | 9 of the footer's 11 links (Pricing, Changelog, About, Blog, Careers, Contact, Privacy, Terms, Cookies) and all three social icons are `href="#"`. There's no privacy page, while uploaded PDFs go to Gemini's free tier, where Google may use prompts. | measured: `landing__375__light.png` | 3.1 |
 | **COPY-05** | S3 | Voice | 103 toast call sites; `error.tsx:51`, `dashboard/error.tsx:48`, `FlashcardReviewClient.tsx:711, 759–764, 913`, `QuizAssessmentClient.tsx:723, 746, 1044`, `LoginClient.tsx:163, 207`, `PDFUploadZone.tsx:144` | The voice drifts from "precise, quiet". Exclamation marks: "Reset email sent!", "Check your email!", "cards generated and saved!", "You're all caught up!". Title Case beside sentence case: "Start New Session", "Resume Session", "Back to Deck", "Review Again", "Quit Quiz", "Quiz Result", "Avg. per Question". `dashboard/error.tsx` says "This deck failed to load" for **every** dashboard route (Today, Stats, study, quiz). Both error boundaries say "The error has been logged", but a client-side render error goes only to that browser's console. | code | 6.6 |
 | **COPY-06** | S3 | Deck row | `DeckRow.tsx:150–160` | A due drill count renders as "+2d" in a mono column beside ease, which reads as "plus two days". | code | 6.2 |
@@ -1182,11 +1182,11 @@ No session replay, no third-party analytics script, no per-user event stream. Th
 
 ## 9. Design system Rev. F
 
-Written against Rev. D **plus** SSP's Rev. E (SSP Appendix B). Nothing elsewhere in this plan departs from Rev. D except through the items below. Paste into `COGNIT_DESIGN_SYSTEM.md` when U4 lands; §9.3 and §9.5 are needed earlier, by U2, and can land with it.
+Written against Rev. D **plus** SSP's Rev. E (SSP Appendix B). Nothing elsewhere in this plan departs from Rev. D except through the items below. Paste into `docs/design-system.md` when U4 lands; §9.3 and §9.5 are needed earlier, by U2, and can land with it.
 
 ### 9.1 Status and changelog
 
-Append to **Status**: `· Rev. F (2026-10: study type by length, motion budgets, one glossary, local days, type utilities — COGNIT_UIUX_PLAN.md §9)`.
+Append to **Status**: `· Rev. F (2026-10: study type by length, motion budgets, one glossary, local days, type utilities — docs/plans/uiux-plan.md §9)`.
 
 **Changelog (Rev. F):** The card face's size follows its text's length (§3.3, §7.6). Motion gets latency budgets and a shorter flip (§5). Chrome type steps get utilities (§3.3). A glossary fixes one meaning per word (§12, new). Days are local (§2.2e). The anti-pattern list names performance badges, invented numbers and all cursor tilt (§1.1). Accessible names must carry the content (§9). Control heights are tokens (§4.2). The document now matches the code on step names and button heights (DS-10).
 

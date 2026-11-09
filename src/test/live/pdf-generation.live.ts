@@ -98,7 +98,7 @@ function buildPdf(text: string, charsPerPage = 4_500): Uint8Array<ArrayBuffer> {
 
 /** Prose from the repo's own long specs: unique lines, real sentences, no page furniture. */
 function sourceText(chars: number): string {
-  const text = fs.readFileSync(path.resolve(process.cwd(), 'COGNIT_MICRO_SYNTHESIS_SPEC.md'), 'utf8')
+  const text = fs.readFileSync(path.resolve(process.cwd(), 'docs/specs/micro-synthesis-spec.md'), 'utf8')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/[#*`|>_-]{2,}/g, ' ');
   return text.slice(0, chars);
