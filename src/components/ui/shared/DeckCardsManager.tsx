@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { CheckSquare, Square, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { CheckSquare, Search, Square, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { bulkDeleteCards, getDeckCardsPage } from '@/app/actions/card';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cardFilterPattern } from '@/lib/card-filter';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
 
@@ -57,6 +59,13 @@ function sortCardsByNumberDesc(items: DeckCard[]) {
 export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: DeckCardsManagerProps) {
   const router = useRouter();
   const [deckCards, setDeckCards] = useState(() => sortCardsByNumberDesc(cards));
+  // The Cards-tab filter (IA-04). `matches` is null while no filter is active;
+  // otherwise it holds the cards the server found, and replaces the list.
+  const [query, setQuery] = useState('');
+  const [matches, setMatches] = useState<DeckCard[] | null>(null);
+  const [matchesHaveMore, setMatchesHaveMore] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
+  const filterRequest = useRef(0);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -67,8 +76,51 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
     setDeckCards(sortCardsByNumberDesc(cards));
   }, [cards]);
 
+  const filterActive = cardFilterPattern(query) !== null;
+
+  // Ask the server once typing pauses. A reply for an earlier query is dropped.
+  useEffect(() => {
+    if (!filterActive) {
+      filterRequest.current += 1;
+      setMatches(null);
+      setIsFiltering(false);
+      return;
+    }
+    const request = (filterRequest.current += 1);
+    setIsFiltering(true);
+    const timer = setTimeout(async () => {
+      const result = await getDeckCardsPage(deckId, 0, 60, query);
+      if (request !== filterRequest.current) return;
+      setIsFiltering(false);
+      if (result.error || !result.success) {
+        toast.error(result.error ?? 'Could not filter the cards.');
+        return;
+      }
+      setMatches(sortCardsByNumberDesc(result.cards));
+      setMatchesHaveMore(result.cards.length === 60);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [query, filterActive, deckId]);
+
+  /** What the grid shows: the filter's matches while one is active, else the loaded cards. */
+  const visibleCards = filterActive && matches ? matches : deckCards;
+
   async function handleLoadMore() {
     setIsLoadingMore(true);
+    if (filterActive && matches) {
+      const result = await getDeckCardsPage(deckId, matches.length, 60, query);
+      setIsLoadingMore(false);
+      if (result.error || !result.success) {
+        toast.error(result.error ?? 'Failed to load more cards.');
+        return;
+      }
+      setMatches((prev) => {
+        const known = new Set((prev ?? []).map((c) => c.id));
+        return sortCardsByNumberDesc([...(prev ?? []), ...result.cards.filter((c) => !known.has(c.id))]);
+      });
+      setMatchesHaveMore(result.cards.length === 60);
+      return;
+    }
     const result = await getDeckCardsPage(deckId, deckCards.length, 60);
     setIsLoadingMore(false);
 
@@ -87,7 +139,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
   }
 
   const selectedCount = selectedIds.size;
-  const allSelected = deckCards.length > 0 && selectedCount === deckCards.length;
+  const allSelected = visibleCards.length > 0 && selectedCount === visibleCards.length;
 
   const cardNumberById = useMemo(() => mapCardNumbersByCreation(deckCards), [deckCards]);
 
@@ -118,11 +170,12 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
       setSelectedIds(new Set());
       return;
     }
-    setSelectedIds(new Set(deckCards.map((card) => card.id)));
+    setSelectedIds(new Set(visibleCards.map((card) => card.id)));
   }
 
   function handleCardDeleted(cardId: string) {
     setDeckCards((prev) => prev.filter((card) => card.id !== cardId));
+    setMatches((prev) => prev && prev.filter((card) => card.id !== cardId));
     setSelectedIds((prev) => {
       if (!prev.has(cardId)) return prev;
       const next = new Set(prev);
@@ -149,6 +202,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
 
     const selectedIdSet = new Set(ids);
     setDeckCards((prev) => prev.filter((card) => !selectedIdSet.has(card.id)));
+    setMatches((prev) => prev && prev.filter((card) => !selectedIdSet.has(card.id)));
     setSelectedIds(new Set());
     setSelectionMode(false);
     setShowBulkDeleteConfirm(false);
@@ -212,8 +266,12 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
         <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
           {selectionMode
-            ? `${selectedCount} of ${deckCards.length} selected`
-            : `${deckCards.length} cards`}
+            ? `${selectedCount} of ${visibleCards.length} selected`
+            : filterActive
+              ? isFiltering && !matches
+                ? 'Searching…'
+                : `${visibleCards.length}${matchesHaveMore ? '+' : ''} matching`
+              : `${deckCards.length} cards`}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -248,8 +306,29 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         </div>
       </div>
 
+      <div className="relative">
+        <Search
+          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-dimmer"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+        <Input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find a card by its words"
+          aria-label="Find a card by its words"
+          autoComplete="off"
+          className="pl-9"
+        />
+      </div>
+
+      {filterActive && matches && visibleCards.length === 0 ? (
+        <p className="py-8 text-center text-sm text-ink-dim">No card in this deck contains “{query.trim()}”.</p>
+      ) : null}
+
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {deckCards.map((card) => (
+        {visibleCards.map((card) => (
           <div key={card.id}>
             <FlashcardWithActions
               cardId={card.id}
@@ -270,7 +349,15 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         ))}
       </div>
 
-      {totalCards !== undefined && deckCards.length < totalCards ? (
+      {filterActive && matches ? (
+        matchesHaveMore ? (
+          <div className="mt-8 flex flex-col items-center justify-center gap-2">
+            <Button onClick={handleLoadMore} disabled={isLoadingMore}>
+              {isLoadingMore ? 'Loading cards…' : 'Load more matches'}
+            </Button>
+          </div>
+        ) : null
+      ) : totalCards !== undefined && deckCards.length < totalCards ? (
         <div className="mt-8 flex flex-col items-center justify-center gap-2">
           <Button onClick={handleLoadMore} disabled={isLoadingMore}>
             {isLoadingMore ? 'Loading cards…' : `Load more cards (${deckCards.length} of ${totalCards})`}

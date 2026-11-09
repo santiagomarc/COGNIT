@@ -15,6 +15,7 @@ import { ensureSessionHeadroom, getRequestClient, getSessionUser } from '@/lib/s
 import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 import { runBackground } from '@/lib/background';
 import { fillDerivedCardData } from '@/lib/card-derived';
+import { cardFilterPattern } from '@/lib/card-filter';
 
 const BULK_DELETE_MAX_COUNT = 200;
 
@@ -306,7 +307,7 @@ export async function bulkDeleteCards(cardIds: string[], deckId: string) {
   return { success: true, deletedCount, requestedCount: parsed.data.card_ids.length };
 }
 
-export async function getDeckCardsPage(deckId: string, offset: number, limit = 60) {
+export async function getDeckCardsPage(deckId: string, offset: number, limit = 60, query?: string) {
   const deckAccess = await requireOwnedDeck(deckId);
   if ('error' in deckAccess) {
     return { error: deckAccess.error };
@@ -316,10 +317,17 @@ export async function getDeckCardsPage(deckId: string, offset: number, limit = 6
   const safeLimit = Math.min(Math.max(1, limit), 100);
   const safeOffset = Math.max(0, offset);
 
-  const { data: cards, error } = await supabase
+  let request = supabase
     .from('cards')
     .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags')
-    .eq('deck_id', deckId)
+    .eq('deck_id', deckId);
+
+  // The Cards tab's filter (IA-04): the same paging, narrowed to cards whose
+  // term or description holds the text.
+  const pattern = query ? cardFilterPattern(query) : null;
+  if (pattern) request = request.or(`front.ilike.${pattern},back.ilike.${pattern}`);
+
+  const { data: cards, error } = await request
     .order('created_at', { ascending: false })
     .range(safeOffset, safeOffset + safeLimit - 1);
 

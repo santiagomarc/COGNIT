@@ -45,7 +45,7 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 2. **FLOW-02: edit a card in the session** (§5.8). `E` and a header button open `EditCardSheet`. Load the sheet with `next/dynamic` so study stays inside its 195 kB budget. Register `E` in `SHORTCUTS`. Add its case to `study.spec.ts`.
 3. **UX-06: a day is the user's day** (§6.1). It needs a migration, which the owner pushes.
 4. **MOB-05: swipe shows its grade** (§5.9).
-5. **IA-04: the Cards-tab filter** (§6.7). Reuse `search_user_cards_lexical`; don't add a third search path.
+5. ~~**IA-04: the Cards-tab filter** (§6.7).~~ Done 2026-11-09: `getDeckCardsPage(…, query)` with `ilike` and the reserved characters stripped (`card-filter.ts`). `search_user_cards_lexical` searches every deck and caps at 8, so it didn't fit a per-deck list.
 6. **COPY-02 · COPY-06 · IA-02: one meaning per word** (§6.2).
 7. **A small migration revoking `anon` EXECUTE on the Phase 1 RPCs** (§11). It isn't a UIUX item, but it's cheap and closes a gap.
 

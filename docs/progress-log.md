@@ -38,13 +38,20 @@ If you made a choice someone could question later, also add it to [decisions.md]
 1. Finish U1: run `npm run build && npm run e2e` with a test account, and fix what the
    signed-in specs find.
 2. UX-06: a "day" is the user's local day. Needs a migration.
-3. IA-04: a text filter on the deck's Cards tab, reusing `search_user_cards_lexical`.
+3. ~~IA-04: Cards-tab filter~~ done (see the entry below; needs a manual check with real data).
 4. COPY-02 / COPY-06 / IA-02: one meaning per word (Retention / Mastery / Recalled).
 5. A small migration revoking `anon` EXECUTE on the Phase 1 RPCs.
 
 ---
 
 ## Entries
+
+### 2026-11-09 · santiagomarc · Find a card on the Cards tab (IA-04)
+- **What:** The deck's Cards tab has a "Find a card by its words" field. Typing two or more characters shows only the cards whose term or description contains them (case-insensitive), with "Load more matches" past 60. Clearing it restores the list. Select and bulk delete act on what is shown.
+- **Why:** A deck of a few hundred cards paged 60 at a time had no way to find one card. ⌘K only searches across decks and shows 8.
+- **Files:** `src/components/ui/shared/DeckCardsManager.tsx`, `src/app/actions/card.ts` (`getDeckCardsPage` takes an optional `query`), `src/lib/card-filter.ts` + test.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** `card-filter.test.ts` (pattern, minimum length, PostgREST syntax and LIKE wildcards stripped). Bundle: deck page 229.8 kB gz against a 232 budget. **Not yet exercised against a signed-in database**; try it on a real deck.
 
 ### 2026-11-09 · owner · Repository cleanup for the team
 - **What:**
