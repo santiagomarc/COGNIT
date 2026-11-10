@@ -69,9 +69,17 @@ const RPCS = {
   get_ai_usage_summary:       {},
 };
 
+// Signatures added beside an older one of the same name, so the map above (one
+// entry per name) can't hold them. A missing one means the migration is
+// unapplied. Local-day RPCs (202611100900, UIUX plan UX-06); anon's EXECUTE is revoked.
+const RPC_OVERLOADS = [
+  ['get_study_activity_days', { p_user_id: DECK, p_tz: 'UTC' }],
+  ['get_card_schedule_summary', { p_user_id: DECK, p_tz: 'UTC', p_days: 7 }],
+];
+
 let missing = 0;
 console.log(`Checking ${process.env.NEXT_PUBLIC_SUPABASE_URL}\n`);
-for (const [name, args] of Object.entries(RPCS)) {
+for (const [name, args] of [...Object.entries(RPCS), ...RPC_OVERLOADS]) {
   const { error } = await supabase.rpc(name, args);
   const msg = error?.message ?? '';
   const notFound = /could not find the function|does not exist|schema cache/i.test(msg);

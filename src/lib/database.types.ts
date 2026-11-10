@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -922,10 +922,20 @@ export type Database = {
         Args: { p_days?: number; p_now?: string }
         Returns: Json
       }
-      get_card_schedule_summary: {
-        Args: { p_days?: number; p_now?: string; p_user_id: string }
-        Returns: Json
-      }
+      get_card_schedule_summary:
+        | {
+            Args: { p_days?: number; p_now?: string; p_user_id: string }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_days?: number
+              p_now?: string
+              p_tz: string
+              p_user_id: string
+            }
+            Returns: Json
+          }
       get_concept_graph: {
         Args: { p_deck_id: string; p_max_nodes?: number }
         Returns: Json
@@ -991,13 +1001,21 @@ export type Database = {
           trashed_count: number
         }[]
       }
-      get_study_activity_days: {
-        Args: { p_user_id: string }
-        Returns: {
-          activity_date: string
-          review_count: number
-        }[]
-      }
+      get_study_activity_days:
+        | {
+            Args: { p_user_id: string }
+            Returns: {
+              activity_date: string
+              review_count: number
+            }[]
+          }
+        | {
+            Args: { p_tz: string; p_user_id: string }
+            Returns: {
+              activity_date: string
+              review_count: number
+            }[]
+          }
       get_synthesis_insights: {
         Args: { p_deck_id: string; p_now?: string }
         Returns: Json

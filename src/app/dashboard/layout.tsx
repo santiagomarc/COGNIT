@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { TimezoneCookie } from '@/components/TimezoneCookie';
+
 export const metadata: Metadata = {
   // Each chromed page names itself (Today, Drills, Settings…); this is the fallback.
   title: 'Cognit',
@@ -29,5 +31,10 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div style={{ paddingBottom: 'var(--dock-clearance)' }}>{children}</div>;
+  return (
+    <div style={{ paddingBottom: 'var(--dock-clearance)' }}>
+      <TimezoneCookie />
+      {children}
+    </div>
+  );
 }

@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import type { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { getDueByDeck, getDueDrills, getRequestClient, getRequestNow, getSessionUser, getUserSettings } from '@/lib/supabase/session';
+import { getRequestTimeZone } from '@/lib/request-timezone';
+import { localDayKey, shiftDayKey } from '@/lib/timezone';
 import { DeckGrid } from '@/components/ui/shared/DeckGrid';
 import { DashboardOnboarding } from '@/components/ui/shared/DashboardOnboarding';
 import { GreetingHeader } from '@/components/ui/shared/GreetingHeader';
@@ -61,8 +63,8 @@ type DashboardSnapshot = {
 // One row per distinct day ever studied, with that day's review count —
 // replaces two raw study_logs fetches (capped at 5,000 and 10,000 rows) that
 // existed only to compute this same grouping in Node.
-async function loadActivityDays(supabase: SupabaseServerClient, userId: string): Promise<ActivityDayRow[]> {
-  const rpcResult = await supabase.rpc('get_study_activity_days', { p_user_id: userId });
+async function loadActivityDays(supabase: SupabaseServerClient, userId: string, timeZone: string): Promise<ActivityDayRow[]> {
+  const rpcResult = await supabase.rpc('get_study_activity_days', { p_user_id: userId, p_tz: timeZone });
 
   if (rpcResult.error) {
     logger.error('dashboard', 'get_study_activity_days rpc failed', { message: rpcResult.error.message });
@@ -99,16 +101,18 @@ async function loadMasterySummary(
 async function loadScheduleSummary(
   supabase: SupabaseServerClient,
   userId: string,
-  now: Date
+  now: Date,
+  timeZone: string
 ): Promise<ScheduleSummary> {
   const empty: ScheduleSummary = {
-    forecastDays: buildSevenDayForecast([], now),
+    forecastDays: buildSevenDayForecast([], now, 7, timeZone),
     easeByDeck: new Map(),
     overdueDays: null,
   };
 
   const rpcResult = await supabase.rpc('get_card_schedule_summary', {
     p_user_id: userId,
+    p_tz: timeZone,
     p_now: now.toISOString(),
     p_days: 7,
   });
@@ -125,7 +129,7 @@ async function loadScheduleSummary(
   }
 
   return {
-    forecastDays: forecastFromDayCounts(summary.forecast, now),
+    forecastDays: forecastFromDayCounts(summary.forecast, now, 7, timeZone),
     easeByDeck: new Map(summary.ease_by_deck.map((row) => [row.deck_id, row.mean_ease])),
     overdueDays: overdueDaysSince(summary.oldest_overdue_at, now),
   };
@@ -208,7 +212,7 @@ async function loadDeckRowsWithFallback(supabase: SupabaseServerClient) {
   };
 }
 
-async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot> {
+async function loadDashboardSnapshot(userId: string, timeZone: string): Promise<DashboardSnapshot> {
   const supabase = await getRequestClient();
   const now = getRequestNow();
 
@@ -226,13 +230,13 @@ async function loadDashboardSnapshot(userId: string): Promise<DashboardSnapshot>
   ] = await Promise.all([
     loadDeckRowsWithFallback(supabase),
     getDueByDeck(userId),   // shared with the shell layout via React.cache
-    loadActivityDays(supabase, userId),
+    loadActivityDays(supabase, userId, timeZone),
     supabase
       .from('study_logs')
       .select('*', { count: 'exact', head: true })
       .eq('user_id', userId),
     loadMasterySummary(supabase, userId),
-    loadScheduleSummary(supabase, userId, now),
+    loadScheduleSummary(supabase, userId, now, timeZone),
     getDueDrills(userId),   // shared with the sidebar's badge via React.cache
   ]);
 
@@ -258,6 +262,8 @@ export default async function Dashboard() {
 
   // Started now and awaited for the greeting, so it rides the snapshot's wave (sidebar plan §5.2).
   const settingsPromise = getUserSettings(user.id);
+  // Days are the user's days (UX-06): the zone the browser told us, else UTC.
+  const timeZone = await getRequestTimeZone();
 
   const {
     deckRows,
@@ -269,7 +275,7 @@ export default async function Dashboard() {
     masterySummaryRows,
     schedule,
     dueDrills,
-  } = await loadDashboardSnapshot(user.id);
+  } = await loadDashboardSnapshot(user.id, timeZone);
 
   if (deckQueryUsedFallback && deckQueryErrorMessage) {
     logger.warn('dashboard', 'relational deck count query failed, fallback was used', { message: deckQueryErrorMessage });
@@ -318,11 +324,8 @@ export default async function Dashboard() {
   const uniqueDays = new Set<string>(activityDays.map((row) => row.activity_date));
 
   const sortedDays = Array.from(uniqueDays).sort((a, b) => b.localeCompare(a)); // newest first
-  const todayDate = getRequestNow();
-  const today = todayDate.toISOString().slice(0, 10);
-  const yesterdayDate = new Date(todayDate);
-  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
-  const yesterday = yesterdayDate.toISOString().slice(0, 10);
+  const today = localDayKey(getRequestNow(), timeZone);
+  const yesterday = shiftDayKey(today, -1);
 
   let streak = 0;
   let check = today;
@@ -347,9 +350,7 @@ export default async function Dashboard() {
     if (day === check) {
       streak++;
       // Move check to previous day
-      const d = new Date(check + 'T00:00:00Z');
-      d.setUTCDate(d.getUTCDate() - 1);
-      check = d.toISOString().slice(0, 10);
+      check = shiftDayKey(check, -1);
     } else if (day < check) {
       break; // gap found
     }
@@ -363,9 +364,7 @@ export default async function Dashboard() {
     if (i === 0) {
       currentRun = 1;
     } else {
-      const prev = new Date(allDaysSorted[i - 1] + 'T00:00:00Z');
-      prev.setUTCDate(prev.getUTCDate() + 1);
-      if (prev.toISOString().slice(0, 10) === allDaysSorted[i]) {
+      if (shiftDayKey(allDaysSorted[i - 1], 1) === allDaysSorted[i]) {
         currentRun++;
       } else {
         currentRun = 1;

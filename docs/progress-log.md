@@ -37,7 +37,7 @@ If you made a choice someone could question later, also add it to [decisions.md]
 **Next up** (from the queue in [plans/uiux-plan.md](plans/uiux-plan.md), "Where to continue"):
 1. Finish U1: run `npm run build && npm run e2e` with a test account, and fix what the
    signed-in specs find.
-2. UX-06: a "day" is the user's local day. Needs a migration.
+2. ~~UX-06: local day~~ code done; **owner pushes `202611100900`, then runs `npm run db:types`** (see the entry below).
 3. ~~IA-04: Cards-tab filter~~ done (see the entry below; needs a manual check with real data).
 4. COPY-02 / COPY-06 / IA-02: one meaning per word (Retention / Mastery / Recalled).
 5. A small migration revoking `anon` EXECUTE on the Phase 1 RPCs.
@@ -45,6 +45,15 @@ If you made a choice someone could question later, also add it to [decisions.md]
 ---
 
 ## Entries
+
+### 2026-11-10 · santiagomarc · A day is the user's day (UX-06)
+- **What:** Today's streak, "reviewed today", activity heatmap and seven-day forecast cut days at the user's local midnight, not UTC's. A user in UTC+8 who studied at 7 am no longer studied "yesterday". The first dashboard visit renders in UTC, writes a `cognit-tz` cookie and refreshes once; every later visit is right on the first byte.
+- **Why:** UTC midnight is 8 am in UTC+8, so streaks broke and "reviewed today" reset mid-morning.
+- **Files:** `src/lib/timezone.ts` (+ test), `src/lib/request-timezone.ts`, `src/components/TimezoneCookie.tsx` (mounted in `dashboard/layout.tsx`), `src/lib/dashboard-forecast.ts` (zone parameter, default UTC), `src/app/dashboard/(shell)/page.tsx`, `supabase/migrations/202611100900_local_day_rpcs.sql`, `src/lib/database.types.ts` (hand-written overload entries), `scripts/verify-deployment.mjs`.
+- **Migration (owner pushes):** adds `get_study_activity_days(uuid, text)` and `get_card_schedule_summary(uuid, text, timestamptz, integer)` beside the UTC signatures, which stay until a later contract migration. anon's EXECUTE is revoked on the new ones. **Push it before the code deploys:** until it is applied, the Today page's two reads fail, are logged, and render an empty streak and forecast.
+- **Not covered:** `get_analytics_snapshot` (Stats' weekly charts) and `get_synthesis_insights` still bucket by UTC.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** `timezone.test.ts` (Manila vs New York day at 23:30 UTC, bad zones, key arithmetic); `dashboard-forecast.test.ts` gains the zone cases. `sqlcheck.mjs` parses the migration. 738 tests, tsc, lint and build pass; study 193.9 kB of 195. The RPCs themselves are unrun: `npm run db:types` after the push should confirm the hand-written types.
 
 ### 2026-11-09 · santiagomarc · Find a card on the Cards tab (IA-04)
 - **What:** The deck's Cards tab has a "Find a card by its words" field. Typing two or more characters shows only the cards whose term or description contains them (case-insensitive), with "Load more matches" past 60. Clearing it restores the list. Select and bulk delete act on what is shown.

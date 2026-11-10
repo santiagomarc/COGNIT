@@ -199,3 +199,22 @@ describe('estimateSessionMinutes', () => {
     expect(estimateSessionMinutes(90)).toBe(12);
   });
 });
+
+describe('forecast in the user\'s zone (UX-06)', () => {
+  // 20:00 UTC on 9 Sep is already 10 Sep in Manila (UTC+8).
+  const evening = new Date('2026-09-09T20:00:00.000Z');
+
+  it('starts the window the day after the user\'s today', () => {
+    expect(buildSevenDayForecast([], evening, 7, 'UTC')[0].date).toBe('2026-09-10');
+    expect(buildSevenDayForecast([], evening, 7, 'Asia/Manila')[0].date).toBe('2026-09-11');
+    expect(forecastFromDayCounts([], evening, 7, 'Asia/Manila')[0].date).toBe('2026-09-11');
+  });
+
+  it('buckets a due time by the user\'s day', () => {
+    // At NOW both windows start 10 Sep. 17:00 UTC on 10 Sep is 01:00 on 11 Sep in Manila:
+    // the first column in UTC, the second there.
+    const rows = [card('2026-09-10T17:00:00.000Z')];
+    expect(buildSevenDayForecast(rows, NOW, 7, 'UTC').map((d) => d.count)).toEqual([1, 0, 0, 0, 0, 0, 0]);
+    expect(buildSevenDayForecast(rows, NOW, 7, 'Asia/Manila').map((d) => d.count)).toEqual([0, 1, 0, 0, 0, 0, 0]);
+  });
+});

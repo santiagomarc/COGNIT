@@ -8,6 +8,8 @@
  * two passes over the same rows for no benefit.
  */
 
+import { dayKeyDiff, localDayKey, shiftDayKey } from '@/lib/timezone';
+
 export type CardScheduleRow = {
   deck_id: string;
   ease_factor: number | null;
@@ -15,17 +17,13 @@ export type CardScheduleRow = {
 };
 
 export type ForecastDay = {
-  /** `YYYY-MM-DD`, UTC. */
+  /** `YYYY-MM-DD`, in the user's zone (UTC unless a zone is passed). */
   date: string;
   /** Cards falling due on that day. */
   count: number;
 };
 
 const DAY_MS = 86_400_000;
-
-function toIsoDate(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
 
 /**
  * Seven columns starting **tomorrow**.
@@ -44,9 +42,10 @@ function toIsoDate(ms: number): string {
 export function buildSevenDayForecast(
   rows: CardScheduleRow[],
   now: Date = new Date(),
-  days = 7
+  days = 7,
+  timeZone = 'UTC'
 ): ForecastDay[] {
-  const firstDayMs = forecastWindowStartMs(now);
+  const firstDay = forecastWindowStart(now, timeZone);
 
   const buckets = new Array<number>(days).fill(0);
 
@@ -56,13 +55,7 @@ export function buildSevenDayForecast(
     const dueMs = Date.parse(row.next_review_at);
     if (Number.isNaN(dueMs)) continue;
 
-    const dueDayMs = Date.UTC(
-      new Date(dueMs).getUTCFullYear(),
-      new Date(dueMs).getUTCMonth(),
-      new Date(dueMs).getUTCDate()
-    );
-
-    const offset = Math.round((dueDayMs - firstDayMs) / DAY_MS);
+    const offset = dayKeyDiff(localDayKey(new Date(dueMs), timeZone), firstDay);
     // Overdue and due-today fall before the window; they are the band's hero
     // figure, not a column here.
     if (offset < 0 || offset >= days) continue;
@@ -71,14 +64,14 @@ export function buildSevenDayForecast(
   }
 
   return buckets.map((count, index) => ({
-    date: toIsoDate(firstDayMs + index * DAY_MS),
+    date: shiftDayKey(firstDay, index),
     count,
   }));
 }
 
-/** UTC midnight of the day after `now` — the forecast's first column. */
-function forecastWindowStartMs(now: Date): number {
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) + DAY_MS;
+/** The day after `now` in `timeZone` — the forecast's first column. */
+function forecastWindowStart(now: Date, timeZone: string): string {
+  return shiftDayKey(localDayKey(now, timeZone), 1);
 }
 
 /**
@@ -132,13 +125,14 @@ export function parseCardScheduleSummary(value: unknown): CardScheduleSummary | 
 export function forecastFromDayCounts(
   dayCounts: Array<{ date: string; count: number }>,
   now: Date = new Date(),
-  days = 7
+  days = 7,
+  timeZone = 'UTC'
 ): ForecastDay[] {
-  const firstDayMs = forecastWindowStartMs(now);
+  const firstDay = forecastWindowStart(now, timeZone);
   const countByDate = new Map(dayCounts.map((entry) => [entry.date, entry.count]));
 
   return Array.from({ length: days }, (_, index) => {
-    const date = toIsoDate(firstDayMs + index * DAY_MS);
+    const date = shiftDayKey(firstDay, index);
     return { date, count: countByDate.get(date) ?? 0 };
   });
 }
