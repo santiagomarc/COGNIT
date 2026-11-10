@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 
-import { StateTick, type TickState } from '@/components/ui/shared/StateTick';
+import { StateTick } from '@/components/ui/shared/StateTick';
 import { DeckActions } from '@/components/ui/shared/DeckActions';
+import { deckState } from '@/lib/deck-row';
 
 export type DeckRowData = {
   id: string;
@@ -54,21 +55,6 @@ const DECK_COL = {
   quizzed: 'hidden w-12 text-right xl:block',
   actions: 'flex w-[68px] justify-end',
 } as const;
-
-/**
- * The deck's dominant state (design system §2.2).
- *
- * Order matters: work outranks progress. A deck with cards waiting reports
- * `due` even if it is 90% mastered, because the tick is there to say what to do
- * next, not to award a grade.
- */
-function deckState(deck: DeckRowData): TickState {
-  if (deck.cardCount === 0) return 'empty';
-  if (deck.dueCount > 0 || deck.dueDrillCount > 0) return 'due';
-  if (deck.assessedCards === 0) return 'neutral';
-  if (deck.masteryPercentage >= 70) return 'mastered';
-  return 'learning';
-}
 
 /**
  * Compact ages: `now`, `2h`, `3d`, `4mo`, `2y`.
@@ -162,17 +148,16 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
         </div>
 
         <div className={DECK_COL.mastery}>
-          <dt className="sr-only">Mastery</dt>
+          <dt className="sr-only">Quiz-proven</dt>
           <dd className="flex items-center justify-end gap-2">
-            {/* 104 × 3px, track --border, fill --ink-dim, stepping to
-                --state-mastered at 70% — the one place mastery earns a hue. */}
+            {/* 104 × 3px, track --border, fill --ink-dim. Quiz-proven is a
+                reading, so it stays ink: --state-mastered means SM-2 mastery. */}
             <span aria-hidden="true" className="block h-[3px] w-[104px] overflow-hidden rounded-[1px] bg-border-strong">
               <span
                 className="block h-full"
                 style={{
                   width: `${hasMastery ? Math.min(100, deck.masteryPercentage) : 0}%`,
-                  backgroundColor:
-                    deck.masteryPercentage >= 70 ? 'var(--state-mastered)' : 'var(--ink-dim)',
+                  backgroundColor: 'var(--ink-dim)',
                 }}
               />
             </span>
@@ -212,7 +197,7 @@ export function DeckRowLegend() {
         <span className={DECK_COL.cards}>Cards</span>
         <span className={DECK_COL.due}>Due</span>
         <span className={DECK_COL.ease}>Ease</span>
-        <span className={DECK_COL.mastery}>Mastery</span>
+        <span className={DECK_COL.mastery}>Quiz-proven</span>
         <span className={DECK_COL.quizzed}>Quizzed</span>
       </span>
       <span className={DECK_COL.actions} aria-hidden="true" />

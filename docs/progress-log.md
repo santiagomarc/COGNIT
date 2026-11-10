@@ -39,12 +39,24 @@ If you made a choice someone could question later, also add it to [decisions.md]
    signed-in specs find.
 2. ~~UX-06: local day~~ code done; **owner pushes `202611100900`, then runs `npm run db:types`** (see the entry below).
 3. ~~IA-04: Cards-tab filter~~ done (see the entry below; needs a manual check with real data).
-4. COPY-02 / COPY-06 / IA-02: one meaning per word (Retention / Mastery / Recalled).
+4. ~~COPY-02 / COPY-06 / IA-02~~ done as a relabel (see the entry below); the plan's Retention and Mastered redefinitions are not built.
 5. A small migration revoking `anon` EXECUTE on the Phase 1 RPCs.
 
 ---
 
 ## Entries
+
+### 2026-11-10 · santiagomarc · One meaning per word (COPY-02, COPY-06, IA-02)
+- **What:**
+  - **Quiz-proven, not "Retention" or "Mastery".** Today's greeting ("Retention") and activity panel ("Recall accuracy · 30d"), the deck list and deck readings ("Mastery"), and the quiz result and history copy all described one number: the share of cards whose last quiz answer was correct. They now say **Quiz-proven**. "Retention" now appears only where it is true, on Stats' 30-day figure.
+  - **No green for quiz-proven.** The deck-list bar and the deck readings bar no longer step to `--state-mastered` at 70%, and a deck's tick can no longer be `mastered`. That hue is for SM-2 mastery (interval ≥ 21 days).
+  - **Merge** is folded into a "Merge into another deck…" disclosure at the foot of Overview, no longer open on the page you study from.
+  - COPY-06 ("+2d" → "2 drills" after the title) was already done in `fdad208`.
+- **Why:** Three words ("retention", "mastery", "recall") named one quiz-based number, while Stats' "Retention · 30d" meant something else, so Today and Stats disagreed under the same word.
+- **Deviations from the plan (§6.2):** the plan redefines Retention and Mastered with new RPC columns (`retention_passed`, `mastered_by_deck`). That needs a migration and a re-wire of Today; the relabel gets the honesty without either. Today therefore shows no 30-day Retention figure and no SM-2 "Mastered" share yet. Merge is a disclosure, not an item in `DeckActions` (which is a row of icon buttons with no list of other decks).
+- **Files:** `src/lib/deck-row.ts` (+ test; `deckState` moved out of `DeckRow`), `DeckRow.tsx`, `DeckReadings.tsx`, `GreetingHeader.tsx`, `SignalPanel.tsx`, `QuizAssessmentClient.tsx`, `QuizHistoryList.tsx`, `[deckId]/page.tsx`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** `deck-row.test.ts` (due beats everything; quiz-proven never yields `mastered`). 742 tests, tsc, lint (incl. contrast) and build pass; every bundle budget holds. Not seen signed in: check Today, the deck list and a deck's Overview once.
 
 ### 2026-11-10 · santiagomarc · A day is the user's day (UX-06)
 - **What:** Today's streak, "reviewed today", activity heatmap and seven-day forecast cut days at the user's local midnight, not UTC's. A user in UTC+8 who studied at 7 am no longer studied "yesterday". The first dashboard visit renders in UTC, writes a `cognit-tz` cookie and refreshes once; every later visit is right on the first byte.

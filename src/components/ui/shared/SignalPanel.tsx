@@ -82,11 +82,11 @@ export function SignalPanel({
       <div className="rule rule--soft my-4 lg:hidden" aria-hidden="true" />
       <div className="rule--v max-lg:hidden" aria-hidden="true" />
 
-      {/* ── Recall accuracy ──────────────────────────────────────────── */}
+      {/* ── Quiz-proven ──────────────────────────────────────────── */}
       <div className="flex flex-col lg:w-[238px] lg:shrink-0 lg:px-[22px]">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-            Recall accuracy · 30d
+            Quiz-proven
           </h2>
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
             {assessedCards} assessed

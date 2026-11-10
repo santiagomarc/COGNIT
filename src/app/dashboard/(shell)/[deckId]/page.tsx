@@ -534,10 +534,17 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
         </>
       ) : null}
 
+      {/* Merging is an occasional tool, not part of studying, so it sits folded
+          at the foot of Overview rather than open on the page you study from (IA-02). */}
       {activeTab === 'overview' && mergeTargets.length > 0 ? (
-        <section className="well px-3.5 py-3" aria-label="Merge this deck">
-          <MergeDeckDialog sourceDeckId={deckId} sourceTitle={deckTitleMeta.cleanTitle} targets={mergeTargets} />
-        </section>
+        <details className="group well px-3.5 py-3">
+          <summary className="cursor-pointer text-[13px] text-ink-dim outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+            Merge into another deck…
+          </summary>
+          <div className="mt-3">
+            <MergeDeckDialog sourceDeckId={deckId} sourceTitle={deckTitleMeta.cleanTitle} targets={mergeTargets} />
+          </div>
+        </details>
       ) : null}
 
       {/* ═══ Exam ═══════════════════════════════════════════════════════ */}

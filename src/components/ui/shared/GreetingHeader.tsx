@@ -84,14 +84,15 @@ export function GreetingHeader({
 
         {/*
           A value takes a state colour only when the value *is* a state (§7.9).
-          Due is orange when there is work; an active streak is amber. Retention
+          Due is orange when there is work; an active streak is amber. Quiz-proven
           and reviewed-today are readings, not states, and stay --ink however
-          good or bad they are.
+          good or bad they are. (Quiz-proven is the share of cards whose last quiz
+          answer was correct; "Retention" is Stats' 30-day figure, UIUX COPY-02.)
         */}
         <div className="flex shrink-0 flex-wrap items-baseline gap-x-6 gap-y-3 lg:pb-1">
           <Telemetry label="Due" value={totalDue} tone={totalDue > 0 ? 'due' : 'ink'} />
           <Telemetry
-            label="Retention"
+            label="Quiz-proven"
             value={retentionPercentage === null ? '—' : `${retentionPercentage}%`}
           />
           <Telemetry

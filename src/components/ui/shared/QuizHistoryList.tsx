@@ -70,7 +70,7 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
           Quiz history
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm text-ink-dim">
-          No quiz history yet. Take your first quiz to start your mastery timeline.
+          No quiz history yet. Take your first quiz to see which cards you can prove.
         </p>
         <Button asChild className="mt-4">
           <Link href={`/dashboard/${deckId}/quiz?mode=mcq`}>Take your first quiz</Link>

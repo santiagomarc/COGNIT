@@ -109,7 +109,7 @@ export function DeckReadings({
         <div className="mt-auto pt-4">
           <div className="flex items-baseline justify-between gap-3">
             <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
-              Mastery
+              Quiz-proven
             </span>
             <span className="font-mono text-xs tnum text-ink-dim">{masteryPercentage}%</span>
           </div>
@@ -121,8 +121,7 @@ export function DeckReadings({
               className="block h-full"
               style={{
                 width: `${Math.min(masteryPercentage, 100)}%`,
-                backgroundColor:
-                  masteryPercentage >= 70 ? 'var(--state-mastered)' : 'var(--ink-dim)',
+                backgroundColor: 'var(--ink-dim)',
               }}
             />
           </span>

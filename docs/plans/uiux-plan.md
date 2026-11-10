@@ -46,7 +46,7 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 3. ~~**UX-06: a day is the user's day** (§6.1).~~ Code done 2026-11-10 for Today's two RPCs (`202611100900`, owner pushes). Stats' and synthesis insights' RPCs still bucket by UTC, and COPY-02's extra columns were left for COPY-02.
 4. **MOB-05: swipe shows its grade** (§5.9).
 5. ~~**IA-04: the Cards-tab filter** (§6.7).~~ Done 2026-11-09: `getDeckCardsPage(…, query)` with `ilike` and the reserved characters stripped (`card-filter.ts`). `search_user_cards_lexical` searches every deck and caps at 8, so it didn't fit a per-deck list.
-6. **COPY-02 · COPY-06 · IA-02: one meaning per word** (§6.2).
+6. ~~**COPY-02 · COPY-06 · IA-02: one meaning per word** (§6.2).~~ Done 2026-11-10 as a relabel: Today and the deck list say **Quiz-proven**, the bars are ink, and Merge is a collapsed disclosure on Overview. The new `retention_passed` and `mastered_by_deck` RPC columns, and a real 30-day Retention and SM-2 Mastered on Today, were not built.
 7. **A small migration revoking `anon` EXECUTE on the Phase 1 RPCs** (§11). It isn't a UIUX item, but it's cheap and closes a gap.
 
 *Deferred* (do them when there's a reason, not as a phase):

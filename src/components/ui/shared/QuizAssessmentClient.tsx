@@ -722,7 +722,7 @@ export function QuizAssessmentClient({
 
                 <div className="mt-6 border-t border-border pt-4 text-sm text-ink-dim">
                   <p className="text-foreground">
-                    Mastery is updated from quiz performance. Daily streaks still come from flashcard review.
+                    Quiz-proven cards are updated from quiz performance. Daily streaks still come from flashcard review.
                   </p>
                   {isSavingResult ? (
                     <p className="mt-2">
@@ -731,8 +731,8 @@ export function QuizAssessmentClient({
                   ) : hasSavedResult ? (
                     <p className="mt-2">
                       {isRematchSession
-                        ? 'Rematch attempts update mastery but stay out of quiz history.'
-                        : 'This attempt has been recorded in your deck mastery progress.'}
+                        ? 'Rematch attempts update which cards are quiz-proven but stay out of quiz history.'
+                        : 'This attempt has been recorded in your quiz-proven cards.'}
                     </p>
                   ) : (
                     <p className="mt-2">This attempt is ready to be recorded once saving completes.</p>
