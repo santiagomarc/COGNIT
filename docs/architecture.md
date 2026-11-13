@@ -112,6 +112,7 @@ Each of these has broken something in the past or is enforced by a test or an as
 3. **Every RPC is `SECURITY INVOKER`**, with a pinned `search_path` and an explicit ownership
    check. There are zero `SECURITY DEFINER` functions, and `production-assertions.sql` enforces
    that. Account deletion uses the Supabase Admin API instead (see decisions D-DATA-3).
+   Signed-out (`anon`) clients may execute only `list_public_decks`; assertion 19 enforces it.
 4. **History tables are append-only** in the database (`study_logs`, `quiz_results`,
    `quiz_card_results`, `ai_usage_logs`), enforced by DENY policies.
 5. **The server decides the grade.** `logQuizResult` re-grades every answer from the card, and

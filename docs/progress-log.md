@@ -40,11 +40,21 @@ If you made a choice someone could question later, also add it to [decisions.md]
 2. ~~UX-06: local day~~ code done; **owner pushes `202611100900`, then runs `npm run db:types`** (see the entry below).
 3. ~~IA-04: Cards-tab filter~~ done (see the entry below; needs a manual check with real data).
 4. ~~COPY-02 / COPY-06 / IA-02~~ done as a relabel (see the entry below); the plan's Retention and Mastered redefinitions are not built.
-5. A small migration revoking `anon` EXECUTE on the Phase 1 RPCs.
+5. ~~Revoke `anon` EXECUTE on the RPCs~~ migration written (see the entry below); **owner pushes `202611130900`**.
 
 ---
 
 ## Entries
+
+### 2026-11-13 · santiagomarc · Signed-out clients can run one function (anon revoke)
+- **What:** Migration `202611130900_revoke_anon_rpcs.sql` revokes `anon`'s EXECUTE on every app-defined function in `public` except `list_public_decks` (37 functions), and revokes the default for future ones. Assertion 19 in `production-assertions.sql` returns zero rows when it holds.
+- **Why:** Supabase's default privileges granted `anon` EXECUTE on every new function, and `revoke … from public` never undid it. Each function still refused an anonymous caller (all are `SECURITY INVOKER` with `auth.uid()` or RLS checks), so this was defense in depth, not a leak; now the call fails with "permission denied" before the body runs.
+- **How it was found:** a read-only `has_function_privilege('anon', …)` query against production listed the 38 callable functions (plus pgvector's own, which are excluded).
+- **Checked against the code:** only `list_public_decks` is called signed-out (Explore). The share page and keep-alive read tables through RLS, not RPCs.
+- **Files:** `supabase/migrations/202611130900_revoke_anon_rpcs.sql`, `supabase/verify/production-assertions.sql`, `docs/decisions.md` (D-DATA-2 addendum), `docs/architecture.md`, `docs/runbooks/migrations.md`.
+- **Owner pushes:** `supabase db push --linked --dry-run`, then `supabase db push --linked`, then run assertion 19 in the SQL editor (zero rows) and `npm run verify:deployment`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** `sqlcheck.mjs` parses it. Not run against a database. The statement set is derived from the live catalog, so what it revokes is what the read-only query listed. No TypeScript changed.
 
 ### 2026-11-10 · santiagomarc · One meaning per word (COPY-02, COPY-06, IA-02)
 - **What:**

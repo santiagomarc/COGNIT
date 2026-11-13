@@ -39,6 +39,12 @@ design stay in [specs/micro-synthesis-spec.md §12](specs/micro-synthesis-spec.m
   of this after every push.
 - **Why:** A bug in application code can't leak or rewrite another user's data.
 - **Source:** `COGNIT_HANDOFF.md` "Architectural invariants"; `COGNIT_PROGRAM_REPORT.md`
+- **Addendum (2026-11-13):** Supabase grants EXECUTE on every new function to `anon` by default,
+  and `revoke … from public` doesn't undo that. Until `202611130900`, 37 RPCs were callable
+  signed-out and only refused by their own `auth.uid()` check. Now `anon` may run exactly one
+  function, `list_public_decks` (the signed-out Explore page); the migration also revokes the
+  default for future functions, and assertion 19 in `production-assertions.sql` fails if one slips
+  through.
 
 ### D-DATA-3: Account deletion uses the Supabase Admin API with an optional, production-only service key
 - **Date:** 2026-09-30

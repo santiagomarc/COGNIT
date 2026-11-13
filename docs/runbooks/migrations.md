@@ -19,7 +19,9 @@ function.
 3. **Follow the house rules for SQL:**
    - Enable RLS on every new table, with own-row policies.
    - RPCs are `security invoker`, have `set search_path = public` (or `''`), check ownership
-     explicitly, `revoke all … from public`, and `grant execute … to authenticated`.
+     explicitly, `revoke all … from public`, and `grant execute … to authenticated`. Add
+     `revoke execute … from anon` too unless the function is for signed-out callers: Supabase's
+     defaults grant `anon` directly (assertion 19 in `production-assertions.sql` catches a miss).
    - Never use `security definer`. The assertion suite fails on it.
 4. **Check the syntax locally:** `node scripts/sqlcheck.mjs supabase/migrations/<file>.sql`.
    This uses PostgreSQL's own parser; Docker isn't needed.

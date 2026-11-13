@@ -248,6 +248,22 @@ where a.attname in ('user_id', 'reporter_id')
   and not a.attisdropped
 order by on_delete, table_name;
 
+-- 19. Signed-out clients may run exactly one function (202611130900):
+--     list_public_decks, for the signed-out Explore page. Supabase grants
+--     EXECUTE on new functions to anon by default, so a new migration that
+--     forgets `revoke execute … from anon` shows up here. Extension-owned
+--     functions (pgvector, pg_trgm) are excluded. Zero rows expected.
+select p.proname as function_anon_can_execute,
+       pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.prokind = 'f'
+  and p.proname <> 'list_public_decks'
+  and has_function_privilege('anon', p.oid, 'execute')
+  and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+order by p.proname;
+
 -- ── Query plans ────────────────────────────────────────────────────
 -- Substitute a real deck id. Expect "Index Scan using
 -- cards_embedding_hnsw_idx", NOT "Seq Scan on cards".
