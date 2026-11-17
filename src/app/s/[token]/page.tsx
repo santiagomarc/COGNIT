@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
@@ -18,19 +19,27 @@ type SharedDeckPageProps = {
 };
 
 /**
+ * The shared deck behind a token. `generateMetadata` and the page both need
+ * it, so it is read once per request, not twice (UIUX plan PERF-08).
+ */
+const loadSharedDeck = cache(async (token: string) => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('decks')
+    .select('id, title, description, clone_count')
+    .eq('share_token', token)
+    .eq('is_public', true)
+    .single();
+  return data;
+});
+
+/**
  * A share link gets pasted into iMessage, Discord and Slack. The unfurl IS the
  * marketing, so it is worth a real generateMetadata.
  */
 export async function generateMetadata({ params }: SharedDeckPageProps): Promise<Metadata> {
   const { token } = await params;
-  const supabase = await createClient();
-
-  const { data: deck } = await supabase
-    .from('decks')
-    .select('title, description')
-    .eq('share_token', token)
-    .eq('is_public', true)
-    .single();
+  const deck = await loadSharedDeck(token);
 
   if (!deck) {
     return { title: 'Deck not found · Cognit' };
@@ -54,18 +63,13 @@ export async function generateMetadata({ params }: SharedDeckPageProps): Promise
 
 export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
   const { token } = await params;
-  const supabase = await createClient();
-
-  const { data: deck } = await supabase
-    .from('decks')
-    .select('id, title, description, clone_count')
-    .eq('share_token', token)
-    .eq('is_public', true)
-    .single();
+  const deck = await loadSharedDeck(token);
 
   if (!deck) {
     notFound();
   }
+
+  const supabase = await createClient();
 
   const [
     { data: previewCards },

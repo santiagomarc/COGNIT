@@ -46,6 +46,17 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-17 · santiagomarc · Loading states for Explore and shared decks; honest dashboard error title (PERF-08, part of COPY-05)
+- **What:**
+  - `/explore` and `/s/[token]` now show a skeleton in the page's own frame (wordmark, title, then rows or cards) while their data loads, in place of a blank page.
+  - The shared-deck read is wrapped in `cache()`, so `generateMetadata` and the page share one query instead of running it twice.
+  - The dashboard error screen says "This page failed to load", not "This deck failed to load": it catches every dashboard route.
+- **Why:** A visitor arriving from a pasted link waited on a blank page for the deck and its cards. Both public pages made the user stare at nothing.
+- **Files:** `src/app/explore/loading.tsx`, `src/app/s/[token]/loading.tsx`, `src/app/s/[token]/page.tsx`, `src/app/dashboard/error.tsx`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** no unit tests (markup only). Both skeletons rendered in Chrome in light and dark and checked against their pages' frames; tsc, lint and 742 tests pass, and `/s/[token]` is 184.3 kB against a 187 budget. The `cache()` change is unrun against a real shared deck: open one share link once.
+- **Not done from COPY-05:** the voice sweep (trailing `!` in toasts, Title Case buttons) and "quote this reference" only when `error.digest` exists.
+
 ### 2026-11-13 · santiagomarc · Signed-out clients can run one function (anon revoke)
 - **What:** Migration `202611130900_revoke_anon_rpcs.sql` revokes `anon`'s EXECUTE on every app-defined function in `public` except `list_public_decks` (37 functions), and revokes the default for future ones. Assertion 19 in `production-assertions.sql` returns zero rows when it holds.
 - **Why:** Supabase's default privileges granted `anon` EXECUTE on every new function, and `revoke … from public` never undid it. Each function still refused an anonymous caller (all are `SECURITY INVOKER` with `auth.uid()` or RLS checks), so this was defense in depth, not a leak; now the call fails with "permission denied" before the body runs.
