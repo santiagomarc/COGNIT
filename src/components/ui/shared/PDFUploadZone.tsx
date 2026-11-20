@@ -342,6 +342,6 @@ function reportOutcome(outcome: GenerationOutcome, requested: number) {
   } else if (outcome.saved < requested) {
     toast.success(`${cards(outcome.saved)} generated (AI stopped early after covering the material).`);
   } else {
-    toast.success(`${cards(outcome.saved)} generated and saved!`);
+    toast.success(`${cards(outcome.saved)} added to this deck.`);
   }
 }

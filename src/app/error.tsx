@@ -56,8 +56,8 @@ export default function GlobalError({
           This page failed to load
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-ink-dim">
-          The error has been logged. Retrying usually works — if it does not, the
-          problem is on our side rather than with anything you did.
+          Retrying usually works. If it doesn&apos;t, the problem is on our side,
+          not anything you did.
         </p>
 
         {error.digest ? (

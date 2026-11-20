@@ -46,6 +46,17 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-20 · santiagomarc · The product's voice (COPY-05)
+- **What:**
+  - No more exclamation marks: "Reset email sent!" → "Check your email for a reset link.", "Check your email!" → "Check your email to confirm your account.", "*n* cards generated and saved!" → "*n* cards added to this deck.", "Password updated successfully!" → "Password updated.", and the study empty state "You're all caught up!" → "Nothing due in this deck".
+  - Sentence case: Start over · Resume · Back to deck · Review again (study); Quiz result · Avg. per question · Quit quiz · Back to deck (quiz).
+  - Creating a deck opens it without a "Deck created successfully" toast on top; the toast now shows only if the deck can't be opened.
+  - The app error screen no longer claims "The error has been logged." (a client error isn't logged anywhere a person can read). Its reference line already showed only when an error has a digest.
+- **Why:** The product spoke in two voices: calm, factual telemetry on most screens and excited toasts on a few.
+- **Files:** `LoginClient.tsx`, `auth/actions.ts`, `PDFUploadZone.tsx`, `FlashcardReviewClient.tsx`, `QuizAssessmentClient.tsx`, `CreateDeckModal.tsx`, `app/error.tsx`, `src/lib/voice.test.ts`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** `voice.test.ts` fails on any string literal in `src` that ends a word with "!" (checked against the old code: it names all four). It can't see JSX text, so headings are still a review item. 743 tests, tsc and lint pass. Copy only, so no bundle change worth measuring.
+
 ### 2026-11-17 · santiagomarc · Loading states for Explore and shared decks; honest dashboard error title (PERF-08, part of COPY-05)
 - **What:**
   - `/explore` and `/s/[token]` now show a skeleton in the page's own frame (wordmark, title, then rows or cards) while their data loads, in place of a blank page.

@@ -536,7 +536,7 @@ export function QuizAssessmentClient({
           </div>
 
           <Link href={`/dashboard/${deckId}`} className="mt-4 inline-block">
-            <Button variant="ghost">Back to Deck</Button>
+            <Button variant="ghost">Back to deck</Button>
           </Link>
         </div>
       </div>
@@ -670,7 +670,7 @@ export function QuizAssessmentClient({
               <div className="surface relative overflow-hidden p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz Result</p>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz result</p>
                     <h2 className="mt-3 type-readout-sm font-semibold leading-[1.15] tracking-[-.03em]">{scoreSummary.percentage}%</h2>
                     <p className="mt-2 text-sm text-ink-dim">
                       <span className="font-mono tnum">{scoreSummary.correctCount}</span> of <span className="font-mono tnum">{results.length}</span> answered correctly in <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>.
@@ -693,7 +693,7 @@ export function QuizAssessmentClient({
                   </div>
                   <div className="surface p-4">
                     <p className="font-mono text-2xl font-semibold tnum">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</p>
-                    <p className="mt-1 text-xs text-ink-dim">Avg. per Question</p>
+                    <p className="mt-1 text-xs text-ink-dim">Avg. per question</p>
                   </div>
                 </div>
 
@@ -989,7 +989,7 @@ export function QuizAssessmentClient({
         }}
         title="Quit this quiz?"
         description="Are you sure you want to quit? This quiz won't be recorded."
-        confirmLabel="Quit Quiz"
+        confirmLabel="Quit quiz"
         cancelLabel="Continue Quiz"
         variant="destructive"
         onConfirm={confirmQuit}

@@ -160,7 +160,7 @@ export default function LoginClient() {
           }
         } else {
           setEmailSent(true);
-          toast.success(result.message ?? 'Reset email sent!');
+          toast.success(result.message ?? 'Check your email for a reset link.');
         }
       });
       return;
@@ -205,7 +205,7 @@ export default function LoginClient() {
           }
         } else {
           setEmailSent(true);
-          toast.success(result.message ?? 'Check your email!');
+          toast.success(result.message ?? 'Check your email to confirm your account.');
         }
       });
     }

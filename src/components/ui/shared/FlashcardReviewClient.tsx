@@ -982,7 +982,7 @@ export function FlashcardReviewClient({
           <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
             Study
           </p>
-          <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">You&apos;re all caught up!</h1>
+          <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Nothing due in this deck</h1>
           <p className="mt-2 text-ink-dim">
             {emptyMessage}
           </p>
@@ -1001,12 +1001,12 @@ export function FlashcardReviewClient({
                 </Link>
               </Button>
               <Button asChild variant="ghost">
-                <Link href={`/dashboard/${deckId}`}>Back to Deck</Link>
+                <Link href={`/dashboard/${deckId}`}>Back to deck</Link>
               </Button>
             </div>
           ) : (
             <Link href={`/dashboard/${deckId}`} className="mt-6 inline-block">
-              <Button>Back to Deck</Button>
+              <Button>Back to deck</Button>
             </Link>
           )}
         </div>
@@ -1030,12 +1030,12 @@ export function FlashcardReviewClient({
           </p>
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Button onClick={startNewSession}>Start New Session</Button>
-            <Button onClick={resumePreviousSession}>Resume Session</Button>
+            <Button onClick={startNewSession}>Start over</Button>
+            <Button onClick={resumePreviousSession}>Resume</Button>
           </div>
 
           <Link href={`/dashboard/${deckId}`} className="mt-4 inline-block">
-            <Button variant="ghost">Back to Deck</Button>
+            <Button variant="ghost">Back to deck</Button>
           </Link>
         </div>
       </div>
@@ -1252,7 +1252,7 @@ export function FlashcardReviewClient({
                   <div className="flex justify-center gap-3">
                     <Button onClick={restart} className="gap-2">
                       <RotateCcw className="h-4 w-4" />
-                      Review Again
+                      Review again
                     </Button>
                     <Button asChild variant="primary" className="gap-2">
                       <Link href={`/dashboard/${deckId}`}>

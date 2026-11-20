@@ -208,7 +208,7 @@ export async function updatePassword(data: UpdatePasswordInput) {
   }
 
   revalidatePath('/', 'layout');
-  return { success: true, message: 'Password updated successfully!' };
+  return { success: true, message: 'Password updated.' };
 }
 
 // ─── LOGOUT ───

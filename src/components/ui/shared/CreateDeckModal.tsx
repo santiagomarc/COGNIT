@@ -103,13 +103,15 @@ export function CreateDeckModal({ defaultOpen = false }: { defaultOpen?: boolean
         setOpen(true);
         toast.error(typeof result.error === 'string' ? result.error : 'Failed to create deck');
       } else {
-        toast.success('Deck created successfully');
         formRef.current?.reset();
         setDraftTitle('');
         setAccentTag('');
         setFieldError(null);
+        // Opening the new deck is the confirmation; a toast on top said it twice (COPY-05).
         if (result?.deckId) {
           router.push(`/dashboard/${result.deckId}`);
+        } else {
+          toast.success('Deck created');
         }
       }
     } catch (err) {
