@@ -58,10 +58,10 @@ export function FeatureGrid() {
     <section className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto mb-14 max-w-lg text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Features
           </p>
-          <h2 className="mt-3 font-serif text-[clamp(3rem,4.5vw,3.75rem)] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
+          <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">
             Everything you need to ace every exam
           </h2>
           <p className="mt-3 text-ink-dim">

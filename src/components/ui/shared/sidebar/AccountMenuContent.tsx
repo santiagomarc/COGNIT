@@ -9,9 +9,9 @@ import { Kbd } from '@/components/ui/Kbd';
 import { ThemePreferenceControl } from '@/components/ui/shared/ThemePreferenceControl';
 import { requestOpenShortcuts } from '@/lib/dashboard-events';
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 const ROW =
-  'flex h-8 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] px-2.5 text-left text-[13px] text-ink ' +
+  'flex h-8 w-full items-center justify-between gap-3 rounded-[var(--radius-control)] px-2.5 text-left type-sm text-ink ' +
   'outline-hidden transition-colors duration-[120ms] hover:bg-surface-raised ' +
   'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--accent)] max-md:h-11';
 
@@ -71,7 +71,7 @@ export function AccountMenuContent({ name, email, onClose, titleId }: AccountMen
         </p>
         <p className="mt-0.5 truncate text-sm font-medium text-ink">{name ?? 'Your account'}</p>
         {email ? (
-          <p className="truncate font-mono text-[12px] text-ink-dimmer" title={email}>
+          <p className="truncate font-mono type-cap text-ink-dimmer" title={email}>
             {email}
           </p>
         ) : null}
@@ -99,20 +99,20 @@ export function AccountMenuContent({ name, email, onClose, titleId }: AccountMen
 
       <div className="m-1 h-px bg-border" />
       <div className="flex items-center justify-between gap-3 px-2.5 py-1.5">
-        <span className="text-[13px] text-ink">Theme</span>
+        <span className="type-sm text-ink">Theme</span>
         <ThemePreferenceControl />
       </div>
 
       <div className="m-1 h-px bg-border" />
       <div className="px-2.5 pb-2.5 pt-1.5">
         <div className="flex items-baseline justify-between">
-          <span className="text-[12px] text-ink-dim">AI calls, last 24 hours</span>
+          <span className="type-cap text-ink-dim">AI calls, last 24 hours</span>
           {usage === null ? (
             <span className="glass-skeleton block h-3 w-14 rounded-sm" aria-hidden="true" />
           ) : usage === 'error' ? (
-            <span className="text-[12px] text-ink-dim">Usage unavailable</span>
+            <span className="type-cap text-ink-dim">Usage unavailable</span>
           ) : (
-            <span className="font-mono text-[12px] tnum">
+            <span className="font-mono type-cap tnum">
               <span className={atLimit ? 'text-destructive' : 'text-ink'}>{usage.used}</span>
               <span className="text-ink-dimmer"> / {usage.ceiling}</span>
             </span>

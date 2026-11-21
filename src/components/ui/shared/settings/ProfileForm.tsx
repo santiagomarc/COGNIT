@@ -75,7 +75,7 @@ export function ProfileForm({ displayName, derivedName, email }: ProfileFormProp
               aria-describedby={error ? 'settings-display-name-hint settings-display-name-error' : 'settings-display-name-hint'}
               className="h-[34px] max-md:h-[44px]"
             />
-            <p id="settings-display-name-error" aria-live="polite" className="mt-1 text-[12px] text-destructive empty:hidden">
+            <p id="settings-display-name-error" aria-live="polite" className="mt-1 type-cap text-destructive empty:hidden">
               {error ?? ''}
             </p>
           </div>
@@ -86,7 +86,7 @@ export function ProfileForm({ displayName, derivedName, email }: ProfileFormProp
       </SettingsRow>
 
       <SettingsRow label="Email" hint="The address you sign in with.">
-        <span className="font-mono text-[13px] text-ink-dim">{email ?? 'No email on this account'}</span>
+        <span className="font-mono type-sm text-ink-dim">{email ?? 'No email on this account'}</span>
       </SettingsRow>
     </>
   );

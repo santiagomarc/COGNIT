@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Wordmark } from '@/components/ui/shared/Wordmark';
 
 const PAGE_SIZE = 24;
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 export const metadata = { title: 'Explore decks — Cognit' };
 /**
@@ -91,10 +91,10 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-ink">{deck.title}</span>
-                  {deck.description ? <span className="block truncate text-[13px] text-ink-dim">{deck.description}</span> : null}
+                  {deck.description ? <span className="block truncate type-sm text-ink-dim">{deck.description}</span> : null}
                 </span>
-                <span className="w-16 shrink-0 text-right font-mono text-[13px] tnum text-ink-dim">{deck.card_count}</span>
-                <span className="w-20 shrink-0 text-right font-mono text-[13px] tnum text-ink-dimmer">{deck.clone_count} saves</span>
+                <span className="w-16 shrink-0 text-right font-mono type-sm tnum text-ink-dim">{deck.card_count}</span>
+                <span className="w-20 shrink-0 text-right font-mono type-sm tnum text-ink-dimmer">{deck.clone_count} saves</span>
               </Link>
             </li>
           ))}

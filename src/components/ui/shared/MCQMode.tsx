@@ -128,7 +128,7 @@ export function MCQMode({
     return (
       <div className="flex flex-1 items-center justify-center p-4 md:p-8">
         <div className="surface mx-auto w-full max-w-xl p-7 text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Multiple choice
           </p>
           <p className="mt-3 text-base font-semibold">Not enough options for this card</p>
@@ -151,7 +151,7 @@ export function MCQMode({
       <div className="flex flex-1 items-center justify-center p-4 md:p-8">
         <div className="mx-auto w-full max-w-2xl space-y-6">
           {/* Eyebrow */}
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <div className="flex items-center justify-between type-label text-ink-dimmer">
             <span>Multiple choice</span>
             <span className="tnum">{options.length} options</span>
           </div>
@@ -194,14 +194,14 @@ export function MCQMode({
                   className="opt"
                 >
                   <Kbd className="mt-[3px] shrink-0">{index + 1}</Kbd>
-                  <span className="flex-1 text-[14px] leading-[1.5]"><RichText text={option} /></span>
+                  <span className="flex-1 type-body leading-[1.5]"><RichText text={option} /></span>
                   {result === 'correct' ? (
-                    <span className="mt-[3px] shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-mastered)]">
+                    <span className="mt-[3px] shrink-0 type-label text-[var(--state-mastered)]">
                       Correct
                     </span>
                   ) : null}
                   {result === 'wrong' ? (
-                    <span className="mt-[3px] shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-lapsed)]">
+                    <span className="mt-[3px] shrink-0 type-label text-[var(--state-lapsed)]">
                       Your answer
                     </span>
                   ) : null}
@@ -228,7 +228,7 @@ export function MCQMode({
                 )}
               </p>
             ) : (
-              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 Select an option 1–{options.length}
               </p>
             )}

@@ -111,7 +111,7 @@ export default async function SharedDeckPage({ params }: SharedDeckPageProps) {
         <div className="h-px w-full bg-border" />
 
         <div className="space-y-3">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Shared deck
           </p>
           <h1 className="font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">

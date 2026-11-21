@@ -31,7 +31,7 @@ export default function NotFound() {
       <Wordmark href="/" size="sm" />
 
       <div className="mt-10 border-t border-border pt-8">
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <p className="type-label text-ink-dimmer">
           Error
         </p>
         <p className="mt-2 type-readout-lg font-semibold leading-none tracking-[-0.04em] text-ink">

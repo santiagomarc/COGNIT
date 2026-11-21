@@ -55,10 +55,10 @@ export function DeckReadings({
       {/* ── Scheduler state ───────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col lg:pr-[22px]">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <h2 className="type-label text-ink-dimmer">
             Scheduler state
           </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          <p className="type-label tnum text-ink-dimmer">
             {totalCards} cards
           </p>
         </div>
@@ -108,7 +108,7 @@ export function DeckReadings({
 
         <div className="mt-auto pt-4">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            <span className="type-label text-ink-dimmer">
               Quiz-proven
             </span>
             <span className="font-mono text-xs tnum text-ink-dim">{masteryPercentage}%</span>
@@ -136,10 +136,10 @@ export function DeckReadings({
           {/* ── Top concepts ─────────────────────────────────────────── */}
           <div className="flex flex-col lg:w-[300px] lg:shrink-0 lg:pl-[22px]">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <h2 className="type-label text-ink-dimmer">
                 Top concepts
               </h2>
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 AI topic tags
               </p>
             </div>
@@ -148,7 +148,7 @@ export function DeckReadings({
                 SM-2 state, so it gets no colour at all. */}
             <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
               {topTopics.slice(0, 8).map(([topic, count]) => (
-                <li key={topic} className="flex items-baseline gap-2 text-[13px]">
+                <li key={topic} className="flex items-baseline gap-2 type-sm">
                   <span className="text-ink">{topic}</span>
                   <span className="font-mono text-xs tnum text-ink-dimmer">{count}</span>
                 </li>

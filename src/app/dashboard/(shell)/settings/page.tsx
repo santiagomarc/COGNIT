@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 };
 
 const LINK =
-  'rounded-[var(--radius-sm)] text-[13px] text-ink underline underline-offset-[3px] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
+  'rounded-[var(--radius-sm)] type-sm text-ink underline underline-offset-[3px] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
 
 /**
  * Settings (sidebar plan §5, SET-00…SET-10): one scrolling page with anchored
@@ -65,7 +65,7 @@ export default async function SettingsPage() {
     <div className="container mx-auto flex max-w-[1000px] flex-col p-4 md:px-8 md:py-6">
       <header className="pb-4">
         <h1 className="font-serif type-display leading-[1.08] tracking-[-0.02em] text-ink">Settings</h1>
-        <p className="mt-1.5 text-[13px] text-ink-dim">Your account, how Cognit looks, and how your sessions run.</p>
+        <p className="mt-1.5 type-sm text-ink-dim">Your account, how Cognit looks, and how your sessions run.</p>
         <SettingsIndex />
       </header>
 
@@ -82,7 +82,7 @@ export default async function SettingsPage() {
           <ThemePreferenceControl />
         </SettingsRow>
         <SettingsRow label="Motion" hint="Cognit follows your system's Reduce motion setting.">
-          <span className="text-[13px] text-ink-dim">System</span>
+          <span className="type-sm text-ink-dim">System</span>
         </SettingsRow>
       </SettingsSection>
 
@@ -121,7 +121,7 @@ export default async function SettingsPage() {
           />
         </SettingsRow>
         <div className="py-3">
-          <p className="well px-4 py-3 text-[13px] leading-[1.55] text-ink-dim">
+          <p className="well px-4 py-3 type-sm leading-[1.55] text-ink-dim">
             Cognit uses Google Gemini on its free tier. On that tier, Google may use what you send to improve its
             products, so don&rsquo;t upload anything confidential.
           </p>

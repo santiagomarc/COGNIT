@@ -134,14 +134,14 @@ export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: Acti
         {monthLabels.map((label, index) => (
           <span
             key={weeks[index]?.[0]?.date ?? index}
-            className="w-[10px] shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+            className="w-[10px] shrink-0 type-label text-ink-dimmer"
           >
             {label ? <span className="relative whitespace-nowrap">{label}</span> : null}
           </span>
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-1.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+      <div className="flex items-center justify-end gap-1.5 type-label text-ink-dimmer">
         <span>Less</span>
         {([0, 1, 2, 3, 4] as const).map((step) => (
           <span

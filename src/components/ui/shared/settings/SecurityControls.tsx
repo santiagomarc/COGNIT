@@ -40,7 +40,7 @@ export function SecurityControls({ providers }: { providers: string[] }) {
   return (
     <>
       <SettingsRow label="Signed in with" hint="How you sign in to Cognit.">
-        <span className="text-[13px] text-ink-dim">{providerLine(providers)}</span>
+        <span className="type-sm text-ink-dim">{providerLine(providers)}</span>
       </SettingsRow>
 
       {hasPassword(providers) ? (

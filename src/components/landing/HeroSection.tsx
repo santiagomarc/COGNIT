@@ -96,13 +96,13 @@ export function HeroSection() {
         <div className="mx-auto max-w-3xl text-center">
           <FadeInUp>
             {/* A number is a better badge than a glyph (§6). */}
-            <p className="font-mono text-[12px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+            <p className="font-mono type-cap uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
               Spaced repetition · SM-2 · AI Flashcard Generator
             </p>
           </FadeInUp>
 
           <FadeInUp delay={0.06}>
-            <h1 className="mt-5 font-serif text-[clamp(4.125rem,7.5vw,6.75rem)] leading-[1.0] tracking-[-0.025em] text-balance text-ink">
+            <h1 className="mt-5 font-serif type-hero leading-[1.0] tracking-[-0.025em] text-balance text-ink">
               Study smarter,
               <br />
               remember forever
@@ -110,7 +110,7 @@ export function HeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.12}>
-            <p className="mx-auto mt-8 max-w-xl font-mono text-[15px] leading-relaxed text-slate-100">
+            <p className="mx-auto mt-8 max-w-xl font-mono text-[15px] leading-relaxed text-ink-dim">
               Turn a PDF into flashcards, then let SM-2 schedule every review.
             </p>
           </FadeInUp>
@@ -140,7 +140,7 @@ export function HeroSection() {
             {/* Top specular hairline highlight */}
             <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
             <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
-              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <span className="type-label text-ink-dimmer">
                 Today
               </span>
               <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
@@ -149,7 +149,7 @@ export function HeroSection() {
             </div>
 
             <div className="p-5 sm:p-7">
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 Due now
               </p>
               <p
@@ -164,7 +164,7 @@ export function HeroSection() {
               </p>
 
               <div className="mt-7 border-t border-border">
-                <div className="flex items-center gap-3 border-b border-border py-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <div className="flex items-center gap-3 border-b border-border py-2 type-label text-ink-dimmer">
                   <span className="w-[2px] shrink-0" aria-hidden="true" />
                   <span className="min-w-0 flex-1">Deck</span>
                   <span className="w-14 text-right">Cards</span>
@@ -180,16 +180,16 @@ export function HeroSection() {
                       style={{ backgroundColor: deck.state }}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm text-ink">{deck.name}</span>
-                    <span className="w-14 text-right font-mono text-[13px] tnum text-ink-dim">
+                    <span className="w-14 text-right font-mono type-sm tnum text-ink-dim">
                       {deck.cards}
                     </span>
                     <span
-                      className="w-12 text-right font-mono text-[13px] tnum"
+                      className="w-12 text-right font-mono type-sm tnum"
                       style={{ color: deck.due > 0 ? 'var(--state-due)' : 'var(--ink-dimmer)' }}
                     >
                       {deck.due}
                     </span>
-                    <span className="w-16 text-right font-mono text-[13px] tnum text-ink-dim">
+                    <span className="w-16 text-right font-mono type-sm tnum text-ink-dim">
                       {deck.mastery}%
                     </span>
                   </div>

@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react';
 import { Kbd } from '@/components/ui/Kbd';
 import { groupShortcuts, keycapLabel } from '@/lib/shortcuts';
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 const noop = () => () => {};
 
@@ -37,7 +37,7 @@ export function ShortcutsTable({ className }: { className?: string }) {
           <tbody>
             {group.shortcuts.map((shortcut) => (
               <tr key={shortcut.id} className="border-b border-border last:border-b-0">
-                <th scope="row" className="py-2 pr-4 text-left text-[13px] font-normal text-ink-dim">
+                <th scope="row" className="py-2 pr-4 text-left type-sm font-normal text-ink-dim">
                   {shortcut.label}
                 </th>
                 <td className="py-2 text-right">

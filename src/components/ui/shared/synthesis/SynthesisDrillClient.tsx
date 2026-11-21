@@ -70,7 +70,7 @@ type CheckResult = {
 };
 
 const EMPTY_OUTLINE: OutlineDraft = { claim: '', mechanisms: ['', ''], tradeoff: '', evidence: '' };
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 /** Past this, the checking reading says so in words (audit U3). */
 const SLOW_CHECK_MS = 4_000;
 const VERY_SLOW_CHECK_MS = 10_000;
@@ -668,7 +668,7 @@ export function SynthesisDrillClient({
             </Button>
             <div className="flex items-baseline gap-2">
               <span className={LABEL}>Deck</span>
-              <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">{deckTitle}</span>
+              <span className="max-w-[10rem] truncate type-sm leading-none text-ink sm:max-w-[16rem]">{deckTitle}</span>
             </div>
           </div>
           <div className="rule" aria-hidden="true" />
@@ -703,7 +703,7 @@ export function SynthesisDrillClient({
             <p className="text-sm text-ink">
               {activeDrillCount === 0 ? 'This deck has no drills yet.' : 'No drills could be served right now.'}
             </p>
-            <p className="mt-1 text-[13px] text-ink-dim">
+            <p className="mt-1 type-sm text-ink-dim">
               {activeDrillCount === 0
                 ? 'Generate a few — they are playable the moment they exist.'
                 : 'Their cards may have been deleted. Generating new drills tidies them away.'}
@@ -749,12 +749,12 @@ export function SynthesisDrillClient({
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <div className="flex items-baseline gap-2">
               <span className={LABEL}>Deck</span>
-              <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">{deckTitle}</span>
+              <span className="max-w-[10rem] truncate type-sm leading-none text-ink sm:max-w-[16rem]">{deckTitle}</span>
             </div>
             <Telemetry label={from === 'study' ? 'Capstone' : drill.kind === 'plan' ? 'Plan' : 'Drill'} value={`${index + 1}/${drills.length}`} />
             <div className="flex items-baseline gap-2">
               <span className={LABEL}>{drill.kind === 'plan' ? 'Command' : 'Format'}</span>
-              <span className="text-[13px] leading-none text-ink">{drill.kind === 'plan' ? (drill.commandWord ?? 'essay') : FORMAT_LABEL[drill.format]}</span>
+              <span className="type-sm leading-none text-ink">{drill.kind === 'plan' ? (drill.commandWord ?? 'essay') : FORMAT_LABEL[drill.format]}</span>
             </div>
             {phase === 'diagnosed' && linksReading && result ? (
               <Telemetry
@@ -768,7 +768,8 @@ export function SynthesisDrillClient({
             )}
             {phase === 'checking' ? (
               <div className="flex items-center gap-2">
-                <StateTick state="streak" label="Checking" />
+                {/* Waiting is time, not memory: no state hue (design system §2.2, VIS-03). */}
+                <StateTick state="neutral" label="Checking" />
                 {/* The counter ticks every second: hidden from assistive technology, which hears the live region instead (A11Y-03). */}
                 <span className={`${LABEL} tnum`} aria-hidden="true">
                   {checkElapsedMs >= SLOW_CHECK_MS ? 'Still checking' : 'Checking'} · {checkSeconds}s
@@ -809,25 +810,25 @@ export function SynthesisDrillClient({
             id={`${promptId}-prompt`}
             ref={promptRef}
             tabIndex={-1}
-            className="font-serif text-[1.5rem] leading-[1.32] tracking-[-0.02em] text-balance text-ink outline-hidden"
+            className="font-serif type-display-sm leading-[1.32] tracking-[-0.02em] text-balance text-ink outline-hidden"
           >
             <RichText text={drill.promptText} />
           </p>
           <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className={LABEL}>Concepts</span>
-            <span className="text-[13px] text-ink-dim">
+            <span className="type-sm text-ink-dim">
               {anchors.map((anchor) => anchor.term).join(' · ')}
             </span>
           </div>
           {lastAttempt && phase === 'answering' && !revisionOf ? (
             <details className="well mt-3 px-3 py-2">
-              <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] text-ink-dim">
+              <summary className="flex cursor-pointer list-none items-center gap-2 type-sm text-ink-dim">
                 <StateTick state={VERDICT_TICK[lastAttempt.verdict]} />
                 <span>Last time · {VERDICT_LABEL[lastAttempt.verdict].toLowerCase()}</span>
                 <span className="font-mono tnum">{lastAttempt.linksCovered}/{lastAttempt.linksTotal}</span>
                 <span className="font-mono tnum text-ink-dimmer">{formatAgo(lastAttempt.createdAt)}</span>
               </summary>
-              {lastAttempt.gapNote ? <p className="mt-2 text-[13px] text-ink-dim">{lastAttempt.gapNote}</p> : null}
+              {lastAttempt.gapNote ? <p className="mt-2 type-sm text-ink-dim">{lastAttempt.gapNote}</p> : null}
             </details>
           ) : null}
         </section>
@@ -858,11 +859,11 @@ export function SynthesisDrillClient({
               <section className="well p-4" aria-label="Worked example">
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className={LABEL}>Worked example · your first drill here</h3>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setWorkedExampleOpen(false)} className="h-[44px] px-2 text-[12px] sm:h-[24px]">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setWorkedExampleOpen(false)} className="h-[44px] px-2 type-cap sm:h-[24px]">
                     Hide
                   </Button>
                 </div>
-                <p className="mt-1 text-[13px] text-ink-dim">This is what a sound answer looks like for this question. Read it, then write your own in the slots below — the next drills will not show one.</p>
+                <p className="mt-1 type-sm text-ink-dim">This is what a sound answer looks like for this question. Read it, then write your own in the slots below — the next drills will not show one.</p>
                 <ul className="mt-2 flex flex-col gap-2 text-sm text-ink">
                   <li><span className="text-ink-dimmer">{SLOT_LABELS[drill.format].claim} · </span><RichText text={workedExample.claim} /></li>
                   <li><span className="text-ink-dimmer">{SLOT_LABELS[drill.format].mechanism1} · </span><RichText text={workedExample.mechanisms[0]} /></li>
@@ -913,13 +914,13 @@ export function SynthesisDrillClient({
         ) : null}
 
         {phase === 'checking' && checkElapsedMs >= VERY_SLOW_CHECK_MS ? (
-          <p className="text-[13px] text-ink-dim">
+          <p className="type-sm text-ink-dim">
             Taking longer than usual — your answer is saved in this tab.
           </p>
         ) : null}
 
         {checkError ? (
-          <p role="alert" className="text-[13px]" style={{ color: 'var(--destructive)' }}>
+          <p role="alert" className="type-sm" style={{ color: 'var(--destructive)' }}>
             {checkError}
           </p>
         ) : null}

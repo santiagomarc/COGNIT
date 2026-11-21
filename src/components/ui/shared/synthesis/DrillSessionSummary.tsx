@@ -44,7 +44,7 @@ type DrillSessionSummaryProps = {
   results?: Record<string, StoredResult>;
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * The end of a launch (audit U1): what happened, drill by drill, which cards
@@ -91,12 +91,12 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs, resul
             const row = (
               <>
                 <StateTick state={VERDICT_TICK[entry.verdict]} />
-                <span className="w-24 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+                <span className="w-24 shrink-0 type-label text-ink-dim">
                   {VERDICT_LABEL[entry.verdict]}{entry.revised ? ' · rev' : ''}
                 </span>
-                <span className="w-10 shrink-0 font-mono text-[13px] tnum text-ink">{entry.linksCovered}/{entry.linksTotal}</span>
+                <span className="w-10 shrink-0 font-mono type-sm tnum text-ink">{entry.linksCovered}/{entry.linksTotal}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-ink">{entry.promptText}</span>
-                <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer md:block">
+                <span className="hidden shrink-0 type-label text-ink-dimmer md:block">
                   {FORMAT_LABEL[entry.format]}
                 </span>
               </>
@@ -142,13 +142,13 @@ export function DrillSessionSummary({ deckId, entries, skipped, elapsedMs, resul
       <div className="surface flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
         <span className={LABEL}>Cards</span>
         {pulled.length > 0 ? (
-          <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink">
+          <span className="flex flex-wrap items-center gap-2 type-sm text-ink">
             <StateTick state="due" />
             {pulled.map((card) => <span key={card.id} className="term-chip cursor-default">{card.term}</span>)}
             <span className="text-ink-dim">→ due tomorrow</span>
           </span>
         ) : (
-          <span className="text-[13px] text-ink-dim">unchanged</span>
+          <span className="type-sm text-ink-dim">unchanged</span>
         )}
         {nextDue ? (
           <span className={`${LABEL} ml-auto tnum`}>Next drill {formatDueIn(nextDue)}</span>

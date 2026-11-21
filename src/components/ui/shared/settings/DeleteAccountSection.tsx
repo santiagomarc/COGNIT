@@ -70,13 +70,13 @@ export function DeleteAccountSection({ available, email, deckCount, sharedCount 
     });
 
   if (!available) {
-    return <p className="py-3 text-[13px] text-ink-dim">Account deletion isn&rsquo;t available yet.</p>;
+    return <p className="py-3 type-sm text-ink-dim">Account deletion isn&rsquo;t available yet.</p>;
   }
 
   return (
     <>
       <div className="flex flex-col gap-3 py-3 md:flex-row md:items-center md:justify-between md:gap-6">
-        <p className="max-w-[420px] text-[13px] leading-[1.55] text-ink-dim">
+        <p className="max-w-[420px] type-sm leading-[1.55] text-ink-dim">
           Deletes your decks, cards, review history and drills. Shared links stop working. This can&rsquo;t be undone.
         </p>
         <Button
@@ -116,7 +116,7 @@ export function DeleteAccountSection({ available, email, deckCount, sharedCount 
               <h2 id="delete-account-title" className="text-base font-semibold tracking-[-.015em] text-ink">
                 Delete your account?
               </h2>
-              <div id="delete-account-body" className="mt-2 space-y-2 text-[13px] leading-[1.55] text-ink-dim">
+              <div id="delete-account-body" className="mt-2 space-y-2 type-sm leading-[1.55] text-ink-dim">
                 <p>
                   This deletes <span className="font-mono tnum text-ink">{deckCount}</span> {deckCount === 1 ? 'deck' : 'decks'}{' '}
                   with every card, review, quiz and drill in them
@@ -137,7 +137,7 @@ export function DeleteAccountSection({ available, email, deckCount, sharedCount 
                   if (matches && !isPending) submit();
                 }}
               >
-                <label htmlFor="delete-account-confirm" className="block text-[13px] text-ink">
+                <label htmlFor="delete-account-confirm" className="block type-sm text-ink">
                   Type <span className="font-mono">{phrase}</span> to confirm
                 </label>
                 <Input
@@ -149,7 +149,7 @@ export function DeleteAccountSection({ available, email, deckCount, sharedCount 
                   aria-invalid={error ? true : undefined}
                   aria-describedby="delete-account-error"
                 />
-                <p id="delete-account-error" role="alert" className="text-[12px] text-destructive empty:hidden">
+                <p id="delete-account-error" role="alert" className="type-cap text-destructive empty:hidden">
                   {error ?? ''}
                 </p>
 

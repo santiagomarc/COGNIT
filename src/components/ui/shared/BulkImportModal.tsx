@@ -160,7 +160,7 @@ export function BulkImportModal({ deckId }: BulkImportModalProps) {
                 >
                   <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
                     <div className="space-y-1">
-                      <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                      <p className="type-label text-ink-dimmer">
                         Bulk import
                       </p>
                       <h2 id="bulk-import-title" className="text-base font-semibold tracking-[-.015em]">

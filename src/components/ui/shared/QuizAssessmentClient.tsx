@@ -492,7 +492,7 @@ export function QuizAssessmentClient({
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-6 md:p-8 bg-bg">
         <div className="surface mx-auto max-w-2xl p-10 text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Quiz
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">No cards available for a quiz yet</h1>
@@ -519,7 +519,7 @@ export function QuizAssessmentClient({
     return (
       <div className="flex min-h-[100dvh] items-center justify-center p-6 md:p-8 bg-bg">
         <div className="surface mx-auto max-w-2xl p-10 text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Quiz
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous quiz?</h1>
@@ -571,19 +571,19 @@ export function QuizAssessmentClient({
 
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <div className="flex items-baseline gap-2">
-              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <span className="type-label text-ink-dimmer">
                 Deck
               </span>
-              <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">
+              <span className="max-w-[10rem] truncate type-sm leading-none text-ink sm:max-w-[16rem]">
                 {deckTitle}
               </span>
             </div>
 
             <div className="flex items-baseline gap-2">
-              <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <span className="type-label text-ink-dimmer">
                 Mode
               </span>
-              <span className="text-[13px] leading-none text-ink">{getModeLabel(quizMode)}</span>
+              <span className="type-sm leading-none text-ink">{getModeLabel(quizMode)}</span>
             </div>
 
             <Telemetry
@@ -644,7 +644,7 @@ export function QuizAssessmentClient({
         </div>
 
         {isPaused && !completed ? (
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-due)]">
+          <p className="type-label text-[var(--state-due)]">
             Paused
           </p>
         ) : null}
@@ -667,35 +667,41 @@ export function QuizAssessmentClient({
             className="mx-auto max-w-4xl space-y-6"
           >
             <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-              <div className="surface relative overflow-hidden p-8">
+              {/*
+                The result is the screen's subject, so it is the one `.raised`
+                plane (design system §2.3, UIUX plan VIS-04); everything else
+                sits in a well. The three stat tiles that used to compete with
+                it are now labelled numbers inside it.
+              */}
+              <div className="raised spec relative overflow-hidden p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Quiz result</p>
+                    <p className="type-label text-ink-dimmer">Quiz result</p>
                     <h2 className="mt-3 type-readout-sm font-semibold leading-[1.15] tracking-[-.03em]">{scoreSummary.percentage}%</h2>
                     <p className="mt-2 text-sm text-ink-dim">
                       <span className="font-mono tnum">{scoreSummary.correctCount}</span> of <span className="font-mono tnum">{results.length}</span> answered correctly in <span className="font-mono tnum">{formatDuration(sessionDuration)}</span>.
                     </p>
                   </div>
                   <div className="rounded-[var(--radius-control)] border border-border-strong px-4 py-3 text-center">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-dimmer">Grade</p>
+                    <p className="type-label text-ink-dimmer">Grade</p>
                     <p className="mt-1 font-mono text-3xl font-semibold tnum text-ink">{scoreSummary.letterGrade}</p>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                  <div className="surface p-4">
-                    <p className="font-mono text-2xl font-semibold tnum text-[var(--state-mastered)]">{scoreSummary.correctCount}</p>
-                    <p className="mt-1 text-xs text-ink-dim">Correct</p>
+                <dl className="mt-6 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-4">
+                  <div>
+                    <dt className="type-label text-ink-dimmer">Correct</dt>
+                    <dd className="mt-1 font-mono text-2xl font-semibold tnum text-[var(--state-mastered)]">{scoreSummary.correctCount}</dd>
                   </div>
-                  <div className="surface p-4">
-                    <p className="font-mono text-2xl font-semibold tnum text-[var(--state-lapsed)]">{scoreSummary.incorrectCount}</p>
-                    <p className="mt-1 text-xs text-ink-dim">Missed</p>
+                  <div>
+                    <dt className="type-label text-ink-dimmer">Missed</dt>
+                    <dd className="mt-1 font-mono text-2xl font-semibold tnum text-[var(--state-lapsed)]">{scoreSummary.incorrectCount}</dd>
                   </div>
-                  <div className="surface p-4">
-                    <p className="font-mono text-2xl font-semibold tnum">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</p>
-                    <p className="mt-1 text-xs text-ink-dim">Avg. per question</p>
+                  <div>
+                    <dt className="type-label text-ink-dimmer">Avg. per question</dt>
+                    <dd className="mt-1 font-mono text-2xl font-semibold tnum">{results.length > 0 ? formatDuration(averagePerQuestionMs) : '0s'}</dd>
                   </div>
-                </div>
+                </dl>
 
                 {quizBadges.length > 0 ? (
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -740,12 +746,12 @@ export function QuizAssessmentClient({
                 </div>
               </div>
 
-              <div className="surface p-6">
+              <div className="well p-6">
                 <div className="flex items-baseline justify-between gap-3">
                   <h3 className="text-base font-semibold tracking-[-.015em]">Focus next</h3>
                   {/* A count beats a glyph (§6), and it is the fact the panel
                       is actually reporting. */}
-                  <span className="font-mono text-[10px] uppercase tracking-[0.16em] tnum text-ink-dimmer">
+                  <span className="type-label tnum text-ink-dimmer">
                     {incorrectResults.length} missed
                   </span>
                 </div>
@@ -768,7 +774,9 @@ export function QuizAssessmentClient({
                           <p className="mt-1.5 text-xs text-ink-dim">
                             Your answer: {entry.userAnswer || 'No answer recorded'}
                           </p>
-                          <p className="mt-0.5 text-xs text-[var(--state-lapsed)]">
+                          {/* Ink, not --state-lapsed: the correct answer isn't a lapse, and the
+                              row's tick already marks the miss (VIS-03). */}
+                          <p className="mt-0.5 text-xs text-ink">
                             Correct answer: {entry.correctAnswer}
                           </p>
                         </div>
@@ -823,7 +831,7 @@ export function QuizAssessmentClient({
               </Button>
             </div>
 
-            <div className="surface p-6">
+            <div className="well p-6">
               <h3 className="text-base font-semibold tracking-[-.015em]">Question diagnostics</h3>
               <p className="mt-1 text-sm text-ink-dim">
                 Misses are listed with your answer so the next review pass has a clear target.
@@ -850,7 +858,7 @@ export function QuizAssessmentClient({
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <p className="text-sm font-medium text-foreground">{entry.prompt}</p>
                         <span
-                          className="font-mono text-[10px] uppercase tracking-[0.16em]"
+                          className="type-label"
                           style={{
                             color: entry.correct ? 'var(--state-mastered)' : 'var(--state-lapsed)',
                           }}
@@ -946,7 +954,7 @@ export function QuizAssessmentClient({
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
               className="surface z-[var(--z-modal)] mx-4 w-full max-w-[480px] border-border-strong p-8 text-center"
             >
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 Quiz paused
               </p>
               <h3 id="quiz-paused-title" className="mt-3 text-xl font-semibold tracking-[-.025em]">

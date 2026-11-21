@@ -25,7 +25,7 @@ type PlanFormProps = {
 
 const SLOT_CLASS =
   'border-0 bg-transparent px-0 shadow-none focus-visible:outline-0 rounded-none text-base sm:text-[15px] leading-relaxed';
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 const POINT_FIELDS: { key: keyof PlanPoint; label: string; placeholder: string; rows: number }[] = [
   { key: 'claim', label: 'Point', placeholder: 'the point this paragraph makes', rows: 1 },
@@ -98,7 +98,7 @@ export function PlanForm({ plan, onChange, anchors, disabled, promptId, revising
       {revisingFrom ? (
         <div className="flex gap-3 rounded-[var(--radius-sm)] bg-surface-raised px-3 py-2" role="note">
           <span className="slot-label shrink-0 pt-[3px]">Revising · gap</span>
-          <p className="text-[13px] leading-relaxed text-ink">{revisingFrom}</p>
+          <p className="type-sm leading-relaxed text-ink">{revisingFrom}</p>
         </div>
       ) : null}
 

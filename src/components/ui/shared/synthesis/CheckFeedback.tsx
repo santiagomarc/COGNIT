@@ -12,7 +12,7 @@ type CheckFeedbackProps = {
   attemptId: string;
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * "Was this check fair?" (audit F5) — the ongoing calibration signal the
@@ -59,7 +59,7 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
         aria-pressed={rating === 'fair'}
         onClick={() => send('fair')}
         disabled={isPending}
-        className="h-[44px] px-2 text-[12px] sm:h-[24px]"
+        className="h-[44px] px-2 type-cap sm:h-[24px]"
       >
         Fair
       </Button>
@@ -70,7 +70,7 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
         aria-pressed={rating === 'unfair'}
         onClick={() => send('unfair')}
         disabled={isPending}
-        className="h-[44px] px-2 text-[12px] sm:h-[24px]"
+        className="h-[44px] px-2 type-cap sm:h-[24px]"
       >
         Unfair
       </Button>
@@ -89,15 +89,15 @@ export function CheckFeedback({ deckId, attemptId }: CheckFeedbackProps) {
             maxLength={300}
             disabled={isPending}
             aria-label="What did the check get wrong?"
-            className="h-[44px] min-w-0 flex-1 text-base sm:h-[28px] sm:text-[12px]"
+            className="h-[44px] min-w-0 flex-1 text-base sm:h-[28px] sm:type-cap"
           />
-          <Button type="submit" variant="ghost" size="sm" disabled={isPending || note.trim().length === 0} className="h-[44px] px-2 text-[12px] sm:h-[24px]">
+          <Button type="submit" variant="ghost" size="sm" disabled={isPending || note.trim().length === 0} className="h-[44px] px-2 type-cap sm:h-[24px]">
             Send
           </Button>
         </form>
       ) : null}
       {retired ? (
-        <p role="status" className="w-full text-[13px] text-ink-dim">
+        <p role="status" className="w-full type-sm text-ink-dim">
           Thanks — this drill has been retired, so it will not come up again.
         </p>
       ) : null}

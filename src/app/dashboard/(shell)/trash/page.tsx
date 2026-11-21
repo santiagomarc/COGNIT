@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: 'Trash - Cognit',
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * Recently deleted decks (sidebar plan §4.4, DST-03). It used to be reachable
@@ -46,13 +46,13 @@ export default async function TrashPage() {
       <header>
         <p className={LABEL}>Library</p>
         <h1 className="mt-1 font-serif type-display leading-[1.08] tracking-[-0.02em] text-ink">Trash</h1>
-        <p className="mt-1.5 max-w-xl text-[13px] text-ink-dim">
+        <p className="mt-1.5 max-w-xl type-sm text-ink-dim">
           Deleted decks stay here for 30 days. Restore one to bring back its cards, history and drills.
         </p>
       </header>
 
       {error ? (
-        <p className="well px-4 py-6 text-center text-[13px] text-ink-dim">
+        <p className="well px-4 py-6 text-center type-sm text-ink-dim">
           The trash could not be loaded. Reload the page to try again.
         </p>
       ) : (

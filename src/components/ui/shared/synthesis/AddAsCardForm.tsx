@@ -39,7 +39,7 @@ export function AddAsCardForm({ deckId, claim, attemptId, claimIndex, absorbedCa
 
   if (addedCardId) {
     return (
-      <span className="inline-flex flex-wrap items-baseline gap-x-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+      <span className="inline-flex flex-wrap items-baseline gap-x-2 type-label text-ink-dimmer">
         Added to deck
         <Link
           href={`/dashboard/${deckId}/study?cards=${addedCardId}`}
@@ -103,7 +103,7 @@ export function AddAsCardForm({ deckId, claim, attemptId, claimIndex, absorbedCa
           maxLength={1000}
           required
           disabled={isPending}
-          className="h-[36px] sm:text-[13px]"
+          className="h-[36px] sm:type-sm"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -115,7 +115,7 @@ export function AddAsCardForm({ deckId, claim, attemptId, claimIndex, absorbedCa
           required
           rows={2}
           disabled={isPending}
-          className="min-h-[3rem] sm:text-[13px]"
+          className="min-h-[3rem] sm:type-sm"
         />
       </label>
       <div className="flex items-center gap-2">

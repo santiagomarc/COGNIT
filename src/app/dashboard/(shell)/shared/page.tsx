@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: 'Shared - Cognit',
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * Every deck the user shares by link (sidebar plan §4.3, DST-02). Sharing used
@@ -31,7 +31,7 @@ export default async function SharedPage() {
       <header>
         <p className={LABEL}>Library</p>
         <h1 className="mt-1 font-serif type-display leading-[1.08] tracking-[-0.02em] text-ink">Shared</h1>
-        <p className="mt-1.5 max-w-xl text-[13px] text-ink-dim">
+        <p className="mt-1.5 max-w-xl type-sm text-ink-dim">
           Anyone with a link can view and copy that deck&rsquo;s cards. Your study history, quiz scores and chat stay
           private.
         </p>

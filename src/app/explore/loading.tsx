@@ -19,7 +19,7 @@ export default function ExploreLoading() {
       </div>
       <div className="h-px w-full bg-border" />
       <header>
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Directory</p>
+        <p className="type-label text-ink-dimmer">Directory</p>
         <h1 className="mt-1 font-serif type-display leading-[1.08] tracking-[-0.02em] text-ink">Explore decks</h1>
       </header>
       <div className="glass-skeleton h-[44px] w-full rounded-[var(--radius-md)]" />

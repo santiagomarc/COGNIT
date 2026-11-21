@@ -71,10 +71,10 @@ export function GreetingHeader({
     <header>
       <div className="flex flex-col gap-y-4 pb-3.5 lg:flex-row lg:items-end lg:justify-between lg:gap-x-10">
         <div className="min-w-0">
-          <h1 className="font-serif text-[1.8125rem] leading-[1.1] tracking-[-0.02em] text-balance text-ink sm:type-display">
+          <h1 className="font-serif type-display-md leading-[1.1] tracking-[-0.02em] text-balance text-ink sm:type-display">
             {name ? `${salutation}, ${name}` : salutation}
           </h1>
-          <p className="mt-1.5 text-[13px] text-ink-dim">
+          <p className="mt-1.5 type-sm text-ink-dim">
             {today ? <>{today} · </> : null}
             <span className="font-mono tnum text-ink">{dueDeckCount}</span> of{' '}
             <span className="font-mono tnum text-ink">{deckCount}</span>{' '}

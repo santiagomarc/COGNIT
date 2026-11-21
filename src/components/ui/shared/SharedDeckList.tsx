@@ -99,7 +99,7 @@ export function SharedDeckList({ decks: initialDecks, exploreEnabled }: SharedDe
 
   if (decks.length === 0) {
     return (
-      <p className="well px-4 py-6 text-center text-[13px] text-ink-dim">
+      <p className="well px-4 py-6 text-center type-sm text-ink-dim">
         Nothing is shared. Share a deck from its page, and its link appears here.
       </p>
     );
@@ -116,7 +116,7 @@ export function SharedDeckList({ decks: initialDecks, exploreEnabled }: SharedDe
             <Link href={`/dashboard/${deck.id}`} className={`block truncate text-sm text-ink ${LINK}`}>
               {deck.title}
             </Link>
-            <p className="mt-0.5 text-[12px] text-ink-dim">
+            <p className="mt-0.5 type-cap text-ink-dim">
               Link on · {deck.sharedLabel}
               {deck.cloneCount > 0 ? (
                 <>
@@ -128,7 +128,7 @@ export function SharedDeckList({ decks: initialDecks, exploreEnabled }: SharedDe
           </div>
 
           {exploreEnabled ? (
-            <label className="flex items-center gap-2 text-[12px] text-ink-dim">
+            <label className="flex items-center gap-2 type-cap text-ink-dim">
               <Switch
                 checked={deck.listed}
                 onCheckedChange={(listed) => void setListed(deck, listed)}

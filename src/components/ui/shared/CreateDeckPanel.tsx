@@ -55,12 +55,12 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
       </span>
 
       <span className="mt-3.5 text-base font-semibold text-ink">Create deck</span>
-      <span className="mt-1 text-[13px] leading-relaxed text-ink-dim">
+      <span className="mt-1 type-sm leading-relaxed text-ink-dim">
         Start blank, paste notes, or generate cards from a PDF.
       </span>
 
       <span className="mt-auto flex w-full items-center justify-between pt-3">
-        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer transition-colors duration-[120ms] group-hover:text-ink-dim">
+        <span className="type-label text-ink-dimmer transition-colors duration-[120ms] group-hover:text-ink-dim">
           {deckCount === 1 ? '1 deck' : `${deckCount} decks`} so far
         </span>
         <Kbd>⌘N</Kbd>

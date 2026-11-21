@@ -24,7 +24,7 @@ export function DeckListingToggle({ deckId, initialListedAt }: { deckId: string;
   });
 
   return (
-    <label className="inline-flex min-h-[44px] items-center gap-2 text-[13px] text-ink-dim sm:min-h-0">
+    <label className="inline-flex min-h-[44px] items-center gap-2 type-sm text-ink-dim sm:min-h-0">
       <input
         type="checkbox"
         checked={listed}

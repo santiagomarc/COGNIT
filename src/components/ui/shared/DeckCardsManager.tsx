@@ -3,12 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, Search, Square, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { bulkDeleteCards, getDeckCardsPage } from '@/app/actions/card';
+import { bulkDeleteCards, deleteCard, getDeckCardsPage } from '@/app/actions/card';
 import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithActions';
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cardFilterPattern } from '@/lib/card-filter';
+import { PENDING_DELETE_MS, schedulePendingDelete } from '@/lib/pending-delete';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
 
@@ -31,6 +32,9 @@ type DeckCardsManagerProps = {
   totalCards?: number;
   errorMessage?: string | null;
 };
+
+/** Above this many cards at once, a toast is too small a warning: ask first (FB-01). */
+const BULK_CONFIRM_ABOVE = 50;
 
 function mapCardNumbersByCreation(items: DeckCard[]) {
   const oldestFirst = [...items].sort(
@@ -69,7 +73,6 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
@@ -173,50 +176,71 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
     setSelectedIds(new Set(visibleCards.map((card) => card.id)));
   }
 
-  function handleCardDeleted(cardId: string) {
-    setDeckCards((prev) => prev.filter((card) => card.id !== cardId));
-    setMatches((prev) => prev && prev.filter((card) => card.id !== cardId));
-    setSelectedIds((prev) => {
-      if (!prev.has(cardId)) return prev;
-      const next = new Set(prev);
-      next.delete(cardId);
-      return next;
+  /**
+   * Act now, commit later (FB-01): the cards leave the list at once and a toast
+   * offers Undo for six seconds; only then does the delete reach the server.
+   * Undo puts them back and sends nothing. A failed delete puts them back too.
+   */
+  function deleteWithUndo(ids: string[]) {
+    if (ids.length === 0) return;
+    const doomed = new Set(ids);
+    const removed = [...deckCards, ...(matches ?? [])].filter(
+      (card, index, all) => doomed.has(card.id) && all.findIndex((other) => other.id === card.id) === index,
+    );
+    const removedFromMatches = (matches ?? []).filter((card) => doomed.has(card.id));
+    const restore = () => {
+      setDeckCards((prev) => sortCardsByNumberDesc([...prev, ...removed.filter((card) => !prev.some((p) => p.id === card.id))]));
+      setMatches((prev) => (prev ? sortCardsByNumberDesc([...prev, ...removedFromMatches.filter((card) => !prev.some((p) => p.id === card.id))]) : prev));
+    };
+
+    setDeckCards((prev) => prev.filter((card) => !doomed.has(card.id)));
+    setMatches((prev) => prev && prev.filter((card) => !doomed.has(card.id)));
+    setSelectedIds((prev) => new Set([...prev].filter((id) => !doomed.has(id))));
+
+    const pending = schedulePendingDelete({
+      commit: async () => {
+        const result = ids.length === 1 ? await deleteCard(ids[0], deckId) : await bulkDeleteCards(ids, deckId);
+        if (!result?.error) return null;
+        return typeof result.error === 'string' ? result.error : 'Failed to delete.';
+      },
+      onCommitted: () => router.refresh(),
+      onFailed: (message) => {
+        restore();
+        toast.error(message);
+      },
     });
-    router.refresh();
+
+    toast(`${ids.length} card${ids.length === 1 ? '' : 's'} deleted`, {
+      duration: PENDING_DELETE_MS,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          if (pending.undo()) restore();
+        },
+      },
+    });
   }
 
-  async function handleBulkDelete() {
+  function handleBulkDeleteRequest() {
+    if (selectedIds.size > BULK_CONFIRM_ABOVE) {
+      setShowBulkDeleteConfirm(true);
+      return;
+    }
+    handleBulkDelete();
+  }
+
+  function handleBulkDelete() {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) {
-      return;
-    }
-
-    setIsBulkDeleting(true);
-    const result = await bulkDeleteCards(ids, deckId);
-
-    if (result?.error) {
-      toast.error(typeof result.error === 'string' ? result.error : 'Failed to delete selected cards');
-      setIsBulkDeleting(false);
-      return;
-    }
-
-    const selectedIdSet = new Set(ids);
-    setDeckCards((prev) => prev.filter((card) => !selectedIdSet.has(card.id)));
-    setMatches((prev) => prev && prev.filter((card) => !selectedIdSet.has(card.id)));
-    setSelectedIds(new Set());
-    setSelectionMode(false);
     setShowBulkDeleteConfirm(false);
-    setIsBulkDeleting(false);
-
-    toast.success(`${ids.length} card${ids.length === 1 ? '' : 's'} deleted`);
-    router.refresh();
+    setSelectionMode(false);
+    deleteWithUndo(ids);
   }
 
   if (deckCards.length === 0) {
     if (errorMessage) {
       return (
         <div className="surface p-8 text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-lapsed)]">
+          <p className="type-label text-[var(--state-lapsed)]">
             Load failed
           </p>
           <h2 className="mt-3 text-base font-semibold tracking-[-.015em]">
@@ -239,7 +263,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
 
     return (
       <div className="rounded-[var(--radius-container)] border border-dashed border-border-strong p-8 text-center">
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <p className="type-label text-ink-dimmer">
           Cards
         </p>
         <h2 className="mt-3 text-base font-semibold tracking-[-.015em]">No cards in this deck yet</h2>
@@ -264,7 +288,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+        <p className="type-label tnum text-ink-dimmer">
           {selectionMode
             ? `${selectedCount} of ${visibleCards.length} selected`
             : filterActive
@@ -295,8 +319,8 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
                 type="button"
                 size="sm"
                 variant="destructive"
-                onClick={() => setShowBulkDeleteConfirm(true)}
-                disabled={selectedCount === 0 || isBulkDeleting}
+                onClick={handleBulkDeleteRequest}
+                disabled={selectedCount === 0}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Delete selected
@@ -343,7 +367,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
               selectionMode={selectionMode}
               selected={selectedIds.has(card.id)}
               onToggleSelected={() => handleToggleCardSelection(card.id)}
-              onDeleted={() => handleCardDeleted(card.id)}
+              onDelete={() => deleteWithUndo([card.id])}
             />
           </div>
         ))}
@@ -369,10 +393,9 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         open={showBulkDeleteConfirm}
         onOpenChange={setShowBulkDeleteConfirm}
         title={`Delete ${selectedCount} selected card${selectedCount === 1 ? '' : 's'}?`}
-        description="This action cannot be undone. The selected flashcards will be permanently removed."
+        description="They leave the deck now; you can undo for a few seconds afterwards."
         confirmLabel="Delete selected"
         variant="destructive"
-        loading={isBulkDeleting}
         onConfirm={handleBulkDelete}
       />
     </div>

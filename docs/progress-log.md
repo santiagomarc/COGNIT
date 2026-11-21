@@ -46,6 +46,30 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-20 · santiagomarc · UIUX plan U4 and the rest of U3 (accessibility, type scale, quiz result, onboarding, delete with undo)
+- **What, by finding:**
+  - **A11Y-14 · touch targets.** Every `Button` is 44 px tall under a coarse pointer (`pointer-coarse:` in `button.tsx`); so are the launcher chips and count input, the drill launcher's chips, login's "Forgot password?", "Sign up"/"Sign in", "use a different email" and show-password, the theme toggle, the card hover actions, the PDF count select and Remove. Deck rows go 38 → 48 px. Desktop density is unchanged.
+  - **A11Y-15 · the PDF drop zone** is a `<label>` for a visually hidden but focusable file input, not a `div role="button"` with a button inside it; Remove sits outside it.
+  - **A11Y-12 · landmarks** were already fixed in `d09dde5`; confirmed: axe finds no landmark, region or skip-link rule on any public page.
+  - **Landing hero contrast (found by axe):** the subtitle used `text-slate-100`, 1.05:1 in light mode, so it was invisible. Now `text-ink-dim`.
+  - **VIS-02 · no tilt.** `Flashcard` (Cards tab, share page) lost its ±8° cursor tilt and both springs; the flip stays.
+  - **VIS-03.** "Correct answer" is ink, not the lapse hue; the drill's "Checking" tick is neutral.
+  - **VIS-04 (quiz half).** The quiz result is the screen's one `.raised` plane; its three stat tiles are labelled numbers inside it; "Focus next" and "Question diagnostics" are wells. The letter grade and badges stay (OD-7).
+  - **DS-08 · type utilities.** `type-label`, `type-sm`, `type-cap`, `type-body`, `type-h3`, `type-study-*` exist. A codemod (scratch, not committed) replaced 147 label strings and 151 raw sizes in 85 files; 22 reviewed exceptions remain. `cn()` now knows `type-*` as font sizes, so tailwind-merge resolves them against `text-sm` as it did against `text-[12px]`.
+  - **DS-09 · display sizes on the scale.** New `type-display-md` (28 px) and `type-hero` (landing only); the mobile page titles, preview card faces, login specimen, drill prompt, sidebar heading, landing headings and `Wordmark sm` read steps. `Wordmark xl`/`2xl` (no consumers) are gone.
+  - **DS-10 · design system Rev. F.** `docs/design-system.md` matches the code: scale, study steps and measure, button heights, motion budgets, anti-patterns, touch targets, accessible names, the `cognit-tz` day, the glossary (§12), self-check items 16–19.
+  - **FLOW-04 · onboarding.** The three ways in are "Fastest", "From your material" and "By hand", not "Step 1/2/3"; the starter deck holds the one filled button; the costs read "~5 s", "about a minute", "a few minutes".
+  - **FB-01 · delete with undo.** Deleting cards on the Cards tab (one or many) hides them at once with "*n* cards deleted · Undo" for 6 s; the server call waits out the toast, or runs on `pagehide`. Undo sends nothing. A failed delete puts the cards back. A confirm remains only above 50 cards at once.
+- **Not done, on purpose:** FLOW-04's shortcut that opens the new deck on the PDF uploader (the uploader loads lazily after render, so a jump could land before it exists; unverifiable without a signed-in run). REF-01 and U5 (owner's call). VIS-01 dropped (OD-7).
+- **Files:** `button.tsx`, `button-class.ts`, `utils.ts`, `globals.css`, `PDFUploadZone.tsx`, `LoginClient.tsx`, `ThemeToggle.tsx`, `DeckRow.tsx`, `DeckSessionLauncher.tsx`, `SynthesisLauncher.tsx`, `Flashcard.tsx`, `FlashcardWithActions.tsx`, `DeckCardsManager.tsx`, `QuizAssessmentClient.tsx`, `SynthesisDrillClient.tsx`, `DashboardOnboarding.tsx`, `Wordmark.tsx`, `HeroSection.tsx`, landing headings, 85 files touched by the DS-08 codemod, `src/lib/pending-delete.ts` (+ test), `src/lib/type-scale.test.ts`, `scripts/bundle-budgets.json`, `docs/design-system.md`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests and checks:**
+  - `pending-delete.test.ts` (6, fake timers), `type-scale.test.ts` (arbitrary-size ceiling 22; every serif size a step), `button-class.test.ts` updated for the touch height. 751 tests, tsc, lint (incl. contrast) pass.
+  - DS-08 pixel check: production builds before and after the codemod, five public pages × desktop and touch phone × both themes: **all 20 renders pixel-identical.** Nine label strings that lacked `leading-[1.5]` gain it; they're on signed-in screens (quiz modes, quiz result, share button), unchecked.
+  - axe on every public page at 375 and 1280: clean. `e2e/a11y.spec.ts` (empty allow-list) passes on landing and login in both themes.
+  - Bundles: `/dashboard/[deckId]` 230.3 → 222.3 kB, `/s/[token]` 184.3 → 177.1 (the tilt springs); budgets lowered to 226 and 181. Every route within budget.
+  - **Not seen signed in:** the quiz result layout, the Cards-tab delete and Undo, onboarding, the touch sizes on a real phone.
+
 ### 2026-11-20 · santiagomarc · The product's voice (COPY-05)
 - **What:**
   - No more exclamation marks: "Reset email sent!" → "Check your email for a reset link.", "Check your email!" → "Check your email to confirm your account.", "*n* cards generated and saved!" → "*n* cards added to this deck.", "Password updated successfully!" → "Password updated.", and the study empty state "You're all caught up!" → "Nothing due in this deck".

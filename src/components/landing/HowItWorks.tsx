@@ -37,10 +37,10 @@ export function HowItWorks() {
     <section id="how-it-works" className="py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-6">
         <div className="mx-auto mb-16 max-w-lg text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             How it works
           </p>
-          <h2 className="mt-3 font-serif text-[clamp(3rem,4.5vw,3.75rem)] leading-[1.08] tracking-[-0.02em] text-balance text-ink">
+          <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance text-ink">
             Three steps to mastery
           </h2>
           <p className="mt-3 text-ink-dim">
@@ -61,7 +61,7 @@ export function HowItWorks() {
                 aria-hidden="true"
                 className="absolute -left-[calc(2rem+1px)] top-1 flex h-6 w-[2px] items-center bg-ink sm:-left-[calc(2.5rem+1px)]"
               />
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 Step {step.number}
               </p>
               <h3 className="mt-2 text-lg font-semibold tracking-[-.02em] text-ink sm:text-xl">

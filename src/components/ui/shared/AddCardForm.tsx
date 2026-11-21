@@ -60,7 +60,7 @@ export function AddCardForm({ deckId }: AddCardFormProps) {
   return (
     <form ref={formRef} action={handleSubmit} className="surface p-5">
       <div className="mb-4">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Add a card
         </h2>
         <p className="mt-2 text-sm text-ink-dim">

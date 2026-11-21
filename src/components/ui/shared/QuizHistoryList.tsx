@@ -66,7 +66,7 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
   if (!history || history.length === 0) {
     return (
       <section className="surface p-5 text-center md:p-6">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Quiz history
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm text-ink-dim">
@@ -82,10 +82,10 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
   return (
     <section className="surface p-5 md:p-6">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Quiz history
         </h2>
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+        <p className="type-label tnum text-ink-dimmer">
           {history.length}{hasMore ? '+' : ''} attempts
         </p>
       </div>
@@ -108,10 +108,10 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
                   <span className="min-w-0 flex-1 truncate text-sm text-ink">
                     {result.mode === 'mcq' ? 'Multiple choice' : 'Identification'}
                   </span>
-                  <span className="hidden shrink-0 font-mono text-[13px] tnum text-ink-dim sm:block">
+                  <span className="hidden shrink-0 font-mono type-sm tnum text-ink-dim sm:block">
                     {result.correct_cards}/{result.total_cards}
                   </span>
-                  <span className="hidden shrink-0 font-mono text-[13px] tnum text-ink-dimmer md:block">
+                  <span className="hidden shrink-0 font-mono type-sm tnum text-ink-dimmer md:block">
                     {date}
                   </span>
                 </div>
@@ -120,7 +120,7 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
               <AccordionContent className="border-t border-border pb-5 pt-4">
                 {result.incorrect_answers && result.incorrect_answers.length > 0 ? (
                   <div className="space-y-3">
-                    <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+                    <p className="type-label tnum text-ink-dimmer">
                       Needs review · {result.wrong_count} missed
                     </p>
                     {result.incorrect_answers.map((mistake, i) => (
@@ -132,7 +132,7 @@ export function QuizHistoryList({ history: initialHistory, deckId, initialHasMor
                         />
                         <div className="min-w-0 flex-1 space-y-1.5">
                           <div className="flex flex-wrap items-baseline gap-2">
-                            <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+                            <span className="type-label tnum text-ink-dimmer">
                               {mistake.card_number ? `#${mistake.card_number}` : '#?'}
                             </span>
                             <p className="text-sm font-medium text-foreground">{mistake.prompt}</p>

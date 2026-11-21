@@ -6,7 +6,7 @@ import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 const WIDTH = 1000;
 const HEIGHT = 520;
 const MAX_NODES = 60;
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * The Insights segment's one `.raised` object (design system §7.1): the deck's

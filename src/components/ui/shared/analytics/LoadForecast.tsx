@@ -33,7 +33,7 @@ export function LoadForecast({ days }: { days: Day[] }) {
         {total} reviews scheduled over the next thirty days
         {busiest && busiest.cards > 0 ? `, peaking at ${busiest.cards} on ${busiest.date}` : ''}.
       </p>
-      <div className="mt-1.5 flex items-baseline justify-between font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+      <div className="mt-1.5 flex items-baseline justify-between type-label text-ink-dimmer">
         <span>Tomorrow</span>
         <span>
           <span className="tnum text-ink">{total}</span> in 30 days

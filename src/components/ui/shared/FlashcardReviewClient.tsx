@@ -979,7 +979,7 @@ export function FlashcardReviewClient({
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="surface mx-auto max-w-2xl p-10 text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Study
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Nothing due in this deck</h1>
@@ -1018,7 +1018,7 @@ export function FlashcardReviewClient({
     return (
       <div className="container mx-auto p-6 md:p-8">
         <div className="surface mx-auto max-w-2xl p-10 text-center">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Study
           </p>
           <h1 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Resume your previous session?</h1>
@@ -1070,10 +1070,10 @@ export function FlashcardReviewClient({
               {/* The deck name is prose, so it stays in the sans face — mono is
                   for the numbers a user reads as data (§3.2). */}
               <div className="hidden items-baseline gap-2 sm:flex">
-                <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <span className="type-label text-ink-dimmer">
                   Deck
                 </span>
-                <span className="max-w-[10rem] truncate text-[13px] leading-none text-ink sm:max-w-[16rem]">
+                <span className="max-w-[10rem] truncate type-sm leading-none text-ink sm:max-w-[16rem]">
                   {deckTitle}
                 </span>
               </div>
@@ -1156,7 +1156,7 @@ export function FlashcardReviewClient({
                 className="mx-auto w-full max-w-2xl space-y-6"
               >
                 <div className="surface p-8 text-center">
-                  <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  <p className="type-label text-ink-dimmer">
                     Session
                   </p>
                   <h2 className="mt-3 font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">Review complete</h2>
@@ -1278,7 +1278,7 @@ export function FlashcardReviewClient({
                   // state colour, filling in once the drag is far enough to commit.
                   <p
                     aria-hidden="true"
-                    className="flex flex-col items-center gap-1 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]"
+                    className="flex flex-col items-center gap-1 type-label"
                     style={{
                       color: swipe.commits
                         ? swipe.grade === 'good' ? 'var(--state-mastered)' : 'var(--state-lapsed)'
@@ -1296,7 +1296,7 @@ export function FlashcardReviewClient({
                     />
                   </p>
                 ) : (
-                  <p className="text-center font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  <p className="text-center type-label text-ink-dimmer">
                     {flipState === 'default' ? 'Question' : 'Answer'}
                   </p>
                 )}
@@ -1339,7 +1339,7 @@ export function FlashcardReviewClient({
                 </div>
 
                 {showAnswer && !peeking && !swipeHintSeen && window.matchMedia('(pointer: coarse)').matches ? (
-                  <p className="text-center text-[13px] text-ink-dim">Swipe right for Good, left for Again</p>
+                  <p className="text-center type-sm text-ink-dim">Swipe right for Good, left for Again</p>
                 ) : null}
 
                 {/* Minimal, centered reveal affordance (§5 Task 3.3) */}
@@ -1441,11 +1441,11 @@ export function FlashcardReviewClient({
             className="fixed inset-0 z-[var(--z-overlay)] flex items-center justify-center bg-[color-mix(in_srgb,var(--bg)_80%,transparent)] backdrop-blur-[4px]"
           >
             <div className="panel mx-4 w-full max-w-md p-8 text-center">
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 Session paused
               </p>
               <h2 className="mt-3 text-xl font-semibold tracking-[-.025em]">Timer is on hold</h2>
-              <p className="mt-1 truncate text-[13px] text-ink-dim">{deckTitle}</p>
+              <p className="mt-1 truncate type-sm text-ink-dim">{deckTitle}</p>
               <p className="mt-2 text-sm text-ink-dim">
                 Your place in the deck is kept. Paused time is not counted toward the session.
               </p>

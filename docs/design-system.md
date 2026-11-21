@@ -1,9 +1,11 @@
 # Cognit — Design System
 
 **Codename:** Obsidian Telemetry
-**Status:** Approved 2026-09-10 · Rev. D (2026-09-26: synthesis on the state channel, errors, time is not memory, readout steps, `--z-grain` — COGNIT_NEXT_HORIZON_PLAN.md §5.4) · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`) · Rev. E (2026-10: sidebar navigation, settings controls, planes on management screens — COGNIT_SIDEBAR_SETTINGS_PLAN.md)
+**Status:** Approved 2026-09-10 · Rev. D (2026-09-26: synthesis on the state channel, errors, time is not memory, readout steps, `--z-grain` — COGNIT_NEXT_HORIZON_PLAN.md §5.4) · Rev. C (extended via `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`) · Rev. E (2026-10: sidebar navigation, settings controls, planes on management screens — COGNIT_SIDEBAR_SETTINGS_PLAN.md) · Rev. F (2026-11: study type by length, motion budgets, one glossary, local days, type utilities, touch targets — docs/plans/uiux-plan.md §9)
 **Applies to:** Next.js 16 (App Router) · React 19 · Tailwind v4 (CSS-first) · Framer Motion 12
 
+> **Changelog (Rev. F):** The card face's size follows its text's length (§3.3, §7.6). Motion gets latency budgets and a 320 ms flip (§5). Chrome type steps get utilities, and a ratchet test holds them (§3.3). A glossary fixes one meaning per word (§12, new). Days are the user's local days (§2.2e). The anti-pattern list names invented numbers and cursor tilt anywhere text is read (§1.1). Accessible names carry the content, and touch targets are 44 px under a finger (§9). The document now matches the code on step names and button heights. Performance badges and the quiz's letter grade stay, by the owner's decision (UIUX plan OD-7).
+>
 > **Changelog (Rev. E):** The 48 px rail becomes a 256 px sidebar that collapses to the rail and becomes a drawer on phones (§8, §7.11). Adds settings controls (§7.12). Scopes "exactly one `.raised`" to screens with a primary object (§1b). Adds three CSS marks and a minus sign to §6. The sidebar ships in Phase 3 of COGNIT_SIDEBAR_SETTINGS_PLAN.md; until then the 48 px rail of Rev. D is what runs.
 >
 > **Changelog (Rev. C):** Added the plane system — `.raised`, `.well` and the recessed `--elevate-inset` step — plus the monochromatic ambient field, gradient-masked rules, and display-type utilities that finally consume the type tokens. Scoped the anti-pattern ban on orbs and grain to *chromatic* decoration. Recorded the state channel's measured CVD separation. Source: `implementation-prompts/REDESIGN_RUN_6_REV_C_SURFACES.md`.
@@ -76,7 +78,8 @@ These were removed deliberately. Adding any of them back is a regression, not a 
 | Gradient text or gradient headings | — | `--ink`, weight 600 |
 | `<Sparkles/>`, `<Brain/>`, `<Wand2/>`, robot/AI glyphs | 17 sparkle instances is why this redesign exists | A count, a label, or nothing |
 | Orbitron (or any sci-fi display face) | — | Geist Sans |
-| Cursor-tracking 3D tilt on readable content | Text plane is never square to the eye | Static card |
+| Cursor-tracking 3D tilt **anywhere text is read**, preview cards included (Rev. F) | Text plane is never square to the eye; Rev. C's "showpiece" exception covered two card lists, both of them content | Static card; the flip only |
+| Numbers that aren't read from data (user counts, ratings, "in 30 seconds") (Rev. F) | The thesis is *trustworthy* | A real count, or nothing |
 | Four+ competing radii | Radius carried no meaning | Three steps, by role (§5) |
 | Emoji as section markers or status | — | A 2px state tick |
 | Any per-frame loop on an authenticated surface | 30-60 minute sessions on laptops | CSS-only, static (§7.10) |
@@ -224,6 +227,9 @@ Timers, countdowns and dates stay `--ink`. Urgency is a word ("last minute",
 "exam today"), never a hue. An edit (a revision diff) is not a fact about
 memory either: `<ins>`/`<del>` with ink decoration.
 
+A day is the user's local day (Rev. F). Streaks, "today", the heatmap and the forecast bucket by the
+IANA zone in the `cognit-tz` cookie, never by UTC (`src/lib/timezone.ts`).
+
 ### 2.3 Rules
 
 - Never introduce a hue outside §2.2. No brand purple, no indigo, no cyan. Synthesis facts use it only through §2.2c.
@@ -232,6 +238,10 @@ memory either: `<ins>`/`<del>` with ink decoration.
 - Never hard-code a hex in a component. Every colour comes from a token, so both themes resolve.
 - A colour is never the *only* carrier of meaning. Pair every state colour with a label, a count or
   a position (WCAG 1.4.1).
+- Third-party brand marks keep their own colours where their guidelines require it (the Google "G"
+  on the sign-in button). Nothing else is exempt. (Rev. F)
+- A Tailwind palette class (`text-slate-100`, `bg-zinc-800`) is a hard-coded hex by another name. The
+  landing hero's subtitle shipped one and was invisible in light mode until Rev. F.
 
 ---
 
@@ -264,9 +274,12 @@ Base is **14px** for application chrome. Instrument Serif display headings and s
 
 ```css
 /* display steps — Instrument Serif (1.5x enlarged scale, weight 400 only) */
---type-display-xl: 4.125rem;  /* 66px — page hero, login brand      */
---type-display-lg: 3rem;      /* 48px — page title (h1), modal head */
---type-display:    2.25rem;   /* 36px — section heading (h2)        */
+--type-display-xl: 4.125rem;  /* 66px — login wordmark                                       */
+--type-display-lg: 3rem;      /* 48px — sparse-screen headings, landing sections             */
+--type-display:    2.25rem;   /* 36px — app page title (h1) from sm                          */
+--type-display-md: 1.75rem;   /* 28px — app page title below sm; wordmark sm (Rev. F)        */
+--type-display-sm: 1.5rem;    /* 24px — the serif floor: the drill prompt, sidebar heading   */
+--type-hero: clamp(4.125rem, 7.5vw, 6.75rem); /* landing hero only (Rev. F)                  */
 --type-study-lg: clamp(2rem, 3.2vw, 2.75rem);      /* card text ≤ 110 chars: 32-44px */
 --type-study-md: clamp(1.625rem, 2.4vw, 2.125rem); /* 111-240 chars: 26-34px */
 --type-study-sm: 1.5rem;                           /* > 240 chars: 24px, the serif floor */
@@ -286,6 +299,13 @@ Base is **14px** for application chrome. Instrument Serif display headings and s
 
 Large numbers use the `type-readout*` utilities, never a restated `text-[44px]`.
 
+**Every size is read through a utility (Rev. F):** `type-display*`, `type-hero`, `type-study-*`,
+`type-h3`, `type-body`, `type-sm`, `type-cap`, `type-label`, `type-readout*`. `type-label` is the
+complete label style (mono, 10px, uppercase, 0.16em, line-height 1.5); compose colour separately
+(`type-label text-ink-dimmer`). A restated `text-[Npx]` is a defect: `src/lib/type-scale.test.ts`
+counts the ones left and fails above its ceiling, which only goes down. `cn()` knows the `type-*`
+utilities as font sizes, so a later one wins over an earlier `text-sm`, as with any Tailwind size.
+
 **These tokens are live in `globals.css` and components consume them through the
 `type-display-xl` / `-lg` / `type-display` / `-sm` utilities** (Rev. C). Before Rev. C the tokens
 held a different scale from this document and had *zero* consumers — every heading hardcoded
@@ -294,7 +314,7 @@ if a heading needs a size that is not on the scale, add a step here first.
 
 Rules:
 - Display type gets `letter-spacing: -0.02em` and `text-wrap: balance`. Never set Instrument Serif below 24px.
-- Prose measure caps at ~68ch; the card prompt caps at **36ch** (see §7.6).
+- Prose measure caps at ~68ch. The card prompt's measure follows its step: 36ch at `lg`, 44ch at `md`, 52ch at `sm` (§7.6).
 - Every column of digits gets `font-variant-numeric: tabular-nums`. No exceptions.
 - Uppercase is reserved for the `label` step. Do not uppercase buttons or headings.
 
@@ -378,11 +398,19 @@ in `src/lib/motion-configs.ts`). The new rule:
 | Hover, colour, border | Ease | `120ms ease` |
 | Key press / release | Ease | `70ms ease` |
 | Panel + overlay enter/exit | Ease-out | `160ms cubic-bezier(.2,.8,.2,1)` |
-| Card flip | Smooth Ease-in-out | `520ms cubic-bezier(0.4, 0, 0.2, 1)` |
-| **Card leaving the stack** | **Spring** | `stiffness 260, damping 24` |
+| Card flip | Smooth Ease-in-out | **`320ms`** `cubic-bezier(0.4, 0, 0.2, 1)`; the answer face shows at the midpoint (Rev. F) |
+| Commit flash | Ease-out | **`120ms`** (Rev. F) |
+| **Card leaving the stack** | **Spring** for the next card's `y` | `stiffness 260, damping 24`; the old card's opacity goes in `90ms linear`, and the new card doesn't wait for it (`popLayout`) |
 
 That last row is the **only** spring left in the product. It exists because a graded card should feel
 like it has mass. Everything else is a duration and an easing curve.
+
+**Budgets (Rev. F).** Key → next prompt readable ≤ **300 ms**; Space → answer readable ≤ **200 ms**.
+`E2E_LATENCY=1 npm run e2e -- study` measures both (median of five).
+
+**Loops (Rev. F).** On an authenticated surface nothing animates indefinitely except while something
+is loading: the skeleton shimmer (`.glass-skeleton`) and a spinner inside a control whose own request
+is in flight. Both stop under reduced motion. A known wait gets a counter, not a loop.
 
 Every animation must be disabled under `prefers-reduced-motion: reduce`. The existing global guard in
 `globals.css` is good and must be preserved — do not regress it.
@@ -496,6 +524,18 @@ Only interactive surfaces get a hover state. A static panel that lights up on ho
 .btn--ghost:hover { border-color: var(--border-strong); }
 ```
 
+**Heights (Rev. F; the `.btn` sketch above predates them):**
+
+| Size | Height | Under a coarse pointer |
+|---|---|---|
+| `sm`, `icon-sm` | 32 px | 44 px |
+| default, `icon` | 40 px | 44 px |
+| `lg`, `icon-lg` | 44 px | 44 px |
+
+`button.tsx` sets them with `pointer-coarse:`, so a mouse keeps the dense layout and a finger gets
+44 px. Controls that aren't `Button`s (chips, the deck row, login's text buttons, the theme toggle)
+follow the same rule. The grade keys stay 64 px below 640 px.
+
 At most one primary button per screen. A screen whose primary action is a specialised control (e.g. the grade deck on the study canvas) has none. The dashboard's is "Start session".
 
 > **Do not** wrap buttons in `framer-motion`. The current `button.tsx` returns an `m.button` with a
@@ -535,6 +575,11 @@ Complete binding inventory (all already implemented in code — they just are no
 | `P` | Pause / resume | Quiz — **currently undocumented in the UI** |
 | `⌘K` | Command palette | Global (new) |
 | `S` | Start session | Dashboard (new) |
+| `Z` | Undo the last grade, within its 6 s window | Study (Rev. F) |
+| `E` | Edit the current card | Study (Rev. F) |
+
+Every binding is a row in `SHORTCUTS` (`src/lib/shortcuts.ts`) in the same commit. Space doesn't
+grade (UIUX plan OD-3).
 
 ### 7.4 Grade key — the tactile exception
 
@@ -644,16 +689,19 @@ type FlipState = 'default' | 'flipping' | 'graded' | 'focus';
   display: grid; place-items: center;
   padding: clamp(1.5rem, 4vw, 2.75rem);
   font-family: var(--font-serif);
-  font-size: clamp(1.5625rem, 2.4vw, 2.125rem);   /* 25px → 34px */
+  /* Size and measure come from `data-length` on .flip__body (Rev. F): see below. */
   line-height: 1.32;
   text-align: center;
   text-wrap: balance;
-  max-width: 32ch;
   margin-inline: auto;
   overflow-y: auto;             /* actually reachable — no line-clamp */
   overscroll-behavior: contain;
 }
 .flip__face--answer { transform: rotateY(180deg); }
+/* Rev. F: the size follows the text. `data-length` (lg / md / sm, from studyLength() in
+   src/lib/study-type.ts) picks --type-study-lg/md/sm and a 36 / 44 / 52ch measure. Text that
+   still overflows fades its last 32px with a mask, and the label step says "More below" under
+   the card. The face's accessible name is its text (§9). */
 
 /* 1 · DEFAULT */
 .flip[data-state="default"]  { transform: rotateY(0deg); }
@@ -838,7 +886,9 @@ Non-negotiable. Verify before calling any UI task done.
 - **Control edges** ≥3:1 → `--border-control`.
 - **Focus visible** on every interactive element. Corner brackets or a 2px `--accent` outline.
 - **Colour is never alone.** Every state colour is paired with a label, count or position.
-- **Touch targets** ≥44×44px; grade keys are 64px tall on mobile.
+- **Touch targets** ≥44×44px under a coarse pointer, ≥24×24px under a fine one (WCAG 2.2 SC 2.5.8); grade keys are 64px tall on mobile. Links inside running prose are exempt. (Rev. F)
+- **A control's accessible name carries the content the user must read.** Instructions go in `aria-describedby`, never in an `aria-label` that replaces the content (the study card was the case, A11Y-13). (Rev. F)
+- **One `main` landmark per page**, which the skip link targets (`#main-content`). A component never renders its own `<main>` inside a layout that has one. `e2e/a11y.spec.ts` runs axe on the main pages and fails on any rule not on its allow-list, which is empty. (Rev. F)
 - **Reduced motion** disables all animation, including the card spring and the odometer roll.
 - **Keyboard** — every binding in §7.3 works and is *visible*.
 - Preserve the existing skip-to-content link and `aria-live` regions.
@@ -853,6 +903,9 @@ Non-negotiable. Verify before calling any UI task done.
   with an inline script in `layout.tsx` preventing flash. Keep that mechanism.
 - **`components.json` says `"baseColor": "neutral"`** — that is now finally true. Anything pulled via
   the shadcn CLI will land in the right palette.
+- **`next/og` images can't read CSS variables.** They take the dark-theme values from
+  `src/lib/og-palette.ts`, which mirrors `globals.css`. It's the one place a hex may appear outside
+  `globals.css`. (Rev. F)
 - **Server components by default.** Only add `'use client'` when a component needs state or effects.
   Do not convert a server component to a client component for styling.
 - **The `Card` primitive in `src/components/ui/card.tsx` hardcodes glass**
@@ -894,3 +947,24 @@ Non-negotiable. Verify before calling any UI task done.
 13. Does every sidebar count that is not due work stay out of `--state-due`? (Rev. E)
 14. Does a new `/dashboard/<name>` route appear in `NAMED_DASHBOARD_SEGMENTS`? (Rev. E)
 15. Is every device-only preference labelled "Saved to this browser"? (Rev. E)
+16. Does every control's accessible name include the text the user has to read? (Rev. F)
+17. Is every number on the screen read from data? (Rev. F)
+18. Is every text size a `type-*` utility, not `text-[Npx]`? (Rev. F)
+19. Is every control at least 44px under a finger? (Rev. F)
+
+---
+
+## 12. Glossary — one meaning per word (Rev. F)
+
+| Word | Means | Hue |
+|---|---|---|
+| **Due** | studied, and its review time has passed | `--state-due` when > 0 |
+| **New** | never studied | none |
+| **Learning** | in the learning or relearning steps (interval < 1 day) | `--state-learning` |
+| **Mastered** | SM-2 interval ≥ 21 days | `--state-mastered` |
+| **Quiz-proven** | the card's last quiz answer was correct | none |
+| **Retention** | share of the last 30 days' reviews of seen cards graded Good or Easy (Stats only) | none |
+| **Recalled** | this session's Good + Easy, as "*n* of *m*" | none |
+
+A new user-facing metric gets a row here before it ships. "Mastery" is not a word in the product:
+it used to name the quiz-proven share, painted in the mastered hue (UIUX plan COPY-02).

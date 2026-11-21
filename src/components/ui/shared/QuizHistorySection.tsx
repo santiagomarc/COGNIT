@@ -11,7 +11,7 @@ export async function QuizHistorySection({ deckId }: QuizHistorySectionProps) {
   if (historyResult && 'error' in historyResult) {
     return (
       <section className="surface p-5 md:p-6">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Quiz history
         </h2>
         <p className="mt-2 text-sm text-ink-dim">

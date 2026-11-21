@@ -186,7 +186,7 @@ export function DueNowBand({
               </Link>
             </Button>
             {hasWork && dueDecks[0] ? (
-              <p className="max-w-[16rem] truncate text-[13px] text-ink-dim sm:text-right">
+              <p className="max-w-[16rem] truncate type-sm text-ink-dim sm:text-right">
                 Starts with <span className="text-ink">{dueDecks[0].deckTitle}</span> ·{' '}
                 <span className="font-mono tnum text-ink">{Math.min(chunkSize, dueDecks[0].dueCount)}</span> of{' '}
                 <span className="font-mono tnum text-ink">{dueDecks[0].dueCount}</span>
@@ -208,7 +208,7 @@ export function DueNowBand({
             */}
             {forecastDays.length > 0 ? (
               <div className="w-full lg:w-[400px] lg:shrink-0">
-                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <p className="type-label text-ink-dimmer">
                   Next 7 days · <span className="tnum text-ink">{forecastTotal}</span> cards
                 </p>
                 <div className="mt-2 grid grid-flow-col auto-cols-fr items-end gap-2">
@@ -218,7 +218,7 @@ export function DueNowBand({
 
                     return (
                       <div key={day.date} className="flex flex-col items-center gap-[5px]">
-                        <span className="font-mono text-[13px] leading-none tnum text-ink-dim max-sm:hidden">
+                        <span className="font-mono type-sm leading-none tnum text-ink-dim max-sm:hidden">
                           {day.count}
                         </span>
                         {/* Capped width: a bar stretched across a seventh of the
@@ -232,7 +232,7 @@ export function DueNowBand({
                             style={{ height: `${heightPercent}%` }}
                           />
                         </span>
-                        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                        <span className="type-label text-ink-dimmer">
                           <span className="sr-only">
                             {day.count} cards on{' '}
                           </span>
@@ -251,7 +251,7 @@ export function DueNowBand({
 
             {dueDecks.length > 0 ? (
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <p className="type-label text-ink-dimmer">
                   Due now, by deck
                 </p>
                 <ul className="mt-2 flex flex-col gap-[5px]">
@@ -261,11 +261,11 @@ export function DueNowBand({
                         href={`/dashboard/${deck.deckId}/study?scope=due&count=${chunkSize}`}
                         className="group flex items-baseline gap-3 rounded-[var(--radius-sm)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                       >
-                        <span className="min-w-0 flex-1 truncate text-[13px] text-ink-dim group-hover:text-ink">
+                        <span className="min-w-0 flex-1 truncate type-sm text-ink-dim group-hover:text-ink">
                           {deck.deckTitle}
                         </span>
                         <span
-                          className="font-mono text-[13px] tnum"
+                          className="font-mono type-sm tnum"
                           style={{ color: 'var(--state-due)' }}
                         >
                           {deck.dueCount}

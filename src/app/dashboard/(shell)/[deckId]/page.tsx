@@ -389,17 +389,17 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
         <div className="mt-3 flex flex-col gap-y-4 lg:flex-row lg:items-end lg:justify-between lg:gap-x-10">
           <div className="min-w-0">
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="font-serif text-[1.8125rem] leading-[1.08] tracking-[-0.02em] text-balance text-ink sm:type-display">
+              <h1 className="font-serif type-display-md leading-[1.08] tracking-[-0.02em] text-balance text-ink sm:type-display">
                 {deckTitleMeta.cleanTitle}
               </h1>
               {deckTitleMeta.tag ? (
-                <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <span className="type-label text-ink-dimmer">
                   {deckTitleMeta.tag}
                 </span>
               ) : null}
             </div>
             {deck.description ? (
-              <p className="mt-1.5 max-w-2xl text-[13px] text-ink-dim">{deck.description}</p>
+              <p className="mt-1.5 max-w-2xl type-sm text-ink-dim">{deck.description}</p>
             ) : null}
           </div>
 
@@ -442,7 +442,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
             <Link
               href={`/dashboard/${deckId}?tab=exam`}
               scroll={false}
-              className="well flex flex-wrap items-baseline gap-x-2 px-3.5 py-2.5 text-[13px] text-ink-dim outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+              className="well flex flex-wrap items-baseline gap-x-2 px-3.5 py-2.5 type-sm text-ink-dim outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
             >
               <span className="text-ink">{examLine(daysToExam(deck.exam_at, new Date()))}</span>
               <span aria-hidden="true">·</span>
@@ -466,7 +466,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
           {recentCards.length > 0 ? (
             <section>
               <div className="flex items-center gap-3.5 pb-2.5">
-                <h2 className="shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <h2 className="shrink-0 type-label text-ink-dimmer">
                   Recent cards
                 </h2>
                 <span className="rule flex-1" aria-hidden="true" />
@@ -507,11 +507,11 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
                         <span className="block truncate text-sm text-ink">{prompt}</span>
                         <span className="block truncate text-xs text-ink-dimmer">{answer}</span>
                       </span>
-                      <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer sm:block">
+                      <span className="hidden shrink-0 type-label text-ink-dimmer sm:block">
                         {card.source === 'ai_pdf' ? 'PDF' : card.source === 'bulk_import' ? 'Bulk' : card.source === 'synthesis_claim' ? 'Drill' : 'Manual'}
                       </span>
                       <span
-                        className="w-12 shrink-0 text-right font-mono text-[13px] tnum"
+                        className="w-12 shrink-0 text-right font-mono type-sm tnum"
                         style={{
                           color:
                             next.state === 'due'
@@ -538,7 +538,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
           at the foot of Overview rather than open on the page you study from (IA-02). */}
       {activeTab === 'overview' && mergeTargets.length > 0 ? (
         <details className="group well px-3.5 py-3">
-          <summary className="cursor-pointer text-[13px] text-ink-dim outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+          <summary className="cursor-pointer type-sm text-ink-dim outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
             Merge into another deck…
           </summary>
           <div className="mt-3">
@@ -552,7 +552,7 @@ export default async function DeckDetailPage({ params, searchParams }: DeckDetai
         hasCards ? (
           <>
             <section className="surface p-4 lg:p-5" aria-labelledby="exam-date-heading">
-              <h2 id="exam-date-heading" className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Exam date</h2>
+              <h2 id="exam-date-heading" className="type-label text-ink-dimmer">Exam date</h2>
               {/* The exam date sets the drill cadence (plan D19): tight inside three days, stretched beyond two weeks. */}
               <ExamDateControl deckId={deckId} examAt={deck.exam_at} />
               {totalCards >= MIN_DECK_CARDS_FOR_DRILLS ? (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, type DragEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useCallback, useEffect, useId, type DragEvent, type ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ElapsedTelemetry } from '@/components/ui/shared/ElapsedTelemetry';
@@ -39,6 +39,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
   const [maxCardChoice, setMaxCardChoice] = useState<string>('10');
   const [startedAt, setStartedAt] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
   const reduced = useReducedMotion();
   const router = useRouter();
   const generation = usePdfGeneration();
@@ -143,7 +144,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       {/* ─── Drop zone ─── */}
       <div className="surface relative p-5">
         <div className="mb-4 space-y-1">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <h2 className="type-label text-ink-dimmer">
             Generate from PDF
           </h2>
           <p className="text-sm text-ink-dim">
@@ -152,70 +153,71 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
           </p>
         </div>
 
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label="Drop a PDF file here or click to browse"
+        {/*
+          A label for a visually hidden file input, not a `div role="button"`
+          with a Remove button inside it (A11Y-15: nested interactive
+          controls). The input stays focusable (`sr-only`, not `hidden`), so
+          Enter and Space open the picker natively, and Remove sits outside.
+        */}
+        <label
+          htmlFor={fileInputId}
           onDragEnter={handleDragEnter}
           onDragLeave={handleDragLeave}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click();
-          }}
-          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-container)] border border-dashed p-6 text-center transition-colors outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] ${
+          className={`flex min-h-36 cursor-pointer flex-col items-center justify-center rounded-[var(--radius-container)] border border-dashed p-6 text-center transition-colors has-[input:focus-visible]:outline-2 has-[input:focus-visible]:outline-offset-2 has-[input:focus-visible]:outline-[var(--accent)] ${
             isDragging || selectedFile
               ? 'border-[var(--accent)] bg-surface-raised'
               : 'border-[var(--border-control)] hover:bg-surface-raised'
           }`}
         >
           <input
+            id={fileInputId}
             ref={inputRef}
             type="file"
             accept="application/pdf"
             onChange={handleFileChange}
-            className="hidden"
-            aria-hidden="true"
+            className="sr-only"
           />
 
           {selectedFile ? (
             <div className="flex flex-col items-center gap-2">
               <p className="text-sm font-medium">{selectedFile.name}</p>
-              <p className="font-mono text-[13px] tnum text-ink-dim">
+              <p className="font-mono type-sm tnum text-ink-dim">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearFile();
-                }}
-                className="mt-1 inline-flex items-center gap-1 rounded-[var(--radius-xs)] text-xs text-ink-dimmer transition-colors hover:text-ink"
-              >
-                <X className="h-3 w-3" />
-                Remove
-              </button>
+              <p className="text-xs text-ink-dimmer">Choose a different PDF</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
-              <Upload className="h-5 w-5 text-ink-dimmer" />
+              <Upload className="h-5 w-5 text-ink-dimmer" aria-hidden="true" />
               <p className="text-sm font-medium">
                 {isDragging ? 'Drop your PDF here' : 'Drag a PDF here, or click to browse'}
               </p>
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 PDF · max 10 MB
               </p>
             </div>
           )}
-        </div>
+        </label>
+
+        {selectedFile ? (
+          <button
+            type="button"
+            onClick={clearFile}
+            className="mt-2 inline-flex min-h-11 items-center gap-1 rounded-[var(--radius-xs)] px-1 text-xs text-ink-dimmer transition-colors outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] sm:min-h-0 pointer-coarse:min-h-11"
+          >
+            <X className="h-3 w-3" aria-hidden="true" />
+            Remove<span className="sr-only"> {selectedFile.name}</span>
+          </button>
+        ) : null}
 
         {selectedFile && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <label
                 htmlFor="card-count"
-                className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+                className="type-label text-ink-dimmer"
               >
                 Max cards
               </label>
@@ -223,7 +225,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
                 id="card-count"
                 value={maxCardChoice}
                 onChange={(e) => setMaxCardChoice(e.target.value)}
-                className="h-[32px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-surface px-2 text-base sm:text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                className="h-[32px] pointer-coarse:h-[44px] rounded-[var(--radius-sm)] border border-[var(--border-control)] bg-surface px-2 text-base sm:text-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
               >
                 {[5, 10, 15, 20, 25].map((n) => (
                   <option key={n} value={n}>
@@ -262,7 +264,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               </p>
               <div aria-hidden="true" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
                 <ElapsedTelemetry key={startedAt} baseMs={0} running />
-                <span className="font-mono text-[13px] tnum text-ink-dim">
+                <span className="font-mono type-sm tnum text-ink-dim">
                   {generatedCards.length} {generatedCards.length === 1 ? 'card' : 'cards'} saved
                   {generation.progress.sections > 1 && (
                     <> · section {Math.min(generation.progress.sectionsRead + 1, generation.progress.sections)} of {generation.progress.sections}</>
@@ -288,7 +290,7 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
       {/* ─── Generated cards ─── */}
       {generatedCards.length > 0 && (
         <div className="space-y-3">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             <span className="tnum">{generatedCards.length}</span> {isGenerating ? 'saved so far' : 'cards generated and saved'}
           </p>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -296,12 +298,12 @@ export function PDFUploadZone({ deckId }: PDFUploadZoneProps) {
               <div key={card.id} className="surface p-4">
                 {/* `front` is the answer and `back` is the question in this schema
                     (design system §7.6), so the preview reads in study order. */}
-                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <p className="type-label text-ink-dimmer">
                   Question
                 </p>
                 <p className="mt-1 text-sm leading-relaxed">{card.back}</p>
                 <hr className="my-3 border-border" />
-                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <p className="type-label text-ink-dimmer">
                   Answer
                 </p>
                 <p className="mt-1 text-sm leading-relaxed text-ink-dim">{card.front}</p>

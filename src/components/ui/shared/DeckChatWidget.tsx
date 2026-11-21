@@ -249,7 +249,7 @@ export function DeckChatWidget({ deckId }: DeckChatWidgetProps) {
     <section className="surface p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <h2 className="type-label text-ink-dimmer">
             Chat with your deck
           </h2>
           <p className="mt-2 text-sm text-ink-dim">
@@ -436,7 +436,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         ) : null}
 
         {message.ungrounded ? (
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-[var(--state-learning)]">
+          <p className="type-label text-[var(--state-learning)]">
             Not covered by this deck
           </p>
         ) : null}
@@ -444,7 +444,7 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
 
         {!message.references && !isUser && message.referenced_card_ids?.length > 0 ? (
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          <p className="type-label tnum text-ink-dimmer">
             {message.referenced_card_ids.length} source
             {message.referenced_card_ids.length === 1 ? '' : 's'} from your deck
           </p>

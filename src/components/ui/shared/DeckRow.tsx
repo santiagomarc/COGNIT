@@ -94,7 +94,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
   return (
     <div
-      className={`group -mx-2 ${DECK_COL.row} h-[38px] border-b border-border px-2 transition-colors last:border-b-0 hover:bg-surface`}
+      className={`group -mx-2 ${DECK_COL.row} h-[38px] pointer-coarse:h-[48px] border-b border-border px-2 transition-colors last:border-b-0 hover:bg-surface`}
     >
       {/*
         The tick carries no label: every fact it encodes is already spelled out
@@ -109,13 +109,13 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
       >
         <span className="truncate text-sm text-ink">{deck.title}</span>
         {deck.tag ? (
-          <span className="shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <span className="shrink-0 type-label text-ink-dimmer">
             {deck.tag}
           </span>
         ) : null}
         {/* The due column counts cards only (COPY-06): "+2d" read as two days. */}
         {deck.dueDrillCount > 0 ? (
-          <span className="shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+          <span className="shrink-0 type-label text-ink-dim">
             <span className="tnum">{deck.dueDrillCount}</span> {deck.dueDrillCount === 1 ? 'drill' : 'drills'}
             <span className="sr-only"> due</span>
           </span>
@@ -124,7 +124,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
       {/* Mono and tabular throughout, so the numbers form real columns down the
           list instead of drifting row by row (§3.3). */}
-      <dl className={`${DECK_COL.metrics} font-mono text-[13px] tnum`}>
+      <dl className={`${DECK_COL.metrics} font-mono type-sm tnum`}>
         <div className={DECK_COL.cards}>
           <dt className="sr-only">Cards</dt>
           <dd className="text-ink-dim">{deck.cardCount}</dd>
@@ -189,7 +189,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 export function DeckRowLegend() {
   return (
     <div
-      className={`-mx-2 ${DECK_COL.row} border-b border-border px-2 py-1.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer`}
+      className={`-mx-2 ${DECK_COL.row} border-b border-border px-2 py-1.5 type-label text-ink-dimmer`}
     >
       <span className="w-[2px]" aria-hidden="true" />
       <span className="min-w-0 flex-1">Deck</span>

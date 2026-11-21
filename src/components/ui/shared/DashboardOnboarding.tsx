@@ -74,7 +74,7 @@ export function DashboardOnboarding({
   return (
     <div className="surface space-y-8 p-6 md:p-8">
       <div className="max-w-xl space-y-3">
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <p className="type-label text-ink-dimmer">
           Getting started
         </p>
         <h2 className="font-serif type-display-lg leading-[1.08] tracking-[-0.02em] text-balance">
@@ -88,24 +88,25 @@ export function DashboardOnboarding({
       </div>
 
       {/*
-        Three numbered steps, not three icon tiles. The panel used to lead with
-        a sparkle glyph in a tinted square, which is the universal "AI template"
-        tell (§6) and told a new user nothing. The times below are the fact that
-        actually helps them choose.
+        Three ways in, not three steps (UIUX plan FLOW-04): they are
+        alternatives, so they're named by what they are, not numbered. The
+        times are the fact that helps a new user choose. The one filled button
+        is the starter deck: it is the fastest way to a first review.
       */}
-      <ol className="grid gap-px border-t border-border md:grid-cols-3 md:border-t-0">
+      <ul className="grid gap-px border-t border-border md:grid-cols-3 md:border-t-0">
         <OnboardingStep
-          index={1}
+          kind="Fastest"
           title="Try a starter deck"
           body="20 ready-made cards, already written. You are reviewing in about five seconds."
-          cost="~5s"
+          cost="~5 s"
         >
           <div className="flex flex-wrap gap-2">
-            {STARTER_DECK_KEYS.map((key) => (
+            {STARTER_DECK_KEYS.map((key, position) => (
               <Button
                 key={key}
                 type="button"
                 size="sm"
+                variant={position === 0 ? 'primary' : 'default'}
                 onClick={() => createStarterDeck(key)}
                 disabled={loadingKey !== null}
                 className="gap-1.5"
@@ -118,41 +119,39 @@ export function DashboardOnboarding({
         </OnboardingStep>
 
         <OnboardingStep
-          index={2}
+          kind="From your material"
           title="Upload a PDF"
           body="Lecture slides, a chapter, your own notes. The cards get written for you."
-          cost="~30s"
+          cost="about a minute"
         >
-          {/* The screen's one filled button: this is the path most new users
-              should take, so it is the one that gets fill (§7.2). */}
-          <Button type="button" size="sm" variant="primary" onClick={onCreateOwn}>
+          <Button type="button" size="sm" onClick={onCreateOwn}>
             New deck, then upload
           </Button>
         </OnboardingStep>
 
         <OnboardingStep
-          index={3}
+          kind="By hand"
           title="Write your own"
           body={'Paste notes as "Term - Definition", or add cards one at a time.'}
-          cost="~2m"
+          cost="a few minutes"
         >
           <Button type="button" size="sm" onClick={onCreateOwn}>
             Create a deck
           </Button>
         </OnboardingStep>
-      </ol>
+      </ul>
     </div>
   );
 }
 
 function OnboardingStep({
-  index,
+  kind,
   title,
   body,
   cost,
   children,
 }: {
-  index: number;
+  kind: string;
   title: string;
   body: string;
   cost: string;
@@ -161,17 +160,15 @@ function OnboardingStep({
   return (
     <li className="flex flex-col gap-3 border-b border-border py-5 md:border-b-0 md:border-t md:pr-6">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
-          Step {index}
-        </span>
-        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+        <span className="type-label text-ink-dimmer">{kind}</span>
+        <span className="type-label tnum text-ink-dimmer">
           {cost}
         </span>
       </div>
 
       <div className="space-y-1">
         <h3 className="text-sm font-semibold tracking-[-.015em] text-foreground">{title}</h3>
-        <p className="text-[13px] leading-relaxed text-ink-dim">{body}</p>
+        <p className="type-sm leading-relaxed text-ink-dim">{body}</p>
       </div>
 
       <div className="mt-auto pt-1">{children}</div>

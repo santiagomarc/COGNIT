@@ -14,7 +14,7 @@ type ConfidencePickerProps = {
   missing: boolean;
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]';
+const LABEL = 'type-label';
 
 /**
  * Judgement of learning before the check (audit F1): three states, one tap,
@@ -45,7 +45,7 @@ export const ConfidencePicker = forwardRef<HTMLDivElement, ConfidencePickerProps
           aria-pressed={value === option}
           onClick={() => onChange(option)}
           disabled={disabled}
-          className="h-[44px] gap-1.5 px-2 text-[12px] sm:h-[28px]"
+          className="h-[44px] gap-1.5 px-2 type-cap sm:h-[28px]"
         >
           {CONFIDENCE_LABEL[option]}
           <Kbd>{option}</Kbd>

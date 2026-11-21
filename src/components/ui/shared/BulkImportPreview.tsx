@@ -36,7 +36,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
         <div className="surface p-4">
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold tracking-[-.015em]">Valid cards</h3>
-            <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            <span className="type-label text-ink-dimmer">
               Exact text preview
             </span>
           </div>
@@ -48,7 +48,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                   className="border-l-2 py-2 pl-3"
                   style={{ borderColor: 'var(--state-mastered)' }}
                 >
-                  <div className="mb-1 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  <div className="mb-1 type-label text-ink-dimmer">
                     Line {card.lineNumber}
                   </div>
                   <p className="text-sm font-medium text-ink">{card.front}</p>
@@ -66,7 +66,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
         <div className="surface p-4">
           <div className="mb-3 flex items-baseline justify-between gap-2">
             <h3 className="text-sm font-semibold tracking-[-.015em]">Needs attention</h3>
-            <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            <span className="type-label text-ink-dimmer">
               Not imported
             </span>
           </div>
@@ -79,7 +79,7 @@ export function BulkImportPreview({ result }: BulkImportPreviewProps) {
                   style={{ borderColor: 'var(--state-learning)' }}
                 >
                   <div className="mb-1 flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                    <span className="type-label text-ink-dimmer">
                       Line {line.lineNumber}
                     </span>
                     {/* The reason is a word, so the tick is never alone (§9). */}

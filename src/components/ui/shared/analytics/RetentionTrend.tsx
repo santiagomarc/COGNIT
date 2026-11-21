@@ -2,7 +2,7 @@ import type { RetentionWeek } from '@/lib/analytics';
 import { ChartDataTable } from '@/components/ui/shared/analytics/ChartDataTable';
 
 const WEEK_LABEL = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /** The drawing box. The SVG stretches to the panel, so these are proportions, not pixels. */
 const WIDTH = 400;
@@ -31,7 +31,7 @@ export function RetentionTrend({ weeks }: { weeks: RetentionWeek[] }) {
 
   if (rated.length < 2) {
     return (
-      <p className="mt-3 text-[13px] text-ink-dim">
+      <p className="mt-3 type-sm text-ink-dim">
         The trend needs two weeks of reviews on cards that have reached the review state.
       </p>
     );

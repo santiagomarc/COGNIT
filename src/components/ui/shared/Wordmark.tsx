@@ -5,21 +5,18 @@ import { cn } from '@/lib/utils';
 type WordmarkProps = {
   /** Wraps the mark in a link. Omit for a mark that is already inside one. */
   href?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
 };
 
 /*
- * `md` and `lg` read the chrome display tokens. `sm`, `xl` and `2xl` are
- * marketing-scale steps that sit outside the token set on purpose — the landing
- * hero is not a page title and should not drag the app's h1 up with it.
+ * Every size reads a display token (UIUX plan DS-09). `sm` was an off-scale
+ * 27px and is now the 28px step; `xl` and `2xl` had no consumers and are gone.
  */
 const SIZE: Record<NonNullable<WordmarkProps['size']>, string> = {
-  sm: 'text-[27px]',
+  sm: 'type-display-md',
   md: 'type-display',
   lg: 'type-display-xl',
-  xl: 'text-[64px] sm:text-[84px] md:text-[98px]',
-  '2xl': 'text-[80px] sm:text-[104px] md:text-[124px]',
 };
 
 /**

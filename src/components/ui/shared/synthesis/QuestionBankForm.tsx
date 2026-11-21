@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { GeneratePlanQuestionButton } from '@/components/ui/shared/synthesis/GenerateSynthesisDrillsButton';
 import { formatActionError } from '@/lib/ai-feedback';
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /** Paste past-paper questions, one per line (plan D16). */
 export function QuestionBankForm({ deckId }: { deckId: string }) {
@@ -59,7 +59,7 @@ export function QuestionBankForm({ deckId }: { deckId: string }) {
           rows={3}
           maxLength={12_000}
           disabled={isPending}
-          className="text-base sm:text-[13px]"
+          className="text-base sm:type-sm"
         />
       </label>
       <div className="flex items-center justify-between gap-3">
@@ -103,13 +103,13 @@ export function QuestionRowActions({ deckId, questionId, drillId, questionText }
   return (
     <span className="flex shrink-0 items-center gap-1">
       {drillId ? (
-        <Button asChild variant="default" size="sm" className="h-[44px] px-2 text-[12px] sm:h-[26px]">
+        <Button asChild variant="default" size="sm" className="h-[44px] px-2 type-cap sm:h-[26px]">
           <Link href={`/dashboard/${deckId}/synthesis?kind=plan&drill=${drillId}&count=1`}>Plan it</Link>
         </Button>
       ) : (
-        <GeneratePlanQuestionButton deckId={deckId} questionId={questionId} label="Make a plan" className="h-[44px] px-2 text-[12px] sm:h-[26px]" />
+        <GeneratePlanQuestionButton deckId={deckId} questionId={questionId} label="Make a plan" className="h-[44px] px-2 type-cap sm:h-[26px]" />
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={isPending} aria-label={`Remove question: ${questionText.slice(0, 60)}`} className="h-[44px] px-2 text-[12px] sm:h-[26px]">
+      <Button type="button" variant="ghost" size="sm" onClick={remove} disabled={isPending} aria-label={`Remove question: ${questionText.slice(0, 60)}`} className="h-[44px] px-2 type-cap sm:h-[26px]">
         Remove
       </Button>
     </span>

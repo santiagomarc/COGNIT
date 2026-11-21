@@ -3,7 +3,7 @@ import { ChartDataTable } from '@/components/ui/shared/analytics/ChartDataTable'
 
 type Bar = ReturnType<typeof retrievabilityHistogram>[number];
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * The forgetting-curve forecast (improvement plan §4.1): ten bars of
@@ -21,7 +21,7 @@ export function RetrievabilityHistogram({ bars }: { bars: Bar[] }) {
 
   if (total === 0) {
     return (
-      <p className="mt-3 text-[13px] text-ink-dim">
+      <p className="mt-3 type-sm text-ink-dim">
         No reviewed cards yet — the curve appears once cards reach the review state.
       </p>
     );

@@ -20,7 +20,7 @@ import { getRequestClient, getRequestNow, getSessionUser } from '@/lib/supabase/
 
 const WINDOW_DAYS = 90;
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 const BAND_LABEL: Record<string, string> = {
   new: 'Never studied',
@@ -139,7 +139,7 @@ export default async function StatsPage() {
           </div>
           <RetrievabilityHistogram bars={bars} />
           {snapshot.totals.at_risk_now > 0 ? (
-            <p className="mt-3 text-[13px] text-ink">
+            <p className="mt-3 type-sm text-ink">
               <span className="font-mono tnum" style={{ color: 'var(--state-due)' }}>{snapshot.totals.at_risk_now}</span>{' '}
               {snapshot.totals.at_risk_now === 1 ? 'card is' : 'cards are'} below 80% predicted recall.
               {atRiskHref ? (
@@ -209,13 +209,13 @@ export default async function StatsPage() {
         <ul className="well overflow-hidden px-3.5">
           {bands.map((band) => (
             <li key={band.band} className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0">
-              <span className="w-14 shrink-0 font-mono text-[13px] tnum text-ink">{band.band}</span>
+              <span className="w-14 shrink-0 font-mono type-sm tnum text-ink">{band.band}</span>
               <span className="min-w-0 flex-1 truncate text-sm text-ink-dim">{BAND_LABEL[band.band]}</span>
               <span className="hidden h-[6px] w-32 overflow-hidden rounded-[2px] bg-[var(--border)] sm:block" aria-hidden="true">
                 <span className="block h-full rounded-[2px] bg-[var(--ink-dim)]" style={{ width: `${Math.round(band.share * 100)}%` }} />
               </span>
-              <span className="w-12 shrink-0 text-right font-mono text-[13px] tnum text-ink-dim">{band.cards}</span>
-              <span className="w-12 shrink-0 text-right font-mono text-[13px] tnum text-ink-dimmer">{Math.round(band.share * 100)}%</span>
+              <span className="w-12 shrink-0 text-right font-mono type-sm tnum text-ink-dim">{band.cards}</span>
+              <span className="w-12 shrink-0 text-right font-mono type-sm tnum text-ink-dimmer">{Math.round(band.share * 100)}%</span>
             </li>
           ))}
         </ul>

@@ -113,7 +113,10 @@
   --type-display-xl: 4.125rem;  /* 66px — landing hero, login wordmark */
   --type-display-lg: 3rem;      /* 48px — page hero                    */
   --type-display:    2.25rem;   /* 36px — page title (h1)              */
+  --type-display-md: 1.75rem;   /* 28px — page title on a phone (Rev. F) */
   --type-display-sm: 1.5rem;    /* 24px — section heading (h2)         */
+  /* Landing hero only (Rev. F §9.2): the one display size allowed to scale with the viewport. */
+  --type-hero: clamp(4.125rem, 7.5vw, 6.75rem);
 
   /* Chrome steps — Geist Sans (§2.2) */
   --type-h3:   1rem;      /* 16px, weight 600  */
@@ -1396,7 +1399,31 @@ button.flip {
 @utility type-display-xl { font-size: var(--type-display-xl); }
 @utility type-display-lg { font-size: var(--type-display-lg); }
 @utility type-display    { font-size: var(--type-display); }
+@utility type-display-md { font-size: var(--type-display-md); }
 @utility type-display-sm { font-size: var(--type-display-sm); }
+@utility type-hero       { font-size: var(--type-hero); }
+
+/*
+ * Chrome and study steps as utilities (UIUX plan DS-08, Rev. F §9.2). Size
+ * only, except the label, which is a composite style. Colour is never part of
+ * a type utility: compose it (`type-label text-ink-dimmer`). `type-sm` and
+ * `type-cap` set font-size only, so they drop in for `text-[13px]` and
+ * `text-[12px]` without changing an inherited line-height.
+ */
+@utility type-h3   { font-size: var(--type-h3); font-weight: 600; }
+@utility type-body { font-size: var(--type-body); }
+@utility type-sm   { font-size: var(--type-sm); }
+@utility type-cap  { font-size: var(--type-cap); }
+@utility type-label {
+  font-family: var(--font-mono);
+  font-size: var(--type-label);
+  line-height: 1.5;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+@utility type-study-lg { font-size: var(--type-study-lg); }
+@utility type-study-md { font-size: var(--type-study-md); }
+@utility type-study-sm { font-size: var(--type-study-sm); }
 
 /*
  * ─── Micro-synthesis drills (docs/specs/micro-synthesis-spec.md §10.7) ───

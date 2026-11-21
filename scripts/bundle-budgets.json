@@ -2,7 +2,7 @@
   "/login/page": 188,
   "/login/update-password/page": 184,
   "/dashboard/(shell)/page": 214,
-  "/dashboard/(shell)/[deckId]/page": 232,
+  "/dashboard/(shell)/[deckId]/page": 226,
   "/dashboard/(shell)/stats/page": 185,
   "/dashboard/(shell)/drills/page": 185,
   "/dashboard/(shell)/shared/page": 190,
@@ -12,5 +12,5 @@
   "/dashboard/(focus)/[deckId]/quiz/page": 195,
   "/dashboard/(focus)/[deckId]/synthesis/page": 206,
   "/page": 184,
-  "/s/[token]/page": 187
+  "/s/[token]/page": 181
 }

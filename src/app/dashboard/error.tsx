@@ -46,7 +46,7 @@ export default function DashboardError({
     <div className="container mx-auto flex min-h-[60vh] items-center px-6 py-12">
       <div className="w-full max-w-lg">
         <p
-          className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]"
+          className="type-label"
           style={{ color: 'var(--state-lapsed)' }}
         >
           Error

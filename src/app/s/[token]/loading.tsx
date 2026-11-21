@@ -18,7 +18,7 @@ export default function SharedDeckLoading() {
         <div className="h-px w-full bg-border" />
 
         <div className="space-y-3">
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Shared deck</p>
+          <p className="type-label text-ink-dimmer">Shared deck</p>
           <div className="glass-skeleton h-10 w-3/5 max-w-md rounded-sm" />
           <div className="glass-skeleton h-3.5 w-full max-w-xl rounded-sm" />
         </div>

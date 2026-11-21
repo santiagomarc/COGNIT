@@ -27,7 +27,7 @@ export function PlanLauncherRow({ deckId, topics, plans }: PlanLauncherRowProps)
   return (
     <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Essay plans</span>
+        <span className="type-label text-ink-dimmer">Essay plans</span>
         <span className="flex items-baseline gap-4">
           <Telemetry label="Plans" value={plans.active} />
           {plans.active > 0 ? <Telemetry label="Due" value={plans.due} tone={plans.due > 0 ? 'due' : 'ink'} /> : null}
@@ -47,7 +47,7 @@ export function PlanLauncherRow({ deckId, topics, plans }: PlanLauncherRowProps)
             ))}
           </select>
         ) : null}
-        <GeneratePlanQuestionButton deckId={deckId} focusTopic={topic || null} variant="ghost" label="+ Plan question" className="h-[30px] px-2 text-[12px]" />
+        <GeneratePlanQuestionButton deckId={deckId} focusTopic={topic || null} variant="ghost" label="+ Plan question" className="h-[30px] px-2 type-cap" />
         {plans.active > 0 ? (
           <Button asChild size="sm" className="h-[30px] flex-1">
             <Link href={`/dashboard/${deckId}/synthesis?kind=plan&count=1`}>{plans.due > 0 ? 'Plan an answer' : 'Plan anytime'}</Link>

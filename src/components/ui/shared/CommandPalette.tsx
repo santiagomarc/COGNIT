@@ -431,7 +431,7 @@ export function CommandPalette({ decks, sessionHref, totalDue, defaultOpen = fal
             >
               <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
                 <div className="space-y-1">
-                  <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                  <p className="type-label text-ink-dimmer">
                     Command palette
                   </p>
                   <h2 id="command-palette-title" className="text-base font-semibold tracking-[-.015em]">
@@ -473,7 +473,7 @@ export function CommandPalette({ decks, sessionHref, totalDue, defaultOpen = fal
                 <div id="command-palette-list" role="listbox" aria-label="Commands and results">
                   {sections.map((section) => (
                     <div key={section.group} className="mb-1">
-                      <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                      <p className="px-3 pb-1 pt-2 type-label text-ink-dimmer">
                         {section.group}
                       </p>
                       {section.commands.map((command) => (
@@ -484,7 +484,7 @@ export function CommandPalette({ decks, sessionHref, totalDue, defaultOpen = fal
 
                   {textResults.length > 0 ? (
                     <div className="mb-1 border-t border-border pt-1 first:border-t-0 first:pt-0">
-                      <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                      <p className="px-3 pb-1 pt-2 type-label text-ink-dimmer">
                         Cards
                       </p>
                       {textResults.map((card) => (
@@ -501,7 +501,7 @@ export function CommandPalette({ decks, sessionHref, totalDue, defaultOpen = fal
 
                   {meaningResults.length > 0 ? (
                     <div className="border-t border-border pt-1 first:border-t-0 first:pt-0">
-                      <p className="px-3 pb-1 pt-2 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                      <p className="px-3 pb-1 pt-2 type-label text-ink-dimmer">
                         By meaning
                       </p>
                       {meaningResults.map((card) => (

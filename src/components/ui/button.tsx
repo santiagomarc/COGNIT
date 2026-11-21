@@ -66,12 +66,14 @@ const buttonVariants = cva(
         destructive:
           "border border-[var(--state-lapsed)] bg-[var(--state-lapsed)] font-semibold text-bg hover:bg-[var(--state-lapsed)]/90 focus-visible:outline-[var(--state-lapsed)]",
       },
+      // Touch pointers get 44px whatever the size (A11Y-14, WCAG 2.5.5): a
+      // finger needs it, and a mouse doesn't, so desktop density is unchanged.
       size: {
-        default: "h-[40px] px-4 text-sm",
-        sm: "h-[32px] gap-1.5 px-3 text-[13px]",
+        default: "h-[40px] px-4 text-sm pointer-coarse:h-[44px]",
+        sm: "h-[32px] gap-1.5 px-3 text-[13px] pointer-coarse:h-[44px]",
         lg: "h-[44px] px-5 text-sm",
-        icon: "size-[40px]",
-        "icon-sm": "size-[32px]",
+        icon: "size-[40px] pointer-coarse:size-[44px]",
+        "icon-sm": "size-[32px] pointer-coarse:size-[44px]",
         "icon-lg": "size-[44px]",
       },
     },

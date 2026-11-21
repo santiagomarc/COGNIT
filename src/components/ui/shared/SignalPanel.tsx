@@ -66,10 +66,10 @@ export function SignalPanel({
       {/* ── Activity ─────────────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col lg:pr-[22px]">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <h2 className="type-label text-ink-dimmer">
             Activity · 6 months
           </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             <span className="tnum text-ink">{totalStudiedCards}</span> reviews all time
           </p>
         </div>
@@ -85,10 +85,10 @@ export function SignalPanel({
       {/* ── Quiz-proven ──────────────────────────────────────────── */}
       <div className="flex flex-col lg:w-[238px] lg:shrink-0 lg:px-[22px]">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <h2 className="type-label text-ink-dimmer">
             Quiz-proven
           </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer">
+          <p className="type-label tnum text-ink-dimmer">
             {assessedCards} assessed
           </p>
         </div>
@@ -139,10 +139,10 @@ export function SignalPanel({
       {/* ── Session streak ───────────────────────────────────────────── */}
       <div className="flex flex-col lg:w-[238px] lg:shrink-0 lg:pl-[22px]">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <h2 className="type-label text-ink-dimmer">
             Session streak
           </h2>
-          <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             {studiedToday ? 'Logged today' : 'Not logged today'}
           </p>
         </div>
@@ -188,7 +188,7 @@ export function SignalPanel({
 
         {/* Today's cell is distinguished by colour AND by position, which the
             end labels make explicit — colour is never the sole carrier. */}
-        <div className="mt-auto flex items-baseline justify-between pt-2.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <div className="mt-auto flex items-baseline justify-between pt-2.5 type-label text-ink-dimmer">
           <span>{STREAK_WINDOW}d ago</span>
           <span>Today</span>
         </div>

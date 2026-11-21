@@ -63,7 +63,7 @@ export function ThemePreferenceControl({ className }: { className?: string }) {
             onClick={() => choose(index)}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cn(
-              'h-7 rounded-[4px] px-3 text-[13px] max-md:h-11 max-md:px-4',
+              'h-7 rounded-[4px] px-3 type-sm max-md:h-11 max-md:px-4',
               'outline-hidden transition-colors duration-[120ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]',
               checked ? 'bg-surface-raised text-ink' : 'text-ink-dim hover:text-ink',
             )}

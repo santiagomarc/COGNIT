@@ -107,7 +107,7 @@ export function IdentificationMode({
       <div className="flex flex-1 items-center justify-center p-4 md:p-8">
         <div className="mx-auto w-full max-w-2xl space-y-6">
           {/* Eyebrow */}
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <div className="flex items-center justify-between type-label text-ink-dimmer">
             <span>Identification</span>
             <span>{promptStatusLabel}</span>
           </div>
@@ -125,7 +125,7 @@ export function IdentificationMode({
             <div className="surface p-5 space-y-3">
               <dl className="space-y-2 text-sm">
                 <div className="flex gap-3">
-                  <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
+                  <dt className="shrink-0 type-label leading-[1.9] text-ink-dimmer">
                     You
                   </dt>
                   <dd
@@ -139,13 +139,13 @@ export function IdentificationMode({
                   </dd>
                 </div>
                 <div className="flex gap-3">
-                  <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
+                  <dt className="shrink-0 type-label leading-[1.9] text-ink-dimmer">
                     Term
                   </dt>
                   <dd className="font-medium text-ink"><RichText text={card.front} /></dd>
                 </div>
                 <div className="flex gap-3">
-                  <dt className="shrink-0 font-mono text-[10px] uppercase leading-[1.9] tracking-[0.16em] text-ink-dimmer">
+                  <dt className="shrink-0 type-label leading-[1.9] text-ink-dimmer">
                     Match
                   </dt>
                   <dd className="font-mono tnum text-ink-dim">{Math.round(result.score * 100)}%</dd>
@@ -156,7 +156,7 @@ export function IdentificationMode({
             <form id={`id-form-${card.id}`} onSubmit={handleSubmit} className="space-y-2">
               <label
                 htmlFor={`id-answer-${card.id}`}
-                className="block font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+                className="block type-label text-ink-dimmer"
               >
                 Type the matching term
               </label>

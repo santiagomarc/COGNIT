@@ -16,7 +16,7 @@ type SynthesisLauncherProps = {
 const COUNT_OPTIONS = [1, 3, 5] as const;
 
 const CHIP =
-  'inline-flex h-[30px] cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-sm)] border px-2.5 text-[13px] transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]';
+  'inline-flex h-[30px] pointer-coarse:h-[44px] cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-sm)] border px-2.5 type-sm transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]';
 
 /**
  * The synthesis block of the deck's session launcher (spec §10.2): a flat
@@ -35,7 +35,7 @@ export function SynthesisLauncher({ deckId, readings, cardCount, topics = [] }: 
   return (
     <form action={`/dashboard/${deckId}/synthesis`} method="get" className="surface flex flex-col p-4 lg:p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Synthesis drills
         </h2>
         {hasDrills ? (
@@ -65,12 +65,12 @@ export function SynthesisLauncher({ deckId, readings, cardCount, topics = [] }: 
               count={3}
               variant="ghost"
               label="+ 3 more"
-              buttonClassName="h-[30px] px-2 text-[12px]"
+              buttonClassName="h-[30px] px-2 type-cap"
               className="mt-3 flex flex-wrap items-center gap-2"
             />
           ) : null}
 
-          <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+          <label className="mt-3 inline-flex cursor-pointer items-center gap-2 type-sm text-ink">
             <input type="checkbox" name="pull" value="1" defaultChecked className="size-[13px] accent-[var(--accent)]" />
             Pull contradicted cards forward
           </label>
@@ -102,13 +102,13 @@ export function SynthesisLauncher({ deckId, readings, cardCount, topics = [] }: 
             {/* Sprint (plan D13): the same launch with a countdown and the
                 feedback held back until the end — exam conditions. A second
                 submit button carries the mode; the form's other fields ride along. */}
-            <Button type="submit" size="sm" variant="ghost" name="mode" value="sprint" className="h-[30px] px-2 text-[12px]" title="Timed, feedback at the end">
+            <Button type="submit" size="sm" variant="ghost" name="mode" value="sprint" className="h-[30px] px-2 type-cap" title="Timed, feedback at the end">
               Sprint · 8 min
             </Button>
           </fieldset>
         </>
       ) : tooFewCards ? (
-        <p className="mt-3 text-[13px] text-ink-dim">
+        <p className="mt-3 type-sm text-ink-dim">
           Synthesis drills need at least <span className="font-mono tnum">{MIN_DECK_CARDS_FOR_DRILLS}</span> cards; this deck has{' '}
           <span className="font-mono tnum">{cardCount}</span>.
         </p>

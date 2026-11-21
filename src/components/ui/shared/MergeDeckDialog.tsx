@@ -46,7 +46,7 @@ export function MergeDeckDialog({ sourceDeckId, sourceTitle, targets }: MergeDec
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <label htmlFor={selectId} className="text-[13px] text-ink-dim">Merge into</label>
+      <label htmlFor={selectId} className="type-sm text-ink-dim">Merge into</label>
       <select
         id={selectId}
         value={targetId}

@@ -35,13 +35,13 @@ function ConceptRow({ concept }: { concept: WeakestConcept }) {
       {/* The colour is never alone: the percentage and the raw attempts say
           the same thing in words and numbers (WCAG 1.4.1). */}
       <span
-        className="w-16 shrink-0 text-right font-mono text-[13px] tnum"
+        className="w-16 shrink-0 text-right font-mono type-sm tnum"
         style={{ color: failing ? 'var(--state-lapsed)' : 'var(--ink-dim)' }}
       >
         {percentage}%
       </span>
 
-      <span className="hidden w-24 shrink-0 text-right font-mono text-[13px] tnum text-ink-dimmer md:block">
+      <span className="hidden w-24 shrink-0 text-right font-mono type-sm tnum text-ink-dimmer md:block">
         {concept.misses}/{concept.attempts}
       </span>
     </div>
@@ -63,10 +63,10 @@ export async function WeakestConcepts({ deckId }: WeakestConceptsProps) {
   return (
     <section className="surface p-5 md:p-6">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Weakest concepts
         </h2>
-        <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <p className="type-label text-ink-dimmer">
           Missed / attempts
         </p>
       </div>

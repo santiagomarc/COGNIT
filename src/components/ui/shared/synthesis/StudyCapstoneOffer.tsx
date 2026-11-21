@@ -19,7 +19,7 @@ type StudyCapstoneOfferProps = {
   drill: CapstoneOffer | null;
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 function anchorsLine(drill: CapstoneOffer): string {
   const cards = `${drill.anchorCount} cards`;
@@ -65,8 +65,8 @@ export function StudyCapstoneOffer({ deckId, drill }: StudyCapstoneOfferProps) {
         <h3 id="capstone-offer-label" className={LABEL}>Cap this session</h3>
         <p className={`${LABEL} tnum`}>≈ 2 min</p>
       </div>
-      <p className="mt-2 line-clamp-2 text-[13px] leading-relaxed text-ink-dim">{drill.promptText}</p>
-      <p className="mt-1 text-[13px] text-ink">{anchorsLine(drill)}</p>
+      <p className="mt-2 line-clamp-2 type-sm leading-relaxed text-ink-dim">{drill.promptText}</p>
+      <p className="mt-1 type-sm text-ink">{anchorsLine(drill)}</p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button asChild>
           <Link href={`/dashboard/${deckId}/synthesis?drill=${drill.id}&from=study`}>Start drill</Link>

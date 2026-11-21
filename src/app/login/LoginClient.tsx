@@ -245,7 +245,7 @@ export default function LoginClient() {
               no shadow. The same treatment the study canvas uses (§7.6). */}
           <div className="relative mt-[42px] grid min-h-[118px] place-items-center px-[26px] py-[30px]">
             <CornerBrackets />
-            <p className="max-w-[21ch] text-balance text-center font-serif text-[31px] leading-[1.24] tracking-[-0.02em] text-ink">
+            <p className="max-w-[21ch] text-balance text-center font-serif type-study-md leading-[1.24] tracking-[-0.02em] text-ink">
               {SPECIMEN_PROMPT}
             </p>
           </div>
@@ -275,7 +275,7 @@ export default function LoginClient() {
               </div>
             ))}
           </div>
-          <p className="mt-3 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="mt-3 type-label text-ink-dimmer">
             Every key shows the interval before you commit
           </p>
 
@@ -294,14 +294,14 @@ export default function LoginClient() {
                 <span className="min-w-0 flex-1 truncate text-sm text-ink-dim">
                   {card.prompt}
                 </span>
-                <span className="font-mono text-[13px] tnum" style={{ color: card.state }}>
+                <span className="font-mono type-sm tnum" style={{ color: card.state }}>
                   {card.interval}
                 </span>
               </li>
             ))}
           </ul>
 
-          <p className="mt-3.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+          <p className="mt-3.5 type-label text-ink-dimmer">
             Next review, scheduled by SM-2
           </p>
         </div>
@@ -335,7 +335,7 @@ export default function LoginClient() {
             {/* ── Email sent confirmation ── */}
             {emailSent ? (
               <div className="space-y-4">
-                <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+                <p className="type-label text-ink-dimmer">
                   Check your email
                 </p>
                 <h1 className="font-serif type-display leading-[1.08] tracking-[-0.02em] text-balance">
@@ -353,7 +353,7 @@ export default function LoginClient() {
                   <button
                     type="button"
                     onClick={() => setEmailSent(false)}
-                    className="rounded-[var(--radius-sm)] font-medium text-ink underline underline-offset-4 outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="rounded-[var(--radius-sm)] font-medium text-ink underline underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                   >
                     send it again
                   </button>
@@ -422,7 +422,7 @@ export default function LoginClient() {
                           <button
                             type="button"
                             onClick={() => switchMode('forgot')}
-                            className="rounded-[var(--radius-sm)] text-xs font-medium text-ink-dim underline-offset-4 transition-colors outline-hidden hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                            className="rounded-[var(--radius-sm)] text-xs font-medium text-ink-dim underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center transition-colors outline-hidden hover:text-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                           >
                             Forgot password?
                           </button>
@@ -452,12 +452,12 @@ export default function LoginClient() {
                                 : undefined
                           }
                           disabled={isPending}
-                          className="pr-10"
+                          className="pr-10 pointer-coarse:pr-12"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword((v) => !v)}
-                          className="absolute right-2 top-1/2 flex size-[26px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                          className="absolute right-2 top-1/2 flex size-[26px] pointer-coarse:right-0 pointer-coarse:size-[44px] -translate-y-1/2 items-center justify-center rounded-[var(--radius-sm)] text-ink-dim outline-hidden transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                           aria-pressed={showPassword}
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
@@ -554,7 +554,7 @@ export default function LoginClient() {
                       onClick={() =>
                         switchMode(mode === 'login' ? 'signup' : 'login')
                       }
-                      className="rounded-[var(--radius-sm)] font-medium text-ink underline underline-offset-4 outline-hidden transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                      className="rounded-[var(--radius-sm)] font-medium text-ink underline underline-offset-4 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center outline-hidden transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     >
                       {mode === 'login' ? 'Sign up' : 'Sign in'}
                     </button>

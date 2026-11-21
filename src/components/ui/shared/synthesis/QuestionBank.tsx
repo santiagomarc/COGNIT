@@ -2,7 +2,7 @@ import { getRequestClient, getSessionUser } from '@/lib/supabase/session';
 import { loadQuestionBank } from '@/lib/synthesis/loaders';
 import { QuestionBankForm, QuestionRowActions } from '@/components/ui/shared/synthesis/QuestionBankForm';
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * The question bank (plan D16): past-paper questions in, coverage out. Each

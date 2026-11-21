@@ -125,14 +125,14 @@ export function AnswerForm({
       {revisingFrom ? (
         <div className="flex gap-3 rounded-[var(--radius-sm)] bg-surface-raised px-3 py-2" role="note">
           <span className="slot-label shrink-0 pt-[3px]">Revising · gap</span>
-          <p className="text-[13px] leading-relaxed text-ink">{revisingFrom}</p>
+          <p className="type-sm leading-relaxed text-ink">{revisingFrom}</p>
         </div>
       ) : null}
 
       {/* Concept chips: the prompt names these anyway, so they are not a hint —
           they are typing accelerators. */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <span className="type-label text-ink-dimmer">
           Insert
         </span>
         {anchors.map((anchor) => {
@@ -153,7 +153,7 @@ export function AnswerForm({
           );
         })}
         {mode === 'outline' ? (
-          <span className="ml-auto font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] tnum text-ink-dimmer" aria-live="polite">
+          <span className="ml-auto type-label tnum text-ink-dimmer" aria-live="polite">
             <span style={{ color: filled.claim ? 'var(--ink)' : undefined }}>{labels.claim}</span>
             {' · '}
             <span style={{ color: filled.mechanisms === 2 ? 'var(--ink)' : undefined }}>{filled.mechanisms}/2</span>

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   title: 'Drills - Cognit',
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 const LINK =
   'rounded-[var(--radius-sm)] outline-hidden hover:underline hover:underline-offset-[3px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
 
@@ -64,7 +64,7 @@ export default async function DrillsPage() {
       <header>
         <p className={LABEL}>Synthesis</p>
         <h1 className="mt-1 font-serif type-display leading-[1.08] tracking-[-0.02em] text-ink">Drills</h1>
-        <p className="mt-1.5 text-[13px] text-ink-dim">
+        <p className="mt-1.5 type-sm text-ink-dim">
           {next ? (
             <>
               <span className="font-mono tnum text-ink">{totalLabel}</span> {total === 1 ? 'drill' : 'drills'} due across{' '}
@@ -88,7 +88,7 @@ export default async function DrillsPage() {
                 {next.title}
               </Link>
             </p>
-            <p className="mt-0.5 text-[13px] text-ink-dim">
+            <p className="mt-0.5 type-sm text-ink-dim">
               <span className="font-mono tnum" style={{ color: 'var(--state-due)' }}>{next.dueCount}</span> due
               {next.examAt ? (
                 <>
@@ -110,10 +110,10 @@ export default async function DrillsPage() {
       ) : (
         <section className="well px-4 py-8 text-center" aria-labelledby="drills-empty">
           <h2 id="drills-empty" className="text-sm font-medium text-ink">No drills due.</h2>
-          <p className="mx-auto mt-1 max-w-md text-[13px] text-ink-dim">
+          <p className="mx-auto mt-1 max-w-md type-sm text-ink-dim">
             Drills are written from a deck&rsquo;s cards. Open a deck and start them from its Overview.
           </p>
-          <Link href="/dashboard" className={`mt-3 inline-block text-[13px] text-ink underline underline-offset-[3px] ${LINK}`}>
+          <Link href="/dashboard" className={`mt-3 inline-block type-sm text-ink underline underline-offset-[3px] ${LINK}`}>
             Back to Today
           </Link>
         </section>
@@ -133,9 +133,9 @@ export default async function DrillsPage() {
                   {deck.title}
                 </Link>
                 {deck.examAt ? (
-                  <span className="text-[12px] text-ink">{examLine(daysToExam(deck.examAt, now))}</span>
+                  <span className="type-cap text-ink">{examLine(daysToExam(deck.examAt, now))}</span>
                 ) : null}
-                <span className="font-mono text-[13px] tnum" style={{ color: 'var(--state-due)' }}>
+                <span className="font-mono type-sm tnum" style={{ color: 'var(--state-due)' }}>
                   {deck.dueCount}
                   <span className="sr-only"> drills due</span>
                 </span>

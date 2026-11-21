@@ -88,7 +88,7 @@ export function EditCardSheet({ deckId, cardId, question, answer, onClose, onSav
         </h2>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Question</span>
+          <span className="type-label text-ink-dimmer">Question</span>
           <Textarea
             value={questionText}
             onChange={(event) => setQuestionText(event.target.value)}
@@ -98,7 +98,7 @@ export function EditCardSheet({ deckId, cardId, question, answer, onClose, onSav
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">Answer</span>
+          <span className="type-label text-ink-dimmer">Answer</span>
           <Textarea
             value={answerText}
             onChange={(event) => setAnswerText(event.target.value)}

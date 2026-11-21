@@ -33,7 +33,7 @@ const MODE_OPTIONS = [
 ];
 
 const CHIP =
-  'inline-flex h-[30px] cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border px-2.5 text-[13px] transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]';
+  'inline-flex h-[30px] pointer-coarse:h-[44px] cursor-pointer items-center gap-2 rounded-[var(--radius-sm)] border px-2.5 type-sm transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--accent)]';
 
 /**
  * The deck page's primary action zone — the one `.raised` object on the screen
@@ -109,7 +109,7 @@ export function DeckSessionLauncher({
 
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <label className="inline-flex items-center gap-2.5">
-            <span className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            <span className="type-label text-ink-dimmer">
               Session
             </span>
             <Input
@@ -119,13 +119,13 @@ export function DeckSessionLauncher({
               max={sessionBounds.max || undefined}
               step={1}
               defaultValue={sessionBounds.defaultCount || undefined}
-              className="h-[30px] w-[74px] px-2 text-[13px] sm:text-[13px]"
+              className="h-[30px] pointer-coarse:h-[44px] w-[74px] px-2 type-sm sm:type-sm"
               aria-label="Number of flashcards to review"
             />
           </label>
 
           <fieldset className="inline-flex flex-wrap items-center gap-2">
-            <legend className="float-left mr-2.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+            <legend className="float-left mr-2.5 type-label text-ink-dimmer">
               Scope
             </legend>
             {SCOPE_OPTIONS.map((option) => (
@@ -159,7 +159,7 @@ export function DeckSessionLauncher({
         method="get"
         className="surface flex flex-col p-4 lg:p-5"
       >
-        <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+        <h2 className="type-label text-ink-dimmer">
           Take quiz
         </h2>
 
@@ -167,7 +167,7 @@ export function DeckSessionLauncher({
           Assessment mode. Results update which cards are quiz-proven.
         </p>
 
-        <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-[13px] text-ink">
+        <label className="mt-3 inline-flex cursor-pointer items-center gap-2 type-sm text-ink">
           <input
             type="checkbox"
             name="focus_unproven"

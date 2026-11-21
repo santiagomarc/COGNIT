@@ -129,7 +129,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <h2 className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer shrink-0">
+          <h2 className="type-label text-ink-dimmer shrink-0">
             All decks
           </h2>
           <div className="hidden sm:block h-px flex-1 bg-border" />

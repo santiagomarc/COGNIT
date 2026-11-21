@@ -19,7 +19,7 @@ import {
 import { useSidebar } from './SidebarProvider';
 
 const GROUP_LABEL =
-  'sidebar__group-label flex items-baseline justify-between px-[9px] pb-1 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+  'sidebar__group-label flex items-baseline justify-between px-[9px] pb-1 type-label text-ink-dimmer';
 
 export type SidebarDeckList = {
   shown: SidebarDeck[];
@@ -86,7 +86,7 @@ function AppNav({ items, decks, pathname }: SidebarNavProps & { pathname: string
               </li>
             ))
           ) : decks.total === 0 ? (
-            <li className="px-[9px] py-1 text-[13px] text-ink-dim">No decks yet</li>
+            <li className="px-[9px] py-1 type-sm text-ink-dim">No decks yet</li>
           ) : (
             <>
               {decks.shown.map((deck) => (
@@ -218,7 +218,7 @@ function SettingsSectionsNav() {
         <span className="sidebar__label">Back to Cognit</span>
       </Link>
 
-      <p className="sidebar__heading px-[9px] pb-3 pt-4 font-serif text-[24px] leading-none tracking-[-0.02em] text-ink">
+      <p className="sidebar__heading px-[9px] pb-3 pt-4 font-serif type-display-sm leading-none tracking-[-0.02em] text-ink">
         Settings
       </p>
 

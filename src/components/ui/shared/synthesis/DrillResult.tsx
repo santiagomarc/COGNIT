@@ -40,7 +40,7 @@ type DrillResultProps = {
   plane?: 'raised' | 'well';
 };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 function TermChip({ term }: { term: string }) {
   return <span className="term-chip cursor-default">{term}</span>;
@@ -103,7 +103,7 @@ export function DrillResult({
 
         {/* Calibration (audit F1): what the student said, next to what happened. No hue — the mismatch is the message. */}
         {diagnostic.confidence !== null && !offTarget ? (
-          <p className="mt-2 text-[13px] text-ink-dim">
+          <p className="mt-2 type-sm text-ink-dim">
             You were <span className="text-ink">{CONFIDENCE_LABEL[diagnostic.confidence].toLowerCase()}</span> ·{' '}
             {diagnostic.verdict === 'sound'
               ? 'sound'
@@ -138,7 +138,7 @@ export function DrillResult({
                         ) : null}
                       </span>
                       {entry.evidence ? (
-                        <span className="quote mt-0.5 block text-[13px]">“{entry.evidence}”</span>
+                        <span className="quote mt-0.5 block type-sm">“{entry.evidence}”</span>
                       ) : null}
                     </span>
                   </li>
@@ -156,7 +156,7 @@ export function DrillResult({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm text-ink">“{entry.statement}”</span>
-                      <span className="mt-0.5 block text-[13px] text-ink-dim">
+                      <span className="mt-0.5 block type-sm text-ink-dim">
                         card says: “{entry.cardSays}”
                       </span>
                       {entry.kind !== 'other' ? (
@@ -205,7 +205,7 @@ export function DrillResult({
                         {claim.verified ? 'AI verified · outside deck' : 'Unverified · outside deck'}
                       </span>
                       <span className="mt-0.5 block text-sm text-ink">“{claim.statement}”</span>
-                      <span className="mt-0.5 block text-[13px] text-ink-dim">{claim.aiAssessment}</span>
+                      <span className="mt-0.5 block type-sm text-ink-dim">{claim.aiAssessment}</span>
                       <span className="mt-1.5 block">
                         <AddAsCardForm
                           deckId={deckId}
@@ -231,7 +231,7 @@ export function DrillResult({
               <h3 className={LABEL}>{isPlan ? 'Exemplar plan' : 'Exemplar'}</h3>
               {exemplarHidden ? (
                 <div className="mt-2 flex flex-col items-start gap-2">
-                  <p className="text-[13px] text-ink-dim">
+                  <p className="type-sm text-ink-dim">
                     Try a revision from the gap note first — the exemplar is here when you want it.
                   </p>
                   <Button type="button" variant="ghost" size="sm" onClick={onShowExemplar}>
@@ -321,7 +321,7 @@ export function DrillResult({
                   {card.explanation ? (
                     <details className="mt-1">
                       <summary className={`${LABEL} cursor-pointer list-none`}>Explanation</summary>
-                      <p className="mt-1 text-[13px] leading-relaxed text-ink-dim">{card.explanation}</p>
+                      <p className="mt-1 type-sm leading-relaxed text-ink-dim">{card.explanation}</p>
                     </details>
                   ) : null}
                 </li>
@@ -335,13 +335,13 @@ export function DrillResult({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className={LABEL}>Cards</span>
         {pulled.length > 0 ? (
-          <span className="flex flex-wrap items-center gap-2 text-[13px] text-ink">
+          <span className="flex flex-wrap items-center gap-2 type-sm text-ink">
             <StateTick state="due" />
             {pulled.map((term) => <TermChip key={term} term={term} />)}
             <span className="text-ink-dim">→ due tomorrow</span>
           </span>
         ) : (
-          <span className="text-[13px] text-ink-dim">
+          <span className="type-sm text-ink-dim">
             {diagnostic.verdict === 'contradicted' ? 'schedule not changed' : 'unchanged'}
           </span>
         )}
@@ -355,7 +355,7 @@ export function DrillResult({
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Previous attempts on this drill">
           <span className={LABEL}>Before this</span>
           {history.map((entry, index) => (
-            <span key={`${entry.createdAt}-${index}`} className="flex items-center gap-1.5 text-[13px] text-ink-dim" title={VERDICT_LABEL[entry.verdict]}>
+            <span key={`${entry.createdAt}-${index}`} className="flex items-center gap-1.5 type-sm text-ink-dim" title={VERDICT_LABEL[entry.verdict]}>
               <StateTick state={VERDICT_TICK[entry.verdict]} />
               <span className="font-mono tnum">{entry.linksCovered}/{entry.linksTotal}</span>
               <span className="font-mono tnum text-ink-dimmer">{formatAge(entry.createdAt)}</span>

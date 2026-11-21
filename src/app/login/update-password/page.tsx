@@ -85,7 +85,7 @@ export default function UpdatePasswordPage() {
           /* ── Success state ── */
           <div className="space-y-4">
             <p
-              className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em]"
+              className="type-label"
               style={{ color: 'var(--state-mastered)' }}
             >
               Password updated

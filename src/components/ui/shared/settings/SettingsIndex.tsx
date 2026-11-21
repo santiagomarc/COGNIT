@@ -15,7 +15,7 @@ export function SettingsIndex() {
           <li key={section.id}>
             <a
               href={`#${section.id}`}
-              className="inline-flex items-center rounded-[var(--radius-sm)] text-[13px] text-ink-dim outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] max-md:min-h-11"
+              className="inline-flex items-center rounded-[var(--radius-sm)] type-sm text-ink-dim outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] max-md:min-h-11"
             >
               {section.label}
             </a>

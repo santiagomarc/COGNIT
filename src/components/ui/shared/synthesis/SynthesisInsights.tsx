@@ -10,7 +10,7 @@ import { MISCONCEPTION_KINDS } from '@/lib/synthesis/types';
 import { sparklinePath } from '@/lib/synthesis/insights';
 import { ChartDataTable } from '@/components/ui/shared/analytics/ChartDataTable';
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 // Both panels render under their own Suspense boundary; `cache` makes the
 // second one reuse the first's reads within the request — and the client and
@@ -53,7 +53,7 @@ export async function WeakLinks({ deckId }: { deckId: string }) {
       </p>
 
       {insights.weakLinks.length === 0 ? (
-        <p className="mt-4 border-t border-border pt-4 text-[13px] text-ink-dim">
+        <p className="mt-4 border-t border-border pt-4 type-sm text-ink-dim">
           No weak links yet — every card has fewer than two signals.
         </p>
       ) : (
@@ -61,16 +61,16 @@ export async function WeakLinks({ deckId }: { deckId: string }) {
           {insights.weakLinks.map((row) => (
             <div key={row.cardId} className="flex items-center gap-4 border-b border-border py-2.5 last:border-b-0">
               <span className="min-w-0 flex-1 truncate text-sm text-ink">{row.term}</span>
-              <span className="w-20 shrink-0 text-right font-mono text-[13px] tnum text-ink-dim">
+              <span className="w-20 shrink-0 text-right font-mono type-sm tnum text-ink-dim">
                 {row.missing} <span className="text-ink-dimmer">missing</span>
               </span>
               <span
-                className="w-24 shrink-0 text-right font-mono text-[13px] tnum"
+                className="w-24 shrink-0 text-right font-mono type-sm tnum"
                 style={{ color: row.contradicted > 0 ? 'var(--state-lapsed)' : 'var(--ink-dim)' }}
               >
                 {row.contradicted} <span className="text-ink-dimmer">contra</span>
               </span>
-              <span className="hidden w-12 shrink-0 text-right font-mono text-[13px] tnum text-ink-dimmer sm:block">
+              <span className="hidden w-12 shrink-0 text-right font-mono type-sm tnum text-ink-dimmer sm:block">
                 {formatAge(row.lastAt)}
               </span>
             </div>
@@ -107,10 +107,10 @@ export async function DrillHistory({ deckId }: { deckId: string }) {
         {insights.history.map((row) => (
           <li key={row.attemptId} className="flex items-center gap-3 border-b border-border py-2.5 last:border-b-0">
             <StateTick state={VERDICT_TICK[row.verdict]} />
-            <span className="w-24 shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
+            <span className="w-24 shrink-0 type-label text-ink-dim">
               {VERDICT_LABEL[row.verdict]}
             </span>
-            <span className="w-10 shrink-0 font-mono text-[13px] tnum text-ink">
+            <span className="w-10 shrink-0 font-mono type-sm tnum text-ink">
               {row.linksCovered}/{row.linksTotal}
             </span>
             <Link
@@ -119,13 +119,13 @@ export async function DrillHistory({ deckId }: { deckId: string }) {
             >
               {row.promptText}
             </Link>
-            <span className="hidden shrink-0 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer md:block">
+            <span className="hidden shrink-0 type-label text-ink-dimmer md:block">
               {FORMAT_LABEL[row.format]}
             </span>
-            <span className="hidden w-12 shrink-0 text-right font-mono text-[13px] tnum text-ink-dimmer sm:block">
+            <span className="hidden w-12 shrink-0 text-right font-mono type-sm tnum text-ink-dimmer sm:block">
               {formatClock(row.durationMs)}
             </span>
-            <span className="w-10 shrink-0 text-right font-mono text-[13px] tnum text-ink-dimmer">
+            <span className="w-10 shrink-0 text-right font-mono type-sm tnum text-ink-dimmer">
               {formatAge(row.createdAt)}
             </span>
           </li>
@@ -198,11 +198,11 @@ export async function DrillSignals({ deckId }: { deckId: string }) {
           {insights.formatRates.map((row) => (
             <div key={row.format} className="flex items-center gap-4 border-b border-border py-2 last:border-b-0">
               <span className="min-w-0 flex-1 text-sm text-ink">{FORMAT_LABEL[row.format]}</span>
-              <span className="w-24 shrink-0 text-right font-mono text-[13px] tnum text-ink-dim">
+              <span className="w-24 shrink-0 text-right font-mono type-sm tnum text-ink-dim">
                 {row.attempts} <span className="text-ink-dimmer">{row.attempts === 1 ? 'attempt' : 'attempts'}</span>
               </span>
               <span
-                className="w-20 shrink-0 text-right font-mono text-[13px] tnum"
+                className="w-20 shrink-0 text-right font-mono type-sm tnum"
                 style={{ color: row.attempts > 0 && row.sound / row.attempts >= 0.7 ? 'var(--state-mastered)' : 'var(--ink-dim)' }}
               >
                 {Math.round((row.sound / Math.max(1, row.attempts)) * 100)}% <span className="text-ink-dimmer">sound</span>
@@ -216,7 +216,7 @@ export async function DrillSignals({ deckId }: { deckId: string }) {
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className={LABEL}>Mistakes 30d</span>
           {kinds.map((entry) => (
-            <span key={entry.kind} className="flex items-center gap-1.5 text-[13px] text-ink">
+            <span key={entry.kind} className="flex items-center gap-1.5 type-sm text-ink">
               <span className="font-mono tnum" style={{ color: 'var(--state-lapsed)' }}>{entry.count}</span>
               <span className="text-ink-dim">{MISCONCEPTION_LABEL[entry.kind]}</span>
             </span>

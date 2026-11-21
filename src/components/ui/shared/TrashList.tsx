@@ -63,7 +63,7 @@ export function TrashList({ decks: initialDecks }: { decks: TrashedDeck[] }) {
 
   if (decks.length === 0) {
     return (
-      <p className="well px-4 py-8 text-center text-[13px] text-ink-dim">
+      <p className="well px-4 py-8 text-center type-sm text-ink-dim">
         Nothing in the trash. Deleted decks stay here for 30 days.
       </p>
     );
@@ -79,7 +79,7 @@ export function TrashList({ decks: initialDecks }: { decks: TrashedDeck[] }) {
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm text-ink">{deck.title}</p>
-              <p className="mt-0.5 text-[12px] text-ink-dim">
+              <p className="mt-0.5 type-cap text-ink-dim">
                 <span className="font-mono tnum">{deck.cardCount}</span> {deck.cardCount === 1 ? 'card' : 'cards'} · deleted{' '}
                 <time dateTime={deck.deletedAt} className="text-ink">{day(deck.deletedAt)}</time> · removed for good{' '}
                 <time dateTime={deck.purgeAfter} className="text-ink">{day(deck.purgeAfter)}</time>

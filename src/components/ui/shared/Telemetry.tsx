@@ -58,7 +58,7 @@ export function Telemetry({
         {label}
       </span>
       <span
-        className="text-[13px] leading-none tnum"
+        className="type-sm leading-none tnum"
         style={{ color: TONE_COLOR[tone] }}
       >
         {value}

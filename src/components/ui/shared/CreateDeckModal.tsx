@@ -159,7 +159,7 @@ export function CreateDeckModal({ defaultOpen = false }: { defaultOpen?: boolean
               transition={reduced ? { duration: 0 } : motionTransitions.panel}
               className="panel relative z-[var(--z-modal)] mx-4 w-full max-w-[480px] p-6"
             >
-              <p className="font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <p className="type-label text-ink-dimmer">
                 New deck
               </p>
               <h2 id="create-deck-title" className="mt-2 text-base font-semibold tracking-[-.015em]">

@@ -51,9 +51,9 @@ Checked against `main` @ `dda8bc4` and the code itself on 2026-11-03. COPY-07 an
 
 *Deferred* (do them when there's a reason, not as a phase):
 - **REF-01:** only if FLOW-02 makes `FlashcardReviewClient` painful to work in, and then just the summary and the pause overlay, not §5.1's whole split.
-- **A11Y-12 (landmarks, skip link) · A11Y-14 · A11Y-15:** `a11y.spec.ts` carries A11Y-12's rules in its allow-list; delete them when the fix lands.
-- **The rest of U4:** DS-08/09/10, VIS-02/03, VIS-04 (quiz) and design system Rev. F.
-- **FLOW-04 · FB-01 · COPY-05 · PERF-08.**
+- ~~**A11Y-12 · A11Y-14 · A11Y-15**~~ done 2026-11-20 (A11Y-12 by `d09dde5`; the allow-list is empty).
+- ~~**The rest of U4:** DS-08/09/10, VIS-02/03, VIS-04 (quiz) and design system Rev. F.~~ Done 2026-11-20; see `docs/progress-log.md`.
+- ~~**FLOW-04 · FB-01 · COPY-05 · PERF-08.**~~ Done 2026-11-17 – 11-20, except FLOW-04's open-on-the-PDF-uploader shortcut.
 - **U5** (OD-11): not with today's handful of users. Vercel Speed Insights is the no-code option if numbers are wanted.
 
 *Dropped by the owner:* UX-08 (OD-3: Space doesn't grade) and VIS-01 (OD-7: the quiz keeps its letter grade and badges).

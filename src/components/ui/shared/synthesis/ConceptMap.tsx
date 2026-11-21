@@ -15,7 +15,7 @@ export type ConceptMapProps = {
 
 type Relation = { id: string; term: string; status: 'holds' | 'weak' | 'untested' | 'mixed' };
 
-const LABEL = 'font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
+const LABEL = 'type-label text-ink-dimmer';
 
 /**
  * How a relation is going, from the latest attempt on each drill that asks
@@ -142,7 +142,7 @@ export function ConceptMap({ deckId, nodes, edges, width, height }: ConceptMapPr
                 stroke={node.contradicted > 0 ? 'var(--state-lapsed)' : 'var(--ink-dim)'}
                 strokeWidth={node.id === active ? 2 : 1}
               />
-              <text x={node.x + 12} y={node.y + 4} className="fill-[var(--ink)] text-[14px]">
+              <text x={node.x + 12} y={node.y + 4} className="fill-[var(--ink)] type-body">
                 {truncate(node.term, 24)}
               </text>
             </a>
@@ -163,7 +163,7 @@ export function ConceptMap({ deckId, nodes, edges, width, height }: ConceptMapPr
               >
                 {node.term}
               </button>
-              <p className="mt-0.5 text-[13px] text-ink-dim">
+              <p className="mt-0.5 type-sm text-ink-dim">
                 {own.map((relation) => `${relation.term} · ${STATUS_WORD[relation.status]}`).join('  —  ')}
               </p>
             </li>

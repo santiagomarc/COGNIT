@@ -105,7 +105,7 @@ export function AccountRow({ name, email }: AccountRowProps) {
             {initial}
           </span>
           <span className="sidebar__label flex flex-col">
-            <span className="truncate text-[13px] font-medium text-ink">{display}</span>
+            <span className="truncate type-sm font-medium text-ink">{display}</span>
             <span className="truncate text-[11px] font-normal text-ink-dimmer">Account</span>
           </span>
         </button>

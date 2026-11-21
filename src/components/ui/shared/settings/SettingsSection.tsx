@@ -30,7 +30,7 @@ export function SettingsSection({ id, title, description, children, className }:
         <h2 id={`${id}-title`} className="text-base font-semibold tracking-[-.01em] text-ink">
           {title}
         </h2>
-        {description ? <p className="mt-1 text-[13px] leading-[1.55] text-ink-dim">{description}</p> : null}
+        {description ? <p className="mt-1 type-sm leading-[1.55] text-ink-dim">{description}</p> : null}
       </div>
       <div className="min-w-0 divide-y divide-border">{children}</div>
     </section>
@@ -57,7 +57,7 @@ export function SettingsRow({ label, hint, htmlFor, hintId, children }: Settings
           {label}
         </LabelTag>
         {hint ? (
-          <p id={hintId} className="mt-0.5 text-[12px] leading-[1.5] text-ink-dim">
+          <p id={hintId} className="mt-0.5 type-cap leading-[1.5] text-ink-dim">
             {hint}
           </p>
         ) : null}

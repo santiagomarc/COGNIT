@@ -44,7 +44,7 @@ export function AiUsageMeter({ used, ceiling, nextFreesAt }: AiUsageMeterProps) 
 
   return (
     <div className="w-full md:w-[280px]">
-      <p className="text-right font-mono text-[13px] tnum">
+      <p className="text-right font-mono type-sm tnum">
         <span className={atLimit ? 'text-destructive' : 'text-ink'}>{used}</span>
         <span className="text-ink-dimmer"> of {ceiling} calls</span>
       </p>
@@ -62,7 +62,7 @@ export function AiUsageMeter({ used, ceiling, nextFreesAt }: AiUsageMeterProps) 
         />
       </div>
       {freesAt ? (
-        <p className="mt-1.5 text-right text-[12px] text-ink-dim">
+        <p className="mt-1.5 text-right type-cap text-ink-dim">
           The oldest call clears at <span className="text-ink">{freesAt}</span>.
         </p>
       ) : null}

@@ -4,9 +4,8 @@ import { useState } from 'react';
 import { m, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Pencil, Trash2, X, Check, Square, CheckSquare } from 'lucide-react';
 import { Flashcard } from '@/components/ui/shared/Flashcard';
-import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { motionTransitions } from '@/lib/motion-configs';
-import { updateCard, deleteCard } from '@/app/actions/card';
+import { updateCard } from '@/app/actions/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,7 +25,8 @@ type FlashcardWithActionsProps = {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelected?: () => void;
-  onDeleted?: () => void;
+  /** Asks the list to delete this card: it hides the card and offers Undo before anything is sent (FB-01). */
+  onDelete?: () => void;
 };
 
 const SOURCE_LABELS: Record<CardSource, string> = {
@@ -50,13 +50,12 @@ export function FlashcardWithActions({
   selectionMode = false,
   selected = false,
   onToggleSelected,
-  onDeleted,
+  onDelete,
 }: FlashcardWithActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editableTerm, setEditableTerm] = useState(term);
   const [editableDescription, setEditableDescription] = useState(description);
   const [isLoading, setIsLoading] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const reduced = useReducedMotion();
 
   async function handleSave() {
@@ -74,19 +73,6 @@ export function FlashcardWithActions({
       setIsEditing(false);
     }
     setIsLoading(false);
-  }
-
-  async function handleDelete() {
-    setIsLoading(true);
-    const result = await deleteCard(cardId, deckId);
-    if (result?.error) {
-      toast.error(typeof result.error === 'string' ? result.error : 'Failed to delete card');
-    } else {
-      toast.success('Card deleted');
-      onDeleted?.();
-    }
-    setIsLoading(false);
-    setShowDeleteConfirm(false);
   }
 
   return (
@@ -155,7 +141,7 @@ export function FlashcardWithActions({
             className="space-y-2"
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex max-w-[75%] flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer">
+              <div className="flex max-w-[75%] flex-wrap items-baseline gap-x-3 gap-y-1 type-label text-ink-dimmer">
                 {typeof cardNumber === 'number' ? (
                   <span className="tnum">#{cardNumber}</span>
                 ) : null}
@@ -193,7 +179,7 @@ export function FlashcardWithActions({
                       e.stopPropagation();
                       setIsEditing(true);
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     title="Edit card"
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -202,9 +188,10 @@ export function FlashcardWithActions({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowDeleteConfirm(true);
+                      // No confirm: the card hides at once and the toast offers Undo (FB-01).
+                      onDelete?.();
                     }}
-                    className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:border-[var(--state-lapsed)] hover:text-[var(--state-lapsed)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+                    className="flex h-8 w-8 pointer-coarse:h-11 pointer-coarse:w-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-control)] text-ink-dimmer transition-colors outline-hidden hover:border-[var(--state-lapsed)] hover:text-[var(--state-lapsed)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
                     title="Delete card"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -219,7 +206,7 @@ export function FlashcardWithActions({
                 {topicTags.map((tag) => (
                   <span
                     key={`${cardId}-${tag}`}
-                    className="rounded-[var(--radius-control)] border border-border px-2 py-0.5 font-mono text-[10px] uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer"
+                    className="rounded-[var(--radius-control)] border border-border px-2 py-0.5 type-label text-ink-dimmer"
                   >
                     {tag}
                   </span>
@@ -230,16 +217,6 @@ export function FlashcardWithActions({
         )}
       </AnimatePresence>
 
-      <ConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        title="Delete this card?"
-        description="This action cannot be undone. The flashcard will be permanently removed."
-        confirmLabel="Delete"
-        variant="destructive"
-        loading={isLoading}
-        onConfirm={handleDelete}
-      />
     </div>
   );
 }

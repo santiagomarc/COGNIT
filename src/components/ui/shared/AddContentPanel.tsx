@@ -30,7 +30,7 @@ export function AddContentPanel({ deckId, hasCards }: { deckId: string; hasCards
         <span className="text-sm font-medium text-ink">
           {hasCards ? 'Add content' : 'Start here — this deck is empty'}
         </span>
-        <span className="truncate text-[13px] text-ink-dimmer max-sm:hidden">
+        <span className="truncate type-sm text-ink-dimmer max-sm:hidden">
           Write a card · paste notes · generate from a PDF
         </span>
         <span

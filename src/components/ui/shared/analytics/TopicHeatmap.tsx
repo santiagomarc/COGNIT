@@ -7,8 +7,8 @@ const TONE_COLOR = {
   ink: 'var(--ink)',
 } as const;
 
-const HEAD = 'py-2 text-right font-mono text-[10px] font-normal uppercase leading-[1.5] tracking-[0.16em] text-ink-dimmer';
-const CELL = 'py-2.5 text-right font-mono text-[13px] tnum';
+const HEAD = 'py-2 text-right type-label font-normal text-ink-dimmer';
+const CELL = 'py-2.5 text-right font-mono type-sm tnum';
 
 function pct(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
@@ -24,7 +24,7 @@ function pct(value: number | null): string {
 export function TopicHeatmap({ topics }: { topics: TopicMastery[] }) {
   if (topics.length === 0) {
     return (
-      <p className="mt-3 text-[13px] text-ink-dim">
+      <p className="mt-3 type-sm text-ink-dim">
         Topics appear once enriched cards carry tags — three or more cards per tag.
       </p>
     );
