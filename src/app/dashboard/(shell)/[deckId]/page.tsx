@@ -216,6 +216,8 @@ async function loadDeckDetailSnapshot(
         )
         .eq('deck_id', deckId)
         .order('created_at', { ascending: false })
+        // Same tie-break as getDeckCardsPage, so its pages continue this one.
+        .order('id', { ascending: false })
         .range(0, 59)
       : supabase
         .from('cards')

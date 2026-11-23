@@ -203,6 +203,16 @@ design stay in [specs/micro-synthesis-spec.md §12](specs/micro-synthesis-spec.m
   band for grading.
 - **Source:** `COGNIT_SIDEBAR_SETTINGS_PLAN.md` §2 D1–D3, D5–D7, D9–D12
 
+### D-UI-4: The Cards tab pages 12 cards over a list loaded from the start
+- **Date:** 2026-11-23 · **By:** santiagomarc
+- **Decision:** Numbered pages of 12, held in client state. The client keeps a contiguous run of
+  cards from the newest and reads 60–100 at a time; a jump reads everything up to that page. Not
+  one request per page, and not a `?page=` URL.
+- **Why:** 12 fills whole rows at one, two and three columns. A run from the start keeps numbering,
+  delete with undo and selection simple, and most page turns need no request. A `?page=` URL would
+  re-run the whole deck page's reads on every turn.
+- **Source:** owner request, 2026-11-23
+
 ## Process (PROC)
 
 ### D-PROC-1: Measure, don't estimate

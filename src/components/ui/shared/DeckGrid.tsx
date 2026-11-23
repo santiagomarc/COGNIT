@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { DeckRow, DeckRowLegend, type DeckRowData } from '@/components/ui/shared/DeckRow';
 import { Button } from '@/components/ui/button';
+import { Pager } from '@/components/ui/shared/Pager';
+import { clampPage, pageCount } from '@/lib/card-pages';
 import { parseDeckTitleMetadata } from '@/lib/deck-tags';
 
 type DeckWithCount = {
@@ -25,6 +27,9 @@ type DeckWithCount = {
 type DeckGridProps = {
   decks: DeckWithCount[];
 };
+
+/** One screenful of rows; the decks are all loaded, so a page is only a slice. */
+const DECKS_PER_PAGE = 10;
 
 type DeckSortMode = 'newest' | 'most-studied' | 'most-due';
 
@@ -112,6 +117,8 @@ export function DeckGrid({ decks }: DeckGridProps) {
    * a backlog — the index exists to answer "what do I open now".
    */
   const [sortMode, setSortMode] = useState<DeckSortMode>('most-due');
+  const [page, setPage] = useState(1);
+  const listRef = useRef<HTMLDivElement>(null);
   const [localDecks, setLocalDecks] = useState(() => decks);
 
   useEffect(() => {
@@ -119,6 +126,19 @@ export function DeckGrid({ decks }: DeckGridProps) {
   }, [decks]);
 
   const orderedDecks = useMemo(() => sortDecks(localDecks, sortMode), [localDecks, sortMode]);
+
+  // Clamped, so deleting the last deck on the last page shows the page before it.
+  const pages = pageCount(orderedDecks.length, DECKS_PER_PAGE);
+  const currentPage = clampPage(page, pages);
+  const start = (currentPage - 1) * DECKS_PER_PAGE;
+  const pageDecks = orderedDecks.slice(start, start + DECKS_PER_PAGE);
+
+  function goToPage(next: number) {
+    setPage(next);
+    // Next disables itself on the last page, which would drop keyboard focus.
+    listRef.current?.focus({ preventScroll: true });
+    listRef.current?.scrollIntoView({ block: 'nearest' });
+  }
 
   const totalCards = useMemo(
     () => localDecks.reduce((sum, d) => sum + (d.cards?.[0]?.count ?? 0), 0),
@@ -134,7 +154,7 @@ export function DeckGrid({ decks }: DeckGridProps) {
           </h2>
           <div className="hidden sm:block h-px flex-1 bg-border" />
           <span className="font-mono text-[11px] text-ink-dimmer shrink-0 tnum">
-            {orderedDecks.length} {orderedDecks.length === 1 ? 'deck' : 'decks'} · {totalCards} cards
+            {pages > 1 ? `${start + 1}–${start + pageDecks.length} of ` : ''}{orderedDecks.length} {orderedDecks.length === 1 ? 'deck' : 'decks'} · {totalCards} cards
           </span>
         </div>
 
@@ -148,7 +168,10 @@ export function DeckGrid({ decks }: DeckGridProps) {
                 size="sm"
                 variant="ghost"
                 aria-pressed={sortMode === mode.value}
-                onClick={() => setSortMode(mode.value)}
+                onClick={() => {
+                  setSortMode(mode.value);
+                  setPage(1);
+                }}
                 className="h-[32px] px-2 text-xs"
               >
                 {mode.label}
@@ -161,10 +184,16 @@ export function DeckGrid({ decks }: DeckGridProps) {
       {orderedDecks.length === 0 ? (
         <p className="well px-4 py-8 text-center text-sm text-ink-dim">No decks yet. Create one to get started.</p>
       ) : (
-        <div className="well overflow-hidden px-3.5">
+        <div
+          ref={listRef}
+          role="region"
+          tabIndex={-1}
+          aria-label={pages > 1 ? `Decks, page ${currentPage} of ${pages}` : 'Decks'}
+          className="well scroll-mt-16 overflow-hidden px-3.5 outline-hidden"
+        >
           <DeckRowLegend />
 
-          {orderedDecks.map((deck) => {
+          {pageDecks.map((deck) => {
             const { cleanTitle, tag } = parseDeckTitleMetadata(deck.title);
             const row: DeckRowData = {
               id: deck.id,
@@ -201,6 +230,8 @@ export function DeckGrid({ decks }: DeckGridProps) {
           })}
         </div>
       )}
+
+      <Pager label="Deck pages" page={currentPage} pages={pages} onPageChange={goToPage} />
     </section>
   );
 }

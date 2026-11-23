@@ -46,6 +46,25 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-23 · santiagomarc · Pages in the dashboard's All decks list
+- **What:** "All decks" shows 10 decks per page with the same pager as the Cards tab; the header reads "1–10 of 34 decks". Changing the sort returns to page 1; counts and sorting still cover every deck. No pager at 10 decks or fewer.
+- **Why:** A long library pushed everything into one list.
+- **Files:** `DeckGrid.tsx`, `Pager.tsx`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** tsc, lint, unit tests, build. Not checked signed in.
+
+### 2026-11-23 · santiagomarc · Pages on the Cards tab
+- **What:**
+  - A deck's Cards tab shows 12 cards at a time with Previous, page numbers and Next, instead of 60 and "Load more cards". Below `lg` it is "Page 2 of 9" between the two buttons. The filter's matches page the same way and show a real count ("1–12 of 49 matching").
+  - Turning a page scrolls to the top of the cards and moves focus to them, so a screen reader announces the new range. Cards not read yet show skeletons; a failed read shows "Try again".
+  - "Select all" is now "Select page" plus "Select all *n*" (up to 200, the delete limit). A selection carries across pages, so the delete button states its count.
+  - Card numbers count from the deck's real total. They used to count only the loaded cards, so the newest of 240 read #60.
+  - Fixed on the way: pages could repeat or skip cards that share a `created_at` (a generated batch does), so `id` now breaks the tie; a refresh while a delete was still in its undo window could bring the card back; an edit to a card found by the filter didn't show until reload.
+- **Why:** 60 cards in one column of rows was too much to read or find anything in.
+- **Files:** `DeckCardsManager.tsx`, `Pager.tsx` (new), `src/lib/card-pages.ts` (new, + test), `FlashcardWithActions.tsx`, `actions/card.ts`, `[deckId]/page.tsx`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** `card-pages.test.ts` (11); 762 tests, tsc, lint and build pass. `/dashboard/[deckId]` is 223.8 kB (budget 226). Driven in Chrome with a stubbed action and 137 cards: paging, jump to last, delete, undo, commit, edit past card 60, filter, select, failed read and retry, at 1280 and 390 px. **Not run against the real database signed in.**
+
 ### 2026-11-20 · santiagomarc · UIUX plan U4 and the rest of U3 (accessibility, type scale, quiz result, onboarding, delete with undo)
 - **What, by finding:**
   - **A11Y-14 · touch targets.** Every `Button` is 44 px tall under a coarse pointer (`pointer-coarse:` in `button.tsx`); so are the launcher chips and count input, the drill launcher's chips, login's "Forgot password?", "Sign up"/"Sign in", "use a different email" and show-password, the theme toggle, the card hover actions, the PDF count select and Remove. Deck rows go 38 → 48 px. Desktop density is unchanged.

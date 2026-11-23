@@ -8,7 +8,9 @@ import { FlashcardWithActions } from '@/components/ui/shared/FlashcardWithAction
 import { ConfirmDialog } from '@/components/ui/shared/ConfirmDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Pager } from '@/components/ui/shared/Pager';
 import { cardFilterPattern } from '@/lib/card-filter';
+import { appendCards, BULK_DELETE_MAX_COUNT, CARDS_PER_PAGE, clampPage, dropCards, pageCount, refreshFirstCards, type CardList } from '@/lib/card-pages';
 import { PENDING_DELETE_MS, schedulePendingDelete } from '@/lib/pending-delete';
 import { toast } from 'sonner';
 import type { CardSource } from '@/index';
@@ -29,131 +31,161 @@ type DeckCard = {
 type DeckCardsManagerProps = {
   deckId: string;
   cards: DeckCard[];
-  totalCards?: number;
+  totalCards: number;
   errorMessage?: string | null;
 };
 
 /** Above this many cards at once, a toast is too small a warning: ask first (FB-01). */
 const BULK_CONFIRM_ABOVE = 50;
 
-function mapCardNumbersByCreation(items: DeckCard[]) {
-  const oldestFirst = [...items].sort(
-    (a, b) => {
-      const byCreatedAt = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      if (byCreatedAt !== 0) {
-        return byCreatedAt;
-      }
-
-      return a.id.localeCompare(b.id);
-    }
-  );
-
-  return new Map(oldestFirst.map((card, index) => [card.id, index + 1]));
+/** One read of the deck's cards. A dropped connection comes back as an error, like a refusal does. */
+async function readCards(deckId: string, offset: number, limit: number, query?: string) {
+  try {
+    const result = await getDeckCardsPage(deckId, offset, limit, query);
+    if (result.success) return { error: null, cards: result.cards as DeckCard[], total: result.total };
+    return { error: result.error ?? 'Could not load the cards.' };
+  } catch {
+    return { error: 'Could not load the cards. Check your connection and try again.' };
+  }
 }
 
-function sortCardsByNumberDesc(items: DeckCard[]) {
-  const cardNumberById = mapCardNumbersByCreation(items);
-  return [...items].sort((a, b) => {
-    const aNumber = cardNumberById.get(a.id) ?? 0;
-    const bNumber = cardNumberById.get(b.id) ?? 0;
-    return bNumber - aNumber;
-  });
-}
+/** Cards per read. Pages are smaller, so most page turns need no request. */
+const CHUNK = 60;
+/** The most `getDeckCardsPage` returns at once. */
+const CHUNK_MAX = 100;
 
 export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: DeckCardsManagerProps) {
   const router = useRouter();
-  const [deckCards, setDeckCards] = useState(() => sortCardsByNumberDesc(cards));
+  const [deckList, setDeckList] = useState<CardList<DeckCard>>({ cards, total: totalCards });
   // The Cards-tab filter (IA-04). `matches` is null while no filter is active;
   // otherwise it holds the cards the server found, and replaces the list.
   const [query, setQuery] = useState('');
-  const [matches, setMatches] = useState<DeckCard[] | null>(null);
-  const [matchesHaveMore, setMatchesHaveMore] = useState(false);
+  const [matches, setMatches] = useState<CardList<DeckCard> | null>(null);
   const [isFiltering, setIsFiltering] = useState(false);
   const filterRequest = useRef(0);
+  const filterTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [page, setPage] = useState(1);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const moveToList = useRef(false);
+  /** Deleted on screen, maybe not yet on the server (FB-01). Never listed, whatever a re-read returns. */
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  useEffect(() => {
-    setDeckCards(sortCardsByNumberDesc(cards));
-  }, [cards]);
+  // A server refresh brings a new first chunk; take it in before painting the old one.
+  const [firstCards, setFirstCards] = useState(cards);
+  if (firstCards !== cards) {
+    setFirstCards(cards);
+    setDeckList((prev) => refreshFirstCards(prev, cards, totalCards));
+  }
 
   const filterActive = cardFilterPattern(query) !== null;
 
-  // Ask the server once typing pauses. A reply for an earlier query is dropped.
-  useEffect(() => {
-    if (!filterActive) {
-      filterRequest.current += 1;
+  useEffect(() => () => clearTimeout(filterTimer.current), []);
+
+  /** Asks the server once typing pauses. A reply for an earlier query is dropped. */
+  function handleQueryChange(next: string) {
+    const request = (filterRequest.current += 1);
+    clearTimeout(filterTimer.current);
+    setQuery(next);
+    setLoadFailed(false);
+    if (cardFilterPattern(next) === null) {
+      // Only leaving a filter goes back to the first page; a first letter typed doesn't.
+      if (filterActive) setPage(1);
       setMatches(null);
       setIsFiltering(false);
       return;
     }
-    const request = (filterRequest.current += 1);
     setIsFiltering(true);
-    const timer = setTimeout(async () => {
-      const result = await getDeckCardsPage(deckId, 0, 60, query);
+    filterTimer.current = setTimeout(async () => {
+      const result = await readCards(deckId, 0, CHUNK, next);
       if (request !== filterRequest.current) return;
       setIsFiltering(false);
-      if (result.error || !result.success) {
-        toast.error(result.error ?? 'Could not filter the cards.');
+      if (result.error !== null) {
+        setMatches(null);
+        toast.error(result.error);
         return;
       }
-      setMatches(sortCardsByNumberDesc(result.cards));
-      setMatchesHaveMore(result.cards.length === 60);
+      setMatches({ cards: result.cards, total: result.total });
+      setPage(1);
     }, 250);
-    return () => clearTimeout(timer);
-  }, [query, filterActive, deckId]);
+  }
 
-  /** What the grid shows: the filter's matches while one is active, else the loaded cards. */
-  const visibleCards = filterActive && matches ? matches : deckCards;
+  /** What the grid pages through: the filter's matches while one is active, else the deck. */
+  const showsMatches = filterActive && matches !== null;
+  const list = showsMatches ? matches : deckList;
+  const loadedCards = list.cards.filter((card) => !hiddenIds.has(card.id));
+  const total = list.total - (list.cards.length - loadedCards.length);
 
-  async function handleLoadMore() {
-    setIsLoadingMore(true);
-    if (filterActive && matches) {
-      const result = await getDeckCardsPage(deckId, matches.length, 60, query);
-      setIsLoadingMore(false);
-      if (result.error || !result.success) {
-        toast.error(result.error ?? 'Failed to load more cards.');
+  const pages = pageCount(total);
+  const currentPage = clampPage(page, pages);
+  const start = (currentPage - 1) * CARDS_PER_PAGE;
+  const end = Math.min(start + CARDS_PER_PAGE, total);
+  const pageCards = loadedCards.slice(start, end);
+  /** How many cards this page needs that haven't been read yet. */
+  const missing = Math.max(0, end - loadedCards.length);
+  const loadedCount = list.cards.length;
+
+  // Read up to the page being shown. Re-runs while a jump still falls short.
+  // The filter's own read owns the list while the query is changing.
+  useEffect(() => {
+    if (missing === 0 || loadFailed || isFiltering) return;
+    let stale = false;
+    const limit = Math.min(Math.max(CHUNK, missing), CHUNK_MAX);
+    void readCards(deckId, loadedCount, limit, showsMatches ? query : undefined).then((result) => {
+      if (stale) return;
+      if (result.error !== null) {
+        setLoadFailed(true);
         return;
       }
-      setMatches((prev) => {
-        const known = new Set((prev ?? []).map((c) => c.id));
-        return sortCardsByNumberDesc([...(prev ?? []), ...result.cards.filter((c) => !known.has(c.id))]);
-      });
-      setMatchesHaveMore(result.cards.length === 60);
-      return;
-    }
-    const result = await getDeckCardsPage(deckId, deckCards.length, 60);
-    setIsLoadingMore(false);
+      if (showsMatches) setMatches((prev) => prev && appendCards(prev, result.cards, result.total));
+      else setDeckList((prev) => appendCards(prev, result.cards, result.total));
+    });
+    return () => {
+      stale = true;
+    };
+  }, [missing, loadFailed, isFiltering, loadedCount, showsMatches, query, deckId]);
 
-    if (result.error || !result.success) {
-      toast.error(result.error ?? 'Failed to load more cards.');
-      return;
-    }
+  function goToPage(next: number) {
+    moveToList.current = true;
+    setLoadFailed(false);
+    setPage(next);
+  }
 
-    if (result.cards && result.cards.length > 0) {
-      setDeckCards((prev) => {
-        const existingIds = new Set(prev.map((c) => c.id));
-        const newCards = result.cards.filter((c) => !existingIds.has(c.id));
-        return sortCardsByNumberDesc([...prev, ...newCards]);
-      });
-    }
+  // The pager sits under the cards, so a new page would otherwise open at its
+  // end. Focus goes with the scroll: the region's name announces the new range.
+  useEffect(() => {
+    if (!moveToList.current) return;
+    moveToList.current = false;
+    listRef.current?.scrollIntoView({ block: 'start' });
+    listRef.current?.focus({ preventScroll: true });
+  }, [page]);
+
+  function handleSaved(cardId: string, front: string, back: string) {
+    const patch = (prev: CardList<DeckCard>) => ({
+      ...prev,
+      cards: prev.cards.map((card) => (card.id === cardId ? { ...card, front, back } : card)),
+    });
+    setDeckList(patch);
+    setMatches((prev) => prev && patch(prev));
   }
 
   const selectedCount = selectedIds.size;
-  const allSelected = visibleCards.length > 0 && selectedCount === visibleCards.length;
+  const pageSelected = pageCards.length > 0 && pageCards.every((card) => selectedIds.has(card.id));
+  const rangeLabel = total === 0 ? '0' : `${start + 1}–${end} of ${total}`;
 
-  const cardNumberById = useMemo(() => mapCardNumbersByCreation(deckCards), [deckCards]);
+  /** #1 is the deck's oldest card; the list is newest first. */
+  const cardNumberById = useMemo(
+    () => new Map(deckList.cards.map((card, index) => [card.id, deckList.total - index])),
+    [deckList],
+  );
 
   function handleSelectionModeToggle() {
-    setSelectionMode((prev) => {
-      const next = !prev;
-      if (!next) {
-        setSelectedIds(new Set());
-      }
-      return next;
-    });
+    if (selectionMode) setSelectedIds(new Set());
+    setSelectionMode(!selectionMode);
   }
 
   function handleToggleCardSelection(cardId: string) {
@@ -168,12 +200,36 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
     });
   }
 
-  function handleSelectAllToggle() {
-    if (allSelected) {
-      setSelectedIds(new Set());
-      return;
+  function handleSelectPageToggle() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const card of pageCards) {
+        if (pageSelected) next.delete(card.id);
+        else next.add(card.id);
+      }
+      return next;
+    });
+  }
+
+  /** Every card in the list, on every page: reads the rest first, since a delete needs their ids. */
+  async function handleSelectAll() {
+    const request = filterRequest.current;
+    setIsSelectingAll(true);
+    let all = list;
+    while (all.cards.length < all.total) {
+      const result = await readCards(deckId, all.cards.length, CHUNK_MAX, showsMatches ? query : undefined);
+      // The filter changed meanwhile: "all" no longer means what was asked for.
+      if (request !== filterRequest.current || result.error !== null) {
+        if (result.error !== null) toast.error(result.error);
+        setIsSelectingAll(false);
+        return;
+      }
+      all = appendCards(all, result.cards, result.total);
+      if (showsMatches) setMatches((prev) => prev && appendCards(prev, result.cards, result.total));
+      else setDeckList((prev) => appendCards(prev, result.cards, result.total));
     }
-    setSelectedIds(new Set(visibleCards.map((card) => card.id)));
+    setIsSelectingAll(false);
+    setSelectedIds(new Set(all.cards.filter((card) => !hiddenIds.has(card.id)).map((card) => card.id)));
   }
 
   /**
@@ -184,17 +240,9 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
   function deleteWithUndo(ids: string[]) {
     if (ids.length === 0) return;
     const doomed = new Set(ids);
-    const removed = [...deckCards, ...(matches ?? [])].filter(
-      (card, index, all) => doomed.has(card.id) && all.findIndex((other) => other.id === card.id) === index,
-    );
-    const removedFromMatches = (matches ?? []).filter((card) => doomed.has(card.id));
-    const restore = () => {
-      setDeckCards((prev) => sortCardsByNumberDesc([...prev, ...removed.filter((card) => !prev.some((p) => p.id === card.id))]));
-      setMatches((prev) => (prev ? sortCardsByNumberDesc([...prev, ...removedFromMatches.filter((card) => !prev.some((p) => p.id === card.id))]) : prev));
-    };
+    const restore = () => setHiddenIds((prev) => new Set([...prev].filter((id) => !doomed.has(id))));
 
-    setDeckCards((prev) => prev.filter((card) => !doomed.has(card.id)));
-    setMatches((prev) => prev && prev.filter((card) => !doomed.has(card.id)));
+    setHiddenIds((prev) => new Set([...prev, ...doomed]));
     setSelectedIds((prev) => new Set([...prev].filter((id) => !doomed.has(id))));
 
     const pending = schedulePendingDelete({
@@ -203,7 +251,11 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         if (!result?.error) return null;
         return typeof result.error === 'string' ? result.error : 'Failed to delete.';
       },
-      onCommitted: () => router.refresh(),
+      onCommitted: () => {
+        setDeckList((prev) => dropCards(prev, doomed));
+        setMatches((prev) => prev && dropCards(prev, doomed));
+        router.refresh();
+      },
       onFailed: (message) => {
         restore();
         toast.error(message);
@@ -222,6 +274,11 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
   }
 
   function handleBulkDeleteRequest() {
+    // The server refuses this too, but only after the cards have left the list.
+    if (selectedIds.size > BULK_DELETE_MAX_COUNT) {
+      toast.error(`You can delete at most ${BULK_DELETE_MAX_COUNT} cards at once.`);
+      return;
+    }
     if (selectedIds.size > BULK_CONFIRM_ABOVE) {
       setShowBulkDeleteConfirm(true);
       return;
@@ -236,7 +293,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
     deleteWithUndo(ids);
   }
 
-  if (deckCards.length === 0) {
+  if (!filterActive && total === 0) {
     if (errorMessage) {
       return (
         <div className="surface p-8 text-center">
@@ -290,12 +347,12 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
         <p className="type-label tnum text-ink-dimmer">
           {selectionMode
-            ? `${selectedCount} of ${visibleCards.length} selected`
+            ? `${selectedCount} selected`
             : filterActive
               ? isFiltering && !matches
                 ? 'Searching…'
-                : `${visibleCards.length}${matchesHaveMore ? '+' : ''} matching`
-              : `${deckCards.length} cards`}
+                : `${rangeLabel} ${showsMatches ? 'matching' : 'cards'}`
+              : `${rangeLabel} cards`}
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -311,19 +368,25 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
 
           {selectionMode ? (
             <>
-              <Button type="button" size="sm" variant="ghost" onClick={handleSelectAllToggle}>
-                {allSelected ? <Square className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
-                {allSelected ? 'Clear all' : 'Select all'}
+              <Button type="button" size="sm" variant="ghost" onClick={handleSelectPageToggle}>
+                {pageSelected ? <Square className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
+                {pageSelected ? 'Clear page' : 'Select page'}
               </Button>
+              {pages > 1 && total <= BULK_DELETE_MAX_COUNT ? (
+                <Button type="button" size="sm" variant="ghost" onClick={handleSelectAll} disabled={isSelectingAll || isFiltering}>
+                  {isSelectingAll ? 'Selecting…' : `Select all ${total}`}
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 size="sm"
                 variant="destructive"
                 onClick={handleBulkDeleteRequest}
-                disabled={selectedCount === 0}
+                disabled={selectedCount === 0 || isSelectingAll}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete selected
+                {/* The count is here because the selection can span pages that aren't on screen. */}
+                Delete {selectedCount} selected
               </Button>
             </>
           ) : null}
@@ -339,7 +402,7 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         <Input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => handleQueryChange(event.target.value)}
           placeholder="Find a card by its words"
           aria-label="Find a card by its words"
           autoComplete="off"
@@ -347,14 +410,22 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
         />
       </div>
 
-      {filterActive && matches && visibleCards.length === 0 ? (
+      {showsMatches && total === 0 ? (
         <p className="py-8 text-center text-sm text-ink-dim">No card in this deck contains “{query.trim()}”.</p>
       ) : null}
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleCards.map((card) => (
-          <div key={card.id}>
+      <div
+        ref={listRef}
+        role="region"
+        tabIndex={-1}
+        aria-label={`Cards ${rangeLabel}`}
+        aria-busy={missing > 0 && !loadFailed}
+        className="scroll-mt-16 outline-hidden"
+      >
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {pageCards.map((card) => (
             <FlashcardWithActions
+              key={card.id}
               cardId={card.id}
               deckId={deckId}
               cardNumber={cardNumberById.get(card.id)}
@@ -367,27 +438,27 @@ export function DeckCardsManager({ deckId, cards, totalCards, errorMessage }: De
               selectionMode={selectionMode}
               selected={selectedIds.has(card.id)}
               onToggleSelected={() => handleToggleCardSelection(card.id)}
+              onSaved={(front, back) => handleSaved(card.id, front, back)}
               onDelete={() => deleteWithUndo([card.id])}
             />
-          </div>
-        ))}
-      </div>
-
-      {filterActive && matches ? (
-        matchesHaveMore ? (
-          <div className="mt-8 flex flex-col items-center justify-center gap-2">
-            <Button onClick={handleLoadMore} disabled={isLoadingMore}>
-              {isLoadingMore ? 'Loading cards…' : 'Load more matches'}
+          ))}
+          {missing > 0 && !loadFailed
+            ? Array.from({ length: end - start - pageCards.length }, (_, index) => (
+              <div key={`loading-${index}`} aria-hidden="true" className="glass-skeleton h-64 rounded-[var(--radius-container)]" />
+            ))
+            : null}
+        </div>
+        {missing > 0 && loadFailed ? (
+          <div className="flex flex-col items-center gap-3 py-8 text-center">
+            <p className="text-sm text-ink-dim" role="alert">These cards couldn&apos;t be loaded.</p>
+            <Button type="button" size="sm" onClick={() => setLoadFailed(false)}>
+              Try again
             </Button>
           </div>
-        ) : null
-      ) : totalCards !== undefined && deckCards.length < totalCards ? (
-        <div className="mt-8 flex flex-col items-center justify-center gap-2">
-          <Button onClick={handleLoadMore} disabled={isLoadingMore}>
-            {isLoadingMore ? 'Loading cards…' : `Load more cards (${deckCards.length} of ${totalCards})`}
-          </Button>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
+
+      <Pager label="Card pages" page={currentPage} pages={pages} onPageChange={goToPage} />
 
       <ConfirmDialog
         open={showBulkDeleteConfirm}

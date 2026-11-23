@@ -16,8 +16,7 @@ import { embedTexts, toVectorLiteral } from '@/lib/embeddings';
 import { runBackground } from '@/lib/background';
 import { fillDerivedCardData } from '@/lib/card-derived';
 import { cardFilterPattern } from '@/lib/card-filter';
-
-const BULK_DELETE_MAX_COUNT = 200;
+import { BULK_DELETE_MAX_COUNT } from '@/lib/card-pages';
 
 const uuidSchema = z.uuid();
 const deleteCardSchema = z.object({ card_id: uuidSchema, deck_id: uuidSchema });
@@ -319,7 +318,7 @@ export async function getDeckCardsPage(deckId: string, offset: number, limit = 6
 
   let request = supabase
     .from('cards')
-    .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags')
+    .select('id, deck_id, front, back, created_at, source, imported_by, mcq_distractors, id_question, topic_tags', { count: 'exact' })
     .eq('deck_id', deckId);
 
   // The Cards tab's filter (IA-04): the same paging, narrowed to cards whose
@@ -327,8 +326,11 @@ export async function getDeckCardsPage(deckId: string, offset: number, limit = 6
   const pattern = query ? cardFilterPattern(query) : null;
   if (pattern) request = request.or(`front.ilike.${pattern},back.ilike.${pattern}`);
 
-  const { data: cards, error } = await request
+  // A generated batch shares one `created_at`, so `id` breaks the tie: without
+  // it, offset pages can repeat a card and skip another.
+  const { data: cards, count, error } = await request
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .range(safeOffset, safeOffset + safeLimit - 1);
 
   if (error) {
@@ -338,6 +340,7 @@ export async function getDeckCardsPage(deckId: string, offset: number, limit = 6
 
   return {
     success: true as const,
+    total: count ?? safeOffset + (cards?.length ?? 0),
     cards: (cards ?? []).map((card) => ({
       ...card,
       created_at: card.created_at ?? new Date().toISOString(),

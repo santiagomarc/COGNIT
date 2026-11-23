@@ -25,6 +25,8 @@ type FlashcardWithActionsProps = {
   selectionMode?: boolean;
   selected?: boolean;
   onToggleSelected?: () => void;
+  /** Tells the list the new text: the server refresh only covers the deck's first cards. */
+  onSaved?: (front: string, back: string) => void;
   /** Asks the list to delete this card: it hides the card and offers Undo before anything is sent (FB-01). */
   onDelete?: () => void;
 };
@@ -50,6 +52,7 @@ export function FlashcardWithActions({
   selectionMode = false,
   selected = false,
   onToggleSelected,
+  onSaved,
   onDelete,
 }: FlashcardWithActionsProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -70,6 +73,7 @@ export function FlashcardWithActions({
       toast.error(typeof result.error === 'string' ? result.error : 'Failed to update card');
     } else {
       toast.success('Card updated');
+      onSaved?.(editableTerm, editableDescription);
       setIsEditing(false);
     }
     setIsLoading(false);
