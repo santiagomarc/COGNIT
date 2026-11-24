@@ -148,13 +148,13 @@ export function DeckGrid({ decks }: DeckGridProps) {
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
           <h2 className="type-label text-ink-dimmer shrink-0">
             All decks
           </h2>
           <div className="hidden sm:block h-px flex-1 bg-border" />
           <span className="font-mono text-[11px] text-ink-dimmer shrink-0 tnum">
-            {pages > 1 ? `${start + 1}–${start + pageDecks.length} of ` : ''}{orderedDecks.length} {orderedDecks.length === 1 ? 'deck' : 'decks'} · {totalCards} cards
+            {pages > 1 ? `${start + 1}–${start + pageDecks.length} of ` : ''}{orderedDecks.length} {orderedDecks.length === 1 ? 'deck' : 'decks'} · {totalCards} {totalCards === 1 ? 'card' : 'cards'}
           </span>
         </div>
 

@@ -213,6 +213,17 @@ design stay in [specs/micro-synthesis-spec.md §12](specs/micro-synthesis-spec.m
   re-run the whole deck page's reads on every turn.
 - **Source:** owner request, 2026-11-23
 
+### D-UI-5: A deck row's actions are one "⋯" menu, loaded on first use
+- **Date:** 2026-11-24 · **By:** santiagomarc
+- **Decision:** One always-visible "⋯" button opens Rename, Duplicate and Move to trash (Radix
+  `DropdownMenu`, not modal). Not three visible icons, and no "Merge into…": Merge is already on
+  the deck's Overview.
+- **Why:** Three buttons need 104px, or 140px at the 44px touch size, and the column had 68px. On a
+  375px phone, icons would leave deck names about 100px. The dashboard had 1.1 kB of budget left, so
+  the menu's code loads on the first click. A modal Radix menu injects a `<style>` to lock
+  scrolling; a three-item menu doesn't need that.
+- **Source:** Francine's review, item 12
+
 ## Process (PROC)
 
 ### D-PROC-1: Measure, don't estimate

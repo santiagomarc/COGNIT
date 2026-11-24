@@ -35,10 +35,17 @@ test('create deck', async ({ page }) => {
 });
 
 test('confirm: move a deck to the trash, cancelled', async ({ page }) => {
-  const { deckId } = requireSeed();
-  await page.goto(`/dashboard/${deckId}?tab=overview`);
-  const dialog = page.getByRole('alertdialog').or(page.getByRole('dialog'));
-  await expectFocusReturns(page, page.getByRole('button', { name: 'Delete deck' }), dialog, escape(page));
+  requireSeed();
+  await page.goto('/dashboard');
+  const trigger = page.getByRole('button', { name: /^Actions for / }).first();
+  await trigger.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('menuitem', { name: 'Move to trash' }).press('Enter');
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 });
 
 test('study pause', async ({ page }) => {

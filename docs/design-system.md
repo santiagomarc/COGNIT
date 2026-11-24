@@ -639,6 +639,8 @@ A deck is a **row of type with its numbers right-aligned**, not a tile.
 - Due count uses `--state-due` when > 0, `--ink-faint` when 0.
 - Mastery bar: 104px × 3px, track `--border`, fill `--ink-dim`, stepping to `--state-mastered` at ≥70%.
 - Row divider: 1px `--border`. No card, no radius, no shadow.
+- Names wrap to two lines, so 38px (48px under a finger) is a minimum height. From `lg` the name is capped at 28rem and the number columns share the rest.
+- Actions: one always-visible "⋯" button opening a menu (D-UI-5).
 
 ### 7.6 FlipCard
 

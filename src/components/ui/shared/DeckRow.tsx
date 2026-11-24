@@ -47,13 +47,15 @@ type DeckRowProps = {
  */
 const DECK_COL = {
   row: 'flex items-center gap-3',
-  metrics: 'flex items-center gap-4 sm:gap-6',
+  // Capped from `lg`, where the leftover width goes between the number columns instead.
+  title: 'min-w-0 flex-1 lg:max-w-md',
+  metrics: 'flex items-center gap-4 sm:gap-6 lg:flex-1 lg:justify-between',
   cards: 'hidden w-12 text-right sm:block',
   due: 'w-8 text-right sm:w-12',
   ease: 'hidden w-12 text-right md:block',
   mastery: 'hidden w-[152px] text-right lg:block',
   quizzed: 'hidden w-12 text-right xl:block',
-  actions: 'flex w-[68px] justify-end',
+  actions: 'flex w-8 shrink-0 justify-end pointer-coarse:w-11',
 } as const;
 
 /**
@@ -94,7 +96,7 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
   return (
     <div
-      className={`group -mx-2 ${DECK_COL.row} h-[38px] pointer-coarse:h-[48px] border-b border-border px-2 transition-colors last:border-b-0 hover:bg-surface`}
+      className={`relative -mx-2 ${DECK_COL.row} min-h-[38px] pointer-coarse:min-h-[48px] max-sm:has-[form]:min-h-[104px] border-b border-border px-2 transition-colors last:border-b-0 hover:bg-surface`}
     >
       {/*
         The tick carries no label: every fact it encodes is already spelled out
@@ -105,9 +107,9 @@ export function DeckRow({ deck, rawTitle, onDeleteOptimistic, onDeleteRollback }
 
       <Link
         href={`/dashboard/${deck.id}`}
-        className="flex min-w-0 flex-1 items-baseline gap-2.5 rounded-[var(--radius-control)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+        className={`${DECK_COL.title} flex items-baseline gap-2.5 py-1 rounded-[var(--radius-control)] outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]`}
       >
-        <span className="truncate text-sm text-ink">{deck.title}</span>
+        <span className="line-clamp-2 min-w-0 break-words text-sm text-ink">{deck.title}</span>
         {deck.tag ? (
           <span className="shrink-0 type-label text-ink-dimmer">
             {deck.tag}
@@ -192,7 +194,7 @@ export function DeckRowLegend() {
       className={`-mx-2 ${DECK_COL.row} border-b border-border px-2 py-1.5 type-label text-ink-dimmer`}
     >
       <span className="w-[2px]" aria-hidden="true" />
-      <span className="min-w-0 flex-1">Deck</span>
+      <span className={DECK_COL.title}>Deck</span>
       <span className={DECK_COL.metrics}>
         <span className={DECK_COL.cards}>Cards</span>
         <span className={DECK_COL.due}>Due</span>
