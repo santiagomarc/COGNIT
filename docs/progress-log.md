@@ -46,6 +46,19 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-24 · santiagomarc · Francine's review, phase 1: deck rows and visible bugs (items 12, 13, 18 text, 24)
+- **What:**
+  - Deck rows have one always-visible "⋯" menu (Rename, Duplicate, Move to trash) instead of three hover-only icons that covered the numbers. Arrow keys, Escape and focus return work.
+  - Rename covers the row (its input was 26px wide), takes two lines on a phone, saves on Enter, cancels on Escape, and stays open if saving fails.
+  - Deck names wrap to two lines. From `lg` the name is capped and the number columns spread out, still aligned with their headings.
+  - Next 7 Days shows its counts on phones. "1 cards", "1 days overdue" and "1 cards due" are singular.
+  - The "85% target" label sits above the retention plot, not on the line.
+  - The "All decks" count no longer overlaps the sort buttons at 375px.
+- **Why:** Francine's UI review. Item 11 (deck pagination) was already done.
+- **Files:** `DeckActions.tsx`, `DeckActionsMenu.tsx` (new), `DeckRow.tsx`, `DeckGrid.tsx`, `DueNowBand.tsx`, `RetentionTrend.tsx`, `e2e/focus.spec.ts` (its trash check looked for a button the deck page no longer has).
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** 762 tests, tsc, lint and build pass. `/dashboard` is 212.9 kB (budget 214). Driven in Chrome with mock data at 1440, 1024, 375 and 320px, light and dark: menu by keyboard and mouse, trash cancelled, rename cancelled. **Not run signed in, and the updated e2e check has not been run** (no test account).
+
 ### 2026-11-23 · santiagomarc · Pages in the dashboard's All decks list
 - **What:** "All decks" shows 10 decks per page with the same pager as the Cards tab; the header reads "1–10 of 34 decks". Changing the sort returns to page 1; counts and sorting still cover every deck. No pager at 10 decks or fewer.
 - **Why:** A long library pushed everything into one list.
