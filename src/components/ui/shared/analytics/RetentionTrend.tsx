@@ -61,6 +61,11 @@ export function RetentionTrend({ weeks }: { weeks: RetentionWeek[] }) {
 
   return (
     <figure className="mt-3">
+      {/* Above the plot, not on the hairline: there it sat on the line it was naming. */}
+      <p className="mb-2 flex items-center justify-end gap-2 type-cap text-ink-dim" aria-hidden="true">
+        <span className="w-5 border-t border-dashed border-[var(--border-control)]" />
+        <span><span className="font-mono tnum">85%</span> target</span>
+      </p>
       <div className="relative h-[110px] w-full" aria-hidden="true">
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full">
           {series.map((week, index) => {
@@ -104,9 +109,6 @@ export function RetentionTrend({ weeks }: { weeks: RetentionWeek[] }) {
             />
           )
         ))}
-        <span className={`absolute right-0 -translate-y-full pb-0.5 ${LABEL}`} style={{ top: `${(y(TARGET) / HEIGHT) * 100}%` }}>
-          85% target
-        </span>
       </div>
       <div className={`mt-1 flex justify-between tnum ${LABEL}`} aria-hidden="true">
         <span>{weekLabel(first.week_start)}</span>

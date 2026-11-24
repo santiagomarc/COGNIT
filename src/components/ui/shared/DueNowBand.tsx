@@ -120,7 +120,7 @@ export function DueNowBand({
             <p className="truncate text-sm font-medium text-ink">
               {hasWork ? (
                 <>
-                  cards due across <span className="font-mono tnum">{dueDecks.length}</span>{' '}
+                  {totalDue === 1 ? 'card' : 'cards'} due across <span className="font-mono tnum">{dueDecks.length}</span>{' '}
                   {deckWord}
                 </>
               ) : (
@@ -132,8 +132,8 @@ export function DueNowBand({
                 <>
                   {oldestOverdueDays !== null && oldestOverdueDays > 0 ? (
                     <>
-                      oldest is <span className="font-mono tnum">{oldestOverdueDays}</span> days
-                      overdue ·{' '}
+                      oldest is <span className="font-mono tnum">{oldestOverdueDays}</span>{' '}
+                      {oldestOverdueDays === 1 ? 'day' : 'days'} overdue ·{' '}
                     </>
                   ) : null}
                   est. <span className="font-mono tnum">{estimatedMinutes}</span> min
@@ -209,7 +209,8 @@ export function DueNowBand({
             {forecastDays.length > 0 ? (
               <div className="w-full lg:w-[400px] lg:shrink-0">
                 <p className="type-label text-ink-dimmer">
-                  Next 7 days · <span className="tnum text-ink">{forecastTotal}</span> cards
+                  Next 7 days · <span className="tnum text-ink">{forecastTotal}</span>{' '}
+                  {forecastTotal === 1 ? 'card' : 'cards'}
                 </p>
                 <div className="mt-2 grid grid-flow-col auto-cols-fr items-end gap-2">
                   {forecastDays.map((day) => {
@@ -218,7 +219,7 @@ export function DueNowBand({
 
                     return (
                       <div key={day.date} className="flex flex-col items-center gap-[5px]">
-                        <span className="font-mono type-sm leading-none tnum text-ink-dim max-sm:hidden">
+                        <span className="font-mono type-sm leading-none tnum text-ink-dim" aria-hidden="true">
                           {day.count}
                         </span>
                         {/* Capped width: a bar stretched across a seventh of the
@@ -234,7 +235,7 @@ export function DueNowBand({
                         </span>
                         <span className="type-label text-ink-dimmer">
                           <span className="sr-only">
-                            {day.count} cards on{' '}
+                            {day.count} {day.count === 1 ? 'card' : 'cards'} on{' '}
                           </span>
                           {WEEKDAY.format(new Date(`${day.date}T00:00:00Z`))}
                         </span>
