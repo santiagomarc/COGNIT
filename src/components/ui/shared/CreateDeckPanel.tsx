@@ -17,6 +17,10 @@ import { requestOpenCreateDeck } from '@/lib/dashboard-events';
  * container mass and position instead. If this is ever filled, that is a
  * documented exception to §7.2, not a drift.
  *
+ * The "Create deck" inside is a `<span>` dressed as the outlined button, since a
+ * button can't hold a button: one tab stop, and the panel's hover and focus
+ * drive it.
+ *
  * Its edge is --border-control rather than the decorative --border: the whole
  * panel is one operable control, and a control's bounds must clear 3:1
  * (WCAG 2.2 SC 1.4.11).
@@ -34,7 +38,7 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
       onClick={requestOpenCreateDeck}
       aria-haspopup="dialog"
       aria-keyshortcuts="Meta+N Control+N"
-      className="surface spec create-deck group relative flex w-full cursor-pointer flex-col items-start p-4 text-left outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] lg:w-[340px] lg:p-5"
+      className="surface spec create-deck group relative flex w-full cursor-pointer flex-col items-start p-4 text-left outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] lg:p-5 xl:w-[340px]"
     >
       {/* Specular hairline highlight that illuminates on hover. The hover
           treatment as a whole is `.create-deck` in globals.css. */}
@@ -54,16 +58,19 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
         </span>
       </span>
 
-      <span className="mt-3.5 text-base font-semibold text-ink">Create deck</span>
+      <span className="mt-3.5 text-base font-semibold text-ink">Add a deck</span>
       <span className="mt-1 type-sm leading-relaxed text-ink-dim">
         Start blank, paste notes, or generate cards from a PDF.
       </span>
 
-      <span className="mt-auto flex w-full items-center justify-between pt-3">
+      <span className="mt-auto flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-3">
+        <span className="inline-flex h-[40px] items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-control)] px-4 text-sm font-medium text-ink transition-[background-color,border-color] duration-[120ms] ease-out group-hover:border-[var(--ink)] group-hover:bg-[var(--bg)] group-focus-visible:border-[var(--ink)] group-focus-visible:bg-[var(--bg)] pointer-coarse:h-[44px]">
+          Create deck
+          <Kbd>⌘N</Kbd>
+        </span>
         <span className="type-label text-ink-dimmer transition-colors duration-[120ms] group-hover:text-ink-dim">
           {deckCount === 1 ? '1 deck' : `${deckCount} decks`} so far
         </span>
-        <Kbd>⌘N</Kbd>
       </span>
     </button>
   );
