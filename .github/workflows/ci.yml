@@ -50,9 +50,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Pinned: `latest` asks GitHub's API for the version without a token, and
+      # runners share that rate limit, so the job failed before testing anything
+      # (2026-11-25). Bump it by hand.
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.4.0
 
       - name: Replay every migration on a fresh database
         run: supabase db start && supabase db reset --local
@@ -69,8 +72,8 @@ jobs:
       # version: the local one spells a NOT NULL json column
       # NonNullable<Json> and a no-argument function Record<PropertyKey,
       # never>, where the hosted one writes Json and never; both are mapped to
-      # the hosted spelling first. CLI 2.120 (2026-10-06, pulled in by
-      # `version: latest`) also writes `ComputedFields: never;` into every
+      # the hosted spelling first. CLI 2.120 (2026-10-06) and later
+      # also write `ComputedFields: never;` into every
       # table, which the hosted one omits; that empty form is dropped, so a
       # table that gains real computed fields still fails the step.
       # On a mismatch the diff goes to the run summary and to annotations

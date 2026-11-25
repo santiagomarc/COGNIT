@@ -46,6 +46,13 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-25 · santiagomarc · CI pins the Supabase CLI
+- **What:** The `database` job installs Supabase CLI 3.4.0 instead of `latest`.
+- **Why:** Run 45538690949 (`f996868`) failed before testing anything: `latest` asks GitHub's API for the version, and that call was rate-limited. A pinned version downloads directly. 3.4.0 was the newest stable release when the previous run passed.
+- **Files:** `.github/workflows/ci.yml`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** the 3.4.0 Linux archive resolves; the workflow file parses. Proven only by the next CI run.
+
 ### 2026-11-25 · santiagomarc · Merged Francine's landing and sign-in work (items 1–10)
 - **What:** `1d319fe` (Francine: landing header, hero, How it works, feature cards, sign-in layout, burnt-orange buttons) merged to `main`. A follow-up commit fixes only what failed the gates: an unused `@ts-expect-error` that broke the build, an unescaped apostrophe, and type sizes outside the scale (10px captions are now 12px, card headings 24px, step numbers 36px).
 - **Why:** Both halves of the UI review in one place.
