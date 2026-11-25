@@ -5,6 +5,7 @@ import { MotionProvider } from "@/components/MotionProvider";
 import { Toaster } from "sonner";
 import { THEME_BOOTSTRAP } from "@/lib/theme-script";
 import { SITE_URL } from "@/lib/site-url";
+// @ts-ignore -- Next.js processes this stylesheet import.
 import "./globals.css";
 
 /*
