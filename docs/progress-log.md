@@ -46,6 +46,14 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-25 · santiagomarc · Merged Francine's landing and sign-in work (items 1–10)
+- **What:** `1d319fe` (Francine: landing header, hero, How it works, feature cards, sign-in layout, burnt-orange buttons) merged to `main`. A follow-up commit fixes only what failed the gates: an unused `@ts-expect-error` that broke the build, an unescaped apostrophe, and type sizes outside the scale (10px captions are now 12px, card headings 24px, step numbers 36px).
+- **Why:** Both halves of the UI review in one place.
+- **Files:** Francine's six files; fixes in `layout.tsx`, `FeatureGrid.tsx`, `HowItWorks.tsx`; `type-scale.test.ts` ceiling 22 → 21.
+- **Commit(s):** merge of `1d319fe`, then see `git log` (uncommitted when written).
+- **Tests:** 762 tests, tsc, lint, build and bundle budgets pass. `/` and `/login` rendered in Chrome at 1440 and 375px, light and dark: no page errors or horizontal overflow. Sign-in itself not run.
+- **Open, for Francine:** raw `#B7410E` / `#C44C15` with no token or decision; the demo grade keys give Hard and Easy the wrong colours; the feature card says colour appears only for scheduler state, which the orange contradicts; Sign in is disabled until both fields have text.
+
 ### 2026-11-25 · santiagomarc · Francine's review, phase 2: Today's panels (items 14–19)
 - **What:**
   - Quiz-proven and Session streak stack: heading, number, then the detail. Quiz-proven says in one sentence what it measures.

@@ -8,12 +8,12 @@ import { describe, expect, it } from 'vitest';
  * a step and drifts from it. This counts the arbitrary font sizes left in
  * `src` and fails above the ceiling.
  *
- * The ceiling only goes down. The 22 left on 2026-11-20 are reviewed
+ * The ceiling only goes down. The 21 left on 2026-11-25 are reviewed
  * exceptions: the grade key's 11px interval (design system §7.4), the drill
  * slots' 15px, and sizes inside the `components/ui` primitives' variant
  * strings. Remove one, lower the number.
  */
-const CEILING = 22;
+const CEILING = 21;
 
 const SRC = path.join(__dirname, '..');
 const ARBITRARY_SIZE = /text-\[\d+(?:\.\d+)?(?:px|rem)\]/g;
