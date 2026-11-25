@@ -224,6 +224,19 @@ design stay in [specs/micro-synthesis-spec.md §12](specs/micro-synthesis-spec.m
   scrolling; a three-item menu doesn't need that.
 - **Source:** Francine's review, item 12
 
+### D-UI-6: Activity and the forecast stay ink; the tick legend says what the ticks mean
+- **Date:** 2026-11-25 · **By:** santiagomarc
+- **Decision:** The heatmap and the Next 7 Days bars are not burnt orange. The heatmap's ink steps
+  are spaced evenly in lightness, and the bars go from `--border-strong` to `--ink-dim`. The
+  Due / Learning / Mastered legend leaves the Quiz-proven panel: under the deck list it reads Due /
+  Quizzed, nothing due / Not quizzed yet.
+- **Why:** `--state-due` means due *now*. Activity is a count, and the forecast's cards aren't due
+  yet; Stats draws the same forecast in ink. The complaint was visibility, and contrast fixes that.
+  The legend described the deck rows' ticks, and `deckState` never returns `mastered`. The middle
+  tick still uses `--state-learning` for "quizzed, nothing due", which isn't the glossary's Learning:
+  left as it was.
+- **Source:** Francine's review, items 14, 17, 18
+
 ## Process (PROC)
 
 ### D-PROC-1: Measure, don't estimate

@@ -46,6 +46,19 @@ If you made a choice someone could question later, also add it to [decisions.md]
 
 ## Entries
 
+### 2026-11-25 · santiagomarc · Francine's review, phase 2: Today's panels (items 14–19)
+- **What:**
+  - Quiz-proven and Session streak stack: heading, number, then the detail. Quiz-proven says in one sentence what it measures.
+  - The legend moved under the deck list as 8px squares with words, beside "What these columns mean" (Ease, Quiz-proven). Ease is in the glossary.
+  - The review total sits beside the Activity heading. The heatmap's cells size to the column (19px at 1440, 9px at 375, at most 20px), so it fills the space and no longer scrolls or clips on a phone. Stats uses the same cells.
+  - Heatmap steps and the Next 7 Days bars have more contrast, still ink (D-UI-6).
+  - The Create deck panel shows an outlined "Create deck" with its keycap; the panel is still one button. Its title is now "Add a deck".
+  - Today's top row and the signal panel go side by side from `xl`, not `lg`. At 1024px with the sidebar open, Tuesday was cut off Next 7 Days and the "cards due" line had no width.
+- **Why:** Francine's UI review.
+- **Files:** `SignalPanel.tsx`, `ActivityHeatmap.tsx`, `DeckGrid.tsx`, `DueNowBand.tsx`, `CreateDeckPanel.tsx`, `dashboard/(shell)/page.tsx`, `stats/page.tsx`, `globals.css`, glossary in `design-system.md` and `uiux-plan.md`.
+- **Commit(s):** see `git log` (uncommitted when written).
+- **Tests:** 762 tests, tsc, lint and build pass. `/dashboard` is 213.5 kB (budget 214). Checked in Chrome with mock data at 1440, 1280, 1024, 768, 375 and 320px, light and dark: all seven days show at every width, and at 1440×900 the signal panel ends at about 674px with the header, above the fold. Phase 1's dark check had run in light by mistake; it was repeated in dark and passed. **Not run signed in.**
+
 ### 2026-11-24 · santiagomarc · Francine's review, phase 1: deck rows and visible bugs (items 12, 13, 18 text, 24)
 - **What:**
   - Deck rows have one always-visible "⋯" menu (Rename, Duplicate, Move to trash) instead of three hover-only icons that covered the numbers. Arrow keys, Escape and focus return work.
