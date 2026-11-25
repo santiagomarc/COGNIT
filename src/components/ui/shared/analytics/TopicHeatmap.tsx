@@ -1,5 +1,9 @@
+'use client';
 import Link from 'next/link';
 import { topicTone, type TopicMastery } from '@/lib/analytics';
+import { useState, useRef } from 'react';
+import { Pager } from '@/components/ui/shared/Pager';
+import { clampPage, pageCount } from '@/lib/card-pages';
 
 const TONE_COLOR = {
   mastered: 'var(--state-mastered)',
@@ -9,6 +13,8 @@ const TONE_COLOR = {
 
 const HEAD = 'py-2 text-right type-label font-normal text-ink-dimmer';
 const CELL = 'py-2.5 text-right font-mono type-sm tnum';
+
+const TOPICS_PER_PAGE = 10;
 
 function pct(value: number | null): string {
   return value === null ? '—' : `${Math.round(value * 100)}%`;
@@ -22,16 +28,74 @@ function pct(value: number | null): string {
  * one number carry it (§2.2).
  */
 export function TopicHeatmap({ topics }: { topics: TopicMastery[] }) {
-  if (topics.length === 0) {
-    return (
+  const [page, setPage] = useState(1);
+const listRef = useRef<HTMLDivElement>(null);
+
+const pages = pageCount(topics.length, TOPICS_PER_PAGE);
+const currentPage = clampPage(page, pages);
+const start = (currentPage - 1) * TOPICS_PER_PAGE;
+const pageTopics = topics.slice(start, start + TOPICS_PER_PAGE);
+
+function goToPage(next: number) {
+  setPage(next);
+  listRef.current?.focus({ preventScroll: true });
+  listRef.current?.scrollIntoView({ block: 'nearest' });
+}
+
+if (topics.length === 0) {
+  return (
+    <section aria-labelledby="topics-heading">
+      <div className="flex items-center gap-3.5 pb-2.5">
+        <h2
+          id="topics-heading"
+          className="shrink-0 type-label text-ink-dimmer"
+        >
+          Topic mastery
+        </h2>
+        <span className="rule flex-1" aria-hidden="true" />
+        <span className="shrink-0 type-label text-ink-dimmer tnum">
+          0 topics
+        </span>
+      </div>
+
       <p className="mt-3 type-sm text-ink-dim">
         Topics appear once enriched cards carry tags — three or more cards per tag.
       </p>
-    );
-  }
+    </section>
+  );
+}
 
   return (
-    <div className="well mt-3 overflow-x-auto px-3.5">
+  <section aria-labelledby="topics-heading">
+    <div className="flex items-center gap-3.5 pb-2.5">
+      <h2
+        id="topics-heading"
+        className="shrink-0 type-label text-ink-dimmer"
+      >
+        Topic mastery
+      </h2>
+
+      <span className="rule flex-1" aria-hidden="true" />
+
+      <span className="shrink-0 type-label text-ink-dimmer tnum">
+        {pages > 1
+          ? `${start + 1}–${start + pageTopics.length} of `
+          : ''}
+        {topics.length} {topics.length === 1 ? 'topic' : 'topics'}
+      </span>
+    </div>
+
+    <div
+      ref={listRef}
+      role="region"
+      tabIndex={-1}
+      aria-label={
+        pages > 1
+          ? `Topic mastery, page ${currentPage} of ${pages}`
+          : 'Topic mastery'
+      }
+      className="well mt-3 scroll-mt-16 overflow-x-auto px-3.5 outline-hidden"
+    >
       <table className="w-full border-collapse">
         <caption className="sr-only">Topic mastery: cards, unseen cards, lapse rate, mastered share and mean ease per topic</caption>
         <thead>
@@ -45,7 +109,7 @@ export function TopicHeatmap({ topics }: { topics: TopicMastery[] }) {
           </tr>
         </thead>
         <tbody>
-          {topics.map((topic) => {
+          {pageTopics.map((topic) => {
             const tone = topicTone(topic);
             const href = topic.deck_id ? `/dashboard/${topic.deck_id}/study?scope=unmastered_only` : null;
             return (
@@ -78,8 +142,18 @@ export function TopicHeatmap({ topics }: { topics: TopicMastery[] }) {
               </tr>
             );
           })}
-        </tbody>
+                </tbody>
       </table>
     </div>
-  );
+
+    <div className="mt-4">
+      <Pager
+        label="Topic mastery pages"
+        page={currentPage}
+        pages={pages}
+        onPageChange={goToPage}
+      />
+    </div>
+  </section>
+);
 }

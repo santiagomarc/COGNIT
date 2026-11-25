@@ -179,10 +179,14 @@ export function DueNowBand({
         {/* The dashboard's one filled button (§7.2). */}
         {sessionHref ? (
           <div className="flex shrink-0 flex-col gap-1.5 max-sm:w-full sm:items-end">
-            <Button asChild variant="primary" size="lg" className="gap-2 max-sm:w-full">
+            <Button
+              asChild
+              variant="primary"
+              size="lg"
+              className="gap-2 max-sm:w-full border-[#B7410E] bg-[#B7410E] font-semibold text-white shadow-sm transition-[background-color,border-color,box-shadow] duration-200 hover:border-[#C44C15] hover:bg-[#C44C15] hover:text-white hover:shadow-md focus-visible:border-[#C44C15] focus-visible:bg-[#C44C15]"
+            >
               <Link href={sessionHref}>
                 {hasWork ? 'Start session' : 'Study ahead'}
-                <Kbd>S</Kbd>
               </Link>
             </Button>
             {hasWork && dueDecks[0] ? (

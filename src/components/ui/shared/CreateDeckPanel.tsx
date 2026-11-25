@@ -58,15 +58,14 @@ export function CreateDeckPanel({ deckCount }: { deckCount: number }) {
         </span>
       </span>
 
-      <span className="mt-3.5 text-base font-semibold text-ink">Add a deck</span>
+      <span className="mt-3.5 text-base font-bold text-ink">Add a deck</span>
       <span className="mt-1 type-sm leading-relaxed text-ink-dim">
         Start blank, paste notes, or generate cards from a PDF.
       </span>
 
       <span className="mt-auto flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2 pt-3">
-        <span className="inline-flex h-[40px] items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-control)] px-4 text-sm font-medium text-ink transition-[background-color,border-color] duration-[120ms] ease-out group-hover:border-[var(--ink)] group-hover:bg-[var(--bg)] group-focus-visible:border-[var(--ink)] group-focus-visible:bg-[var(--bg)] pointer-coarse:h-[44px]">
+        <span className="inline-flex h-[40px] items-center gap-2 rounded-[var(--radius-sm)] border border-[#B7410E] bg-[#B7410E] px-4 text-sm font-semibold text-white shadow-sm transition-[background-color,border-color,box-shadow] duration-200 ease-out group-hover:border-[#C44C15] group-hover:bg-[#C44C15] group-hover:shadow-md group-focus-visible:border-[#C44C15] group-focus-visible:bg-[#C44C15] group-focus-visible:shadow-md pointer-coarse:h-[44px]">
           Create deck
-          <Kbd>⌘N</Kbd>
         </span>
         <span className="type-label text-ink-dimmer transition-colors duration-[120ms] group-hover:text-ink-dim">
           {deckCount === 1 ? '1 deck' : `${deckCount} decks`} so far

@@ -110,7 +110,7 @@ export function SignalPanel({
                 className="block flex-1 rounded-t-[2px]"
                 style={{
                   height: hasActivity ? `${Math.max(14, (point.count / sparkPeak) * 100)}%` : '2px',
-                  backgroundColor: hasActivity ? 'var(--ink-dim)' : 'var(--border)',
+                  backgroundColor: hasActivity ? 'var(--heat-ramp-4)' : 'var(--heat-ramp-1)',
                 }}
               />
             );
@@ -159,10 +159,10 @@ export function SignalPanel({
                 style={{
                   backgroundColor: active
                     ? isToday
-                      ? 'var(--state-streak)'
-                      : 'var(--border-strong)'
-                    : 'var(--surface-raised)',
-                  border: active ? 'none' : '1px solid var(--border)',
+                      ? 'var(--heat-ramp-4)'
+                      : 'var(--heat-ramp-3)'
+                    : 'var(--heat-ramp-0)',
+                  border: active ? 'none' : '1px solid var(--heat-ramp-1)',
                 }}
               />
             );

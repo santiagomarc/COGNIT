@@ -174,14 +174,7 @@ export default async function StatsPage() {
       </div>
 
       {/* ═══ Topic mastery ═════════════════════════════════════════════ */}
-      <section aria-labelledby="topics-heading">
-        <div className="flex items-center gap-3.5 pb-2.5">
-          <h2 id="topics-heading" className={`shrink-0 ${LABEL}`}>Topic mastery</h2>
-          <span className="rule flex-1" aria-hidden="true" />
-          <span className={`shrink-0 ${LABEL} tnum`}>{snapshot.topic_mastery.length} topics</span>
-        </div>
-        <TopicHeatmap topics={snapshot.topic_mastery} />
-      </section>
+      <TopicHeatmap topics={snapshot.topic_mastery} />
 
       {/* ═══ Effort ════════════════════════════════════════════════════ */}
       <section className="surface p-4 lg:p-5" aria-labelledby="effort-heading">
