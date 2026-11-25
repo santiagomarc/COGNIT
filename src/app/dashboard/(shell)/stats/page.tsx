@@ -192,7 +192,7 @@ export default async function StatsPage() {
             <span className="text-ink">{Math.round(minutes)}</span> min
           </p>
         </div>
-        <div className="mt-2.5 overflow-x-auto">
+        <div className="mt-2.5">
           <ActivityHeatmap activity={effort} monthsToShow={3} anchorDate={todayIso} />
         </div>
       </section>

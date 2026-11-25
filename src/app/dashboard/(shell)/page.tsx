@@ -442,7 +442,8 @@ export default async function Dashboard() {
         <DashboardOnboarding />
       ) : (
         <>
-          <section className="flex flex-col items-stretch gap-4 lg:flex-row">
+          {/* Side by side from `xl`: at `lg` with the sidebar open the band is 348px, too narrow for seven days. */}
+          <section className="flex flex-col items-stretch gap-4 xl:flex-row">
             <div className="min-w-0 flex-1">
               <DueNowBand
                 totalDue={totalDue}

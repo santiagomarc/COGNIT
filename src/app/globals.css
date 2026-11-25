@@ -224,12 +224,13 @@
 
   /* Activity heatmap — a sequential ONE-hue ramp, ink on surface. The top step
      is capped well below full ink: at ~0.88 a six-month grid became the
-     brightest object on the dashboard, which inverts the hierarchy. */
-  --heat-ramp-0: rgb(24 24 27 / 0.055);
-  --heat-ramp-1: rgb(24 24 27 / 0.15);
-  --heat-ramp-2: rgb(24 24 27 / 0.29);
-  --heat-ramp-3: rgb(24 24 27 / 0.48);
-  --heat-ramp-4: rgb(24 24 27 / 0.72);
+     brightest object on the dashboard, which inverts the hierarchy. The steps
+     are even in lightness (about 15 L* apart on --surface), so each one reads. */
+  --heat-ramp-0: rgb(24 24 27 / 0.06);
+  --heat-ramp-1: rgb(24 24 27 / 0.25);
+  --heat-ramp-2: rgb(24 24 27 / 0.41);
+  --heat-ramp-3: rgb(24 24 27 / 0.58);
+  --heat-ramp-4: rgb(24 24 27 / 0.74);
 
   /* Ambient light. On a LIGHT ground, "light from above" means the periphery
      recedes; on dark it means the top glows. Same role, opposite
@@ -315,10 +316,10 @@
   --spec: rgb(255 255 255 / 0.085);
 
   --heat-ramp-0: rgb(250 250 250 / 0.05);
-  --heat-ramp-1: rgb(250 250 250 / 0.14);
-  --heat-ramp-2: rgb(250 250 250 / 0.25);
-  --heat-ramp-3: rgb(250 250 250 / 0.42);
-  --heat-ramp-4: rgb(250 250 250 / 0.64);
+  --heat-ramp-1: rgb(250 250 250 / 0.2);
+  --heat-ramp-2: rgb(250 250 250 / 0.34);
+  --heat-ramp-3: rgb(250 250 250 / 0.49);
+  --heat-ramp-4: rgb(250 250 250 / 0.66);
 
   --amb-field:
     radial-gradient(ellipse 115% 62% at 50% -8%, rgb(255 255 255 / 0.050), rgb(255 255 255 / 0.014) 42%, transparent 70%),

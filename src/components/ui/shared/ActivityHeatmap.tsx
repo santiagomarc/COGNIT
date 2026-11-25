@@ -58,6 +58,10 @@ function buildHeatmapWeeks(
   return weeks;
 }
 
+/** Largest cell, and the gap between cells, in px. */
+const MAX_CELL = 20;
+const GAP = 2.5;
+
 function getIntensity(count: number): 0 | 1 | 2 | 3 | 4 {
   if (count <= 0) return 0;
   if (count <= 2) return 1;
@@ -83,6 +87,10 @@ function getIntensity(count: number): 0 | 1 | 2 | 3 | 4 {
  * Cells carry no border: a stroke around every cell is data-weight ink that is
  * not data. The 2.5px gap is the separator.
  *
+ * Cells share the container's width up to a cap, so six months fills Today's
+ * column, fits a phone without scrolling, and three months on Stats doesn't
+ * balloon. CSS only.
+ *
  * A server component — it renders a static grid of numbers already computed.
  */
 export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: ActivityHeatmapProps) {
@@ -105,11 +113,13 @@ export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: Acti
     return date.getUTCMonth() === previousMonth ? null : MONTH.format(date);
   });
 
+  const columns = { gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` };
+
   return (
-    <div className="inline-flex min-w-max flex-col gap-1.5">
-      <div className="flex gap-[2.5px]">
+    <div className="flex flex-col gap-1.5" style={{ maxWidth: weeks.length * (MAX_CELL + GAP) - GAP }}>
+      <div className="grid gap-[2.5px]" style={columns}>
         {weeks.map((week, weekIndex) => (
-          <div key={week[0]?.date ?? weekIndex} className="flex w-[10px] flex-col gap-[2.5px]">
+          <div key={week[0]?.date ?? weekIndex} className="flex flex-col gap-[2.5px]">
             {week.map((cell) => {
               const studiedLabel =
                 cell.count === 0
@@ -121,7 +131,7 @@ export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: Acti
                   key={cell.date}
                   title={`${studiedLabel} on ${cell.date}`}
                   aria-label={`${studiedLabel} on ${cell.date}`}
-                  className="h-[10px] w-[10px] rounded-[2px]"
+                  className="aspect-square w-full rounded-[2px]"
                   style={{ backgroundColor: `var(--heat-ramp-${getIntensity(cell.count)})` }}
                 />
               );
@@ -130,13 +140,14 @@ export function ActivityHeatmap({ activity, monthsToShow = 6, anchorDate }: Acti
         ))}
       </div>
 
-      <div className="flex items-center gap-[2.5px]">
+      <div className="grid gap-[2.5px]" style={columns}>
         {monthLabels.map((label, index) => (
           <span
             key={weeks[index]?.[0]?.date ?? index}
-            className="w-[10px] shrink-0 type-label text-ink-dimmer"
+            // A month that starts in the last columns hangs left, so its name stays inside the panel.
+            className={`flex min-w-0 type-label text-ink-dimmer ${index >= weeks.length - 2 ? 'justify-end' : ''}`}
           >
-            {label ? <span className="relative whitespace-nowrap">{label}</span> : null}
+            {label ? <span className="whitespace-nowrap">{label}</span> : null}
           </span>
         ))}
       </div>

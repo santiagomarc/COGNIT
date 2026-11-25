@@ -62,39 +62,43 @@ export function SignalPanel({
   const days = buildRecentSeries(activity, todayIso, STREAK_WINDOW);
 
   return (
-    <section className="surface spec flex flex-col items-stretch p-4 lg:flex-row lg:px-5 lg:pb-3 lg:pt-3.5">
+    <section className="surface spec flex flex-col items-stretch p-4 xl:flex-row xl:px-5 xl:pb-3 xl:pt-3.5">
       {/* ── Activity ─────────────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col lg:pr-[22px]">
-        <div className="flex items-baseline justify-between gap-4">
+      <div className="flex min-w-0 flex-1 flex-col xl:pr-[22px]">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <h2 className="type-label text-ink-dimmer">
             Activity · 6 months
           </h2>
           <p className="type-label text-ink-dimmer">
-            <span className="tnum text-ink">{totalStudiedCards}</span> reviews all time
+            <span className="tnum text-ink">{totalStudiedCards}</span> {totalStudiedCards === 1 ? 'review' : 'reviews'} all time
           </p>
         </div>
 
-        <div className="mt-2.5 overflow-x-auto">
+        <div className="mt-2.5">
           <ActivityHeatmap activity={activity} monthsToShow={6} anchorDate={todayIso} />
         </div>
       </div>
 
-      <div className="rule rule--soft my-4 lg:hidden" aria-hidden="true" />
-      <div className="rule--v max-lg:hidden" aria-hidden="true" />
+      <div className="rule rule--soft my-4 xl:hidden" aria-hidden="true" />
+      <div className="rule--v max-xl:hidden" aria-hidden="true" />
 
       {/* ── Quiz-proven ──────────────────────────────────────────── */}
-      <div className="flex flex-col lg:w-[238px] lg:shrink-0 lg:px-[22px]">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="type-label text-ink-dimmer">
-            Quiz-proven
-          </h2>
-          <p className="type-label tnum text-ink-dimmer">
-            {assessedCards} assessed
-          </p>
-        </div>
+      <div className="flex flex-col xl:w-[238px] xl:shrink-0 xl:px-[22px]">
+        <h2 className="type-label text-ink-dimmer">
+          Quiz-proven
+        </h2>
 
         <p className="mt-2.5 type-readout-sm font-semibold leading-none tracking-[-0.03em] text-ink">
           {retentionPercentage === null ? '—' : `${retentionPercentage}%`}
+        </p>
+        <p className="mt-1.5 type-cap text-ink">
+          <span className="font-mono tnum">{assessedCards}</span> {assessedCards === 1 ? 'card' : 'cards'} assessed
+        </p>
+        {/* Plain text, not a tooltip: it has to work by keyboard and by touch. */}
+        <p className="mt-1 type-cap text-ink-dim">
+          {assessedCards > 0
+            ? 'Share of the cards you’ve been quizzed on whose last quiz answer was correct.'
+            : 'Take a quiz to see the share of cards you answer correctly.'}
         </p>
 
         <div className="mt-3 flex h-[34px] items-end gap-[2px]" aria-hidden="true">
@@ -112,40 +116,16 @@ export function SignalPanel({
             );
           })}
         </div>
-
-        {/* Every state swatch is paired with its word. The state channel's
-            due/learning pair measures ΔE 0.6 under deuteranopia in light mode,
-            so §2.3's "colour is never alone" rule is load-bearing here, not
-            decorative — do not reduce this to bare ticks. */}
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3 font-mono text-[10px] text-ink-dimmer">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-[2px] rounded-[1px] bg-[var(--state-due)]" aria-hidden="true" />
-            Due
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-[2px] rounded-[1px] bg-[var(--state-learning)]" aria-hidden="true" />
-            Learning
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2 w-[2px] rounded-[1px] bg-[var(--state-mastered)]" aria-hidden="true" />
-            Mastered
-          </span>
-        </div>
       </div>
 
-      <div className="rule rule--soft my-4 lg:hidden" aria-hidden="true" />
-      <div className="rule--v max-lg:hidden" aria-hidden="true" />
+      <div className="rule rule--soft my-4 xl:hidden" aria-hidden="true" />
+      <div className="rule--v max-xl:hidden" aria-hidden="true" />
 
       {/* ── Session streak ───────────────────────────────────────────── */}
-      <div className="flex flex-col lg:w-[238px] lg:shrink-0 lg:pl-[22px]">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="type-label text-ink-dimmer">
-            Session streak
-          </h2>
-          <p className="type-label text-ink-dimmer">
-            {studiedToday ? 'Logged today' : 'Not logged today'}
-          </p>
-        </div>
+      <div className="flex flex-col xl:w-[238px] xl:shrink-0 xl:pl-[22px]">
+        <h2 className="type-label text-ink-dimmer">
+          Session streak
+        </h2>
 
         <div className="mt-2.5 flex items-baseline gap-2">
           <p
@@ -155,9 +135,12 @@ export function SignalPanel({
             {streak}
           </p>
           <span className="font-mono text-xs text-ink-dimmer">
-            days · best <span className="tnum text-ink-dim">{longestStreak}</span>
+            {streak === 1 ? 'day' : 'days'} · best <span className="tnum text-ink-dim">{longestStreak}</span>
           </span>
         </div>
+        <p className="mt-1.5 type-cap text-ink-dim">
+          {studiedToday ? 'Logged today' : 'Not logged today'}
+        </p>
 
         {/*
           28 days, not 14. A 14-cell strip at a 14-day streak is entirely lit
@@ -188,7 +171,7 @@ export function SignalPanel({
 
         {/* Today's cell is distinguished by colour AND by position, which the
             end labels make explicit — colour is never the sole carrier. */}
-        <div className="mt-auto flex items-baseline justify-between pt-2.5 type-label text-ink-dimmer">
+        <div className="flex items-baseline justify-between pt-2 type-label text-ink-dimmer">
           <span>{STREAK_WINDOW}d ago</span>
           <span>Today</span>
         </div>

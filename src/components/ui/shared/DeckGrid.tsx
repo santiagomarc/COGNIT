@@ -31,6 +31,13 @@ type DeckGridProps = {
 /** One screenful of rows; the decks are all loaded, so a page is only a slice. */
 const DECKS_PER_PAGE = 10;
 
+/** What `deckState` reports on a row's tick. Every swatch has its word (§2.2b). */
+const TICK_KEY = [
+  { label: 'Due', color: 'bg-[var(--state-due)]' },
+  { label: 'Quizzed, nothing due', color: 'bg-[var(--state-learning)]' },
+  { label: 'Not quizzed yet', color: 'bg-[var(--state-neutral)]' },
+];
+
 type DeckSortMode = 'newest' | 'most-studied' | 'most-due';
 
 const SORT_MODES: { value: DeckSortMode; label: string }[] = [
@@ -231,7 +238,49 @@ export function DeckGrid({ decks }: DeckGridProps) {
         </div>
       )}
 
+      {orderedDecks.length > 0 ? <DeckListKey /> : null}
+
       <Pager label="Deck pages" page={currentPage} pages={pages} onPageChange={goToPage} />
     </section>
+  );
+}
+
+/**
+ * What the rows' ticks and columns mean. A native `<details>`, so the
+ * definitions work by keyboard and touch, and each hides with its column.
+ */
+function DeckListKey() {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2 type-cap text-ink-dim">
+      <ul className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Deck colours">
+        {TICK_KEY.map((item) => (
+          <li key={item.label} className="inline-flex items-center gap-1.5">
+            <span className={`size-2 rounded-[1px] ${item.color}`} aria-hidden="true" />
+            {item.label}
+          </li>
+        ))}
+      </ul>
+
+      <details className="max-md:hidden">
+        <summary className="w-fit cursor-pointer rounded-[var(--radius-xs)] outline-hidden hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]">
+          What these columns mean
+        </summary>
+        <dl className="mt-2 max-w-[68ch] space-y-1.5">
+          <div>
+            <dt className="inline font-medium text-ink">Ease: </dt>
+            <dd className="inline">
+              how easily the deck’s cards stick, on average. New cards start at{' '}
+              <span className="font-mono tnum">2.50</span>; a lower number means harder cards, which come back sooner.
+            </dd>
+          </div>
+          <div className="max-lg:hidden">
+            <dt className="inline font-medium text-ink">Quiz-proven: </dt>
+            <dd className="inline">
+              the share of all the deck’s cards whose last quiz answer was correct. Cards not quizzed yet count against it.
+            </dd>
+          </div>
+        </dl>
+      </details>
+    </div>
   );
 }

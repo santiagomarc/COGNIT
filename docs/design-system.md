@@ -965,6 +965,7 @@ Non-negotiable. Verify before calling any UI task done.
 | **Learning** | in the learning or relearning steps (interval < 1 day) | `--state-learning` |
 | **Mastered** | SM-2 interval ≥ 21 days | `--state-mastered` |
 | **Quiz-proven** | the card's last quiz answer was correct | none |
+| **Ease** | the deck's mean SM-2 ease factor, unstudied cards included (they start at 2.5) | none |
 | **Retention** | share of the last 30 days' reviews of seen cards graded Good or Easy (Stats only) | none |
 | **Recalled** | this session's Good + Easy, as "*n* of *m*" | none |
 

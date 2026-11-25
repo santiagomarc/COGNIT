@@ -229,7 +229,7 @@ export function DueNowBand({
                           aria-hidden="true"
                         >
                           <span
-                            className="block w-full rounded-t-[3px] bg-border-strong"
+                            className="block w-full rounded-t-[3px] bg-ink-dim"
                             style={{ height: `${heightPercent}%` }}
                           />
                         </span>
