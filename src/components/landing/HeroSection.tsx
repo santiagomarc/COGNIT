@@ -1,48 +1,37 @@
+
 'use client';
 
 import Link, { useLinkStatus } from 'next/link';
 import { ArrowRight, Loader2 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Kbd } from '@/components/ui/Kbd';
 import { Wordmark } from '@/components/ui/shared/Wordmark';
 import { FadeInUp } from '@/components/motion';
 
 /*
- * The mock dashboard beneath the fold. It is a specimen of the real deck index
- * (§7.5) — state tick, name, right-aligned mono numerics — rather than a
- * drawing of one. Showing the actual instrument is both more honest marketing
- * and the only version that cannot drift from the product.
+ * Preserve the original CTA navigation feedback.
  */
-const SPECIMEN_DECKS = [
-  { name: 'Automata Theory', cards: 24, due: 7, mastery: 62, state: 'var(--state-due)' },
-  { name: 'Data Structures', cards: 18, due: 0, mastery: 88, state: 'var(--state-mastered)' },
-  { name: 'Linear Algebra', cards: 31, due: 3, mastery: 41, state: 'var(--state-learning)' },
-];
-
-/**
- * The body of a CTA link, with the navigation's pending state made visible.
- *
- * Next disables `<Link>` prefetching in development, so a click there waits
- * on the route being compiled and fetched — up to a second — with no feedback,
- * which reads as the page freezing. Production prefetches from the viewport
- * and lands in ~20ms, but a slow connection on a cold visit still has a gap.
- * `useLinkStatus` reports the in-flight navigation; the trailing icon slot
- * becomes a spinner and the label dims. The spinner's 100ms fade-in delay is
- * what stops it flashing on navigations that are already instant.
- *
- * Must render *inside* the `<Link>`: that is where `useLinkStatus` reads from.
- */
-function CtaBody({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+function CtaBody({
+  children,
+  icon,
+}: {
+  children: ReactNode;
+  icon?: ReactNode;
+}) {
   const { pending } = useLinkStatus();
 
   return (
     <>
-      <span className={pending ? 'opacity-70' : undefined}>{children}</span>
+      <span className={pending ? 'opacity-70' : undefined}>
+        {children}
+      </span>
       {pending ? (
-        <span className="inline-flex animate-in fade-in fill-mode-both delay-100" aria-hidden="true">
+        <span
+          className="inline-flex animate-in fade-in fill-mode-both delay-100"
+          aria-hidden="true"
+        >
           <Loader2 className="h-4 w-4 animate-spin" />
         </span>
       ) : (
@@ -52,55 +41,112 @@ function CtaBody({ children, icon }: { children: ReactNode; icon?: ReactNode }) 
   );
 }
 
-/**
- * The landing hero (design system §1.1, §9.2).
+/*
+ * Sticky landing header.
+ * Transparent at the top of the page.
+ * Uses the existing background color while scrolling
+ * to prevent headings from showing through the links.
  *
- * What left, and why each was not a matter of taste:
- *
- *  - **Three blurred gradient orbs** (two full-page, one glow under the mockup).
- *    §1.1 names decorative blurred orbs "the single loudest AI-template tell".
- *  - **Two `<Sparkles/>`** — one as the logo, one in a badge reading
- *    "AI-Powered Active Recall", which is a claim about the vendor rather than
- *    a fact about the reader.
- *  - **A gradient-clipped headline.** §1.1 bans gradient text outright.
- *  - **`<Brain/>`** inside the mockup, plus a `colorMap` indirection that only
- *    existed because two deck tiles wanted different tints.
- *  - **A scroll-linked parallax** on the mockup (`useScroll` + three
- *    `useTransform`s + a spring), which ran a transform on every scroll frame.
- *
- * It also fixes a **hydration mismatch under `prefers-reduced-motion`**
- * (pre-existing, reproduced at baseline). The old code passed
- * `initial={reduced ? undefined : {...}}` to a raw `m.div`. Framer's
- * `useReducedMotion()` cannot know the user's preference during SSR, so the
- * server always rendered the *animated* branch — `opacity: 0` and a transform —
- * and a reduced-motion client then rendered the *unanimated* branch, so React
- * found markup it did not expect. Motion here now goes through `FadeInUp`,
- * which resolves the preference behind a `useSyncExternalStore` mounted check:
- * server and first client render are byte-identical resting states, and motion
- * only starts once hydration has happened and the preference is actually known.
- *
- * Per the plan the landing may keep more expressive motion than the app; what
- * it may not keep is anything on §1.1's list.
+ * Render this above HeroSection in page.tsx.
+ */
+export function LandingHeader() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const updateScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+
+    updateScroll();
+
+    window.addEventListener('scroll', updateScroll, {
+      passive: true,
+    });
+
+    return () => {
+      window.removeEventListener('scroll', updateScroll);
+    };
+  }, []);
+
+  const navLink =
+    'inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-3 py-2 font-mono text-sm font-medium text-ink-dim transition-colors duration-200 hover:bg-surface-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]';
+
+  return (
+    <header
+      className={`sticky top-0 z-50 w-full transition-colors duration-200 ${
+        scrolled
+          ? 'bg-[var(--bg)]/95 backdrop-blur-xl'
+          : 'bg-transparent'
+      }`}
+    >
+      <nav
+        aria-label="Main navigation"
+        className="mx-auto grid max-w-6xl grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2 px-6 py-5 lg:grid-cols-[1fr_auto_auto] lg:gap-x-6"
+      >
+        {/* Original Cognit wordmark */}
+        <div className="min-w-0 justify-self-start">
+          <Wordmark href="/" size="md" />
+        </div>
+
+        {/* Navigation links */}
+        <div className="order-3 col-span-2 flex min-w-0 items-center gap-2 overflow-x-auto whitespace-nowrap lg:order-none lg:col-span-1 lg:col-start-2 lg:gap-4 lg:overflow-visible">
+
+          <a href="#how-it-works" className={navLink}>
+            How It Works
+          </a>
+
+          <a href="#features" className={navLink}>
+            Features
+          </a>
+
+          <Link
+            href="/login?mode=login"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg px-4 py-2 font-mono text-sm font-medium text-ink transition-colors duration-200 hover:bg-surface-raised hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          >
+            Sign In
+          </Link>
+
+          <Link
+            href="/login?mode=signup"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center gap-3 rounded-xl border border-[#B7410E] bg-[#B7410E] px-6 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:border-[#C44C15] hover:bg-[#C44C15] hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
+          >
+            Sign Up
+            <ArrowRight
+              className="h-4 w-4"
+              aria-hidden="true"
+            />
+          </Link>
+
+        </div>
+
+        {/* Existing theme toggle */}
+        <div className="justify-self-end lg:col-start-3 lg:row-start-1">
+          <ThemeToggle />
+        </div>
+      </nav>
+    </header>
+  );
+}
+
+/*
+ * Landing hero.
+ * Original typography and existing theme colors retained.
+ * No background or dashboard changes are made here.
  */
 export function HeroSection() {
   return (
     <section className="relative">
-      {/* ── Navbar ── */}
-      <nav className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 pt-8 pb-4 sm:pt-12 sm:pb-6">
-        <Wordmark href="/" size="md" />
+      <div className="mx-auto flex min-h-[76svh] max-w-6xl flex-col justify-center px-6 pb-16 pt-8">
 
-        <ThemeToggle />
-      </nav>
+        <div className="mx-auto w-full max-w-3xl text-center">
 
-      <div className="mx-auto max-w-6xl px-6 pb-8 pt-6 md:pt-10">
-        <div className="mx-auto max-w-3xl text-center">
           <FadeInUp>
-            {/* A number is a better badge than a glyph (§6). */}
             <p className="font-mono type-cap uppercase leading-[1.5] tracking-[0.16em] text-ink-dim">
               Spaced repetition · SM-2 · AI Flashcard Generator
             </p>
           </FadeInUp>
 
+          {/* EXACT ORIGINAL COGNIT HEADLINE STYLING */}
           <FadeInUp delay={0.06}>
             <h1 className="mt-5 font-serif type-hero leading-[1.0] tracking-[-0.025em] text-balance text-ink">
               Study smarter,
@@ -110,94 +156,46 @@ export function HeroSection() {
           </FadeInUp>
 
           <FadeInUp delay={0.12}>
-            <p className="mx-auto mt-8 max-w-xl font-mono text-[15px] leading-relaxed text-ink-dim">
+            <p className="mx-auto mt-8 max-w-xl font-mono text-[15px] leading-relaxed text-ink">
               Turn a PDF into flashcards, then let SM-2 schedule every review.
             </p>
           </FadeInUp>
 
+          {/* Figma-inspired action layout, existing Cognit colors */}
           <FadeInUp delay={0.18}>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              {/* The page's one filled button (§7.2). */}
-              <Button asChild variant="primary" size="lg" className="w-full px-8 text-base sm:w-auto">
+
+              <Button
+                asChild
+                variant="primary"
+                size="lg"
+                className="w-full px-8 text-base sm:w-auto border-[#B7410E]! bg-[#B7410E]! text-white! hover:border-[#C44C15]! hover:bg-[#C44C15]!"
+              >
                 <Link href="/login?mode=signup">
-                  <CtaBody icon={<ArrowRight className="h-4 w-4" aria-hidden="true" />}>
-                    Start free
+                  <CtaBody
+                    icon={
+                      <ArrowRight
+                        className="h-4 w-4"
+                        aria-hidden="true"
+                      />
+                    }
+                  >
+                    Sign Up
                   </CtaBody>
                 </Link>
               </Button>
-              <Button asChild size="lg" className="w-full px-8 text-base sm:w-auto">
-                <Link href="/login?mode=login">
-                  <CtaBody>Sign in</CtaBody>
-                </Link>
-              </Button>
+
+              <a
+                href="#how-it-works"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-control)] px-8 py-2 text-base font-medium text-ink transition-colors duration-200 hover:border-[var(--border-strong)] hover:bg-surface-raised hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)] sm:w-auto"
+              >
+                See How It Works
+              </a>
+
             </div>
           </FadeInUp>
+
         </div>
-
-        {/* ── Product specimen ── */}
-        <FadeInUp delay={0.24} className="mx-auto mt-16 max-w-4xl">
-          <div className="surface relative overflow-hidden rounded-lg border border-border/80 dark:border-white/10 shadow-[0_1px_3px_rgba(0,0,0,0.1),0_24px_60px_-12px_rgba(0,0,0,0.4)] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_24px_68px_-12px_rgba(0,0,0,0.85),0_0_40px_-10px_rgba(255,255,255,0.05)]">
-            {/* Top specular hairline highlight */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-            <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
-              <span className="type-label text-ink-dimmer">
-                Today
-              </span>
-              <span className="inline-flex items-center gap-1.5 text-xs text-ink-dim">
-                Search <Kbd>⌘K</Kbd>
-              </span>
-            </div>
-
-            <div className="p-5 sm:p-7">
-              <p className="type-label text-ink-dimmer">
-                Due now
-              </p>
-              <p
-                className="mt-2 type-readout-lg font-semibold leading-none tracking-[-0.04em]"
-                style={{ color: 'var(--state-due)' }}
-              >
-                10
-              </p>
-              <p className="mt-3 text-sm text-ink-dim">
-                across <span className="font-mono tnum text-ink-dim">2</span> decks · about{' '}
-                <span className="font-mono tnum text-ink-dim">4</span> min
-              </p>
-
-              <div className="mt-7 border-t border-border">
-                <div className="flex items-center gap-3 border-b border-border py-2 type-label text-ink-dimmer">
-                  <span className="w-[2px] shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1">Deck</span>
-                  <span className="w-14 text-right">Cards</span>
-                  <span className="w-12 text-right">Due</span>
-                  <span className="w-16 text-right">Mastery</span>
-                </div>
-
-                {SPECIMEN_DECKS.map((deck) => (
-                  <div key={deck.name} className="flex items-center gap-3 border-b border-border py-2.5">
-                    <span
-                      aria-hidden="true"
-                      className="h-4 w-[2px] shrink-0 rounded-[1px]"
-                      style={{ backgroundColor: deck.state }}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink">{deck.name}</span>
-                    <span className="w-14 text-right font-mono type-sm tnum text-ink-dim">
-                      {deck.cards}
-                    </span>
-                    <span
-                      className="w-12 text-right font-mono type-sm tnum"
-                      style={{ color: deck.due > 0 ? 'var(--state-due)' : 'var(--ink-dimmer)' }}
-                    >
-                      {deck.due}
-                    </span>
-                    <span className="w-16 text-right font-mono type-sm tnum text-ink-dim">
-                      {deck.mastery}%
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </FadeInUp>
       </div>
     </section>
   );

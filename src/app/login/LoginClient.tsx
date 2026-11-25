@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { PasswordStrength } from '@/components/ui/shared/PasswordStrength';
 import { Wordmark } from '@/components/ui/shared/Wordmark';
-import { AmbientField } from '@/components/ui/shared/AmbientField';
+import { LandingBackground } from '@/components/landing/LandingBackground';
 import { CornerBrackets } from '@/components/ui/CornerBrackets';
 import { login, signup, resetPassword, loginWithOAuth } from '@/app/auth/actions';
 import { checkLogin, checkResetPassword, checkSignup } from '@/lib/form-checks';
@@ -229,10 +229,11 @@ export default function LoginClient() {
 
   return (
     <div className="relative flex min-h-screen">
-      <AmbientField />
+      <LandingBackground />
 
       {/* ═══════════ Left panel (the product, at rest) ═══════════ */}
-      <aside className="relative z-[1] hidden w-[58%] flex-col justify-center px-12 lg:flex xl:px-[88px]">
+      
+      <aside className="relative z-[1] hidden w-[48%] shrink-0 flex-col justify-center px-12 lg:flex xl:w-[42%] xl:px-[88px]">
         <div className="w-full max-w-[470px]">
           <Wordmark href="/" size="lg" />
 
@@ -330,7 +331,7 @@ export default function LoginClient() {
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -8 }}
             transition={reduced ? { duration: 0 } : motionTransitions.panel}
-            className="panel w-full max-w-[420px] p-5 sm:p-8"
+            className="panel w-full max-w-[420px] sm:max-w-[800px] p-5 sm:p-8"
           >
             {/* ── Email sent confirmation ── */}
             {emailSent ? (
@@ -494,7 +495,16 @@ export default function LoginClient() {
                   )}
 
                   {/* Submit button */}
-                  <Button type="submit" variant="primary" className="w-full" disabled={isPending}>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    className="w-full border-[#B7410E]! bg-[#B7410E]! text-white! transition-all! duration-200 hover:border-[#C44C15]! hover:bg-[#C44C15]! hover:shadow-[0_6px_18px_rgba(183,65,14,0.30)] disabled:border-zinc-300! disabled:bg-zinc-300! disabled:text-zinc-700! disabled:opacity-100! dark:disabled:border-zinc-700! dark:disabled:bg-zinc-700! dark:disabled:text-zinc-200!"
+                    disabled={
+                      isPending ||
+                      !email.trim() ||
+                      (mode !== 'forgot' && !password)
+                    }
+                  >
                     {isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
