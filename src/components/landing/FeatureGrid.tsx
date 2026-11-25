@@ -56,13 +56,13 @@ function FeaturePreview({ index }: { index: number }) {
               <p className="truncate text-xs font-semibold text-ink">
                 Lecture_08.pdf
               </p>
-              <p className="mt-1 font-mono text-[10px] text-ink-dimmer">
+              <p className="mt-1 font-mono type-cap text-ink-dimmer">
                 PDF study material
               </p>
             </div>
           </div>
         </div>
-        <p className="font-mono text-[10px] text-ink-dim">
+        <p className="font-mono type-cap text-ink-dim">
           Generating study cards…
         </p>
         <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--border)]">
@@ -78,10 +78,10 @@ function FeaturePreview({ index }: { index: number }) {
         <div className="absolute inset-x-9 top-2 h-[100px] rotate-[-4deg] rounded-lg border border-[var(--border-strong)] bg-[var(--surface-raised)]" />
         <div className="absolute inset-x-6 top-4 h-[100px] rotate-[3deg] rounded-lg border border-[var(--border-strong)] bg-[var(--surface)]" />
         <div className="absolute inset-x-2 top-7 flex h-[100px] flex-col justify-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 shadow-sm">
-          <p className="font-mono text-[9px] uppercase tracking-wider text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Automata Theory · Sample card
           </p>
-          <p className="mt-2 font-serif text-lg leading-tight text-ink">
+          <p className="mt-2 font-serif type-display-sm leading-[1.05] text-ink">
             What makes a language regular?
           </p>
         </div>
@@ -96,7 +96,7 @@ function FeaturePreview({ index }: { index: number }) {
           <div className="absolute left-[12%] right-[12%] top-[30px] h-px bg-[var(--border-strong)]" />
           {['Now', '3d', '8d', '21d'].map((day, i) => (
             <div key={day} className="relative flex flex-col items-center gap-2.5">
-              <span className="font-mono text-[10px] text-ink-dim">
+              <span className="font-mono type-cap text-ink-dim">
                 {day}
               </span>
               <span
@@ -109,7 +109,7 @@ function FeaturePreview({ index }: { index: number }) {
             </div>
           ))}
         </div>
-        <p className="mt-5 text-center font-mono text-[10px] text-ink-dimmer">
+        <p className="mt-5 text-center font-mono type-cap text-ink-dimmer">
           Illustrative review intervals
         </p>
       </div>
@@ -172,7 +172,7 @@ function FeaturePreview({ index }: { index: number }) {
         <Kbd>⌘K</Kbd>
       </div>
       <div className="mt-2 rounded-md bg-[var(--surface-raised)] px-3 py-2 text-xs font-semibold text-ink">
-        Start today's review
+        Start today&apos;s review
       </div>
       <p className="px-3 pt-2 text-xs text-ink-dim">
         Open Automata Theory
@@ -228,7 +228,7 @@ export function FeatureGrid() {
                 {isWide ? (
                   <div className="grid gap-5 pt-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-8 lg:pt-0">
                     <div>
-                      <h3 className="font-serif text-xl leading-tight tracking-[-0.02em] text-ink">
+                      <h3 className="font-serif type-display-sm leading-tight tracking-[-0.02em] text-ink">
                         {feature.title}
                       </h3>
                       <p className="mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
@@ -253,7 +253,7 @@ export function FeatureGrid() {
                       <FeaturePreview index={i} />
                     </div>
                     <div className="mt-auto">
-                      <h3 className="font-serif text-xl leading-tight tracking-[-0.02em] text-ink">
+                      <h3 className="font-serif type-display-sm leading-tight tracking-[-0.02em] text-ink">
                         {feature.title}
                       </h3>
                       <p className="mt-2 text-sm leading-relaxed text-ink-dim">

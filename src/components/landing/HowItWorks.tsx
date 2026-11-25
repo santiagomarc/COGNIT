@@ -38,14 +38,14 @@ function StepPreview({ index }: { index: number }) {
               <p className="truncate text-xs font-semibold text-ink sm:text-sm">
                 Lecture_08.pdf
               </p>
-              <p className="mt-0.5 font-mono text-[10px] text-ink-dimmer">
+              <p className="mt-0.5 font-mono type-cap text-ink-dimmer">
                 Ready to upload
               </p>
             </div>
           </div>
           <div className="mt-3 flex items-center gap-2 border-t border-border pt-2.5">
             <FileText className="size-3.5 text-ink-dim" />
-            <span className="font-mono text-[10px] text-ink-dim">
+            <span className="font-mono type-cap text-ink-dim">
               PDF or pasted notes
             </span>
           </div>
@@ -60,10 +60,10 @@ function StepPreview({ index }: { index: number }) {
         <div className="absolute inset-x-7 top-2 h-[90px] rotate-[-5deg] rounded-md border border-border bg-[var(--surface)]" />
         <div className="absolute inset-x-4 top-4 h-[90px] rotate-[3deg] rounded-md border border-border bg-[var(--surface-raised)]" />
         <div className="absolute inset-x-1 top-7 flex h-[90px] flex-col justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-4 shadow-sm">
-          <p className="font-mono text-[9px] uppercase tracking-wider text-ink-dimmer">
+          <p className="type-label text-ink-dimmer">
             Sample flashcard
           </p>
-          <p className="mt-2 font-serif text-lg leading-tight text-ink">
+          <p className="mt-2 font-serif type-display-sm leading-[1.05] text-ink">
             What makes a language regular?
           </p>
         </div>
@@ -77,7 +77,7 @@ function StepPreview({ index }: { index: number }) {
         <div className="absolute left-[12%] right-[12%] top-[31px] h-px bg-[var(--border-strong)]" />
         {['Now', '3d', '8d', '21d'].map((day, i) => (
           <div key={day} className="relative flex flex-col items-center gap-2.5">
-            <span className="font-mono text-[10px] text-ink-dim">
+            <span className="font-mono type-cap text-ink-dim">
               {day}
             </span>
             <span
@@ -90,7 +90,7 @@ function StepPreview({ index }: { index: number }) {
           </div>
         ))}
       </div>
-      <p className="mt-5 text-center font-mono text-[10px] text-ink-dimmer">
+      <p className="mt-5 text-center font-mono type-cap text-ink-dimmer">
         Example review intervals
       </p>
     </div>
@@ -126,7 +126,7 @@ export function HowItWorks() {
             >
               <span
                 aria-hidden="true"
-                className="absolute right-5 top-4 font-serif text-[42px] leading-none text-[#B7410E] opacity-70"
+                className="absolute right-5 top-4 font-serif type-display leading-none text-[#B7410E] opacity-70"
               >
                 {step.number}
               </span>
@@ -139,7 +139,7 @@ export function HowItWorks() {
               </div>
 
               <div className="mt-auto">
-                <h3 className="font-serif text-xl leading-tight tracking-[-0.02em] text-ink">
+                <h3 className="font-serif type-display-sm leading-tight tracking-[-0.02em] text-ink">
                   {step.title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-ink-dim">

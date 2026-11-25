@@ -5,8 +5,6 @@ import { MotionProvider } from "@/components/MotionProvider";
 import { Toaster } from "sonner";
 import { THEME_BOOTSTRAP } from "@/lib/theme-script";
 import { SITE_URL } from "@/lib/site-url";
-// TypeScript may not have a declaration for Next.js's CSS side-effect import.
-// @ts-expect-error -- Next.js processes this stylesheet at build time.
 import "./globals.css";
 
 /*
